@@ -1,0 +1,59 @@
+# Güvenilir olmayan veya makineye özel sanal ortamlar
+.venv/
+.venv_broken/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Editör ve işletim sistemi
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Sırlar ve makineye özel ayarlar
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+credentials*.json
+secrets/
+
+# Büyük cache ve artifact'ler
+.cache/
+models/**
+adapters/**
+checkpoints/**
+
+# Büyük veya üretilmiş veri
+data/raw/**
+data/processed/**
+data/generated/**
+
+# Üretilmiş raporlar ve çalışma çıktıları
+reports/**
+runs/
+outputs/
+logs/
+
+# Dizin açıklamalarını/manifestlerini gerektiğinde sürümleyebilmek için
+!models/README.md
+!adapters/README.md
+!checkpoints/README.md
+!data/raw/README.md
+!data/processed/README.md
+!reports/README.md
+

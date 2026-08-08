@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kayra.local/schemas/run-result.schema.json",
+  "title": "Kayra evaluation run result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "case_id", "model", "runtime", "parameters",
+    "output", "rubric_scores", "latency_ms", "created_at", "success"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "run_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$" },
+    "case_id": { "type": "string", "pattern": "^eval-[a-z0-9][a-z0-9._-]{2,119}$" },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision", "artifact_sha256"],
+      "properties": {
+        "id": { "type": "string", "minLength": 2, "maxLength": 200 },
+        "revision": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "artifact_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "platform"],
+      "properties": {
+        "name": { "enum": ["lm_studio", "llama_cpp", "mock"] },
+        "version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "platform": { "type": "string", "minLength": 2, "maxLength": 100 }
+      }
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["context_length", "temperature"],
+      "properties": {
+        "context_length": { "type": "integer", "minimum": 512 },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 }
+      }
+    },
+    "output": { "type": "string", "maxLength": 131072 },
+    "rubric_scores": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion", "score", "judge"],
+        "properties": {
+          "criterion": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "judge": { "type": "string", "minLength": 2, "maxLength": 200 },
+          "notes": { "type": ["string", "null"], "maxLength": 2000 }
+        }
+      }
+    },
+    "latency_ms": { "type": "number", "minimum": 0 },
+    "prompt_tokens": { "type": ["integer", "null"], "minimum": 0 },
+    "completion_tokens": { "type": ["integer", "null"], "minimum": 0 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "success": { "type": "boolean" },
+    "error": { "type": ["string", "null"], "maxLength": 4000 }
+  }
+}
+

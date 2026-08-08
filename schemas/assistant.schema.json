@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kayra.local/schemas/assistant.schema.json",
+  "title": "Kayra assistant definition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "name",
+    "default_language",
+    "description",
+    "system_prompt",
+    "capabilities",
+    "limitations",
+    "modes",
+    "privacy",
+    "tool_policy",
+    "response_style",
+    "generation_defaults"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "default_language": { "enum": ["tr", "en"] },
+    "description": { "type": "string", "minLength": 20, "maxLength": 500 },
+    "system_prompt": { "type": "string", "minLength": 100, "maxLength": 8000 },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 2 }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 2 }
+    },
+    "modes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["thinking", "non_thinking"],
+      "properties": {
+        "thinking": { "$ref": "#/$defs/mode" },
+        "non_thinking": { "$ref": "#/$defs/mode" }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "embed_personal_data_in_weights",
+        "rag_enabled",
+        "retain_secrets",
+        "require_explicit_context_for_personal_claims"
+      ],
+      "properties": {
+        "embed_personal_data_in_weights": { "const": false },
+        "rag_enabled": { "type": "boolean" },
+        "retain_secrets": { "const": false },
+        "require_explicit_context_for_personal_claims": { "const": true }
+      }
+    },
+    "tool_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_only_observed_results",
+        "require_confirmation_for_destructive_actions",
+        "require_confirmation_for_external_side_effects"
+      ],
+      "properties": {
+        "claim_only_observed_results": { "const": true },
+        "require_confirmation_for_destructive_actions": { "const": true },
+        "require_confirmation_for_external_side_effects": { "const": true }
+      }
+    },
+    "response_style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concise_by_default", "acknowledge_uncertainty", "prefer_plain_language"],
+      "properties": {
+        "concise_by_default": { "type": "boolean" },
+        "acknowledge_uncertainty": { "const": true },
+        "prefer_plain_language": { "type": "boolean" }
+      }
+    },
+    "generation_defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context_length", "temperature", "top_p", "top_k"],
+      "properties": {
+        "context_length": { "type": "integer", "minimum": 512, "maximum": 32768 },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+        "top_p": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "top_k": { "type": "integer", "minimum": 0, "maximum": 200 }
+      }
+    }
+  },
+  "$defs": {
+    "mode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "use_for"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "use_for": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 2 }
+        }
+      }
+    }
+  }
+}
+

@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kayra.local/schemas/eval-case.schema.json",
+  "title": "Kayra evaluation case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "id", "language", "category", "difficulty", "mode",
+    "messages", "expected_behavior", "rubric", "tags", "max_output_tokens",
+    "privacy_sensitivity", "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "id": { "type": "string", "pattern": "^eval-[a-z0-9][a-z0-9._-]{2,119}$" },
+    "language": { "enum": ["tr", "en", "mixed"] },
+    "category": {
+      "enum": [
+        "turkish", "instruction_following", "reasoning", "coding",
+        "summarization", "honesty", "privacy", "safety", "format",
+        "rag_boundary", "persona"
+      ]
+    },
+    "difficulty": { "enum": ["easy", "medium", "hard"] },
+    "mode": { "enum": ["thinking", "non_thinking", "both"] },
+    "messages": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/prompt_message" }
+    },
+    "expected_behavior": { "type": "string", "minLength": 20, "maxLength": 3000 },
+    "reference_answer": { "type": ["string", "null"], "maxLength": 10000 },
+    "rubric": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/rubric_item" }
+    },
+    "tags": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+    },
+    "max_output_tokens": { "type": "integer", "minimum": 16, "maximum": 4096 },
+    "privacy_sensitivity": { "enum": ["none", "low", "high"] },
+    "provenance": { "$ref": "#/$defs/eval_provenance" }
+  },
+  "$defs": {
+    "prompt_message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "content"],
+      "properties": {
+        "role": { "enum": ["system", "user"] },
+        "content": { "type": "string", "minLength": 1, "maxLength": 32768 }
+      }
+    },
+    "rubric_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterion", "weight"],
+      "properties": {
+        "criterion": { "type": "string", "minLength": 10, "maxLength": 500 },
+        "weight": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "eval_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind", "generator", "generator_model", "human_reviewed",
+        "license", "created_at", "review_status"
+      ],
+      "properties": {
+        "kind": { "enum": ["human", "synthetic", "mixed"] },
+        "generator": { "type": ["string", "null"], "minLength": 2, "maxLength": 200 },
+        "generator_model": { "type": ["string", "null"], "minLength": 2, "maxLength": 200 },
+        "human_reviewed": { "type": "boolean" },
+        "license": { "type": "string", "minLength": 2, "maxLength": 128 },
+        "created_at": { "type": "string", "format": "date-time" },
+        "review_status": { "enum": ["draft/unreviewed", "reviewed", "locked"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "enum": ["synthetic", "mixed"] } } },
+          "then": {
+            "properties": {
+              "generator": { "type": "string", "minLength": 2 },
+              "generator_model": { "type": "string", "minLength": 2 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "human_reviewed": { "const": false } } },
+          "then": { "properties": { "review_status": { "const": "draft/unreviewed" } } }
+        },
+        {
+          "if": { "properties": { "review_status": { "enum": ["reviewed", "locked"] } } },
+          "then": { "properties": { "human_reviewed": { "const": true } } }
+        }
+      ]
+    }
+  }
+}

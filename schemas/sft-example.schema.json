@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kayra.local/schemas/sft-example.schema.json",
+  "title": "Kayra SFT example",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "split", "language", "category", "messages", "provenance", "content_sha256", "pii"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "id": { "$ref": "#/$defs/id" },
+    "split": { "enum": ["train", "validation"] },
+    "language": { "enum": ["tr", "en", "mixed"] },
+    "category": { "type": "string", "minLength": 2, "maxLength": 80 },
+    "messages": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 32,
+      "items": { "$ref": "#/$defs/message" }
+    },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "content_sha256": { "$ref": "#/$defs/sha256" },
+    "pii": { "$ref": "#/$defs/pii" },
+    "quality": { "$ref": "#/$defs/quality" },
+    "tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 40 }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "content"],
+      "properties": {
+        "role": { "enum": ["system", "user", "assistant"] },
+        "content": { "type": "string", "minLength": 1, "maxLength": 65536 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "source_id", "license", "created_at", "generator", "critic", "prompt_version"],
+      "properties": {
+        "kind": { "enum": ["human", "synthetic", "mixed"] },
+        "source_id": { "type": "string", "minLength": 2, "maxLength": 256 },
+        "license": { "type": "string", "minLength": 2, "maxLength": 128 },
+        "created_at": { "type": "string", "format": "date-time" },
+        "generator": { "type": ["string", "null"], "maxLength": 200 },
+        "critic": { "type": ["string", "null"], "maxLength": 200 },
+        "prompt_version": { "type": ["string", "null"], "maxLength": 80 }
+      }
+    },
+    "pii": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contains_personal_data", "reviewed"],
+      "properties": {
+        "contains_personal_data": { "const": false },
+        "reviewed": { "type": "boolean" },
+        "notes": { "type": ["string", "null"], "maxLength": 500 }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "scores"],
+      "properties": {
+        "status": { "enum": ["candidate", "accepted", "rejected"] },
+        "scores": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "notes": { "type": ["string", "null"], "maxLength": 1000 }
+      }
+    }
+  }
+}
+
