@@ -1,0 +1,206 @@
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from kayra_ai.runtime.config import (
+    ConfiguredModel,
+    ExecutionConfig,
+    LMStudioBackendConfig,
+    NetworkConfig,
+    PrivacyConfig,
+    ProfileConfig,
+    RuntimeConfig,
+    build_api_url,
+    load_runtime_config,
+    normalize_api_root,
+    resolve_backend_config,
+)
+from kayra_ai.runtime.errors import ConfigurationFailure, PrivacyPolicyFailure
+
+
+class RuntimeConfigTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.config = load_runtime_config(ROOT / "configs" / "runtime.yaml")
+
+    def remote_config(
+        self,
+        *,
+        allow_non_loopback: bool = False,
+        allowed_hosts: list[str] | None = None,
+    ) -> RuntimeConfig:
+        data = self.config.model_dump(mode="python")
+        data["active_backend"] = "lm_studio"
+        data["backends"]["lm_studio"]["enabled"] = True
+        data["network"]["allow_non_loopback"] = allow_non_loopback
+        if allowed_hosts is not None:
+            data["network"]["allowed_hosts"] = allowed_hosts
+        return RuntimeConfig.model_validate(data)
+
+    def test_repository_runtime_config_is_strict_and_mock_by_default(self) -> None:
+        self.assertEqual("mock", self.config.active_backend)
+        self.assertEqual(4096, self.config.execution.context_length)
+        self.assertEqual(1, self.config.execution.max_in_flight)
+        self.assertEqual(0, self.config.execution.retries)
+        self.assertFalse(self.config.privacy.log_prompts)
+
+    def test_unknown_yaml_field_is_rejected_without_echoing_value(self) -> None:
+        data = self.config.model_dump(mode="python")
+        data["private_canary"] = "DO-NOT-ECHO"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "runtime.yaml"
+            path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+            with self.assertRaises(ConfigurationFailure) as caught:
+                load_runtime_config(path)
+        self.assertNotIn("DO-NOT-ECHO", str(caught.exception))
+
+    def test_api_root_trailing_slashes_normalize_to_one_form(self) -> None:
+        expected = "http://localhost:1234/v1"
+        self.assertEqual(expected, normalize_api_root(expected))
+        self.assertEqual(expected, normalize_api_root(expected + "/"))
+        self.assertEqual(expected, normalize_api_root(expected + "///"))
+
+    def test_endpoint_join_never_duplicates_v1_or_slashes(self) -> None:
+        self.assertEqual(
+            "http://127.0.0.1:8080/v1/chat/completions",
+            build_api_url("http://127.0.0.1:8080/v1///", "/chat/completions/"),
+        )
+        with self.assertRaises(ConfigurationFailure):
+            build_api_url("http://127.0.0.1:8080/v1", "v1/models")
+        with self.assertRaises(ConfigurationFailure):
+            build_api_url("http://127.0.0.1:8080/v1", "chat//completions")
+        with self.assertRaises(ConfigurationFailure):
+            build_api_url("http://127.0.0.1:8080/v1", "embeddings")
+
+    def test_api_root_rejects_non_root_paths_and_unsafe_url_parts(self) -> None:
+        invalid = (
+            "http://localhost:1234",
+            "http://localhost:1234/v1/v1",
+            "http://localhost:1234/openai//v1",
+            "http://user:password@localhost:1234/v1",
+            "http://localhost:1234/v1?token=secret",
+            "http://localhost:1234/v1?",
+            "http://localhost:1234/v1#fragment",
+            "http://localhost:1234/v1#",
+        )
+        for value in invalid:
+            with self.subTest(value=value), self.assertRaises(ConfigurationFailure):
+                normalize_api_root(value)
+
+    def test_bind_addresses_are_never_connection_targets(self) -> None:
+        for value in ("http://0.0.0.0:1234/v1", "http://[::]:1234/v1"):
+            with self.subTest(value=value), self.assertRaises(PrivacyPolicyFailure):
+                normalize_api_root(value)
+
+    def test_optional_api_key_env_may_be_unset(self) -> None:
+        config = self.remote_config()
+        resolved = resolve_backend_config(
+            config,
+            environ={
+                "KAYRA_LM_STUDIO_BASE_URL": "http://localhost:1234/v1/",
+                "KAYRA_LM_STUDIO_MODEL": "local-model",
+            },
+        )
+        self.assertIsNone(resolved.api_key)
+
+    def test_optional_api_key_env_field_may_be_omitted(self) -> None:
+        data = self.remote_config().model_dump(mode="python")
+        data["backends"]["lm_studio"].pop("api_key_env")
+        config = RuntimeConfig.model_validate(data)
+        resolved = resolve_backend_config(
+            config,
+            environ={
+                "KAYRA_LM_STUDIO_BASE_URL": "http://localhost:1234/v1",
+                "KAYRA_LM_STUDIO_MODEL": "local-model",
+            },
+        )
+        self.assertIsNone(resolved.api_key)
+
+    def test_schema_and_models_agree_on_defaulted_optional_fields(self) -> None:
+        data = self.config.model_dump(mode="python")
+        data["backends"]["mock"]["model"].pop("artifact_sha256")
+        data["backends"]["lm_studio"].pop("enabled")
+        validated = RuntimeConfig.model_validate(data)
+        self.assertIsNone(validated.backends.mock.model.artifact_sha256)
+        self.assertFalse(validated.backends.lm_studio.enabled)
+
+        schema = json.loads(
+            (ROOT / "schemas" / "runtime-config.schema.json").read_text(encoding="utf-8")
+        )
+        mappings = (
+            (ExecutionConfig, "execution"),
+            (NetworkConfig, "network"),
+            (PrivacyConfig, "privacy"),
+            (ConfiguredModel, "model"),
+            (LMStudioBackendConfig, "remoteBackendBase"),
+            (ProfileConfig, "profile"),
+        )
+        for model, definition in mappings:
+            with self.subTest(model=model.__name__, definition=definition):
+                pydantic_required = {
+                    name for name, field in model.model_fields.items() if field.is_required()
+                }
+                schema_required = set(schema["$defs"][definition].get("required", []))
+                self.assertEqual(pydantic_required, schema_required)
+
+    def test_api_key_is_excluded_and_masked(self) -> None:
+        canary = "API-KEY-CANARY-83f10"
+        api_root_canary = "localhost:1234"
+        model_canary = "local-model"
+        config = self.remote_config()
+        resolved = resolve_backend_config(
+            config,
+            environ={
+                "KAYRA_LM_STUDIO_BASE_URL": "http://localhost:1234/v1",
+                "KAYRA_LM_STUDIO_MODEL": "local-model",
+                "KAYRA_LM_STUDIO_API_KEY": canary,
+            },
+        )
+        self.assertNotIn(canary, repr(resolved))
+        self.assertNotIn(canary, str(resolved.model_dump()))
+        self.assertNotIn(canary, resolved.model_dump_json())
+        self.assertNotIn("api_key", resolved.model_dump())
+        self.assertNotIn(api_root_canary, repr(resolved))
+        self.assertNotIn(model_canary, repr(resolved))
+        self.assertNotIn(api_root_canary, resolved.model_dump_json())
+        self.assertNotIn(model_canary, resolved.model_dump_json())
+        self.assertEqual({"kind": "lm_studio"}, resolved.model_dump())
+
+    def test_missing_required_env_is_safe_configuration_error(self) -> None:
+        config = self.remote_config()
+        with self.assertRaises(ConfigurationFailure) as caught:
+            resolve_backend_config(config, environ={})
+        self.assertIn("KAYRA_LM_STUDIO_BASE_URL", str(caught.exception))
+
+    def test_non_loopback_requires_flag_and_exact_allowlist(self) -> None:
+        environment = {
+            "KAYRA_LM_STUDIO_BASE_URL": "http://192.168.1.50:1234/v1",
+            "KAYRA_LM_STUDIO_MODEL": "local-model",
+        }
+        with self.assertRaises(PrivacyPolicyFailure):
+            resolve_backend_config(self.remote_config(), environ=environment)
+        with self.assertRaises(PrivacyPolicyFailure):
+            resolve_backend_config(
+                self.remote_config(allow_non_loopback=True, allowed_hosts=["localhost"]),
+                environ=environment,
+            )
+        resolved = resolve_backend_config(
+            self.remote_config(allow_non_loopback=True, allowed_hosts=["192.168.1.50"]),
+            environ=environment,
+        )
+        self.assertEqual("http://192.168.1.50:1234/v1", resolved.api_root)
+
+
+if __name__ == "__main__":
+    unittest.main()

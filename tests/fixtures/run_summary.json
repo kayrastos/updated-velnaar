@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "run_id": "stage1-mock-fixture",
+  "started_at": "2026-08-08T12:00:00+03:00",
+  "finished_at": "2026-08-08T12:00:01+03:00",
+  "duration_ms": 1000.0,
+  "model": {
+    "id": "kayra-mock",
+    "revision": "deterministic-v1",
+    "artifact_sha256": null
+  },
+  "runtime": {
+    "name": "mock",
+    "version": "1.0",
+    "platform": "offline-test"
+  },
+  "input_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "result_reference": {
+    "path": "results.jsonl",
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "record_count": 54
+  },
+  "distinct_case_count": 40,
+  "execution_count": 54,
+  "success_count": 54,
+  "failure_count": 0,
+  "skipped_count": 0,
+  "error_rate": 0.0,
+  "profiles": [
+    {
+      "profile": "thinking",
+      "execution_count": 29,
+      "success_count": 29,
+      "failure_count": 0,
+      "skipped_count": 0,
+      "error_rate": 0.0
+    },
+    {
+      "profile": "non_thinking",
+      "execution_count": 25,
+      "success_count": 25,
+      "failure_count": 0,
+      "skipped_count": 0,
+      "error_rate": 0.0
+    }
+  ],
+  "errors": [],
+  "semantic_scoring_performed": false,
+  "pipeline_warning": "Pipeline-only evaluation; results are not semantic quality scores or model benchmarks.",
+  "benchmark": null
+}

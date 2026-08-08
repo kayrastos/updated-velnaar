@@ -1,0 +1,63 @@
+schema_version: "1.0"
+assistant_config: configs/assistant.yaml
+active_backend: mock
+
+execution:
+  context_length: 4096
+  max_in_flight: 1
+  retries: 0
+  connect_timeout_seconds: 3
+  request_timeout_seconds: 180
+
+network:
+  allow_non_loopback: false
+  allowed_hosts:
+    - localhost
+    - 127.0.0.1
+    - "::1"
+  disable_environment_proxies: true
+  follow_redirects: false
+
+privacy:
+  log_prompts: false
+  log_responses: false
+  log_headers: false
+
+backends:
+  mock:
+    kind: mock
+    model:
+      id: kayra-mock
+      revision: deterministic-v1
+      artifact_sha256: null
+
+  lm_studio:
+    kind: lm_studio
+    enabled: false
+    base_url_env: KAYRA_LM_STUDIO_BASE_URL
+    model_id_env: KAYRA_LM_STUDIO_MODEL
+    model_revision_env: KAYRA_LM_STUDIO_MODEL_REVISION
+    api_key_env: KAYRA_LM_STUDIO_API_KEY
+
+  llama_cpp:
+    kind: llama_cpp
+    enabled: false
+    base_url_env: KAYRA_LLAMA_CPP_BASE_URL
+    model_id_env: KAYRA_LLAMA_CPP_MODEL
+    model_revision_env: KAYRA_LLAMA_CPP_MODEL_REVISION
+    api_key_env: KAYRA_LLAMA_CPP_API_KEY
+
+profiles:
+  thinking:
+    requested_mode: thinking
+    unsupported_capability: error
+    temperature: 0.6
+    top_p: 0.95
+    max_output_tokens: 512
+
+  non_thinking:
+    requested_mode: non_thinking
+    unsupported_capability: error
+    temperature: 0.6
+    top_p: 0.95
+    max_output_tokens: 512

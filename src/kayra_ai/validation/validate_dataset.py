@@ -38,7 +38,10 @@ def validate_dataset(path: Path, kind: str, check_hash: bool = True) -> int:
             )
             raise ValidationIssue(f"{path}:{line_number}: {details}") from exc
 
-        record_id = str(validated.id if hasattr(validated, "id") else validated.case_id)
+        if kind == "run-result":
+            record_id = str(validated.result_id)
+        else:
+            record_id = str(validated.id)
         if record_id in seen_ids:
             raise ValidationIssue(
                 f"{path}:{line_number}: yinelenen id {record_id!r}; ilk satır {seen_ids[record_id]}"
@@ -84,4 +87,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

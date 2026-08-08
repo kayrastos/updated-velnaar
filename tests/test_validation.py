@@ -24,7 +24,18 @@ from kayra_ai.validation.validate_jsonl import validate_jsonl
 class SchemaTests(unittest.TestCase):
     def test_all_json_schemas_parse(self) -> None:
         schema_paths = sorted((ROOT / "schemas").glob("*.schema.json"))
-        self.assertEqual(5, len(schema_paths))
+        self.assertEqual(
+            {
+                "assistant.schema.json",
+                "eval-case.schema.json",
+                "preference-example.schema.json",
+                "run-result.schema.json",
+                "run-summary.schema.json",
+                "runtime-config.schema.json",
+                "sft-example.schema.json",
+            },
+            {path.name for path in schema_paths},
+        )
         for path in schema_paths:
             with self.subTest(path=path.name), path.open("r", encoding="utf-8") as handle:
                 value = json.load(handle)

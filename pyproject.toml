@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kayra-ai"
 version = "0.1.0"
-description = "Kayra AI veri sözleşmeleri ve çevrimdışı doğrulama araçları"
+description = "Kayra AI modelden bağımsız yerel çalışma zamanı ve değerlendirme altyapısı"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -17,6 +17,8 @@ dependencies = [
 kayra-validate = "kayra_ai.validation.validate_dataset:main"
 kayra-check-pii = "kayra_ai.validation.check_pii:main"
 kayra-check-overlap = "kayra_ai.validation.check_overlap:main"
+kayra-runtime-preflight = "kayra_ai.runtime.preflight:main"
+kayra-eval = "kayra_ai.evaluation.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

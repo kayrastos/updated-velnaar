@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kayra.local/schemas/runtime-config.schema.json",
+  "title": "Kayra runtime configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "assistant_config",
+    "active_backend",
+    "execution",
+    "network",
+    "privacy",
+    "backends",
+    "profiles"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "assistant_config": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "active_backend": { "enum": ["mock", "lm_studio", "llama_cpp"] },
+    "execution": { "$ref": "#/$defs/execution" },
+    "network": { "$ref": "#/$defs/network" },
+    "privacy": { "$ref": "#/$defs/privacy" },
+    "backends": { "$ref": "#/$defs/backends" },
+    "profiles": { "$ref": "#/$defs/profiles" }
+  },
+  "$defs": {
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context_length": { "type": "integer", "minimum": 512, "maximum": 131072 },
+        "max_in_flight": { "const": 1 },
+        "retries": { "const": 0 },
+        "connect_timeout_seconds": { "type": "number", "exclusiveMinimum": 0, "maximum": 60 },
+        "request_timeout_seconds": { "type": "number", "exclusiveMinimum": 0, "maximum": 3600 }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow_non_loopback": { "type": "boolean" },
+        "allowed_hosts": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "disable_environment_proxies": { "const": true },
+        "follow_redirects": { "const": false }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "log_prompts": { "const": false },
+        "log_responses": { "const": false },
+        "log_headers": { "const": false }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision"],
+      "properties": {
+        "id": { "type": "string", "minLength": 2, "maxLength": 200 },
+        "revision": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "artifact_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "envName": {
+      "type": "string",
+      "pattern": "^[A-Z_][A-Z0-9_]*$"
+    },
+    "remoteBackendBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "base_url_env", "model_id_env"],
+      "properties": {
+        "kind": { "enum": ["lm_studio", "llama_cpp"] },
+        "enabled": { "type": "boolean" },
+        "base_url_env": {
+          "$ref": "#/$defs/envName",
+          "description": "Environment variable containing an OpenAI API root ending in /v1; trailing slashes are normalized."
+        },
+        "model_id_env": { "$ref": "#/$defs/envName" },
+        "model_revision_env": {
+          "oneOf": [
+            { "$ref": "#/$defs/envName" },
+            { "type": "null" }
+          ]
+        },
+        "api_key_env": {
+          "oneOf": [
+            { "$ref": "#/$defs/envName" },
+            { "type": "null" }
+          ],
+          "description": "Optional. An unset variable means no Authorization header is sent."
+        }
+      }
+    },
+    "backends": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mock", "lm_studio", "llama_cpp"],
+      "properties": {
+        "mock": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "model"],
+          "properties": {
+            "kind": { "const": "mock" },
+            "model": { "$ref": "#/$defs/model" }
+          }
+        },
+        "lm_studio": {
+          "allOf": [
+            { "$ref": "#/$defs/remoteBackendBase" },
+            { "properties": { "kind": { "const": "lm_studio" } } }
+          ]
+        },
+        "llama_cpp": {
+          "allOf": [
+            { "$ref": "#/$defs/remoteBackendBase" },
+            { "properties": { "kind": { "const": "llama_cpp" } } }
+          ]
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requested_mode"],
+      "properties": {
+        "requested_mode": { "enum": ["thinking", "non_thinking"] },
+        "unsupported_capability": { "enum": ["error", "backend_default"] },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+        "top_p": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "max_output_tokens": { "type": "integer", "minimum": 1, "maximum": 4096 }
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["thinking", "non_thinking"],
+      "properties": {
+        "thinking": {
+          "allOf": [
+            { "$ref": "#/$defs/profile" },
+            { "properties": { "requested_mode": { "const": "thinking" } } }
+          ]
+        },
+        "non_thinking": {
+          "allOf": [
+            { "$ref": "#/$defs/profile" },
+            { "properties": { "requested_mode": { "const": "non_thinking" } } }
+          ]
+        }
+      }
+    }
+  }
+}
