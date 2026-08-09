@@ -69,6 +69,15 @@ class MockBackendConfig(StrictModel):
     model: ConfiguredModel
 
 
+class LMStudioNativeV1Config(StrictModel):
+    model_format: Literal["gguf"]
+    quantization: Literal["Q4_K_M"]
+    size_bytes: Literal[9001752960]
+    context_length: Literal[4096]
+    parallel: Literal[1]
+    offload_kv_cache_to_gpu: Literal[False]
+
+
 class LMStudioBackendConfig(StrictModel):
     kind: Literal["lm_studio"]
     enabled: bool = False
@@ -76,6 +85,22 @@ class LMStudioBackendConfig(StrictModel):
     model_id_env: str = Field(pattern=ENV_NAME_PATTERN)
     model_revision_env: str | None = Field(default=None, pattern=ENV_NAME_PATTERN)
     api_key_env: str | None = Field(default=None, pattern=ENV_NAME_PATTERN)
+    api_mode: Literal["openai_compatible", "native_v1"] = "openai_compatible"
+    model_manifest: Literal["configs/models/qwen3-14b-q4_k_m.yaml"] | None = None
+    native_v1: LMStudioNativeV1Config | None = None
+
+    @model_validator(mode="after")
+    def native_configuration_is_complete(self) -> "LMStudioBackendConfig":
+        if self.api_mode == "native_v1":
+            if self.model_manifest is None:
+                raise ValueError("native_v1 LM Studio backend için model_manifest gerekli")
+            if self.native_v1 is None:
+                raise ValueError("native_v1 LM Studio backend için native_v1 beklentileri gerekli")
+        elif self.native_v1 is not None or self.model_manifest is not None:
+            raise ValueError(
+                "model manifest ve native_v1 beklentileri yalnız api_mode=native_v1 ile kullanılabilir"
+            )
+        return self
 
 
 class LlamaCppBackendConfig(StrictModel):
@@ -85,6 +110,9 @@ class LlamaCppBackendConfig(StrictModel):
     model_id_env: str = Field(pattern=ENV_NAME_PATTERN)
     model_revision_env: str | None = Field(default=None, pattern=ENV_NAME_PATTERN)
     api_key_env: str | None = Field(default=None, pattern=ENV_NAME_PATTERN)
+    api_mode: Literal["openai_compatible"] = "openai_compatible"
+    model_manifest: None = None
+    native_v1: None = None
 
 
 RemoteBackendConfig = Annotated[
@@ -150,6 +178,22 @@ class RuntimeConfig(StrictModel):
     backends: BackendConfigs
     profiles: ProfilesConfig
 
+    @model_validator(mode="after")
+    def native_lm_studio_profile_is_fail_closed(self) -> "RuntimeConfig":
+        backend = self.backends.lm_studio
+        if backend.api_mode != "native_v1":
+            return self
+        if self.execution.context_length != 4096:
+            raise ValueError("LM Studio native v1 context_length tam olarak 4096 olmalı")
+        if self.network.allow_non_loopback or self.network.allowed_hosts != ["127.0.0.1"]:
+            raise ValueError("LM Studio native v1 yalnız 127.0.0.1 hedefini kullanmalı")
+        if any(
+            profile.unsupported_capability != "error"
+            for profile in (self.profiles.thinking, self.profiles.non_thinking)
+        ):
+            raise ValueError("LM Studio native v1 profil fallback kullanamaz")
+        return self
+
 
 class ResolvedBackendConfig(StrictModel):
     kind: Literal["lm_studio", "llama_cpp"]
@@ -157,6 +201,11 @@ class ResolvedBackendConfig(StrictModel):
     model_id: str = Field(min_length=1, max_length=200, exclude=True, repr=False)
     model_revision: str | None = Field(default=None, max_length=200, exclude=True, repr=False)
     api_key: SecretStr | None = Field(default=None, exclude=True, repr=False)
+    api_mode: Literal["openai_compatible", "native_v1"] = Field(
+        default="openai_compatible", exclude=True, repr=False
+    )
+    model_manifest: str | None = Field(default=None, exclude=True, repr=False)
+    native_v1: LMStudioNativeV1Config | None = Field(default=None, exclude=True, repr=False)
 
 
 def _validation_message(exc: ValidationError) -> str:
@@ -220,11 +269,52 @@ def normalize_api_root(value: str) -> str:
     return urlunsplit((parsed.scheme.lower(), netloc, "/v1", "", ""))
 
 
+def normalize_lm_studio_native_api_root(value: str) -> str:
+    """Validate and normalize an LM Studio native API root ending in /api/v1."""
+
+    if "?" in value or "#" in value:
+        raise ConfigurationFailure("LM Studio native API kökü query veya fragment içeremez.")
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except (TypeError, ValueError):
+        raise ConfigurationFailure("LM Studio native API kökü geçersiz.") from None
+    if parsed.scheme.lower() not in {"http", "https"}:
+        raise ConfigurationFailure("LM Studio native API kökü http veya https kullanmalı.")
+    if not parsed.hostname:
+        raise ConfigurationFailure("LM Studio native API kökünde host gerekli.")
+    if parsed.username is not None or parsed.password is not None:
+        raise ConfigurationFailure("LM Studio native API kökü userinfo içeremez.")
+    if parsed.query or parsed.fragment:
+        raise ConfigurationFailure("LM Studio native API kökü query veya fragment içeremez.")
+    path = parsed.path.rstrip("/")
+    if "//" in path:
+        raise ConfigurationFailure("LM Studio native API kökü çift eğik çizgi içeremez.")
+    if path != "/api/v1":
+        raise ConfigurationFailure("LM Studio native API kökü tam olarak /api/v1 yolunu göstermeli.")
+
+    host = parsed.hostname.lower()
+    if host != "127.0.0.1":
+        raise PrivacyPolicyFailure("LM Studio native v1 yalnız 127.0.0.1 hedefine bağlanabilir.")
+
+    host_text = f"[{host}]" if ":" in host else host
+    netloc = f"{host_text}:{port}" if port is not None else host_text
+    return urlunsplit((parsed.scheme.lower(), netloc, "/api/v1", "", ""))
+
+
 def build_api_url(api_root: str, endpoint: str) -> str:
     root = normalize_api_root(api_root)
     relative = endpoint.strip("/")
     if relative not in {"models", "chat/completions"}:
         raise ConfigurationFailure("Yalnız models ve chat/completions endpoint'leri desteklenir.")
+    return f"{root}/{relative}"
+
+
+def build_lm_studio_native_api_url(api_root: str, endpoint: str) -> str:
+    root = normalize_lm_studio_native_api_root(api_root)
+    relative = endpoint.strip("/")
+    if relative not in {"models", "chat"}:
+        raise ConfigurationFailure("Yalnız LM Studio native models ve chat endpoint'leri desteklenir.")
     return f"{root}/{relative}"
 
 
@@ -272,7 +362,12 @@ def resolve_backend_config(
         raise ConfigurationFailure(f"Gerekli ortam değişkeni tanımlı değil: {backend.base_url_env}.")
     if not raw_model_id:
         raise ConfigurationFailure(f"Gerekli ortam değişkeni tanımlı değil: {backend.model_id_env}.")
-    api_root = normalize_api_root(raw_api_root)
+    api_mode = backend.api_mode if isinstance(backend, LMStudioBackendConfig) else "openai_compatible"
+    api_root = (
+        normalize_lm_studio_native_api_root(raw_api_root)
+        if api_mode == "native_v1"
+        else normalize_api_root(raw_api_root)
+    )
     enforce_network_policy(api_root, config.network)
 
     model_revision = values.get(backend.model_revision_env) if backend.model_revision_env else None
@@ -285,6 +380,9 @@ def resolve_backend_config(
             model_id=raw_model_id,
             model_revision=model_revision or None,
             api_key=api_key,
+            api_mode=api_mode,
+            model_manifest=backend.model_manifest if isinstance(backend, LMStudioBackendConfig) else None,
+            native_v1=backend.native_v1 if isinstance(backend, LMStudioBackendConfig) else None,
         )
     except ValidationError:
         raise ConfigurationFailure("Çözümlenen backend yapılandırması geçersiz.") from None

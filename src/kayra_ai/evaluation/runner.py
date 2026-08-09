@@ -16,15 +16,22 @@ from pydantic import ValidationError
 from kayra_ai.runtime import ChatMessage, GenerationRequest, GenerationSettings, build_backend
 from kayra_ai.runtime.backends.base import Backend
 from kayra_ai.runtime.config import (
+    LMStudioBackendConfig,
     MockBackendConfig,
     RuntimeConfig,
     load_runtime_config,
+    normalize_lm_studio_native_api_root,
     normalize_api_root,
 )
-from kayra_ai.runtime.contracts import ProfileName
+from kayra_ai.runtime.contracts import GenerationResponse, ProfileExecutionState, ProfileName
 from kayra_ai.runtime.errors import MalformedResponseFailure, PrivacyPolicyFailure, RuntimeFailure
 from kayra_ai.runtime.http_transport import TransportFactory
 from kayra_ai.validation.common import ValidationIssue, iter_jsonl
+from kayra_ai.validation.model_artifact import (
+    ModelArtifact,
+    ModelArtifactValidationError,
+    load_model_artifact,
+)
 from kayra_ai.validation.models import (
     BackendErrorInfo,
     ErrorSummary,
@@ -55,6 +62,16 @@ BackendFactory = Callable[..., Backend]
 NowFactory = Callable[[], datetime]
 Clock = Callable[[], float]
 
+_STAGE2_ARTIFACT_ID = "qwen3-14b-q4-k-m"
+_STAGE2_ARTIFACT_REPOSITORY = "Qwen/Qwen3-14B-GGUF"
+_STAGE2_ARTIFACT_COMMIT = "c75e7b2d0234068f674a1bacf548ea32e27ccd29"
+_STAGE2_ARTIFACT_LICENSE = "Apache-2.0"
+_STAGE2_ARTIFACT_FILENAME = "Qwen3-14B-Q4_K_M.gguf"
+_STAGE2_ARTIFACT_SHA256 = (
+    "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0"
+)
+_STAGE2_SMOKE_SHA256 = "605ecf339774b5130c9214fbaa126202f2f91b20327092f3d44cb9df8111751d"
+
 
 class EvaluationFailure(ValueError):
     """A safe evaluation-level error suitable for the CLI."""
@@ -74,8 +91,14 @@ def _file_bytes(path: Path, description: str) -> bytes:
         raise EvaluationFailure(f"{description} okunamadı.") from None
 
 
-def _config_digest(runtime_bytes: bytes, assistant_bytes: bytes) -> str:
+def _config_digest(
+    runtime_bytes: bytes,
+    assistant_bytes: bytes,
+    model_manifest_bytes: bytes | None,
+) -> str:
     payload = b"kayra-runtime\0" + runtime_bytes + b"\0kayra-assistant\0" + assistant_bytes
+    if model_manifest_bytes is not None:
+        payload += b"\0kayra-model-manifest\0" + model_manifest_bytes
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -110,13 +133,39 @@ def expand_case_profiles(
     return executions
 
 
+def _prioritize_native_profile_probe(
+    cases: list[EvalCase],
+    executions: list[tuple[EvalCase, ProfileName]],
+    selection: ProfileSelection,
+) -> list[tuple[EvalCase, ProfileName]]:
+    """Put one existing both-mode case first as an on/off fail-closed gate."""
+
+    if selection != "all":
+        raise EvaluationFailure(
+            "LM Studio native v1 değerlendirmesi eşleştirilmiş iki profili gerektirir."
+        )
+    probe_case = next((case for case in cases if case.mode == "both"), None)
+    if probe_case is None:
+        raise EvaluationFailure(
+            "LM Studio native v1 için both modunda profil probu vakası gerekli."
+        )
+    probe = [(probe_case, "thinking"), (probe_case, "non_thinking")]
+    remaining = [item for item in executions if item[0].id != probe_case.id]
+    return [*probe, *remaining]
+
+
 def _result_id(run_id: str, case_id: str, profile: ProfileName, attempt: int) -> str:
     material = f"{run_id}\0{case_id}\0{profile}\0{attempt}".encode("utf-8")
     return f"result-{hashlib.sha256(material).hexdigest()[:32]}"
 
 
-def _model_identity(config: RuntimeConfig, backend: Backend, backend_name: str) -> ModelIdentity:
-    artifact_sha256 = None
+def _model_identity(
+    config: RuntimeConfig,
+    backend: Backend,
+    backend_name: str,
+    model_artifact: ModelArtifact | None,
+) -> ModelIdentity:
+    artifact_sha256 = model_artifact.files[0].sha256 if model_artifact is not None else None
     configured = config.backends.get(backend_name)
     if isinstance(configured, MockBackendConfig):
         artifact_sha256 = configured.model.artifact_sha256
@@ -175,8 +224,52 @@ def _resolved_runtime_values(
     resolved = [values.get(name) for name in names if name]
     raw_api_root = values.get(configured.base_url_env)
     if raw_api_root:
-        resolved.append(normalize_api_root(raw_api_root))
+        normalizer = (
+            normalize_lm_studio_native_api_root
+            if isinstance(configured, LMStudioBackendConfig)
+            and configured.api_mode == "native_v1"
+            else normalize_api_root
+        )
+        resolved.append(normalizer(raw_api_root))
     return tuple(dict.fromkeys(value for value in resolved if value))
+
+
+def _selected_model_artifact(
+    *,
+    config: RuntimeConfig,
+    backend_name: str,
+) -> tuple[ModelArtifact | None, bytes | None]:
+    configured = config.backends.get(backend_name)
+    if not isinstance(configured, LMStudioBackendConfig) or configured.api_mode != "native_v1":
+        return None, None
+    if configured.model_manifest is None or configured.native_v1 is None:
+        raise EvaluationFailure("LM Studio native v1 model manifest yapılandırması eksik.")
+
+    manifest_path = Path(configured.model_manifest)
+    try:
+        artifact = load_model_artifact(manifest_path)
+    except ModelArtifactValidationError as exc:
+        raise EvaluationFailure(f"Model artifact manifesti geçersiz: {exc}") from None
+    manifest_bytes = _file_bytes(manifest_path, "Model artifact manifesti")
+    artifact_file = artifact.files[0]
+    expected = configured.native_v1
+    if (
+        artifact.id != _STAGE2_ARTIFACT_ID
+        or artifact.repository != _STAGE2_ARTIFACT_REPOSITORY
+        or artifact.commit != _STAGE2_ARTIFACT_COMMIT
+        or artifact.license != _STAGE2_ARTIFACT_LICENSE
+        or artifact_file.filename != _STAGE2_ARTIFACT_FILENAME
+        or artifact_file.sha256 != _STAGE2_ARTIFACT_SHA256
+        or artifact.schema_version != "1.0"
+        or artifact.format.casefold() != expected.model_format
+        or artifact.quantization != expected.quantization
+        or artifact_file.size_bytes != expected.size_bytes
+        or artifact.context_length != expected.context_length
+    ):
+        raise EvaluationFailure(
+            "Runtime native v1 beklentileri model artifact manifestiyle uyuşmuyor."
+        )
+    return artifact, manifest_bytes
 
 
 def _mode_resolution(
@@ -184,18 +277,105 @@ def _mode_resolution(
     config: RuntimeConfig,
     backend: Backend,
     profile: ProfileName,
-    effective_profile: str | None,
+    response: GenerationResponse | None,
 ) -> ModeResolution:
-    status = backend.capabilities.status_for_profile(profile)
+    capabilities = backend.capabilities
+    status = capabilities.status_for_profile(profile)
+    capability_source = capabilities.source
+    native_lm_studio = (
+        backend.runtime_name == "lm_studio"
+        and config.backends.lm_studio.api_mode == "native_v1"
+    )
+    if response is None:
+        advertised_options = capabilities.advertised_reasoning_options
+        return ModeResolution(
+            capability_status=status,
+            effective_profile="unknown",
+            fallback_used=False,
+            requested_reasoning=None,
+            advertised_reasoning_options=(
+                list(advertised_options) if advertised_options is not None else None
+            ),
+            advertised_reasoning_default=capabilities.advertised_reasoning_default,
+            observed_reasoning_output="unknown",
+            resolved_reasoning_state=None,
+            verification_status="unknown",
+            evidence_source=(
+                "lm_studio_native_v1_models"
+                if capability_source == "lm_studio_native_v1_models"
+                else "unverified"
+            ),
+        )
+
+    profile_state: ProfileExecutionState | None = response.profile_state
+    if profile_state is not None:
+        expected_reasoning = "on" if profile == "thinking" else "off"
+        expected_observation = "present" if profile == "thinking" else "absent"
+        if (
+            profile_state.requested_profile != profile
+            or profile_state.capability_status != status
+            or profile_state.requested_reasoning != expected_reasoning
+            or profile_state.observed_reasoning_output != expected_observation
+            or profile_state.resolved_reasoning_state != "unknown"
+            or profile_state.verification_status != "behaviorally_consistent"
+            or profile_state.source != "lm_studio_native_v1_response"
+            or profile_state.advertised_reasoning_options
+            != capabilities.advertised_reasoning_options
+            or profile_state.advertised_reasoning_default
+            != capabilities.advertised_reasoning_default
+            or response.effective_profile != "unknown"
+            or not native_lm_studio
+            or capability_source != "lm_studio_native_v1_models"
+        ):
+            raise MalformedResponseFailure(
+                "LM Studio native v1 profil kanıtı istenen profille uyuşmuyor."
+            )
+        return ModeResolution(
+            capability_status=status,
+            effective_profile="unknown",
+            fallback_used=False,
+            requested_reasoning=profile_state.requested_reasoning,
+            advertised_reasoning_options=list(profile_state.advertised_reasoning_options),
+            advertised_reasoning_default=profile_state.advertised_reasoning_default,
+            observed_reasoning_output=profile_state.observed_reasoning_output,
+            resolved_reasoning_state="unknown",
+            verification_status="behaviorally_consistent",
+            evidence_source="lm_studio_native_v1_response",
+        )
+
+    if native_lm_studio:
+        raise MalformedResponseFailure(
+            "LM Studio native v1 yanıtı profil yürütme kanıtı içermiyor."
+        )
+
+    effective_profile = response.effective_profile
     fallback = effective_profile == "backend_default"
-    if effective_profile is None:
-        policy = config.profiles.get(profile).unsupported_capability
-        fallback = status != "supported" and policy == "backend_default"
-        effective_profile = "backend_default" if fallback else (profile if status == "supported" else "unknown")
+    if fallback:
+        return ModeResolution(
+            capability_status=status,
+            effective_profile="backend_default",
+            fallback_used=True,
+            requested_reasoning=None,
+            advertised_reasoning_options=None,
+            advertised_reasoning_default=None,
+            observed_reasoning_output="unknown",
+            resolved_reasoning_state=None,
+            verification_status="fallback",
+            evidence_source="unverified",
+        )
+    if status != "supported" or effective_profile != profile:
+        raise MalformedResponseFailure("Backend profil çözümü doğrulanamadı.")
     return ModeResolution(
         capability_status=status,
         effective_profile=effective_profile,
-        fallback_used=fallback,
+        fallback_used=False,
+        requested_reasoning=None,
+        advertised_reasoning_options=None,
+        advertised_reasoning_default=None,
+        observed_reasoning_output="unknown",
+        resolved_reasoning_state=None,
+        verification_status="static_verified",
+        evidence_source="static_backend",
     )
 
 
@@ -219,7 +399,7 @@ def _successful_result(
     case: EvalCase,
     profile: ProfileName,
     request: GenerationRequest,
-    response,
+    response: GenerationResponse,
     config: RuntimeConfig,
     backend: Backend,
     model: ModelIdentity,
@@ -241,20 +421,21 @@ def _successful_result(
             "Yanıt, çözümlenmiş runtime yapılandırma değeri içerdiği için saklanmadı."
         )
     content_sha256 = hashlib.sha256(response.content.encode("utf-8")).hexdigest()
-    has_usage = any(
+    usage_source = response.usage.source
+    if usage_source == "client_measured":
+        raise MalformedResponseFailure("Token kullanımı istemci ölçümü olarak raporlanamaz.")
+    if usage_source == "unavailable" and any(
         value is not None
         for value in (
             response.usage.prompt_tokens,
             response.usage.completion_tokens,
             response.usage.total_tokens,
+            response.usage.reasoning_tokens,
         )
-    )
-    usage_source = "mock_deterministic" if runtime.name == "mock" and has_usage else (
-        "backend_reported" if has_usage else "unavailable"
-    )
-    timing_source = "mock_deterministic" if runtime.name == "mock" else "measured"
+    ):
+        raise MalformedResponseFailure("Token kullanımı kaynağı ve değerleri tutarsız.")
     return RunResult(
-        schema_version="2.0",
+        schema_version="2.1",
         run_id=run_id,
         result_id=_result_id(run_id, case.id, profile, 1),
         case_id=case.id,
@@ -267,7 +448,7 @@ def _successful_result(
             config=config,
             backend=backend,
             profile=profile,
-            effective_profile=response.effective_profile,
+            response=response,
         ),
         response=ResponseArtifact(
             retention="evaluation_artifact",
@@ -280,13 +461,19 @@ def _successful_result(
             prompt_tokens=response.usage.prompt_tokens,
             completion_tokens=response.usage.completion_tokens,
             total_tokens=response.usage.total_tokens,
+            reasoning_tokens=response.usage.reasoning_tokens,
         ),
         timing=TimingMetrics(
-            source=timing_source,
             first_token_ms=response.timing.ttft_ms,
+            first_token_ms_source=response.timing.ttft_ms_source,
             generation_ms=None,
+            generation_ms_source="unavailable",
             total_ms=response.timing.total_ms,
-            tokens_per_second=None,
+            total_ms_source=response.timing.total_ms_source,
+            tokens_per_second=response.timing.tokens_per_second,
+            tokens_per_second_source=response.timing.tokens_per_second_source,
+            model_load_ms=response.timing.model_load_ms,
+            model_load_ms_source=response.timing.model_load_ms_source,
         ),
         evaluation=EvaluationOutcome(
             kind="pipeline_only",
@@ -332,7 +519,7 @@ def _failed_result(
             http_status=failure.info.status_code,
         )
     return RunResult(
-        schema_version="2.0",
+        schema_version="2.1",
         run_id=run_id,
         result_id=_result_id(run_id, case.id, profile, 1),
         case_id=case.id,
@@ -345,7 +532,7 @@ def _failed_result(
             config=config,
             backend=backend,
             profile=profile,
-            effective_profile=None,
+            response=None,
         ),
         response=ResponseArtifact(
             retention="not_retained",
@@ -358,13 +545,19 @@ def _failed_result(
             prompt_tokens=None,
             completion_tokens=None,
             total_tokens=None,
+            reasoning_tokens=None,
         ),
         timing=TimingMetrics(
-            source="measured",
             first_token_ms=None,
+            first_token_ms_source="unavailable",
             generation_ms=None,
+            generation_ms_source="unavailable",
             total_ms=elapsed_ms,
+            total_ms_source="client_measured",
             tokens_per_second=None,
+            tokens_per_second_source="unavailable",
+            model_load_ms=None,
+            model_load_ms_source="unavailable",
         ),
         evaluation=EvaluationOutcome(
             kind="pipeline_only",
@@ -412,6 +605,7 @@ def run_evaluation(
     backend_factory: BackendFactory = build_backend,
     clock: Clock = time.monotonic,
     now: NowFactory = lambda: datetime.now().astimezone(),
+    allow_native_non_smoke_eval: bool = False,
 ) -> EvaluationRun:
     if re.fullmatch(ID_PATTERN, run_id) is None:
         raise EvaluationFailure("Run kimliği geçersiz.")
@@ -420,7 +614,13 @@ def run_evaluation(
 
     runtime_bytes = _file_bytes(config_path, "Runtime yapılandırması")
     input_bytes = _file_bytes(eval_path, "Eval dosyası")
+    input_sha256 = sha256_bytes(input_bytes)
     config = load_runtime_config(config_path)
+    selected_backend = backend_name or config.active_backend
+    model_artifact, model_manifest_bytes = _selected_model_artifact(
+        config=config,
+        backend_name=selected_backend,
+    )
 
     assistant_path = Path(config.assistant_config)
     assistant_bytes = _file_bytes(assistant_path, "Asistan yapılandırması")
@@ -433,12 +633,27 @@ def run_evaluation(
     executions = expand_case_profiles(cases, profiles)
     if not executions:
         raise EvaluationFailure("Seçilen profil için eval yürütmesi bulunamadı.")
+    configured_backend = config.backends.get(selected_backend)
+    native_lm_studio = (
+        isinstance(configured_backend, LMStudioBackendConfig)
+        and configured_backend.api_mode == "native_v1"
+    )
+    if allow_native_non_smoke_eval and not native_lm_studio:
+        raise EvaluationFailure(
+            "Native non-smoke eval izni yalnız LM Studio native v1 için kullanılabilir."
+        )
+    if native_lm_studio:
+        if not allow_native_non_smoke_eval and input_sha256 != _STAGE2_SMOKE_SHA256:
+            raise EvaluationFailure(
+                "LM Studio native v1 varsayılan olarak yalnız sabit Aşama 2 smoke setini çalıştırır; "
+                "non-smoke eval ayrıca G-FULL ve açık CLI interlock'u gerektirir."
+            )
+        executions = _prioritize_native_profile_probe(cases, executions, profiles)
 
     run_directory = output_root / run_id
     if run_directory.exists():
         raise OutputCollisionError(f"Koşu dizini zaten var: {run_id}")
 
-    selected_backend = backend_name or config.active_backend
     backend = backend_factory(
         config,
         selected_backend,
@@ -448,9 +663,8 @@ def run_evaluation(
     )
     backend.preflight()
 
-    input_sha256 = sha256_bytes(input_bytes)
-    config_sha256 = _config_digest(runtime_bytes, assistant_bytes)
-    model = _model_identity(config, backend, selected_backend)
+    config_sha256 = _config_digest(runtime_bytes, assistant_bytes, model_manifest_bytes)
+    model = _model_identity(config, backend, selected_backend, model_artifact)
     runtime = _runtime_identity(backend)
     sensitive_values = _resolved_runtime_values(config, selected_backend, environ)
 
@@ -478,6 +692,10 @@ def run_evaluation(
                 sensitive_values=sensitive_values,
             )
         except RuntimeFailure as exc:
+            if native_lm_studio:
+                # A native profile probe or response-contract failure revokes the
+                # whole run. No later prompt and no partial artifact is allowed.
+                raise
             elapsed_ms = max(0.0, (clock() - request_started) * 1000)
             result = _failed_result(
                 run_id=run_id,
@@ -495,6 +713,10 @@ def run_evaluation(
                 failure=exc,
             )
         except Exception:
+            if native_lm_studio:
+                raise EvaluationFailure(
+                    "LM Studio native v1 profil doğrulaması güvenli biçimde durduruldu."
+                ) from None
             elapsed_ms = max(0.0, (clock() - request_started) * 1000)
             result = _failed_result(
                 run_id=run_id,
@@ -522,7 +744,7 @@ def run_evaluation(
         result.error.type for result in results if result.error is not None
     )
     summary = RunSummary(
-        schema_version="1.0",
+        schema_version="1.1",
         run_id=run_id,
         started_at=started_at,
         finished_at=finished_at,

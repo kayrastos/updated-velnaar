@@ -8,7 +8,7 @@ Kayra AI, internet bağlantısı olmadan kişisel dizüstü bilgisayarda çalı�
 - Nihai yerel artifact: GGUF Q4_K_M
 - Birincil çalışma zamanı: Windows üzerinde LM Studio
 - İkincil çalışma zamanı: llama.cpp server
-- Ortak istemci sınırı: OpenAI uyumlu yerel HTTP API
+- İstemci sınırı: ortak Backend sözleşmesi; LM Studio için native v1, llama.cpp için OpenAI uyumlu HTTP
 - Çalışma şekli: CPU/GPU hibrit
 - Donanım: Ryzen 5 4600H, fiziksel 16 GB RAM, GTX 1650 Ti 4 GB
 - İnce ayar: Bulut GPU üzerinde QLoRA
@@ -17,7 +17,15 @@ Kayra AI, internet bağlantısı olmadan kişisel dizüstü bilgisayarda çalı�
 
 WSL'nin yaklaşık 7,5 GiB RAM görmesi varsayılan WSL sınırından kaynaklanır ve nihai modelin RAM sınırı değildir. Model Windows üzerinde çalıştırılırken yüksek RAM kullanan diğer uygulamalar kapatılacaktır. Buna rağmen 16 GB RAM ve 4 GB VRAM Qwen3-14B Q4_K_M için alt sınıra yakın olduğundan başlangıç profili 4096 token, tek kullanıcı ve aynı anda tek istek olarak tutulacak; daha yüksek değerler yalnızca benchmark sonucuyla kabul edilecektir.
 
-LM Studio ve llama.cpp farklılıkları küçük adaptörlerde kalır. Model kimliği ile API kök URL'si koda sabitlenmez. WSL içinden Windows `localhost` adresine her ağ yapılandırmasında erişilebildiği varsayılmaz; istemci yalnız açıkça yapılandırılmış ve güvenli preflight kontrolünden geçmiş hedefi kullanır. Proje sunucuyu yerel ağa açmaz, Windows güvenlik duvarını değiştirmez ve Qwen chat template'ini yeniden üretmez; resmî template uygulaması çalışma zamanına aittir.
+LM Studio ve llama.cpp farklılıkları küçük adaptörlerde kalır. LM Studio adaptörü
+reasoning capability'sini ve native istatistikleri belgelenmiş `/api/v1/models`
+ve `/api/v1/chat` yüzeyinden ele alır; llama.cpp adaptörü OpenAI uyumlu sınırda
+kalır. Model kimliği ile API kök URL'si koda sabitlenmez. WSL içinden Windows
+`localhost` adresine her ağ yapılandırmasında erişilebildiği varsayılmaz; istemci
+yalnız açıkça yapılandırılmış ve güvenli preflight kontrolünden geçmiş hedefi
+kullanır. Proje sunucuyu yerel ağa açmaz, Windows güvenlik duvarını değiştirmez
+ve Qwen chat template'ini yeniden üretmez; resmî template uygulaması çalışma
+zamanına aittir.
 
 ## Proje ilkeleri
 
@@ -27,6 +35,8 @@ LM Studio ve llama.cpp farklılıkları küçük adaptörlerde kalır. Model kim
 - Büyük artifact'ler Git dışında, D diskinde tutulur.
 - Doğrulama ve veri hazırlama araçları çevrimdışı çalışabilir.
 - Model indirme, eğitim ve eğitim paketi kurulumu ayrı onay kapılarıdır.
+- Plan onayı depo değişikliği değildir; G-CODE ile dosya/test, G-GIT ile
+  stage/commit/bundle ayrı yetkilendirilir.
 - Genel çalışma zamanı logları prompt, yanıt, HTTP header'ı veya kimlik bilgisi saklamaz.
 
 ## Depo düzeni
@@ -55,7 +65,7 @@ Tek desteklenen yerel Python yorumlayıcısı:
 
 Depo kökündeki `.venv` ve `.venv_broken` kullanılmaz, değiştirilmez veya otomatik olarak silinmez.
 
-Paket kurmadan mevcut doğrulamaları çalıştırmak için:
+**Yer — WSL/Ubuntu terminali.** Paket kurmadan mevcut doğrulamaları çalıştırmak için:
 
 ```bash
 PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python -m kayra_ai.validation.validate_dataset --kind eval data/eval/seed.jsonl
@@ -63,19 +73,29 @@ PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python -m kayra_ai.validation.che
 /home/kayra/.venvs/kayra-ai/bin/python -m unittest discover -s tests -v
 ```
 
-## Modelden bağımsız çalışma zamanı
+## Çalışma zamanı ve Aşama 2 çevrimdışı altyapısı
 
-Aşama 1, model indirmeden veya yerel sunucu başlatmadan ortak çalışma zamanı ve değerlendirme hattını sağlar. Varsayılan `mock` backend deterministiktir ve HTTP taşıması oluşturmaz. Gerçek backend'ler etkinleştirilmeden önce model kimliği ile OpenAI uyumlu API kök URL'si ortam değişkenlerinden çözülmelidir. API anahtarı isteğe bağlıdır; tanımlı değilse `Authorization` header'ı gönderilmez.
+Aşama 1, model indirmeden veya yerel sunucu başlatmadan ortak çalışma zamanı ve
+değerlendirme hattını sağlar. Aşama 2 G-CODE altyapısı buna sabit model artifact
+manifestini, LM Studio native v1 adapter sözleşmesini, üç vakalık smoke setini ve
+içeriksiz benchmark-series doğrulamasını ekler. Bu depo değişiklikleri LM Studio
+kurmaz, model indirmez/yüklemez ve gerçek API isteği göndermez.
+
+Varsayılan `mock` backend deterministiktir ve HTTP taşıması oluşturmaz. Gerçek
+backend etkinleştirilmeden önce model kimliği ile API kök URL'si ortam
+değişkenlerinden çözülmelidir. LM Studio base URL'si tam
+`http://127.0.0.1:<port>/api/v1` köküdür. API anahtarı isteğe bağlıdır; tanımlı
+değilse `Authorization` header'ı gönderilmez.
 
 Çözümlenmiş gerçek-backend ortam değerleri log veya artifact'lere ham yazılmaz; model ve revision kimlikleri sonuçlarda tek yönlü `sha256:` tanımlayıcılarıyla temsil edilir.
 
-Mock preflight:
+**Yer — WSL/Ubuntu terminali.** Mock preflight:
 
 ```bash
 PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python -m kayra_ai.runtime.preflight --config configs/runtime.yaml --backend mock
 ```
 
-Kapalı eval setini iki açık profil üzerinden çalıştırma:
+**Yer — WSL/Ubuntu terminali.** Kapalı eval setini iki açık profil üzerinden çalıştırma:
 
 ```bash
 PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python -m kayra_ai.evaluation.cli \
@@ -88,9 +108,27 @@ PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python -m kayra_ai.evaluation.cli
 
 40 benzersiz vaka, `both` vakaları iki profile açıldığında 54 yürütme üretir. Mock sonucu yalnız yapılandırma, yönlendirme, sözleşme ve raporlama hattının çalıştığını gösterir; semantik kalite puanı veya gerçek model benchmark'ı değildir. Var olan bir `reports/runs/<run-id>/` dizininin üzerine yazılmaz; başka bir run kimliği seçilmelidir.
 
-Thinking ve non-thinking ayrı profillerdir. Gerçek backend'in ilgili kontrolü belgelenmiş bir capability olarak doğrulanamıyorsa varsayılan davranış güvenli hatadır. Açıkça seçilmiş bir backend-default fallback kullanılırsa istenen ve fiilen uygulanan profil sonuçta ayrı kaydedilir; uygulama belgelenmemiş parametre veya chat-template işareti uydurmaz.
+Thinking ve non-thinking ayrı profillerdir. LM Studio native request'teki
+`reasoning` değeri yalnız istenen profildir; request'ten `effective_profile`
+uydurulmaz. İlan edilen seçenekler, istenen değer ve gözlenen reasoning kanıtı
+ayrı tutulur; runtime etkin state'i echo etmediği için
+`resolved_reasoning_state: unknown` kalır. Capability ya da davranış kanıtı
+eksikse güvenli biçimde durulur.
 
-Ayrıntılı kullanım, bağlantı ve gizlilik davranışı için [çalışma zamanı ve eval kılavuzuna](docs/runtime-and-eval.md); ölçüm tanımları için [benchmark protokolüne](docs/benchmark-protocol.md) bakın.
+Ayrıntılı kullanım, bağlantı ve gizlilik davranışı için [çalışma zamanı ve eval
+kılavuzuna](docs/runtime-and-eval.md), manuel Windows kapıları için [Aşama 2 LM
+Studio baseline runbook'una](docs/stage2-lm-studio-baseline.md), ölçüm tanımları
+için [benchmark protokolüne](docs/benchmark-protocol.md) bakın.
+
+**Yer — WSL/Ubuntu terminali; yalnız yerel dosyaları doğrular.**
+
+```bash
+PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python \
+  -m kayra_ai.validation.model_artifact configs/models/qwen3-14b-q4_k_m.yaml
+
+PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python \
+  -m kayra_ai.evaluation.benchmark_cli tests/fixtures/benchmark-series-valid.json
+```
 
 ## Artifact ve cache yerleşimi
 
@@ -115,5 +153,10 @@ Sanal ortam, makineye özel küçük ayarlar ve kimlik bilgileri WSL ana dizinin
 
 ## Mevcut kapsam
 
-Bu sürüm Aşama 0 altyapısı ile Aşama 1'in modelden bağımsız çalışma zamanı ve değerlendirme hattını içerir. Mevcut 40 eval vakası OpenAI Codex tarafından üretilmiş, kesin üretici model kimliği kaydedilmemiş ve henüz insan incelemesinden geçmemiş sentetik taslaklardır. Aşama 1 bu kayıtların `human_reviewed: false` durumunu değiştirmez. Model, Torch, eğitim kodu veya eğitim artifact'i içermez.
+Bu sürüm Aşama 0/1 altyapısı ile Aşama 2'nin çevrimdışı G-CODE sözleşmelerini
+içerir. Gerçek LM Studio/model çalıştırması ayrı kapılara bağlıdır. Mevcut 40
+eval vakası OpenAI Codex tarafından üretilmiş, kesin üretici model kimliği
+kaydedilmemiş ve henüz insan incelemesinden geçmemiş sentetik taslaklardır.
+Smoke dosyası seed'in yalnız üç byte-for-byte kopyasını taşır; seed değişmez.
+Model, Torch, eğitim kodu veya eğitim artifact'i içermez.
 Model indirme ve eğitim öncesi kalıcı kontrol listesi için `docs/preflight-checklist.md` kullanılır.

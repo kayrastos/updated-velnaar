@@ -18,13 +18,16 @@ from kayra_ai.runtime.config import (
     ConfiguredModel,
     ExecutionConfig,
     LMStudioBackendConfig,
+    LMStudioNativeV1Config,
     NetworkConfig,
     PrivacyConfig,
     ProfileConfig,
     RuntimeConfig,
     build_api_url,
+    build_lm_studio_native_api_url,
     load_runtime_config,
     normalize_api_root,
+    normalize_lm_studio_native_api_root,
     resolve_backend_config,
 )
 from kayra_ai.runtime.errors import ConfigurationFailure, PrivacyPolicyFailure
@@ -55,6 +58,21 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertEqual(0, self.config.execution.retries)
         self.assertFalse(self.config.privacy.log_prompts)
 
+    def test_repository_lm_studio_native_config_is_strict_and_versioned(self) -> None:
+        config = load_runtime_config(ROOT / "configs" / "runtime.lm-studio.yaml")
+        backend = config.backends.lm_studio
+        self.assertEqual("lm_studio", config.active_backend)
+        self.assertTrue(backend.enabled)
+        self.assertEqual("native_v1", backend.api_mode)
+        self.assertEqual("configs/models/qwen3-14b-q4_k_m.yaml", backend.model_manifest)
+        self.assertEqual("gguf", backend.native_v1.model_format if backend.native_v1 else None)
+        self.assertEqual("Q4_K_M", backend.native_v1.quantization if backend.native_v1 else None)
+        self.assertEqual(9001752960, backend.native_v1.size_bytes if backend.native_v1 else None)
+        self.assertEqual(4096, config.execution.context_length)
+        self.assertEqual(1, config.execution.max_in_flight)
+        self.assertFalse(config.network.allow_non_loopback)
+        self.assertEqual(["127.0.0.1"], config.network.allowed_hosts)
+
     def test_unknown_yaml_field_is_rejected_without_echoing_value(self) -> None:
         data = self.config.model_dump(mode="python")
         data["private_canary"] = "DO-NOT-ECHO"
@@ -82,6 +100,37 @@ class RuntimeConfigTests(unittest.TestCase):
             build_api_url("http://127.0.0.1:8080/v1", "chat//completions")
         with self.assertRaises(ConfigurationFailure):
             build_api_url("http://127.0.0.1:8080/v1", "embeddings")
+
+    def test_native_api_root_and_endpoint_allowlist_are_exact(self) -> None:
+        expected = "http://127.0.0.1:1234/api/v1"
+        self.assertEqual(expected, normalize_lm_studio_native_api_root(expected + "///"))
+        self.assertEqual(
+            expected + "/models",
+            build_lm_studio_native_api_url(expected, "/models/"),
+        )
+        self.assertEqual(
+            expected + "/chat",
+            build_lm_studio_native_api_url(expected, "chat"),
+        )
+        for endpoint in ("chat/completions", "v1/models", "models/extra", "load"):
+            with self.subTest(endpoint=endpoint), self.assertRaises(ConfigurationFailure):
+                build_lm_studio_native_api_url(expected, endpoint)
+        for root in (
+            "http://127.0.0.1:1234/v1",
+            "http://127.0.0.1:1234/api/v1/models",
+            "http://user@127.0.0.1:1234/api/v1",
+            "http://127.0.0.1:1234/api/v1?secret=x",
+        ):
+            with self.subTest(root=root), self.assertRaises(ConfigurationFailure):
+                normalize_lm_studio_native_api_root(root)
+        for root in (
+            "http://localhost:1234/api/v1",
+            "http://[::1]:1234/api/v1",
+            "http://0.0.0.0:1234/api/v1",
+            "http://192.168.1.50:1234/api/v1",
+        ):
+            with self.subTest(root=root), self.assertRaises(PrivacyPolicyFailure):
+                normalize_lm_studio_native_api_root(root)
 
     def test_api_root_rejects_non_root_paths_and_unsafe_url_parts(self) -> None:
         invalid = (
@@ -144,6 +193,7 @@ class RuntimeConfigTests(unittest.TestCase):
             (PrivacyConfig, "privacy"),
             (ConfiguredModel, "model"),
             (LMStudioBackendConfig, "remoteBackendBase"),
+            (LMStudioNativeV1Config, "lmStudioNativeV1"),
             (ProfileConfig, "profile"),
         )
         for model, definition in mappings:
@@ -153,6 +203,56 @@ class RuntimeConfigTests(unittest.TestCase):
                 }
                 schema_required = set(schema["$defs"][definition].get("required", []))
                 self.assertEqual(pydantic_required, schema_required)
+
+    def test_native_mode_requires_manifest_and_exact_expectations(self) -> None:
+        data = self.config.model_dump(mode="python")
+        backend = data["backends"]["lm_studio"]
+        backend["api_mode"] = "native_v1"
+        data["network"]["allowed_hosts"] = ["127.0.0.1"]
+        backend["model_manifest"] = None
+        backend["native_v1"] = None
+        with self.assertRaises(ValueError):
+            RuntimeConfig.model_validate(data)
+
+        backend["model_manifest"] = "configs/models/qwen3-14b-q4_k_m.yaml"
+        backend["native_v1"] = {
+            "model_format": "gguf",
+            "quantization": "Q4_K_M",
+            "size_bytes": 9001752960,
+            "context_length": 4096,
+            "parallel": 1,
+            "offload_kv_cache_to_gpu": False,
+        }
+        validated = RuntimeConfig.model_validate(data)
+        self.assertEqual("native_v1", validated.backends.lm_studio.api_mode)
+
+        backend["native_v1"]["quantization"] = "Q3_K_M"
+        with self.assertRaises(ValueError):
+            RuntimeConfig.model_validate(data)
+
+        backend["native_v1"]["quantization"] = "Q4_K_M"
+        backend["native_v1"]["size_bytes"] = 9001752959
+        with self.assertRaises(ValueError):
+            RuntimeConfig.model_validate(data)
+
+    def test_native_mode_rejects_network_context_and_profile_fallback_drift(self) -> None:
+        native = load_runtime_config(ROOT / "configs" / "runtime.lm-studio.yaml")
+        changes = (
+            ("network host", lambda item: item["network"].update(allowed_hosts=["localhost"])),
+            ("non-loopback", lambda item: item["network"].update(allow_non_loopback=True)),
+            ("context", lambda item: item["execution"].update(context_length=8192)),
+            (
+                "fallback",
+                lambda item: item["profiles"]["thinking"].update(
+                    unsupported_capability="backend_default"
+                ),
+            ),
+        )
+        for label, mutate in changes:
+            data = native.model_dump(mode="python")
+            mutate(data)
+            with self.subTest(label=label), self.assertRaises(ValueError):
+                RuntimeConfig.model_validate(data)
 
     def test_api_key_is_excluded_and_masked(self) -> None:
         canary = "API-KEY-CANARY-83f10"

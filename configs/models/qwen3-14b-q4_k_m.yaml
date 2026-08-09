@@ -1,0 +1,12 @@
+schema_version: "1.0"
+id: qwen3-14b-q4-k-m
+repository: Qwen/Qwen3-14B-GGUF
+commit: c75e7b2d0234068f674a1bacf548ea32e27ccd29
+license: Apache-2.0
+format: GGUF
+quantization: Q4_K_M
+context_length: 4096
+files:
+  - filename: Qwen3-14B-Q4_K_M.gguf
+    size_bytes: 9001752960
+    sha256: 500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0

@@ -11,7 +11,7 @@
     "created_at", "input_sha256", "config_sha256"
   ],
   "properties": {
-    "schema_version": { "const": "2.0" },
+    "schema_version": { "const": "2.1" },
     "run_id": { "$ref": "#/$defs/id" },
     "result_id": { "$ref": "#/$defs/id" },
     "case_id": { "type": "string", "pattern": "^eval-[a-z0-9][a-z0-9._-]{2,119}$" },
@@ -39,10 +39,37 @@
   "allOf": [
     {
       "if": { "properties": { "success": { "const": true } }, "required": ["success"] },
-      "then": { "properties": { "error": { "type": "null" } } },
+      "then": {
+        "properties": {
+          "error": { "type": "null" },
+          "mode_resolution": {
+            "properties": {
+              "verification_status": {
+                "enum": ["static_verified", "behaviorally_consistent", "fallback"]
+              }
+            },
+            "required": ["verification_status"]
+          }
+        }
+      },
       "else": {
         "properties": {
           "error": { "$ref": "#/$defs/error" },
+          "mode_resolution": {
+            "properties": {
+              "effective_profile": { "const": "unknown" },
+              "fallback_used": { "const": false },
+              "requested_reasoning": { "type": "null" },
+              "observed_reasoning_output": { "const": "unknown" },
+              "resolved_reasoning_state": { "type": "null" },
+              "verification_status": { "const": "unknown" }
+            },
+            "required": [
+              "effective_profile", "fallback_used", "requested_reasoning",
+              "observed_reasoning_output", "resolved_reasoning_state",
+              "verification_status"
+            ]
+          },
           "response": {
             "properties": {
               "retention": { "const": "not_retained" },
@@ -50,6 +77,37 @@
               "content_sha256": { "type": "null" },
               "finish_reason": { "type": "null" }
             }
+          },
+          "usage": {
+            "properties": {
+              "source": { "const": "unavailable" },
+              "prompt_tokens": { "type": "null" },
+              "completion_tokens": { "type": "null" },
+              "total_tokens": { "type": "null" },
+              "reasoning_tokens": { "type": "null" }
+            },
+            "required": [
+              "source", "prompt_tokens", "completion_tokens", "total_tokens",
+              "reasoning_tokens"
+            ]
+          },
+          "timing": {
+            "properties": {
+              "first_token_ms": { "type": "null" },
+              "first_token_ms_source": { "const": "unavailable" },
+              "generation_ms": { "type": "null" },
+              "generation_ms_source": { "const": "unavailable" },
+              "total_ms_source": { "enum": ["client_measured", "unavailable"] },
+              "tokens_per_second": { "type": "null" },
+              "tokens_per_second_source": { "const": "unavailable" },
+              "model_load_ms": { "type": "null" },
+              "model_load_ms_source": { "const": "unavailable" }
+            },
+            "required": [
+              "first_token_ms", "first_token_ms_source", "generation_ms",
+              "generation_ms_source", "total_ms_source", "tokens_per_second",
+              "tokens_per_second_source", "model_load_ms", "model_load_ms_source"
+            ]
           }
         }
       }
@@ -87,10 +145,55 @@
     {
       "if": {
         "properties": {
+          "success": { "const": true },
+          "runtime": {
+            "properties": { "name": { "const": "mock" } },
+            "required": ["name"]
+          }
+        },
+        "required": ["success", "runtime"]
+      },
+      "then": {
+        "properties": {
+          "mode_resolution": {
+            "properties": {
+              "verification_status": { "const": "static_verified" },
+              "evidence_source": { "const": "static_backend" }
+            },
+            "required": ["verification_status", "evidence_source"]
+          },
+          "usage": {
+            "properties": { "source": { "const": "mock_deterministic" } },
+            "required": ["source"]
+          },
+          "timing": {
+            "properties": {
+              "first_token_ms": { "type": "null" },
+              "first_token_ms_source": { "const": "unavailable" },
+              "generation_ms": { "type": "null" },
+              "generation_ms_source": { "const": "unavailable" },
+              "total_ms_source": { "const": "mock_deterministic" },
+              "tokens_per_second": { "type": "null" },
+              "tokens_per_second_source": { "const": "unavailable" },
+              "model_load_ms": { "type": "null" },
+              "model_load_ms_source": { "const": "unavailable" }
+            },
+            "required": [
+              "first_token_ms", "first_token_ms_source", "generation_ms",
+              "generation_ms_source", "total_ms_source", "tokens_per_second",
+              "tokens_per_second_source", "model_load_ms", "model_load_ms_source"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
           "requested_profile": { "const": "thinking" },
           "mode_resolution": {
-            "properties": { "capability_status": { "const": "supported" } },
-            "required": ["capability_status"]
+            "properties": { "verification_status": { "const": "static_verified" } },
+            "required": ["verification_status"]
           }
         },
         "required": ["requested_profile", "mode_resolution"]
@@ -109,8 +212,8 @@
         "properties": {
           "requested_profile": { "const": "non_thinking" },
           "mode_resolution": {
-            "properties": { "capability_status": { "const": "supported" } },
-            "required": ["capability_status"]
+            "properties": { "verification_status": { "const": "static_verified" } },
+            "required": ["verification_status"]
           }
         },
         "required": ["requested_profile", "mode_resolution"]
@@ -120,6 +223,166 @@
           "mode_resolution": {
             "properties": { "effective_profile": { "const": "non_thinking" } },
             "required": ["effective_profile"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "runtime": {
+            "properties": { "name": { "enum": ["lm_studio", "llama_cpp"] } },
+            "required": ["name"]
+          }
+        },
+        "required": ["runtime"]
+      },
+      "then": {
+        "properties": {
+          "model": {
+            "properties": {
+              "id": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+              "revision": {
+                "oneOf": [
+                  { "type": "null" },
+                  { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+                ]
+              }
+            },
+            "required": ["id", "revision"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode_resolution": {
+            "properties": { "fallback_used": { "const": true } },
+            "required": ["fallback_used"]
+          }
+        },
+        "required": ["mode_resolution"]
+      },
+      "then": {
+        "properties": {
+          "runtime": {
+            "properties": { "name": { "const": "llama_cpp" } },
+            "required": ["name"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode_resolution": {
+            "properties": {
+              "verification_status": { "const": "behaviorally_consistent" }
+            },
+            "required": ["verification_status"]
+          }
+        },
+        "required": ["mode_resolution"]
+      },
+      "then": {
+        "properties": {
+          "runtime": {
+            "properties": { "name": { "const": "lm_studio" } },
+            "required": ["name"]
+          },
+          "model": {
+            "properties": {
+              "artifact_sha256": {
+                "const": "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0"
+              }
+            },
+            "required": ["artifact_sha256"]
+          },
+          "generation": {
+            "properties": {
+              "context_length": { "const": 4096 },
+              "stream": { "const": false }
+            },
+            "required": ["context_length", "stream"]
+          },
+          "usage": {
+            "properties": { "source": { "const": "lm_studio_native_v1" } },
+            "required": ["source"]
+          },
+          "timing": {
+            "properties": {
+              "first_token_ms_source": { "const": "lm_studio_native_v1" },
+              "generation_ms": { "type": "null" },
+              "generation_ms_source": { "const": "unavailable" },
+              "total_ms_source": { "const": "client_measured" },
+              "tokens_per_second_source": { "const": "lm_studio_native_v1" },
+              "model_load_ms_source": {
+                "enum": ["lm_studio_native_v1", "unavailable"]
+              }
+            },
+            "required": [
+              "first_token_ms_source", "generation_ms", "generation_ms_source",
+              "total_ms_source", "tokens_per_second_source", "model_load_ms_source"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "requested_profile": { "const": "thinking" },
+          "mode_resolution": {
+            "properties": {
+              "verification_status": { "const": "behaviorally_consistent" }
+            },
+            "required": ["verification_status"]
+          }
+        },
+        "required": ["requested_profile", "mode_resolution"]
+      },
+      "then": {
+        "properties": {
+          "mode_resolution": {
+            "properties": {
+              "requested_reasoning": { "const": "on" },
+              "observed_reasoning_output": { "const": "present" }
+            },
+            "required": ["requested_reasoning", "observed_reasoning_output"]
+          },
+          "usage": {
+            "properties": { "reasoning_tokens": { "type": "integer", "minimum": 1 } },
+            "required": ["reasoning_tokens"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "requested_profile": { "const": "non_thinking" },
+          "mode_resolution": {
+            "properties": {
+              "verification_status": { "const": "behaviorally_consistent" }
+            },
+            "required": ["verification_status"]
+          }
+        },
+        "required": ["requested_profile", "mode_resolution"]
+      },
+      "then": {
+        "properties": {
+          "mode_resolution": {
+            "properties": {
+              "requested_reasoning": { "const": "off" },
+              "observed_reasoning_output": { "const": "absent" }
+            },
+            "required": ["requested_reasoning", "observed_reasoning_output"]
+          },
+          "usage": {
+            "properties": { "reasoning_tokens": { "const": 0 } },
+            "required": ["reasoning_tokens"]
           }
         }
       }
@@ -172,13 +435,52 @@
     "mode_resolution": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["capability_status", "effective_profile", "fallback_used"],
+      "required": [
+        "capability_status", "effective_profile", "fallback_used", "requested_reasoning",
+        "advertised_reasoning_options", "advertised_reasoning_default",
+        "observed_reasoning_output", "resolved_reasoning_state",
+        "verification_status", "evidence_source"
+      ],
       "properties": {
         "capability_status": { "enum": ["supported", "unsupported", "unknown"] },
         "effective_profile": {
           "enum": ["thinking", "non_thinking", "backend_default", "unknown"]
         },
-        "fallback_used": { "type": "boolean" }
+        "fallback_used": { "type": "boolean" },
+        "requested_reasoning": {
+          "type": ["string", "null"],
+          "enum": ["on", "off", null]
+        },
+        "advertised_reasoning_options": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "enum": ["off", "on", "low", "medium", "high"] }
+            }
+          ]
+        },
+        "advertised_reasoning_default": {
+          "type": ["string", "null"],
+          "enum": ["off", "on", "low", "medium", "high", null]
+        },
+        "observed_reasoning_output": {
+          "enum": ["present", "absent", "unknown"]
+        },
+        "resolved_reasoning_state": {
+          "type": ["string", "null"],
+          "enum": ["unknown", null]
+        },
+        "verification_status": {
+          "enum": ["static_verified", "behaviorally_consistent", "fallback", "unknown"]
+        },
+        "evidence_source": {
+          "enum": [
+            "static_backend", "lm_studio_native_v1_models",
+            "lm_studio_native_v1_response", "unverified"
+          ]
+        }
       },
       "allOf": [
         {
@@ -194,18 +496,91 @@
         },
         {
           "if": {
-            "properties": { "capability_status": { "const": "supported" } },
-            "required": ["capability_status"]
+            "properties": { "verification_status": { "const": "static_verified" } },
+            "required": ["verification_status"]
           },
           "then": {
             "properties": {
+              "capability_status": { "const": "supported" },
               "effective_profile": { "enum": ["thinking", "non_thinking"] },
-              "fallback_used": { "const": false }
+              "fallback_used": { "const": false },
+              "requested_reasoning": { "type": "null" },
+              "advertised_reasoning_options": { "type": "null" },
+              "advertised_reasoning_default": { "type": "null" },
+              "observed_reasoning_output": { "const": "unknown" },
+              "resolved_reasoning_state": { "type": "null" },
+              "evidence_source": { "const": "static_backend" }
             }
+          }
+        },
+        {
+          "if": {
+            "properties": { "verification_status": { "const": "behaviorally_consistent" } },
+            "required": ["verification_status"]
           },
-          "else": {
+          "then": {
             "properties": {
-              "effective_profile": { "enum": ["unknown", "backend_default"] }
+              "capability_status": { "const": "supported" },
+              "effective_profile": { "const": "unknown" },
+              "fallback_used": { "const": false },
+              "requested_reasoning": { "enum": ["on", "off"] },
+              "advertised_reasoning_options": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "observed_reasoning_output": { "enum": ["present", "absent"] },
+              "resolved_reasoning_state": { "const": "unknown" },
+              "evidence_source": { "const": "lm_studio_native_v1_response" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "verification_status": { "const": "fallback" } },
+            "required": ["verification_status"]
+          },
+          "then": {
+            "properties": {
+              "capability_status": { "enum": ["unsupported", "unknown"] },
+              "effective_profile": { "const": "backend_default" },
+              "fallback_used": { "const": true },
+              "requested_reasoning": { "type": "null" },
+              "advertised_reasoning_options": { "type": "null" },
+              "advertised_reasoning_default": { "type": "null" },
+              "observed_reasoning_output": { "const": "unknown" },
+              "resolved_reasoning_state": { "type": "null" },
+              "evidence_source": { "const": "unverified" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "verification_status": { "const": "unknown" } },
+            "required": ["verification_status"]
+          },
+          "then": {
+            "properties": {
+              "effective_profile": { "const": "unknown" },
+              "fallback_used": { "const": false },
+              "requested_reasoning": { "type": "null" },
+              "observed_reasoning_output": { "const": "unknown" },
+              "resolved_reasoning_state": { "type": "null" },
+              "evidence_source": {
+                "enum": ["lm_studio_native_v1_models", "unverified"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "evidence_source": { "const": "unverified" } },
+            "required": ["evidence_source"]
+          },
+          "then": {
+            "properties": {
+              "advertised_reasoning_options": { "type": "null" },
+              "advertised_reasoning_default": { "type": "null" }
             }
           }
         }
@@ -249,12 +624,19 @@
     "usage": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source", "prompt_tokens", "completion_tokens", "total_tokens"],
+      "required": [
+        "source", "prompt_tokens", "completion_tokens", "total_tokens", "reasoning_tokens"
+      ],
       "properties": {
-        "source": { "enum": ["backend_reported", "mock_deterministic", "unavailable"] },
+        "source": {
+          "enum": [
+            "backend_reported", "lm_studio_native_v1", "mock_deterministic", "unavailable"
+          ]
+        },
         "prompt_tokens": { "type": ["integer", "null"], "minimum": 0 },
         "completion_tokens": { "type": ["integer", "null"], "minimum": 0 },
-        "total_tokens": { "type": ["integer", "null"], "minimum": 0 }
+        "total_tokens": { "type": ["integer", "null"], "minimum": 0 },
+        "reasoning_tokens": { "type": ["integer", "null"], "minimum": 0 }
       },
       "allOf": [
         {
@@ -263,7 +645,22 @@
             "properties": {
               "prompt_tokens": { "type": "null" },
               "completion_tokens": { "type": "null" },
-              "total_tokens": { "type": "null" }
+              "total_tokens": { "type": "null" },
+              "reasoning_tokens": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "source": { "const": "lm_studio_native_v1" } },
+            "required": ["source"]
+          },
+          "then": {
+            "properties": {
+              "prompt_tokens": { "type": "integer" },
+              "completion_tokens": { "type": "integer" },
+              "total_tokens": { "type": "null" },
+              "reasoning_tokens": { "type": "integer" }
             }
           }
         }
@@ -273,26 +670,78 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "source", "first_token_ms", "generation_ms", "total_ms", "tokens_per_second"
+        "first_token_ms", "first_token_ms_source", "generation_ms",
+        "generation_ms_source", "total_ms", "total_ms_source", "tokens_per_second",
+        "tokens_per_second_source", "model_load_ms", "model_load_ms_source"
       ],
       "properties": {
-        "source": { "enum": ["measured", "mock_deterministic", "unavailable"] },
         "first_token_ms": { "type": ["number", "null"], "minimum": 0 },
+        "first_token_ms_source": {
+          "enum": ["lm_studio_native_v1", "mock_deterministic", "unavailable"]
+        },
         "generation_ms": { "type": ["number", "null"], "minimum": 0 },
+        "generation_ms_source": {
+          "enum": [
+            "backend_reported", "client_measured", "mock_deterministic", "unavailable"
+          ]
+        },
         "total_ms": { "type": ["number", "null"], "minimum": 0 },
-        "tokens_per_second": { "type": ["number", "null"], "minimum": 0 }
+        "total_ms_source": {
+          "enum": ["client_measured", "mock_deterministic", "unavailable"]
+        },
+        "tokens_per_second": { "type": ["number", "null"], "minimum": 0 },
+        "tokens_per_second_source": {
+          "enum": [
+            "lm_studio_native_v1", "backend_reported", "mock_deterministic", "unavailable"
+          ]
+        },
+        "model_load_ms": { "type": ["number", "null"], "minimum": 0 },
+        "model_load_ms_source": {
+          "enum": ["lm_studio_native_v1", "unavailable"]
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "source": { "const": "unavailable" } }, "required": ["source"] },
+          "if": {
+            "properties": { "first_token_ms_source": { "const": "unavailable" } },
+            "required": ["first_token_ms_source"]
+          },
+          "then": { "properties": { "first_token_ms": { "type": "null" } } },
+          "else": { "properties": { "first_token_ms": { "type": "number" } } }
+        },
+        {
+          "if": {
+            "properties": { "generation_ms_source": { "const": "unavailable" } },
+            "required": ["generation_ms_source"]
+          },
+          "then": { "properties": { "generation_ms": { "type": "null" } } },
+          "else": { "properties": { "generation_ms": { "type": "number" } } }
+        },
+        {
+          "if": {
+            "properties": { "total_ms_source": { "const": "unavailable" } },
+            "required": ["total_ms_source"]
+          },
+          "then": { "properties": { "total_ms": { "type": "null" } } },
+          "else": { "properties": { "total_ms": { "type": "number" } } }
+        },
+        {
+          "if": {
+            "properties": { "tokens_per_second_source": { "const": "unavailable" } },
+            "required": ["tokens_per_second_source"]
+          },
+          "then": { "properties": { "tokens_per_second": { "type": "null" } } },
+          "else": { "properties": { "tokens_per_second": { "type": "number" } } }
+        },
+        {
+          "if": {
+            "properties": { "model_load_ms_source": { "const": "unavailable" } },
+            "required": ["model_load_ms_source"]
+          },
           "then": {
-            "properties": {
-              "first_token_ms": { "type": "null" },
-              "generation_ms": { "type": "null" },
-              "total_ms": { "type": "null" },
-              "tokens_per_second": { "type": "null" }
-            }
-          }
+            "properties": { "model_load_ms": { "type": "null" } }
+          },
+          "else": { "properties": { "model_load_ms": { "type": "number" } } }
         }
       ]
     },

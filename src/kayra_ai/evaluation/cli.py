@@ -25,6 +25,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--output-root", type=Path, default=Path("reports/runs"))
+    parser.add_argument(
+        "--allow-native-non-smoke-eval",
+        action="store_true",
+        help="Yalnız ayrı G-FULL onayından sonra native smoke kilidini aç",
+    )
     return parser
 
 
@@ -38,6 +43,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             profiles=args.profiles,
             run_id=args.run_id,
             output_root=args.output_root,
+            allow_native_non_smoke_eval=args.allow_native_non_smoke_eval,
         )
     except RuntimeFailure as exc:
         print(

@@ -1,0 +1,350 @@
+{
+  "schema_version": "1.0",
+  "series_id": "stage2-fixture",
+  "started_at": "2026-08-08T10:00:00+03:00",
+  "finished_at": "2026-08-08T10:10:00+03:00",
+  "smoke_set": {
+    "path": "data/eval/stage2-smoke.jsonl",
+    "sha256": "605ecf339774b5130c9214fbaa126202f2f91b20327092f3d44cb9df8111751d",
+    "case_ids": ["eval-tr-001", "eval-if-003", "eval-reason-001"]
+  },
+  "model": {
+    "identifier_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "revision_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "quantization": "Q4_K_M"
+  },
+  "runtime": {
+    "name": "lm_studio",
+    "version": "fixture-0.1",
+    "engine": "llama.cpp",
+    "engine_version": "fixture-engine-0.1",
+    "platform": "windows",
+    "windows_version": "Windows fixture",
+    "gpu_driver_version": "fixture-driver-0.1"
+  },
+  "configuration": {
+    "endpoint": "/api/v1/chat",
+    "store": false,
+    "stream": false,
+    "context_length": 4096,
+    "parallel": 1,
+    "offload_kv_cache_to_gpu": false,
+    "retries": 0,
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "max_output_tokens_source": "eval_case",
+    "mode_control_method": "native_api_reasoning_parameter",
+    "profile_verification_status": "behaviorally_consistent",
+    "resolved_reasoning_state": "unknown",
+    "runtime_config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "assistant_config_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "metric_contract": {
+    "native_stats": {
+      "source": "lm_studio_native_v1",
+      "input_tokens": "stats.input_tokens",
+      "total_output_tokens": "stats.total_output_tokens",
+      "reasoning_output_tokens": "stats.reasoning_output_tokens",
+      "tokens_per_second": "stats.tokens_per_second",
+      "time_to_first_token_seconds": "stats.time_to_first_token_seconds",
+      "model_load_time_seconds": "stats.model_load_time_seconds"
+    },
+    "client_timing": {
+      "source": "client_monotonic",
+      "metric": "total_request_ms"
+    }
+  },
+  "profiles": [
+    {
+      "profile": "thinking",
+      "warmup_excluded": true,
+      "reasoning_evidence": {
+        "requested_reasoning": "on",
+        "advertised_reasoning_options": ["off", "on", "low", "medium", "high"],
+        "advertised_reasoning_default": "on",
+        "observed_reasoning_output": "present",
+        "profile_verification_status": "behaviorally_consistent",
+        "resolved_reasoning_state": "unknown"
+      },
+      "memory": {
+        "ram": {
+          "metric": "available_physical_mib",
+          "scope": "windows_system",
+          "collector": "powershell_get_counter_memory_available_mbytes",
+          "collector_version": "fixture-powershell",
+          "sampling_interval_ms": 500,
+          "baseline_mib": 12000,
+          "loaded_idle_mib": 6000,
+          "measured_minimum_mib": 5000
+        },
+        "vram": {
+          "metric": "used_mib",
+          "scope": "gpu_total",
+          "collector": "nvidia_smi",
+          "collector_version": "fixture-nvidia-smi",
+          "sampling_interval_ms": 500,
+          "gpu_identifier_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "baseline_mib": 200,
+          "loaded_idle_mib": 3500,
+          "measured_peak_mib": 3800
+        }
+      },
+      "samples": [
+        {
+          "phase": "warmup",
+          "ordinal": 0,
+          "case_id": "eval-reason-001",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "present",
+          "native_stats": {
+            "input_tokens": {"value": 19, "null_reason": null},
+            "total_output_tokens": {"value": 29, "null_reason": null},
+            "reasoning_output_tokens": {"value": 9, "null_reason": null},
+            "tokens_per_second": {"value": 999, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.4, "null_reason": null},
+            "model_load_time_seconds": {"value": 3.0, "null_reason": null}
+          },
+          "total_request_ms": {"value": 900, "null_reason": null}
+        },
+        {
+          "phase": "measured",
+          "ordinal": 1,
+          "case_id": "eval-reason-001",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "present",
+          "native_stats": {
+            "input_tokens": {"value": 20, "null_reason": null},
+            "total_output_tokens": {"value": 30, "null_reason": null},
+            "reasoning_output_tokens": {"value": 10, "null_reason": null},
+            "tokens_per_second": {"value": 10, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.5, "null_reason": null},
+            "model_load_time_seconds": {"value": null, "null_reason": "server_field_absent"}
+          },
+          "total_request_ms": {"value": 1000, "null_reason": null}
+        },
+        {
+          "phase": "measured",
+          "ordinal": 2,
+          "case_id": "eval-if-003",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "present",
+          "native_stats": {
+            "input_tokens": {"value": 21, "null_reason": null},
+            "total_output_tokens": {"value": 31, "null_reason": null},
+            "reasoning_output_tokens": {"value": 11, "null_reason": null},
+            "tokens_per_second": {"value": 20, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.6, "null_reason": null},
+            "model_load_time_seconds": {"value": null, "null_reason": "server_field_absent"}
+          },
+          "total_request_ms": {"value": 1100, "null_reason": null}
+        },
+        {
+          "phase": "measured",
+          "ordinal": 3,
+          "case_id": "eval-reason-001",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "present",
+          "native_stats": {
+            "input_tokens": {"value": 22, "null_reason": null},
+            "total_output_tokens": {"value": 32, "null_reason": null},
+            "reasoning_output_tokens": {"value": 12, "null_reason": null},
+            "tokens_per_second": {"value": 30, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.7, "null_reason": null},
+            "model_load_time_seconds": {"value": null, "null_reason": "server_field_absent"}
+          },
+          "total_request_ms": {"value": 1200, "null_reason": null}
+        },
+        {
+          "phase": "measured",
+          "ordinal": 4,
+          "case_id": "eval-if-003",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "present",
+          "native_stats": {
+            "input_tokens": {"value": 23, "null_reason": null},
+            "total_output_tokens": {"value": 33, "null_reason": null},
+            "reasoning_output_tokens": {"value": 13, "null_reason": null},
+            "tokens_per_second": {"value": 40, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.8, "null_reason": null},
+            "model_load_time_seconds": {"value": null, "null_reason": "server_field_absent"}
+          },
+          "total_request_ms": {"value": 1300, "null_reason": null}
+        },
+        {
+          "phase": "measured",
+          "ordinal": 5,
+          "case_id": "eval-reason-001",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "present",
+          "native_stats": {
+            "input_tokens": {"value": 24, "null_reason": null},
+            "total_output_tokens": {"value": 34, "null_reason": null},
+            "reasoning_output_tokens": {"value": 14, "null_reason": null},
+            "tokens_per_second": {"value": 50, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.9, "null_reason": null},
+            "model_load_time_seconds": {"value": null, "null_reason": "server_field_absent"}
+          },
+          "total_request_ms": {"value": 1400, "null_reason": null}
+        }
+      ]
+    },
+    {
+      "profile": "non_thinking",
+      "warmup_excluded": true,
+      "reasoning_evidence": {
+        "requested_reasoning": "off",
+        "advertised_reasoning_options": ["off", "on", "low", "medium", "high"],
+        "advertised_reasoning_default": "on",
+        "observed_reasoning_output": "absent",
+        "profile_verification_status": "behaviorally_consistent",
+        "resolved_reasoning_state": "unknown"
+      },
+      "memory": {
+        "ram": {
+          "metric": "available_physical_mib",
+          "scope": "windows_system",
+          "collector": "powershell_get_counter_memory_available_mbytes",
+          "collector_version": "fixture-powershell",
+          "sampling_interval_ms": 500,
+          "baseline_mib": 12100,
+          "loaded_idle_mib": 6100,
+          "measured_minimum_mib": 5100
+        },
+        "vram": {
+          "metric": "used_mib",
+          "scope": "gpu_total",
+          "collector": "nvidia_smi",
+          "collector_version": "fixture-nvidia-smi",
+          "sampling_interval_ms": 500,
+          "gpu_identifier_sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "baseline_mib": 200,
+          "loaded_idle_mib": 3400,
+          "measured_peak_mib": 3700
+        }
+      },
+      "samples": [
+        {
+          "phase": "warmup",
+          "ordinal": 0,
+          "case_id": "eval-tr-001",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "absent",
+          "native_stats": {
+            "input_tokens": {"value": 14, "null_reason": null},
+            "total_output_tokens": {"value": 19, "null_reason": null},
+            "reasoning_output_tokens": {"value": 0, "null_reason": null},
+            "tokens_per_second": {"value": 888, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.2, "null_reason": null},
+            "model_load_time_seconds": {"value": 2.5, "null_reason": null}
+          },
+          "total_request_ms": {"value": 800, "null_reason": null}
+        },
+        {
+          "phase": "measured",
+          "ordinal": 1,
+          "case_id": "eval-tr-001",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "absent",
+          "native_stats": {
+            "input_tokens": {"value": 15, "null_reason": null},
+            "total_output_tokens": {"value": 20, "null_reason": null},
+            "reasoning_output_tokens": {"value": 0, "null_reason": null},
+            "tokens_per_second": {"value": 20, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.3, "null_reason": null},
+            "model_load_time_seconds": {"value": null, "null_reason": "server_field_absent"}
+          },
+          "total_request_ms": {"value": 700, "null_reason": null}
+        },
+        {
+          "phase": "measured",
+          "ordinal": 2,
+          "case_id": "eval-if-003",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "absent",
+          "native_stats": {
+            "input_tokens": {"value": 16, "null_reason": null},
+            "total_output_tokens": {"value": 21, "null_reason": null},
+            "reasoning_output_tokens": {"value": 0, "null_reason": null},
+            "tokens_per_second": {"value": 25, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.4, "null_reason": null},
+            "model_load_time_seconds": {"value": null, "null_reason": "server_field_absent"}
+          },
+          "total_request_ms": {"value": 800, "null_reason": null}
+        },
+        {
+          "phase": "measured",
+          "ordinal": 3,
+          "case_id": "eval-tr-001",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "absent",
+          "native_stats": {
+            "input_tokens": {"value": 17, "null_reason": null},
+            "total_output_tokens": {"value": 22, "null_reason": null},
+            "reasoning_output_tokens": {"value": 0, "null_reason": null},
+            "tokens_per_second": {"value": 30, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.5, "null_reason": null},
+            "model_load_time_seconds": {"value": null, "null_reason": "server_field_absent"}
+          },
+          "total_request_ms": {"value": 900, "null_reason": null}
+        },
+        {
+          "phase": "measured",
+          "ordinal": 4,
+          "case_id": "eval-if-003",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "absent",
+          "native_stats": {
+            "input_tokens": {"value": 18, "null_reason": null},
+            "total_output_tokens": {"value": 23, "null_reason": null},
+            "reasoning_output_tokens": {"value": 0, "null_reason": null},
+            "tokens_per_second": {"value": 35, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.6, "null_reason": null},
+            "model_load_time_seconds": {"value": null, "null_reason": "server_field_absent"}
+          },
+          "total_request_ms": {"value": 1000, "null_reason": null}
+        },
+        {
+          "phase": "measured",
+          "ordinal": 5,
+          "case_id": "eval-tr-001",
+          "retry_count": 0,
+          "success": true,
+          "error_type": null,
+          "observed_reasoning_output": "absent",
+          "native_stats": {
+            "input_tokens": {"value": 19, "null_reason": null},
+            "total_output_tokens": {"value": 24, "null_reason": null},
+            "reasoning_output_tokens": {"value": 0, "null_reason": null},
+            "tokens_per_second": {"value": 40, "null_reason": null},
+            "time_to_first_token_seconds": {"value": 0.7, "null_reason": null},
+            "model_load_time_seconds": {"value": null, "null_reason": "server_field_absent"}
+          },
+          "total_request_ms": {"value": 1100, "null_reason": null}
+        }
+      ]
+    }
+  ]
+}

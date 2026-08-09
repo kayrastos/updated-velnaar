@@ -24,6 +24,54 @@
     "backends": { "$ref": "#/$defs/backends" },
     "profiles": { "$ref": "#/$defs/profiles" }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "backends": {
+            "properties": {
+              "lm_studio": {
+                "properties": { "api_mode": { "const": "native_v1" } },
+                "required": ["api_mode"]
+              }
+            },
+            "required": ["lm_studio"]
+          }
+        },
+        "required": ["backends"]
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "properties": { "context_length": { "const": 4096 } }
+          },
+          "network": {
+            "required": ["allow_non_loopback", "allowed_hosts"],
+            "properties": {
+              "allow_non_loopback": { "const": false },
+              "allowed_hosts": {
+                "type": "array",
+                "prefixItems": [{ "const": "127.0.0.1" }],
+                "items": false,
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          },
+          "profiles": {
+            "properties": {
+              "thinking": {
+                "properties": { "unsupported_capability": { "const": "error" } }
+              },
+              "non_thinking": {
+                "properties": { "unsupported_capability": { "const": "error" } }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "execution": {
       "type": "object",
@@ -85,7 +133,7 @@
         "enabled": { "type": "boolean" },
         "base_url_env": {
           "$ref": "#/$defs/envName",
-          "description": "Environment variable containing an OpenAI API root ending in /v1; trailing slashes are normalized."
+          "description": "Environment variable containing the selected API mode's exact root; trailing slashes are normalized."
         },
         "model_id_env": { "$ref": "#/$defs/envName" },
         "model_revision_env": {
@@ -100,7 +148,38 @@
             { "type": "null" }
           ],
           "description": "Optional. An unset variable means no Authorization header is sent."
+        },
+        "api_mode": {
+          "enum": ["openai_compatible", "native_v1"],
+          "default": "openai_compatible"
+        },
+        "model_manifest": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "native_v1": {
+          "oneOf": [
+            { "$ref": "#/$defs/lmStudioNativeV1" },
+            { "type": "null" }
+          ]
         }
+      }
+    },
+    "lmStudioNativeV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_format", "quantization", "size_bytes", "context_length",
+        "parallel", "offload_kv_cache_to_gpu"
+      ],
+      "properties": {
+        "model_format": { "const": "gguf" },
+        "quantization": { "const": "Q4_K_M" },
+        "size_bytes": { "const": 9001752960 },
+        "context_length": { "const": 4096 },
+        "parallel": { "const": 1 },
+        "offload_kv_cache_to_gpu": { "const": false }
       }
     },
     "backends": {
@@ -120,13 +199,40 @@
         "lm_studio": {
           "allOf": [
             { "$ref": "#/$defs/remoteBackendBase" },
-            { "properties": { "kind": { "const": "lm_studio" } } }
+            { "properties": { "kind": { "const": "lm_studio" } } },
+            {
+              "if": {
+                "properties": { "api_mode": { "const": "native_v1" } },
+                "required": ["api_mode"]
+              },
+              "then": {
+                "required": ["model_manifest", "native_v1"],
+                "properties": {
+                  "model_manifest": {
+                    "const": "configs/models/qwen3-14b-q4_k_m.yaml"
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "model_manifest": { "type": "null" },
+                  "native_v1": { "type": "null" }
+                }
+              }
+            }
           ]
         },
         "llama_cpp": {
           "allOf": [
             { "$ref": "#/$defs/remoteBackendBase" },
-            { "properties": { "kind": { "const": "llama_cpp" } } }
+            {
+              "properties": {
+                "kind": { "const": "llama_cpp" },
+                "api_mode": { "enum": ["openai_compatible"] },
+                "model_manifest": { "type": "null" },
+                "native_v1": { "type": "null" }
+              }
+            }
           ]
         }
       }

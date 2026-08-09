@@ -27,7 +27,9 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(
             {
                 "assistant.schema.json",
+                "benchmark-series.schema.json",
                 "eval-case.schema.json",
+                "model-artifact.schema.json",
                 "preference-example.schema.json",
                 "run-result.schema.json",
                 "run-summary.schema.json",

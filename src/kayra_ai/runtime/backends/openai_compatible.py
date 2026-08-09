@@ -56,6 +56,7 @@ class OpenAICompatibleBackend:
             streaming="unsupported",
             token_usage="unknown",
             model_listing="supported",
+            source="unverified",
         )
 
     @property
@@ -201,7 +202,12 @@ class OpenAICompatibleBackend:
             return GenerationResponse(
                 content=message["content"],
                 usage=usage,
-                timing=TimingMetrics(total_ms=total_ms, ttft_ms=None),
+                timing=TimingMetrics(
+                    total_ms=total_ms,
+                    total_ms_source="client_measured",
+                    ttft_ms=None,
+                    ttft_ms_source="unavailable",
+                ),
                 effective_profile=effective_profile,
                 finish_reason=finish_reason,
             )
@@ -211,7 +217,7 @@ class OpenAICompatibleBackend:
     @staticmethod
     def _parse_usage(value: object) -> TokenUsage:
         if value is None:
-            return TokenUsage()
+            return TokenUsage(source="unavailable")
         if not isinstance(value, dict):
             raise TypeError
 
@@ -224,6 +230,7 @@ class OpenAICompatibleBackend:
             return item
 
         return TokenUsage(
+            source="backend_reported",
             prompt_tokens=optional_int("prompt_tokens"),
             completion_tokens=optional_int("completion_tokens"),
             total_tokens=optional_int("total_tokens"),

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import hashlib
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -10,6 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 ID_PATTERN = r"^[a-z0-9][a-z0-9._-]{2,127}$"
 EVAL_ID_PATTERN = r"^eval-[a-z0-9][a-z0-9._-]{2,119}$"
 SHA256_PATTERN = r"^[a-f0-9]{64}$"
+HASHED_RUNTIME_ID_PATTERN = r"^sha256:[a-f0-9]{64}$"
+PINNED_STAGE2_ARTIFACT_SHA256 = (
+    "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0"
+)
 
 
 class StrictModel(BaseModel):
@@ -213,18 +218,99 @@ class ModeResolution(StrictModel):
     capability_status: Literal["supported", "unsupported", "unknown"]
     effective_profile: Literal["thinking", "non_thinking", "backend_default", "unknown"]
     fallback_used: bool
+    requested_reasoning: Literal["on", "off"] | None
+    advertised_reasoning_options: list[Literal["off", "on", "low", "medium", "high"]] | None
+    advertised_reasoning_default: Literal["off", "on", "low", "medium", "high"] | None
+    observed_reasoning_output: Literal["present", "absent", "unknown"]
+    resolved_reasoning_state: Literal["unknown"] | None
+    verification_status: Literal[
+        "static_verified",
+        "behaviorally_consistent",
+        "fallback",
+        "unknown",
+    ]
+    evidence_source: Literal[
+        "static_backend",
+        "lm_studio_native_v1_models",
+        "lm_studio_native_v1_response",
+        "unverified",
+    ]
 
     @model_validator(mode="after")
     def fallback_is_explicit(self) -> "ModeResolution":
+        options = self.advertised_reasoning_options
+        if options is not None and len(options) != len(set(options)):
+            raise ValueError("advertised reasoning seçenekleri benzersiz olmalı")
+        if (
+            self.advertised_reasoning_default is not None
+            and options is not None
+            and self.advertised_reasoning_default not in options
+        ):
+            raise ValueError("advertised reasoning default seçenekler içinde olmalı")
         if self.fallback_used and self.effective_profile != "backend_default":
             raise ValueError("fallback kullanıldığında effective_profile backend_default olmalı")
         if not self.fallback_used and self.effective_profile == "backend_default":
             raise ValueError("backend_default effective_profile açık fallback gerektirir")
-        if self.capability_status == "supported":
-            if self.fallback_used or self.effective_profile not in {"thinking", "non_thinking"}:
-                raise ValueError("supported capability açık profille ve fallback olmadan çözülmeli")
-        elif self.effective_profile not in {"unknown", "backend_default"}:
+        if self.capability_status != "supported" and self.effective_profile not in {
+            "unknown",
+            "backend_default",
+        }:
             raise ValueError("desteklenmeyen veya bilinmeyen capability profil iddia edemez")
+        if self.verification_status == "static_verified":
+            if (
+                self.capability_status != "supported"
+                or self.effective_profile not in {"thinking", "non_thinking"}
+                or self.fallback_used
+                or self.requested_reasoning is not None
+                or self.advertised_reasoning_options is not None
+                or self.advertised_reasoning_default is not None
+                or self.observed_reasoning_output != "unknown"
+                or self.resolved_reasoning_state is not None
+                or self.evidence_source != "static_backend"
+            ):
+                raise ValueError("static profil doğrulaması kendi kanıt alanlarıyla tutarlı olmalı")
+        elif self.verification_status == "behaviorally_consistent":
+            if (
+                self.capability_status != "supported"
+                or self.effective_profile != "unknown"
+                or self.fallback_used
+                or self.requested_reasoning is None
+                or options is None
+                or self.requested_reasoning not in options
+                or self.observed_reasoning_output == "unknown"
+                or self.resolved_reasoning_state != "unknown"
+                or self.evidence_source != "lm_studio_native_v1_response"
+            ):
+                raise ValueError("davranışsal profil kanıtı resolved state iddia edemez")
+        elif self.verification_status == "fallback":
+            if (
+                self.capability_status == "supported"
+                or not self.fallback_used
+                or self.effective_profile != "backend_default"
+                or self.requested_reasoning is not None
+                or self.advertised_reasoning_options is not None
+                or self.advertised_reasoning_default is not None
+                or self.observed_reasoning_output != "unknown"
+                or self.resolved_reasoning_state is not None
+                or self.evidence_source != "unverified"
+            ):
+                raise ValueError("fallback profil kanıtı tutarsız")
+        elif self.verification_status == "unknown":
+            if (
+                self.effective_profile != "unknown"
+                or self.fallback_used
+                or self.requested_reasoning is not None
+                or self.observed_reasoning_output != "unknown"
+                or self.resolved_reasoning_state is not None
+                or self.evidence_source
+                not in {"lm_studio_native_v1_models", "unverified"}
+            ):
+                raise ValueError("bilinmeyen profil doğrulaması effective profil iddia edemez")
+            if self.evidence_source == "unverified" and (
+                self.advertised_reasoning_options is not None
+                or self.advertised_reasoning_default is not None
+            ):
+                raise ValueError("unverified profil advertised reasoning metadata taşıyamaz")
         return self
 
 
@@ -248,16 +334,37 @@ class ResponseArtifact(StrictModel):
 
 
 class TokenUsage(StrictModel):
-    source: Literal["backend_reported", "mock_deterministic", "unavailable"]
+    source: Literal[
+        "backend_reported",
+        "lm_studio_native_v1",
+        "mock_deterministic",
+        "unavailable",
+    ]
     prompt_tokens: int | None = Field(ge=0)
     completion_tokens: int | None = Field(ge=0)
     total_tokens: int | None = Field(ge=0)
+    reasoning_tokens: int | None = Field(ge=0)
 
     @model_validator(mode="after")
     def token_counts_are_consistent(self) -> "TokenUsage":
-        values = (self.prompt_tokens, self.completion_tokens, self.total_tokens)
+        values = (
+            self.prompt_tokens,
+            self.completion_tokens,
+            self.total_tokens,
+            self.reasoning_tokens,
+        )
         if self.source == "unavailable" and any(value is not None for value in values):
             raise ValueError("unavailable usage token sayıları içeremez")
+        if self.source == "lm_studio_native_v1":
+            if (
+                self.prompt_tokens is None
+                or self.completion_tokens is None
+                or self.reasoning_tokens is None
+                or self.total_tokens is not None
+            ):
+                raise ValueError(
+                    "native v1 usage input/output/reasoning tokenlarını taşımalı ve total_tokens üretmemeli"
+                )
         if self.prompt_tokens is not None and self.completion_tokens is not None:
             expected = self.prompt_tokens + self.completion_tokens
             if self.total_tokens is not None and self.total_tokens != expected:
@@ -266,24 +373,48 @@ class TokenUsage(StrictModel):
 
 
 class TimingMetrics(StrictModel):
-    source: Literal["measured", "mock_deterministic", "unavailable"]
     first_token_ms: float | None = Field(ge=0)
+    first_token_ms_source: Literal[
+        "lm_studio_native_v1",
+        "mock_deterministic",
+        "unavailable",
+    ]
     generation_ms: float | None = Field(ge=0)
+    generation_ms_source: Literal[
+        "backend_reported",
+        "client_measured",
+        "mock_deterministic",
+        "unavailable",
+    ]
     total_ms: float | None = Field(ge=0)
+    total_ms_source: Literal["client_measured", "mock_deterministic", "unavailable"]
     tokens_per_second: float | None = Field(ge=0)
+    tokens_per_second_source: Literal[
+        "lm_studio_native_v1",
+        "backend_reported",
+        "mock_deterministic",
+        "unavailable",
+    ]
+    model_load_ms: float | None = Field(ge=0)
+    model_load_ms_source: Literal["lm_studio_native_v1", "unavailable"]
 
     @model_validator(mode="after")
     def timings_are_consistent(self) -> "TimingMetrics":
-        values = (self.first_token_ms, self.generation_ms, self.total_ms, self.tokens_per_second)
-        if self.source == "unavailable" and any(value is not None for value in values):
-            raise ValueError("unavailable timing ölçüm içeremez")
+        pairs = (
+            (self.first_token_ms, self.first_token_ms_source),
+            (self.generation_ms, self.generation_ms_source),
+            (self.total_ms, self.total_ms_source),
+            (self.tokens_per_second, self.tokens_per_second_source),
+            (self.model_load_ms, self.model_load_ms_source),
+        )
+        for value, source in pairs:
+            if (value is None) != (source == "unavailable"):
+                raise ValueError("timing değeri ile ölçüm kaynağı tutarlı olmalı")
         if self.total_ms is not None:
             if self.first_token_ms is not None and self.first_token_ms > self.total_ms:
                 raise ValueError("first_token_ms total_ms değerini aşamaz")
             if self.generation_ms is not None and self.generation_ms > self.total_ms:
                 raise ValueError("generation_ms total_ms değerini aşamaz")
-        if self.tokens_per_second is not None and not self.generation_ms:
-            raise ValueError("tokens_per_second için pozitif generation_ms gerekli")
         return self
 
 
@@ -320,7 +451,7 @@ class EvaluationOutcome(StrictModel):
 
 
 class RunResult(StrictModel):
-    schema_version: Literal["2.0"]
+    schema_version: Literal["2.1"]
     run_id: str = Field(pattern=ID_PATTERN)
     result_id: str = Field(pattern=ID_PATTERN)
     case_id: str = Field(pattern=EVAL_ID_PATTERN)
@@ -342,6 +473,13 @@ class RunResult(StrictModel):
 
     @model_validator(mode="after")
     def outcome_is_consistent(self) -> "RunResult":
+        if self.runtime.name != "mock":
+            if re.fullmatch(HASHED_RUNTIME_ID_PATTERN, self.model.id) is None:
+                raise ValueError("gerçek runtime model id değeri sha256 kimliği olmalı")
+            if self.model.revision is not None and re.fullmatch(
+                HASHED_RUNTIME_ID_PATTERN, self.model.revision
+            ) is None:
+                raise ValueError("gerçek runtime model revision değeri sha256 kimliği olmalı")
         if self.success and self.error is not None:
             raise ValueError("başarılı sonuç error içeremez")
         if not self.success and self.error is None:
@@ -349,11 +487,66 @@ class RunResult(StrictModel):
         if not self.success:
             if self.response.retention != "not_retained" or self.response.content is not None:
                 raise ValueError("başarısız sonuç response içeriği saklayamaz")
+            if (
+                self.mode_resolution.effective_profile != "unknown"
+                or self.mode_resolution.fallback_used
+                or self.mode_resolution.requested_reasoning is not None
+                or self.mode_resolution.observed_reasoning_output != "unknown"
+                or self.mode_resolution.resolved_reasoning_state is not None
+                or self.mode_resolution.verification_status != "unknown"
+            ):
+                raise ValueError("başarısız sonuç profil yürütme iddiası içeremez")
+            if self.usage.source != "unavailable":
+                raise ValueError("başarısız sonuç token kullanımı iddia edemez")
+            if (
+                self.timing.first_token_ms_source != "unavailable"
+                or self.timing.generation_ms_source != "unavailable"
+                or self.timing.tokens_per_second_source != "unavailable"
+                or self.timing.model_load_ms_source != "unavailable"
+                or self.timing.total_ms_source not in {"client_measured", "unavailable"}
+            ):
+                raise ValueError(
+                    "başarısız sonuç yalnız istemci toplam süresini veya unavailable timing taşıyabilir"
+                )
+        elif self.mode_resolution.verification_status == "unknown":
+            raise ValueError("başarılı sonuç unknown profil doğrulaması taşıyamaz")
+        if self.mode_resolution.fallback_used and self.runtime.name != "llama_cpp":
+            raise ValueError("profil fallback yalnız llama_cpp runtime ile kullanılabilir")
         if self.mode_resolution.capability_status == "supported":
-            if self.mode_resolution.effective_profile != self.requested_profile:
-                raise ValueError("desteklenen mod istenen profile çözülmeli")
-            if self.mode_resolution.fallback_used:
-                raise ValueError("desteklenen mod fallback kullanamaz")
+            if self.mode_resolution.verification_status == "static_verified":
+                if self.mode_resolution.effective_profile != self.requested_profile:
+                    raise ValueError("statik desteklenen mod istenen profile çözülmeli")
+            elif self.mode_resolution.verification_status == "behaviorally_consistent":
+                expected_reasoning = "on" if self.requested_profile == "thinking" else "off"
+                expected_observation = "present" if self.requested_profile == "thinking" else "absent"
+                if (
+                    self.mode_resolution.requested_reasoning != expected_reasoning
+                    or self.mode_resolution.observed_reasoning_output != expected_observation
+                ):
+                    raise ValueError("native reasoning kanıtı istenen profille uyuşmuyor")
+                if self.requested_profile == "thinking":
+                    if self.usage.reasoning_tokens is None or self.usage.reasoning_tokens <= 0:
+                        raise ValueError("thinking davranış kanıtı pozitif reasoning token gerektirir")
+                elif self.usage.reasoning_tokens != 0:
+                    raise ValueError("non-thinking davranış kanıtı sıfır reasoning token gerektirir")
+                if (
+                    self.runtime.name != "lm_studio"
+                    or self.generation.context_length != 4096
+                    or self.generation.stream
+                    or self.model.artifact_sha256 != PINNED_STAGE2_ARTIFACT_SHA256
+                    or self.usage.source != "lm_studio_native_v1"
+                    or self.timing.first_token_ms_source != "lm_studio_native_v1"
+                    or self.timing.generation_ms_source != "unavailable"
+                    or self.timing.tokens_per_second_source != "lm_studio_native_v1"
+                    or self.timing.total_ms_source != "client_measured"
+                    or self.timing.model_load_ms_source
+                    not in {"lm_studio_native_v1", "unavailable"}
+                ):
+                    raise ValueError(
+                        "native davranış kanıtı pinli artifact, 4096 context, non-stream ve native v1 metrikleri gerektirir"
+                    )
+            elif self.success:
+                raise ValueError("başarılı supported sonuç doğrulama kanıtı gerektirir")
         if self.runtime.name == "mock":
             if (
                 self.evaluation.kind != "pipeline_only"
@@ -363,10 +556,26 @@ class RunResult(StrictModel):
                 raise ValueError("mock sonucu yalnız pipeline_only olabilir")
             if self.mode_resolution.capability_status != "supported":
                 raise ValueError("mock backend iki profili de desteklemeli")
-            if self.mode_resolution.effective_profile != self.requested_profile:
-                raise ValueError("mock effective_profile istenen profille aynı olmalı")
             if self.mode_resolution.fallback_used:
                 raise ValueError("mock backend fallback kullanamaz")
+            if self.success:
+                if self.mode_resolution.effective_profile != self.requested_profile:
+                    raise ValueError("mock effective_profile istenen profille aynı olmalı")
+                if (
+                    self.mode_resolution.verification_status != "static_verified"
+                    or self.mode_resolution.evidence_source != "static_backend"
+                ):
+                    raise ValueError("mock backend statik profil doğrulaması kullanmalı")
+                if self.usage.source != "mock_deterministic":
+                    raise ValueError("mock backend yalnız mock_deterministic usage taşımalı")
+                if (
+                    self.timing.first_token_ms_source != "unavailable"
+                    or self.timing.generation_ms_source != "unavailable"
+                    or self.timing.total_ms_source != "mock_deterministic"
+                    or self.timing.tokens_per_second_source != "unavailable"
+                    or self.timing.model_load_ms_source != "unavailable"
+                ):
+                    raise ValueError("mock backend yalnız güvenli deterministik timing kaynakları taşımalı")
         if self.timing.tokens_per_second is not None:
             if self.usage.completion_tokens is None:
                 raise ValueError("tokens_per_second için completion_tokens gerekli")
@@ -412,27 +621,13 @@ class ResultReference(StrictModel):
     record_count: int = Field(ge=1)
 
 
-class BenchmarkMetrics(StrictModel):
-    sample_count: int = Field(ge=1)
-    warmup_count: int = Field(ge=0)
-    ram_baseline_mib: float | None = Field(ge=0)
-    ram_idle_mib: float | None = Field(ge=0)
-    ram_peak_mib: float | None = Field(ge=0)
-    vram_baseline_mib: float | None = Field(ge=0)
-    vram_idle_mib: float | None = Field(ge=0)
-    vram_peak_mib: float | None = Field(ge=0)
-    tokens_per_second: float | None = Field(ge=0)
-    first_token_ms: float | None = Field(ge=0)
-    total_ms: float | None = Field(ge=0)
-
-
 PIPELINE_WARNING = (
     "Pipeline-only evaluation; results are not semantic quality scores or model benchmarks."
 )
 
 
 class RunSummary(StrictModel):
-    schema_version: Literal["1.0"]
+    schema_version: Literal["1.1"]
     run_id: str = Field(pattern=ID_PATTERN)
     started_at: datetime
     finished_at: datetime
@@ -450,16 +645,25 @@ class RunSummary(StrictModel):
     error_rate: float = Field(ge=0, le=1)
     profiles: list[ProfileSummary] = Field(min_length=1, max_length=2)
     errors: list[ErrorSummary]
-    semantic_scoring_performed: bool
+    semantic_scoring_performed: Literal[False]
     pipeline_warning: Literal[
         "Pipeline-only evaluation; results are not semantic quality scores or model benchmarks."
     ]
-    benchmark: BenchmarkMetrics | None
+    benchmark: None
 
     @model_validator(mode="after")
     def summary_is_consistent(self) -> "RunSummary":
+        if self.runtime.name != "mock":
+            if re.fullmatch(HASHED_RUNTIME_ID_PATTERN, self.model.id) is None:
+                raise ValueError("gerçek runtime özet model id değeri sha256 kimliği olmalı")
+            if self.model.revision is not None and re.fullmatch(
+                HASHED_RUNTIME_ID_PATTERN, self.model.revision
+            ) is None:
+                raise ValueError("gerçek runtime özet model revision değeri sha256 kimliği olmalı")
         if self.finished_at < self.started_at:
             raise ValueError("finished_at started_at değerinden önce olamaz")
+        if self.distinct_case_count > self.execution_count:
+            raise ValueError("distinct_case_count execution_count değerini aşamaz")
         if self.success_count + self.failure_count + self.skipped_count != self.execution_count:
             raise ValueError("özet sayımları execution_count ile eşleşmiyor")
         if self.result_reference.record_count != self.execution_count:
@@ -484,11 +688,6 @@ class RunSummary(StrictModel):
         error_types = [item.type for item in self.errors]
         if len(error_types) != len(set(error_types)):
             raise ValueError("error türleri benzersiz olmalı")
-        if self.runtime.name == "mock":
-            if self.semantic_scoring_performed:
-                raise ValueError("mock özeti semantik puanlama içeremez")
-            if self.benchmark is not None:
-                raise ValueError("mock özeti gerçek benchmark metriği içeremez")
         return self
 
 DATASET_MODELS = {

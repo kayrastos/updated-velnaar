@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,22 +15,28 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from kayra_ai.evaluation.reporting import OutputCollisionError
-from kayra_ai.evaluation.runner import load_eval_cases, run_evaluation
+from kayra_ai.evaluation.runner import EvaluationFailure, load_eval_cases, run_evaluation
 from kayra_ai.runtime.contracts import (
     BackendCapabilities,
     GenerationResponse,
     PreflightResult,
+    ProfileExecutionState,
     TimingMetrics as RuntimeTiming,
     TokenUsage as RuntimeUsage,
 )
+from kayra_ai.runtime.errors import CapabilityUnavailableFailure, ConnectionFailure
 from kayra_ai.validation.common import ValidationIssue
+from kayra_ai.validation.model_artifact import load_model_artifact
 from kayra_ai.validation.models import RunResult, RunSummary
 from kayra_ai.validation.validate_dataset import validate_dataset
 
 
 CONFIG = ROOT / "configs" / "runtime.yaml"
+NATIVE_CONFIG = ROOT / "configs" / "runtime.lm-studio.yaml"
 EVAL = ROOT / "data" / "eval" / "seed.jsonl"
+SMOKE = ROOT / "data" / "eval" / "stage2-smoke.jsonl"
 EXPECTED_EVAL_SHA256 = "cfb2f683977b7178d3f4ed4f2b1008e7013531686d97fd546104b8784cd53d89"
+EXPECTED_MODEL_SHA256 = "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0"
 
 
 class CapturingMockBackend:
@@ -55,6 +62,7 @@ class CapturingMockBackend:
             streaming="unsupported",
             token_usage="unsupported",
             model_listing="supported",
+            source="static_backend" if self.runtime_name == "mock" else "unverified",
         )
 
     @property
@@ -78,8 +86,19 @@ class CapturingMockBackend:
             raise self.failure
         return GenerationResponse(
             content=self.response_content or f"capture:{request.requested_profile}",
-            usage=RuntimeUsage(),
-            timing=RuntimeTiming(total_ms=0.0, ttft_ms=None),
+            usage=RuntimeUsage(
+                source=(
+                    "mock_deterministic" if self.runtime_name == "mock" else "unavailable"
+                )
+            ),
+            timing=RuntimeTiming(
+                total_ms=0.0,
+                total_ms_source=(
+                    "mock_deterministic" if self.runtime_name == "mock" else "client_measured"
+                ),
+                ttft_ms=None,
+                ttft_ms_source="unavailable",
+            ),
             effective_profile=request.requested_profile,
             finish_reason=self.response_finish_reason,
         )
@@ -90,6 +109,66 @@ class CapturingRemoteBackend(CapturingMockBackend):
     runtime_version = None
     model_id = "MODEL-ENV-VALUE-CANARY-41a"
     model_revision = "REVISION-ENV-VALUE-CANARY-52b"
+
+
+class CapturingNativeBackend(CapturingRemoteBackend):
+    model_id = "qwen3-14b-q4-k-m"
+    model_revision = None
+
+    def __init__(self, *, failure: Exception | None = None) -> None:
+        super().__init__(failure=failure)
+        self._capabilities = BackendCapabilities(
+            thinking="supported",
+            non_thinking="supported",
+            streaming="unsupported",
+            token_usage="supported",
+            model_listing="supported",
+            source="lm_studio_native_v1_models",
+            advertised_reasoning_options=("off", "on"),
+            advertised_reasoning_default="off",
+        )
+
+    def generate(self, request):  # type: ignore[no-untyped-def]
+        self.requests.append(request)
+        if self.failure is not None:
+            raise self.failure
+        requested_reasoning = "on" if request.requested_profile == "thinking" else "off"
+        observed = request.requested_profile == "thinking"
+        return GenerationResponse(
+            content=f"native-capture:{request.requested_profile}",
+            usage=RuntimeUsage(
+                source="lm_studio_native_v1",
+                prompt_tokens=20,
+                completion_tokens=8,
+                total_tokens=None,
+                reasoning_tokens=3 if observed else 0,
+            ),
+            timing=RuntimeTiming(
+                total_ms=80.0,
+                total_ms_source="client_measured",
+                ttft_ms=12.5,
+                ttft_ms_source="lm_studio_native_v1",
+                tokens_per_second=30.0,
+                tokens_per_second_source="lm_studio_native_v1",
+                model_load_ms=None,
+                model_load_ms_source="unavailable",
+            ),
+            effective_profile="unknown",
+            finish_reason=None,
+            model_instance_id="native-instance-1",
+            response_id=None,
+            profile_state=ProfileExecutionState(
+                capability_status="supported",
+                requested_profile=request.requested_profile,
+                requested_reasoning=requested_reasoning,
+                advertised_reasoning_options=("off", "on"),
+                advertised_reasoning_default="off",
+                observed_reasoning_output="present" if observed else "absent",
+                resolved_reasoning_state="unknown",
+                verification_status="behaviorally_consistent",
+                source="lm_studio_native_v1_response",
+            ),
+        )
 
 
 class EvaluationPipelineTests(unittest.TestCase):
@@ -153,6 +232,281 @@ class EvaluationPipelineTests(unittest.TestCase):
             ).read_text(encoding="utf-8")
             self.assertNotIn("pipeline-ok", summary_text)
             self.assertIn("pipeline-ok", results_path.read_text(encoding="utf-8"))
+
+    def test_native_fake_run_carries_manifest_hash_without_transport_or_socket(self) -> None:
+        backend = CapturingNativeBackend()
+        transport_calls = 0
+
+        def forbidden_transport(_network):
+            nonlocal transport_calls
+            transport_calls += 1
+            raise AssertionError("fake native run must not construct a transport")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch(
+                "socket.socket", side_effect=AssertionError("socket use is forbidden")
+            ), patch(
+                "socket.create_connection",
+                side_effect=AssertionError("socket connection is forbidden"),
+            ):
+                completed = run_evaluation(
+                    config_path=NATIVE_CONFIG,
+                    eval_path=SMOKE,
+                    backend_name="lm_studio",
+                    profiles="all",
+                    run_id="stage2-native-fake",
+                    output_root=root / "runs",
+                    environ={
+                        "KAYRA_LM_STUDIO_BASE_URL": "http://127.0.0.1:1234/api/v1",
+                        "KAYRA_LM_STUDIO_MODEL": backend.model_id,
+                    },
+                    transport_factory=forbidden_transport,
+                    backend_factory=lambda *_args, **_kwargs: backend,
+                )
+            native_summary_text = (
+                (completed.run_directory / "summary.json").read_text(encoding="utf-8")
+                + (completed.run_directory / "summary.md").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(0, transport_calls)
+        self.assertEqual(4, len(completed.results))
+        self.assertEqual(
+            [("eval-if-003", "thinking"), ("eval-if-003", "non_thinking")],
+            [
+                (item.case_id, item.requested_profile)
+                for item in completed.results[:2]
+            ],
+        )
+        self.assertEqual(
+            backend.requests[0].messages[-1].content,
+            backend.requests[1].messages[-1].content,
+        )
+        self.assertNotIn("native-capture", native_summary_text)
+        self.assertNotIn(backend.model_id, native_summary_text)
+        self.assertEqual(EXPECTED_MODEL_SHA256, completed.results[0].model.artifact_sha256)
+        resolution = completed.results[0].mode_resolution
+        self.assertEqual("unknown", resolution.effective_profile)
+        self.assertEqual("unknown", resolution.resolved_reasoning_state)
+        self.assertEqual("on", resolution.requested_reasoning)
+        self.assertEqual("present", resolution.observed_reasoning_output)
+        self.assertEqual("behaviorally_consistent", resolution.verification_status)
+        self.assertIsNone(completed.results[0].usage.total_tokens)
+        self.assertEqual("lm_studio_native_v1", completed.results[0].timing.first_token_ms_source)
+
+    def test_native_profile_probe_failure_stops_without_later_prompts_or_artifacts(self) -> None:
+        backend = CapturingNativeBackend(failure=ConnectionFailure())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output_root = root / "runs"
+            with patch(
+                "socket.socket", side_effect=AssertionError("socket use is forbidden")
+            ), patch(
+                "socket.create_connection",
+                side_effect=AssertionError("socket connection is forbidden"),
+            ):
+                with self.assertRaises(ConnectionFailure):
+                    run_evaluation(
+                        config_path=NATIVE_CONFIG,
+                        eval_path=SMOKE,
+                        backend_name="lm_studio",
+                        profiles="all",
+                        run_id="stage2-native-failure",
+                        output_root=output_root,
+                        environ={
+                            "KAYRA_LM_STUDIO_BASE_URL": "http://127.0.0.1:1234/api/v1",
+                            "KAYRA_LM_STUDIO_MODEL": backend.model_id,
+                        },
+                        transport_factory=lambda _network: (_ for _ in ()).throw(
+                            AssertionError("transport use is forbidden")
+                        ),
+                        backend_factory=lambda *_args, **_kwargs: backend,
+                    )
+
+            self.assertEqual(1, len(backend.requests))
+            self.assertEqual("thinking", backend.requests[0].requested_profile)
+            self.assertFalse((output_root / "stage2-native-failure").exists())
+
+    def test_native_second_profile_failure_stops_before_remaining_smoke_cases(self) -> None:
+        class SecondProfileFailureBackend(CapturingNativeBackend):
+            def generate(self, request):  # type: ignore[no-untyped-def]
+                if request.requested_profile == "non_thinking":
+                    self.requests.append(request)
+                    raise CapabilityUnavailableFailure(
+                        "Eşleştirilmiş non-thinking profil kanıtı doğrulanamadı."
+                    )
+                return super().generate(request)
+
+        backend = SecondProfileFailureBackend()
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "runs"
+            with patch(
+                "socket.socket", side_effect=AssertionError("socket use is forbidden")
+            ), patch(
+                "socket.create_connection",
+                side_effect=AssertionError("socket connection is forbidden"),
+            ):
+                with self.assertRaises(CapabilityUnavailableFailure):
+                    run_evaluation(
+                        config_path=NATIVE_CONFIG,
+                        eval_path=SMOKE,
+                        backend_name="lm_studio",
+                        profiles="all",
+                        run_id="stage2-native-second-profile-failure",
+                        output_root=output_root,
+                        environ={
+                            "KAYRA_LM_STUDIO_BASE_URL": "http://127.0.0.1:1234/api/v1",
+                            "KAYRA_LM_STUDIO_MODEL": backend.model_id,
+                        },
+                        transport_factory=lambda _network: (_ for _ in ()).throw(
+                            AssertionError("transport use is forbidden")
+                        ),
+                        backend_factory=lambda *_args, **_kwargs: backend,
+                    )
+
+            self.assertEqual(
+                ["thinking", "non_thinking"],
+                [request.requested_profile for request in backend.requests],
+            )
+            self.assertEqual(
+                backend.requests[0].messages[-1].content,
+                backend.requests[1].messages[-1].content,
+            )
+            self.assertFalse(
+                (output_root / "stage2-native-second-profile-failure").exists()
+            )
+
+    def test_native_run_requires_smoke_or_explicit_full_gate_and_a_profile_pair(self) -> None:
+        backend_calls = 0
+
+        def forbidden_backend(*_args, **_kwargs):
+            nonlocal backend_calls
+            backend_calls += 1
+            raise AssertionError("profile gate must run before backend construction")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            one_case = root / "one.jsonl"
+            one_case.write_text(
+                EVAL.read_text(encoding="utf-8").splitlines()[0] + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(EvaluationFailure):
+                run_evaluation(
+                    config_path=NATIVE_CONFIG,
+                    eval_path=EVAL,
+                    backend_name="lm_studio",
+                    profiles="all",
+                    run_id="stage2-native-no-full-gate",
+                    output_root=root / "runs",
+                    backend_factory=forbidden_backend,
+                )
+            with self.assertRaises(EvaluationFailure):
+                run_evaluation(
+                    config_path=NATIVE_CONFIG,
+                    eval_path=SMOKE,
+                    backend_name="lm_studio",
+                    profiles="thinking",
+                    run_id="stage2-native-one-profile",
+                    output_root=root / "runs",
+                    backend_factory=forbidden_backend,
+                )
+            with self.assertRaises(EvaluationFailure):
+                run_evaluation(
+                    config_path=NATIVE_CONFIG,
+                    eval_path=one_case,
+                    backend_name="lm_studio",
+                    profiles="all",
+                    run_id="stage2-native-no-both",
+                    output_root=root / "runs",
+                    backend_factory=forbidden_backend,
+                    allow_native_non_smoke_eval=True,
+                )
+
+        self.assertEqual(0, backend_calls)
+
+    def test_manifest_mismatch_stops_before_backend_or_transport(self) -> None:
+        backend_calls = 0
+        transport_calls = 0
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifact = load_model_artifact(
+                ROOT / "configs" / "models" / "qwen3-14b-q4_k_m.yaml"
+            )
+            mismatches = (
+                (
+                    "repository",
+                    artifact.model_copy(update={"repository": "Other/Repository"}),
+                ),
+                ("commit", artifact.model_copy(update={"commit": "0" * 40})),
+                ("license", artifact.model_copy(update={"license": "MIT"})),
+                (
+                    "filename",
+                    artifact.model_copy(
+                        update={
+                            "files": [
+                                artifact.files[0].model_copy(
+                                    update={"filename": "other-Q4_K_M.gguf"}
+                                )
+                            ]
+                        }
+                    ),
+                ),
+                (
+                    "size",
+                    artifact.model_copy(
+                        update={
+                            "files": [artifact.files[0].model_copy(update={"size_bytes": 1})]
+                        }
+                    ),
+                ),
+                (
+                    "sha256",
+                    artifact.model_copy(
+                        update={
+                            "files": [
+                                artifact.files[0].model_copy(update={"sha256": "0" * 64})
+                            ]
+                        }
+                    ),
+                ),
+            )
+
+            def forbidden_backend(*_args, **_kwargs):
+                nonlocal backend_calls
+                backend_calls += 1
+                raise AssertionError("manifest mismatch must stop before backend construction")
+
+            def forbidden_transport(_network):
+                nonlocal transport_calls
+                transport_calls += 1
+                raise AssertionError("manifest mismatch must stop before transport construction")
+
+            with patch(
+                "socket.socket", side_effect=AssertionError("socket use is forbidden")
+            ), patch(
+                "socket.create_connection",
+                side_effect=AssertionError("socket connection is forbidden"),
+            ):
+                for label, mismatched_artifact in mismatches:
+                    with self.subTest(field=label), patch(
+                        "kayra_ai.evaluation.runner.load_model_artifact",
+                        return_value=mismatched_artifact,
+                    ):
+                        with self.assertRaises(EvaluationFailure):
+                            run_evaluation(
+                                config_path=NATIVE_CONFIG,
+                                eval_path=SMOKE,
+                                backend_name="lm_studio",
+                                profiles="all",
+                                run_id=f"stage2-manifest-{label}",
+                                output_root=root / "runs",
+                                transport_factory=forbidden_transport,
+                                backend_factory=forbidden_backend,
+                            )
+
+        self.assertEqual(0, backend_calls)
+        self.assertEqual(0, transport_calls)
 
     def test_existing_run_directory_is_preserved_before_backend_construction(self) -> None:
         backend_calls = 0

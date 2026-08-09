@@ -26,6 +26,7 @@ class MockBackend:
             streaming="unsupported",
             token_usage="unsupported",
             model_listing="supported",
+            source="static_backend",
         )
 
     @property
@@ -69,8 +70,13 @@ class MockBackend:
         digest = hashlib.sha256(canonical).hexdigest()[:16]
         return GenerationResponse(
             content=f"[kayra-mock:{request.requested_profile}:{digest}] pipeline-ok",
-            usage=TokenUsage(),
-            timing=TimingMetrics(total_ms=0.0, ttft_ms=None),
+            usage=TokenUsage(source="mock_deterministic"),
+            timing=TimingMetrics(
+                total_ms=0.0,
+                total_ms_source="mock_deterministic",
+                ttft_ms=None,
+                ttft_ms_source="unavailable",
+            ),
             effective_profile=request.requested_profile,
             finish_reason="mock_complete",
         )

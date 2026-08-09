@@ -1,0 +1,800 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kayra.local/schemas/benchmark-series.schema.json",
+  "title": "Kayra Stage 2 LM Studio benchmark series",
+  "description": "İçerik ve sır taşımayan; iki profil için bir ısınma ve beş ölçümlü örnek içeren benchmark artifact'i.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "series_id",
+    "started_at",
+    "finished_at",
+    "smoke_set",
+    "model",
+    "runtime",
+    "configuration",
+    "metric_contract",
+    "profiles"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "series_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$"
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "smoke_set": { "$ref": "#/$defs/smoke_set" },
+    "model": { "$ref": "#/$defs/model" },
+    "runtime": { "$ref": "#/$defs/runtime" },
+    "configuration": { "$ref": "#/$defs/configuration" },
+    "metric_contract": { "$ref": "#/$defs/metric_contract" },
+    "profiles": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/profile" },
+            { "properties": { "profile": { "const": "thinking" } } }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/profile" },
+            { "properties": { "profile": { "const": "non_thinking" } } }
+          ]
+        }
+      ],
+      "items": false
+    }
+  },
+  "$defs": {
+    "smoke_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "case_ids"],
+      "properties": {
+        "path": { "const": "data/eval/stage2-smoke.jsonl" },
+        "sha256": {
+          "const": "605ecf339774b5130c9214fbaa126202f2f91b20327092f3d44cb9df8111751d"
+        },
+        "case_ids": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            { "const": "eval-tr-001" },
+            { "const": "eval-if-003" },
+            { "const": "eval-reason-001" }
+          ],
+          "items": false
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identifier_sha256",
+        "revision_sha256",
+        "artifact_sha256",
+        "quantization"
+      ],
+      "properties": {
+        "identifier_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "revision_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "quantization": { "const": "Q4_K_M" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "engine",
+        "engine_version",
+        "platform",
+        "windows_version",
+        "gpu_driver_version"
+      ],
+      "properties": {
+        "name": { "const": "lm_studio" },
+        "version": { "$ref": "#/$defs/safe_label" },
+        "engine": { "$ref": "#/$defs/safe_label" },
+        "engine_version": { "$ref": "#/$defs/safe_label" },
+        "platform": { "const": "windows" },
+        "windows_version": { "$ref": "#/$defs/safe_label" },
+        "gpu_driver_version": { "$ref": "#/$defs/safe_label" }
+      }
+    },
+    "safe_label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[^\\r\\n\\t]+$"
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpoint",
+        "store",
+        "stream",
+        "context_length",
+        "parallel",
+        "offload_kv_cache_to_gpu",
+        "retries",
+        "temperature",
+        "top_p",
+        "max_output_tokens_source",
+        "mode_control_method",
+        "profile_verification_status",
+        "resolved_reasoning_state",
+        "runtime_config_sha256",
+        "assistant_config_sha256"
+      ],
+      "properties": {
+        "endpoint": { "const": "/api/v1/chat" },
+        "store": { "const": false },
+        "stream": { "const": false },
+        "context_length": { "const": 4096 },
+        "parallel": { "const": 1 },
+        "offload_kv_cache_to_gpu": { "const": false },
+        "retries": { "const": 0 },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+        "top_p": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "max_output_tokens_source": { "const": "eval_case" },
+        "mode_control_method": { "const": "native_api_reasoning_parameter" },
+        "profile_verification_status": { "const": "behaviorally_consistent" },
+        "resolved_reasoning_state": { "const": "unknown" },
+        "runtime_config_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "assistant_config_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "metric_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["native_stats", "client_timing"],
+      "properties": {
+        "native_stats": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "input_tokens",
+            "total_output_tokens",
+            "reasoning_output_tokens",
+            "tokens_per_second",
+            "time_to_first_token_seconds",
+            "model_load_time_seconds"
+          ],
+          "properties": {
+            "source": { "const": "lm_studio_native_v1" },
+            "input_tokens": { "const": "stats.input_tokens" },
+            "total_output_tokens": { "const": "stats.total_output_tokens" },
+            "reasoning_output_tokens": { "const": "stats.reasoning_output_tokens" },
+            "tokens_per_second": { "const": "stats.tokens_per_second" },
+            "time_to_first_token_seconds": {
+              "const": "stats.time_to_first_token_seconds"
+            },
+            "model_load_time_seconds": { "const": "stats.model_load_time_seconds" }
+          }
+        },
+        "client_timing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "metric"],
+          "properties": {
+            "source": { "const": "client_monotonic" },
+            "metric": { "const": "total_request_ms" }
+          }
+        }
+      }
+    },
+    "native_integer_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "null_reason"],
+      "oneOf": [
+        {
+          "properties": {
+            "value": { "type": "integer", "minimum": 0 },
+            "null_reason": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "value": { "type": "null" },
+            "null_reason": { "enum": ["server_field_absent", "request_failed"] }
+          }
+        }
+      ]
+    },
+    "native_float_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "null_reason"],
+      "oneOf": [
+        {
+          "properties": {
+            "value": { "type": "number", "minimum": 0 },
+            "null_reason": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "value": { "type": "null" },
+            "null_reason": { "enum": ["server_field_absent", "request_failed"] }
+          }
+        }
+      ]
+    },
+    "client_float_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "null_reason"],
+      "oneOf": [
+        {
+          "properties": {
+            "value": { "type": "number", "minimum": 0 },
+            "null_reason": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "value": { "type": "null" },
+            "null_reason": { "const": "client_measurement_unavailable" }
+          }
+        }
+      ]
+    },
+    "request_failed_integer_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "null_reason"],
+      "properties": {
+        "value": { "type": "null" },
+        "null_reason": { "const": "request_failed" }
+      }
+    },
+    "request_failed_float_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "null_reason"],
+      "properties": {
+        "value": { "type": "null" },
+        "null_reason": { "const": "request_failed" }
+      }
+    },
+    "successful_model_load_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "null_reason"],
+      "oneOf": [
+        {
+          "properties": {
+            "value": { "type": "number", "minimum": 0 },
+            "null_reason": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "value": { "type": "null" },
+            "null_reason": { "const": "server_field_absent" }
+          }
+        }
+      ]
+    },
+    "native_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_tokens",
+        "total_output_tokens",
+        "reasoning_output_tokens",
+        "tokens_per_second",
+        "time_to_first_token_seconds",
+        "model_load_time_seconds"
+      ],
+      "properties": {
+        "input_tokens": { "$ref": "#/$defs/native_integer_metric" },
+        "total_output_tokens": { "$ref": "#/$defs/native_integer_metric" },
+        "reasoning_output_tokens": { "$ref": "#/$defs/native_integer_metric" },
+        "tokens_per_second": { "$ref": "#/$defs/native_float_metric" },
+        "time_to_first_token_seconds": { "$ref": "#/$defs/native_float_metric" },
+        "model_load_time_seconds": { "$ref": "#/$defs/native_float_metric" }
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "ordinal",
+        "case_id",
+        "retry_count",
+        "success",
+        "error_type",
+        "observed_reasoning_output",
+        "native_stats",
+        "total_request_ms"
+      ],
+      "properties": {
+        "phase": { "enum": ["warmup", "measured"] },
+        "ordinal": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "case_id": {
+          "enum": ["eval-tr-001", "eval-if-003", "eval-reason-001"]
+        },
+        "retry_count": { "const": 0 },
+        "success": { "type": "boolean" },
+        "error_type": {
+          "type": ["string", "null"],
+          "enum": [
+            "configuration",
+            "connection",
+            "timeout",
+            "http_status",
+            "malformed_response",
+            "model_unavailable",
+            "capability_unavailable",
+            "privacy_policy",
+            "internal",
+            null
+          ]
+        },
+        "observed_reasoning_output": {
+          "enum": ["present", "absent", "unknown"]
+        },
+        "native_stats": { "$ref": "#/$defs/native_stats" },
+        "total_request_ms": { "$ref": "#/$defs/client_float_metric" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "success": { "const": true } } },
+          "then": {
+            "properties": {
+              "error_type": { "type": "null" },
+              "observed_reasoning_output": { "enum": ["present", "absent"] }
+            }
+          },
+          "else": {
+            "properties": {
+              "error_type": {
+                "enum": [
+                  "configuration",
+                  "connection",
+                  "timeout",
+                  "http_status",
+                  "malformed_response",
+                  "model_unavailable",
+                  "capability_unavailable",
+                  "privacy_policy",
+                  "internal"
+                ]
+              },
+              "observed_reasoning_output": { "const": "unknown" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "success": { "const": true } },
+            "required": ["success"]
+          },
+          "then": {
+            "properties": {
+              "native_stats": {
+                "properties": {
+                  "input_tokens": {
+                    "properties": {
+                      "value": { "type": "integer", "minimum": 0 },
+                      "null_reason": { "type": "null" }
+                    }
+                  },
+                  "total_output_tokens": {
+                    "properties": {
+                      "value": { "type": "integer", "minimum": 0 },
+                      "null_reason": { "type": "null" }
+                    }
+                  },
+                  "reasoning_output_tokens": {
+                    "properties": {
+                      "value": { "type": "integer", "minimum": 0 },
+                      "null_reason": { "type": "null" }
+                    }
+                  },
+                  "tokens_per_second": {
+                    "properties": {
+                      "value": { "type": "number", "minimum": 0 },
+                      "null_reason": { "type": "null" }
+                    }
+                  },
+                  "time_to_first_token_seconds": {
+                    "properties": {
+                      "value": { "type": "number", "minimum": 0 },
+                      "null_reason": { "type": "null" }
+                    }
+                  },
+                  "model_load_time_seconds": {
+                    "$ref": "#/$defs/successful_model_load_metric"
+                  }
+                }
+              },
+              "total_request_ms": {
+                "properties": {
+                  "value": { "type": "number", "minimum": 0 },
+                  "null_reason": { "type": "null" }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "native_stats": {
+                "properties": {
+                  "input_tokens": { "$ref": "#/$defs/request_failed_integer_metric" },
+                  "total_output_tokens": { "$ref": "#/$defs/request_failed_integer_metric" },
+                  "reasoning_output_tokens": { "$ref": "#/$defs/request_failed_integer_metric" },
+                  "tokens_per_second": { "$ref": "#/$defs/request_failed_float_metric" },
+                  "time_to_first_token_seconds": { "$ref": "#/$defs/request_failed_float_metric" },
+                  "model_load_time_seconds": { "$ref": "#/$defs/request_failed_float_metric" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "scope",
+        "collector",
+        "collector_version",
+        "sampling_interval_ms",
+        "baseline_mib",
+        "loaded_idle_mib",
+        "measured_minimum_mib"
+      ],
+      "properties": {
+        "metric": { "const": "available_physical_mib" },
+        "scope": { "const": "windows_system" },
+        "collector": {
+          "const": "powershell_get_counter_memory_available_mbytes"
+        },
+        "collector_version": { "$ref": "#/$defs/safe_label" },
+        "sampling_interval_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000
+        },
+        "baseline_mib": { "type": "number", "minimum": 0 },
+        "loaded_idle_mib": { "type": "number", "minimum": 0 },
+        "measured_minimum_mib": { "type": "number", "minimum": 0 }
+      }
+    },
+    "vram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "scope",
+        "collector",
+        "collector_version",
+        "sampling_interval_ms",
+        "gpu_identifier_sha256",
+        "baseline_mib",
+        "loaded_idle_mib",
+        "measured_peak_mib"
+      ],
+      "properties": {
+        "metric": { "const": "used_mib" },
+        "scope": { "const": "gpu_total" },
+        "collector": { "const": "nvidia_smi" },
+        "collector_version": { "$ref": "#/$defs/safe_label" },
+        "sampling_interval_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000
+        },
+        "gpu_identifier_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "baseline_mib": { "type": "number", "minimum": 0 },
+        "loaded_idle_mib": { "type": "number", "minimum": 0 },
+        "measured_peak_mib": { "type": "number", "minimum": 0 }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ram", "vram"],
+      "properties": {
+        "ram": { "$ref": "#/$defs/ram" },
+        "vram": { "$ref": "#/$defs/vram" }
+      }
+    },
+    "reasoning_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requested_reasoning",
+        "advertised_reasoning_options",
+        "advertised_reasoning_default",
+        "observed_reasoning_output",
+        "profile_verification_status",
+        "resolved_reasoning_state"
+      ],
+      "properties": {
+        "requested_reasoning": { "enum": ["on", "off"] },
+        "advertised_reasoning_options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": { "enum": ["off", "on", "low", "medium", "high"] },
+          "allOf": [
+            { "contains": { "const": "off" }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "const": "on" }, "minContains": 1, "maxContains": 1 }
+          ]
+        },
+        "advertised_reasoning_default": {
+          "type": ["string", "null"],
+          "enum": ["off", "on", "low", "medium", "high", null]
+        },
+        "observed_reasoning_output": { "enum": ["present", "absent"] },
+        "profile_verification_status": { "const": "behaviorally_consistent" },
+        "resolved_reasoning_state": { "const": "unknown" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "advertised_reasoning_default": { "const": "off" } },
+            "required": ["advertised_reasoning_default"]
+          },
+          "then": {
+            "properties": {
+              "advertised_reasoning_options": { "contains": { "const": "off" } }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "advertised_reasoning_default": { "const": "on" } },
+            "required": ["advertised_reasoning_default"]
+          },
+          "then": {
+            "properties": {
+              "advertised_reasoning_options": { "contains": { "const": "on" } }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "advertised_reasoning_default": { "const": "low" } },
+            "required": ["advertised_reasoning_default"]
+          },
+          "then": {
+            "properties": {
+              "advertised_reasoning_options": { "contains": { "const": "low" } }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "advertised_reasoning_default": { "const": "medium" } },
+            "required": ["advertised_reasoning_default"]
+          },
+          "then": {
+            "properties": {
+              "advertised_reasoning_options": { "contains": { "const": "medium" } }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "advertised_reasoning_default": { "const": "high" } },
+            "required": ["advertised_reasoning_default"]
+          },
+          "then": {
+            "properties": {
+              "advertised_reasoning_options": { "contains": { "const": "high" } }
+            }
+          }
+        }
+      ]
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "warmup_excluded",
+        "reasoning_evidence",
+        "memory",
+        "samples"
+      ],
+      "properties": {
+        "profile": { "enum": ["thinking", "non_thinking"] },
+        "warmup_excluded": { "const": true },
+        "reasoning_evidence": { "$ref": "#/$defs/reasoning_evidence" },
+        "memory": { "$ref": "#/$defs/memory" },
+        "samples": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "prefixItems": [
+            {
+              "allOf": [
+                { "$ref": "#/$defs/sample" },
+                {
+                  "properties": {
+                    "phase": { "const": "warmup" },
+                    "ordinal": { "const": 0 }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/sample" },
+                {
+                  "properties": {
+                    "phase": { "const": "measured" },
+                    "ordinal": { "const": 1 }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/sample" },
+                {
+                  "properties": {
+                    "phase": { "const": "measured" },
+                    "ordinal": { "const": 2 }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/sample" },
+                {
+                  "properties": {
+                    "phase": { "const": "measured" },
+                    "ordinal": { "const": 3 }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/sample" },
+                {
+                  "properties": {
+                    "phase": { "const": "measured" },
+                    "ordinal": { "const": 4 }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/sample" },
+                {
+                  "properties": {
+                    "phase": { "const": "measured" },
+                    "ordinal": { "const": 5 }
+                  }
+                }
+              ]
+            }
+          ],
+          "items": false
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "profile": { "const": "thinking" } },
+            "required": ["profile"]
+          },
+          "then": {
+            "properties": {
+              "reasoning_evidence": {
+                "properties": {
+                  "requested_reasoning": { "const": "on" },
+                  "observed_reasoning_output": { "const": "present" }
+                }
+              },
+              "samples": {
+                "items": {
+                  "if": {
+                    "properties": { "success": { "const": true } },
+                    "required": ["success"]
+                  },
+                  "then": {
+                    "properties": {
+                      "observed_reasoning_output": { "const": "present" },
+                      "native_stats": {
+                        "properties": {
+                          "reasoning_output_tokens": {
+                            "properties": { "value": { "type": "integer", "minimum": 1 } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "profile": { "const": "non_thinking" } },
+            "required": ["profile"]
+          },
+          "then": {
+            "properties": {
+              "reasoning_evidence": {
+                "properties": {
+                  "requested_reasoning": { "const": "off" },
+                  "observed_reasoning_output": { "const": "absent" }
+                }
+              },
+              "samples": {
+                "items": {
+                  "if": {
+                    "properties": { "success": { "const": true } },
+                    "required": ["success"]
+                  },
+                  "then": {
+                    "properties": {
+                      "observed_reasoning_output": { "const": "absent" },
+                      "native_stats": {
+                        "properties": {
+                          "reasoning_output_tokens": {
+                            "properties": { "value": { "const": 0 } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
