@@ -22,6 +22,9 @@ from kayra_ai.validation.model_artifact import (
 
 
 MANIFEST_PATH = ROOT / "configs" / "models" / "qwen3-14b-q4_k_m.yaml"
+KAYRA_V1_MANIFEST_PATH = (
+    ROOT / "configs" / "models" / "qwen3_5_9b_kayra_v1_q4_k_m.yaml"
+)
 
 
 class ModelArtifactTests(unittest.TestCase):
@@ -49,6 +52,24 @@ class ModelArtifactTests(unittest.TestCase):
     def test_validate_alias_returns_the_strict_model(self) -> None:
         artifact = validate_model_artifact(MANIFEST_PATH)
         self.assertIsInstance(artifact, ModelArtifact)
+
+    def test_kayra_v1_manifest_pins_base_revision_and_derived_gguf(self) -> None:
+        artifact = load_model_artifact(KAYRA_V1_MANIFEST_PATH)
+        self.assertEqual("qwen3.5-9b-kayra-v1", artifact.id)
+        self.assertEqual("Qwen/Qwen3.5-9B", artifact.repository)
+        self.assertEqual("f8c2a121ee234afa9d26304a683e3c75a8dc2985", artifact.commit)
+        self.assertEqual("Apache-2.0", artifact.license)
+        self.assertEqual("Q4_K_M", artifact.quantization)
+        self.assertEqual(4096, artifact.context_length)
+        self.assertEqual(5629108576, artifact.total_size_bytes)
+        self.assertEqual(
+            "kayraai-qwen3.5-9b-kayra-v1-Q4_K_M-no-mtp.gguf",
+            artifact.files[0].filename,
+        )
+        self.assertEqual(
+            "4ef803a9e021139abff93f6e6ecb358491c16ad9c6a841c3ad55fa512283c238",
+            artifact.files[0].sha256,
+        )
 
     def test_unknown_field_and_type_coercion_are_rejected(self) -> None:
         data = self.artifact.model_dump(mode="python")

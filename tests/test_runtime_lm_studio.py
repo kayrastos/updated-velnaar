@@ -29,8 +29,8 @@ from kayra_ai.runtime.errors import (
 from kayra_ai.runtime.http_transport import TransportResponse
 
 
-MODEL_KEY = "qwen3-14b-q4-k-m"
-INSTANCE_ID = "qwen3-14b-instance-1"
+MODEL_KEY = "qwen3.5-9b-kayra-v1"
+INSTANCE_ID = "qwen3.5-9b-kayra-v1"
 
 
 def json_response(data: object) -> TransportResponse:
@@ -47,7 +47,7 @@ def valid_models_payload() -> dict[str, object]:
             {
                 "key": MODEL_KEY,
                 "format": "gguf",
-                "size_bytes": 9001752960,
+                "size_bytes": 5629108576,
                 "quantization": {"name": "Q4_K_M", "bits_per_weight": 4.83},
                 "capabilities": {
                     "reasoning": {
@@ -104,7 +104,9 @@ class RecordingTransport:
 
 class LMStudioNativeV1Tests(unittest.TestCase):
     def setUp(self) -> None:
-        self.config = load_runtime_config(ROOT / "configs" / "runtime.lm-studio.yaml")
+        self.config = load_runtime_config(
+            ROOT / "configs" / "runtime.kayra-v1.lm-studio.yaml"
+        )
         self.environment = {
             "KAYRA_LM_STUDIO_BASE_URL": "http://127.0.0.1:1234/api/v1///",
             "KAYRA_LM_STUDIO_MODEL": MODEL_KEY,
@@ -282,7 +284,7 @@ class LMStudioNativeV1Tests(unittest.TestCase):
     def test_exact_artifact_and_instance_values_are_required(self) -> None:
         mutations = {
             "format": lambda model: model.update(format="mlx"),
-            "size": lambda model: model.update(size_bytes=9001752959),
+            "size": lambda model: model.update(size_bytes=5629108575),
             "quantization": lambda model: model["quantization"].update(name="Q3_K_M"),
             "context": lambda model: model["loaded_instances"][0]["config"].update(
                 context_length=8192

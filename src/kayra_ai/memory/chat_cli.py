@@ -64,7 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/runtime.lm-studio.yaml"),
+        default=Path("configs/runtime.kayra-v1.lm-studio.yaml"),
         help="KayraAI deposundaki runtime YAML yolu",
     )
     parser.add_argument(

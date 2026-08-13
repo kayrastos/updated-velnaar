@@ -22,6 +22,15 @@ This milestone adds a local-only encrypted memory core.
 - `kayra-memory-chat` performs a fresh LM Studio preflight, retrieves only
   relevant active records, marks them as untrusted data, and sends a single
   non-persistent (`store=false`) request to the loopback-only runtime.
+- The chat command defaults to the separately pinned Kayra v1 profile at
+  `configs/runtime.kayra-v1.lm-studio.yaml`. The earlier Qwen3-14B profile is
+  retained for historical evaluation reproducibility.
+- When the CLI runs inside WSL while LM Studio runs on Windows, WSL mirrored
+  networking is required so the fail-closed `127.0.0.1` boundary remains
+  usable. The runtime must not be changed to a LAN or dynamic host address.
+- The Kayra v1 runtime expects `KAYRA_LM_STUDIO_BASE_URL` to be
+  `http://127.0.0.1:1234/api/v1` and `KAYRA_LM_STUDIO_MODEL` to be
+  `qwen3.5-9b-kayra-v1`.
 - `ask` is read-only with respect to persistent memory. A model response can
   never create, update, or delete a memory record.
 

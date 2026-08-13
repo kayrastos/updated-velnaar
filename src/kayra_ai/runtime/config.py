@@ -17,6 +17,13 @@ from .errors import ConfigurationFailure, PrivacyPolicyFailure
 ENV_NAME_PATTERN = r"^[A-Z_][A-Z0-9_]*$"
 SHA256_PATTERN = r"^[a-f0-9]{64}$"
 
+LEGACY_QWEN3_14B_MANIFEST = "configs/models/qwen3-14b-q4_k_m.yaml"
+KAYRA_V1_MANIFEST = "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml"
+NATIVE_MODEL_SIZES = {
+    LEGACY_QWEN3_14B_MANIFEST: 9001752960,
+    KAYRA_V1_MANIFEST: 5629108576,
+}
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -72,7 +79,7 @@ class MockBackendConfig(StrictModel):
 class LMStudioNativeV1Config(StrictModel):
     model_format: Literal["gguf"]
     quantization: Literal["Q4_K_M"]
-    size_bytes: Literal[9001752960]
+    size_bytes: Literal[9001752960, 5629108576]
     context_length: Literal[4096]
     parallel: Literal[1]
     offload_kv_cache_to_gpu: Literal[False]
@@ -86,7 +93,10 @@ class LMStudioBackendConfig(StrictModel):
     model_revision_env: str | None = Field(default=None, pattern=ENV_NAME_PATTERN)
     api_key_env: str | None = Field(default=None, pattern=ENV_NAME_PATTERN)
     api_mode: Literal["openai_compatible", "native_v1"] = "openai_compatible"
-    model_manifest: Literal["configs/models/qwen3-14b-q4_k_m.yaml"] | None = None
+    model_manifest: Literal[
+        "configs/models/qwen3-14b-q4_k_m.yaml",
+        "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml",
+    ] | None = None
     native_v1: LMStudioNativeV1Config | None = None
 
     @model_validator(mode="after")
@@ -96,6 +106,12 @@ class LMStudioBackendConfig(StrictModel):
                 raise ValueError("native_v1 LM Studio backend için model_manifest gerekli")
             if self.native_v1 is None:
                 raise ValueError("native_v1 LM Studio backend için native_v1 beklentileri gerekli")
+            if self.model_manifest is not None and self.native_v1 is not None:
+                expected_size = NATIVE_MODEL_SIZES[self.model_manifest]
+                if self.native_v1.size_bytes != expected_size:
+                    raise ValueError(
+                        "model_manifest ile native_v1 size_bytes birbiriyle eşleşmeli"
+                    )
         elif self.native_v1 is not None or self.model_manifest is not None:
             raise ValueError(
                 "model manifest ve native_v1 beklentileri yalnız api_mode=native_v1 ile kullanılabilir"

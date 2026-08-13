@@ -73,6 +73,25 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertFalse(config.network.allow_non_loopback)
         self.assertEqual(["127.0.0.1"], config.network.allowed_hosts)
 
+    def test_kayra_v1_native_config_pins_the_observed_local_artifact(self) -> None:
+        config = load_runtime_config(
+            ROOT / "configs" / "runtime.kayra-v1.lm-studio.yaml"
+        )
+        backend = config.backends.lm_studio
+        self.assertEqual("lm_studio", config.active_backend)
+        self.assertTrue(backend.enabled)
+        self.assertEqual("native_v1", backend.api_mode)
+        self.assertEqual(
+            "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml",
+            backend.model_manifest,
+        )
+        self.assertEqual(
+            5629108576,
+            backend.native_v1.size_bytes if backend.native_v1 else None,
+        )
+        self.assertEqual(4096, config.execution.context_length)
+        self.assertEqual(["127.0.0.1"], config.network.allowed_hosts)
+
     def test_unknown_yaml_field_is_rejected_without_echoing_value(self) -> None:
         data = self.config.model_dump(mode="python")
         data["private_canary"] = "DO-NOT-ECHO"
@@ -232,6 +251,16 @@ class RuntimeConfigTests(unittest.TestCase):
 
         backend["native_v1"]["quantization"] = "Q4_K_M"
         backend["native_v1"]["size_bytes"] = 9001752959
+        with self.assertRaises(ValueError):
+            RuntimeConfig.model_validate(data)
+
+    def test_native_manifest_and_size_cannot_be_mixed(self) -> None:
+        data = load_runtime_config(
+            ROOT / "configs" / "runtime.kayra-v1.lm-studio.yaml"
+        ).model_dump(mode="python")
+        data["backends"]["lm_studio"]["model_manifest"] = (
+            "configs/models/qwen3-14b-q4_k_m.yaml"
+        )
         with self.assertRaises(ValueError):
             RuntimeConfig.model_validate(data)
 
