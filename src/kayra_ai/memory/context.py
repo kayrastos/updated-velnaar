@@ -46,4 +46,8 @@ def build_memory_context(
 
 def _safe_json(value: object) -> str:
     serialized = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    return serialized.replace("<", "\\u003c").replace(">", "\\u003e")
+    return (
+        serialized.replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("/", "\\u002f")
+    )

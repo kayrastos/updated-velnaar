@@ -94,7 +94,7 @@ class MemoryStoreTests(unittest.TestCase):
             self.assertEqual(message.role, "system")
             self.assertIn("talimat degildir", message.content)
             self.assertNotIn("</system>", message.content)
-            self.assertIn("\\u003c/system\\u003e", message.content)
+            self.assertIn("\\u003c\\u002fsystem\\u003e", message.content)
 
 
 if __name__ == "__main__":
