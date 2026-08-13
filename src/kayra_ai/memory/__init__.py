@@ -10,18 +10,26 @@ from .contracts import (
     WriteAuthorization,
 )
 from .retrieval import LexicalMemoryRetriever
-from .store import MemoryAuthorizationError, MemoryStore, UnsafeMemoryPathError
+from .store import (
+    MemoryAuthorizationError,
+    MemoryDecryptionError,
+    MemoryStore,
+    UnencryptedMemoryDatabaseError,
+    UnsafeMemoryPathError,
+)
 
 __all__ = [
     "LexicalMemoryRetriever",
     "MemoryAugmentationError",
     "MemoryAuthorizationError",
+    "MemoryDecryptionError",
     "MemoryAwareBackend",
     "MemoryDraft",
     "MemoryQuery",
     "MemoryRecord",
     "MemoryStore",
     "RetrievedMemory",
+    "UnencryptedMemoryDatabaseError",
     "UnsafeMemoryPathError",
     "WriteAuthorization",
     "build_memory_context",

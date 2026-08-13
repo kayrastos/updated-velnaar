@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+
 from .contracts import MemoryDraft, MemoryRecord, WriteAuthorization
 
 
@@ -15,6 +19,14 @@ class MemoryAuthorizationError(PermissionError):
 
 
 class UnsafeMemoryPathError(ValueError):
+    pass
+
+
+class MemoryDecryptionError(ValueError):
+    pass
+
+
+class UnencryptedMemoryDatabaseError(ValueError):
     pass
 
 
@@ -35,8 +47,11 @@ class MemoryStore:
         self,
         db_path: str | Path | None = None,
         *,
+        passphrase: str,
         repository_root: str | Path | None = None,
     ) -> None:
+        if len(passphrase) < 12:
+            raise ValueError("hafiza parolasi en az 12 karakter olmali")
         self.db_path = Path(db_path) if db_path is not None else default_memory_db_path()
         self.db_path = self.db_path.expanduser().resolve()
         if repository_root is not None:
@@ -44,7 +59,7 @@ class MemoryStore:
             if self.db_path == repo or self.db_path.is_relative_to(repo):
                 raise UnsafeMemoryPathError("kisisel hafiza veritabani Git deposunun disinda olmali")
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._initialize()
+        self._initialize(passphrase)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path)
@@ -53,17 +68,26 @@ class MemoryStore:
         connection.execute("PRAGMA journal_mode = WAL")
         return connection
 
-    def _initialize(self) -> None:
+    def _initialize(self, passphrase: str) -> None:
         with self._connect() as connection:
+            columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(memories)")
+            }
+            if columns and "payload_ciphertext" not in columns:
+                raise UnencryptedMemoryDatabaseError(
+                    "sifresiz eski hafiza veritabani otomatik acilamaz"
+                )
             connection.executescript(
                 """
+                CREATE TABLE IF NOT EXISTS memory_meta (
+                    key TEXT PRIMARY KEY,
+                    value BLOB NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS memories (
                     id TEXT PRIMARY KEY,
-                    content TEXT NOT NULL,
-                    kind TEXT NOT NULL,
-                    sensitivity TEXT NOT NULL,
-                    source TEXT NOT NULL,
-                    tags_json TEXT NOT NULL,
+                    payload_nonce BLOB NOT NULL,
+                    payload_ciphertext BLOB NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     expires_at TEXT,
@@ -74,13 +98,93 @@ class MemoryStore:
                     event_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     memory_id TEXT NOT NULL,
                     event_type TEXT NOT NULL,
-                    purpose TEXT NOT NULL,
+                    purpose_nonce BLOB NOT NULL,
+                    purpose_ciphertext BLOB NOT NULL,
                     confirmed_at TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY(memory_id) REFERENCES memories(id)
                 );
                 """
             )
+            self._aesgcm = self._load_or_create_cipher(connection, passphrase)
+        try:
+            os.chmod(self.db_path, 0o600)
+        except OSError:
+            pass
+
+    @staticmethod
+    def _derive_key(passphrase: str, salt: bytes) -> bytes:
+        return Scrypt(salt=salt, length=32, n=2**15, r=8, p=1).derive(
+            passphrase.encode("utf-8")
+        )
+
+    def _load_or_create_cipher(
+        self,
+        connection: sqlite3.Connection,
+        passphrase: str,
+    ) -> AESGCM:
+        rows = {
+            row["key"]: bytes(row["value"])
+            for row in connection.execute("SELECT key, value FROM memory_meta")
+        }
+        required = {"kdf_salt", "key_check_nonce", "key_check_ciphertext"}
+        if rows and set(rows) != required:
+            raise MemoryDecryptionError("hafiza anahtar metadatasi gecersiz")
+        if not rows:
+            salt = os.urandom(16)
+            aesgcm = AESGCM(self._derive_key(passphrase, salt))
+            nonce = os.urandom(12)
+            ciphertext = aesgcm.encrypt(
+                nonce,
+                b"kayra-memory-key-check-v1",
+                b"kayra-memory-meta-v1",
+            )
+            connection.executemany(
+                "INSERT INTO memory_meta (key, value) VALUES (?, ?)",
+                (
+                    ("kdf_salt", salt),
+                    ("key_check_nonce", nonce),
+                    ("key_check_ciphertext", ciphertext),
+                ),
+            )
+            return aesgcm
+        aesgcm = AESGCM(self._derive_key(passphrase, rows["kdf_salt"]))
+        try:
+            plaintext = aesgcm.decrypt(
+                rows["key_check_nonce"],
+                rows["key_check_ciphertext"],
+                b"kayra-memory-meta-v1",
+            )
+        except InvalidTag:
+            raise MemoryDecryptionError("hafiza parolasi yanlis veya veritabani bozuk") from None
+        if plaintext != b"kayra-memory-key-check-v1":
+            raise MemoryDecryptionError("hafiza anahtar dogrulamasi basarisiz")
+        return aesgcm
+
+    @staticmethod
+    def _record_aad(memory_id: str) -> bytes:
+        return f"kayra-memory-record-v1:{memory_id}".encode("ascii")
+
+    @staticmethod
+    def _event_aad(memory_id: str, event_type: str, confirmed_at: str) -> bytes:
+        return f"kayra-memory-event-v1:{memory_id}:{event_type}:{confirmed_at}".encode(
+            "utf-8"
+        )
+
+    def _encrypt_payload(self, memory_id: str, draft: MemoryDraft) -> tuple[bytes, bytes]:
+        payload = json.dumps(
+            {
+                "content": draft.content,
+                "kind": draft.kind,
+                "sensitivity": draft.sensitivity,
+                "source": draft.source,
+                "tags": draft.tags,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        nonce = os.urandom(12)
+        return nonce, self._aesgcm.encrypt(nonce, payload, self._record_aad(memory_id))
 
     @staticmethod
     def _require_authorization(
@@ -109,21 +213,19 @@ class MemoryStore:
             updated_at=now,
             expires_at=draft.expires_at,
         )
+        payload_nonce, payload_ciphertext = self._encrypt_payload(record.id, draft)
         with self._connect() as connection:
             connection.execute(
                 """
                 INSERT INTO memories (
-                    id, content, kind, sensitivity, source, tags_json,
+                    id, payload_nonce, payload_ciphertext,
                     created_at, updated_at, expires_at, deleted_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                ) VALUES (?, ?, ?, ?, ?, ?, NULL)
                 """,
                 (
                     record.id,
-                    record.content,
-                    record.kind,
-                    record.sensitivity,
-                    record.source,
-                    json.dumps(record.tags, ensure_ascii=False),
+                    payload_nonce,
+                    payload_ciphertext,
                     record.created_at.isoformat(),
                     record.updated_at.isoformat(),
                     record.expires_at.isoformat() if record.expires_at else None,
@@ -165,38 +267,57 @@ class MemoryStore:
             ).fetchall()
         return [self._row_to_record(row) for row in rows]
 
-    @staticmethod
     def _insert_event(
+        self,
         connection: sqlite3.Connection,
         memory_id: str,
         event_type: str,
         authorization: WriteAuthorization,
         created_at: datetime,
     ) -> None:
+        confirmed_at = authorization.confirmed_at.isoformat()
+        purpose_nonce = os.urandom(12)
+        purpose_ciphertext = self._aesgcm.encrypt(
+            purpose_nonce,
+            authorization.purpose.encode("utf-8"),
+            self._event_aad(memory_id, event_type, confirmed_at),
+        )
         connection.execute(
             """
             INSERT INTO memory_events (
-                memory_id, event_type, purpose, confirmed_at, created_at
-            ) VALUES (?, ?, ?, ?, ?)
+                memory_id, event_type, purpose_nonce, purpose_ciphertext,
+                confirmed_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 memory_id,
                 event_type,
-                authorization.purpose,
-                authorization.confirmed_at.isoformat(),
+                purpose_nonce,
+                purpose_ciphertext,
+                confirmed_at,
                 created_at.isoformat(),
             ),
         )
 
-    @staticmethod
-    def _row_to_record(row: sqlite3.Row) -> MemoryRecord:
+    def _row_to_record(self, row: sqlite3.Row) -> MemoryRecord:
+        try:
+            plaintext = self._aesgcm.decrypt(
+                bytes(row["payload_nonce"]),
+                bytes(row["payload_ciphertext"]),
+                self._record_aad(row["id"]),
+            )
+            payload = json.loads(plaintext.decode("utf-8"))
+        except (InvalidTag, UnicodeDecodeError, json.JSONDecodeError, TypeError, KeyError):
+            raise MemoryDecryptionError(
+                f"hafiza kaydi dogrulanamadi: {row['id']}"
+            ) from None
         return MemoryRecord(
             id=row["id"],
-            content=row["content"],
-            kind=row["kind"],
-            sensitivity=row["sensitivity"],
-            source=row["source"],
-            tags=tuple(json.loads(row["tags_json"])),
+            content=payload["content"],
+            kind=payload["kind"],
+            sensitivity=payload["sensitivity"],
+            source=payload["source"],
+            tags=tuple(payload["tags"]),
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
             expires_at=datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None,
