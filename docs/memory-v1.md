@@ -16,6 +16,15 @@ This milestone adds a local-only encrypted memory core.
   message. Stored markup is escaped before prompt insertion.
 - Personal content must never be committed to Git or copied into training/eval
   data.
+- `kayra-memory add` and `kayra-memory delete` require an exact interactive
+  `EVET` confirmation. Content and search questions are entered interactively so
+  they do not become shell-history arguments.
+- `kayra-memory-chat` performs a fresh LM Studio preflight, retrieves only
+  relevant active records, marks them as untrusted data, and sends a single
+  non-persistent (`store=false`) request to the loopback-only runtime.
+- `ask` is read-only with respect to persistent memory. A model response can
+  never create, update, or delete a memory record.
 
-Semantic embeddings, encryption-at-rest integration, and automatic LM Studio
-request augmentation are intentionally deferred to later reviewed milestones.
+The first retrieval implementation is deliberately lexical and offline.
+Semantic embeddings and multi-turn conversation history remain deferred to a
+later reviewed milestone.

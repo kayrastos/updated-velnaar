@@ -18,8 +18,10 @@ capabilities:
   - summarization
   - reasoning
   - software_help
+  - local_encrypted_memory
 limitations:
   - no_implicit_personal_memory
+  - explicit_memory_writes_only
   - no_background_actions
   - no_claimed_access_without_context
 modes:
@@ -37,7 +39,7 @@ modes:
       - short_commands
 privacy:
   embed_personal_data_in_weights: false
-  rag_enabled: false
+  rag_enabled: true
   retain_secrets: false
   require_explicit_context_for_personal_claims: true
 tool_policy:
@@ -53,4 +55,3 @@ generation_defaults:
   temperature: 0.6
   top_p: 0.95
   top_k: 20
-
