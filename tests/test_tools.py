@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -9,10 +11,14 @@ from kayra_ai.tools import (
     TOOL_REQUEST_ADAPTER,
     ListDirectoryRequest,
     ReadOnlyCommandRequest,
+    ReadOnlyFilesystem,
+    ReadOnlyPathPolicy,
     ReadTextRequest,
+    StatPathRequest,
     ToolApprovalError,
     ToolApprovalGate,
     ToolAuthorization,
+    ToolPolicyError,
     build_tool_preview,
     tool_request_digest,
 )
@@ -169,5 +175,122 @@ class ToolApprovalGateTests(unittest.TestCase):
             )
 
 
+class ReadOnlyFilesystemTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary_directory.cleanup)
+        self.root = Path(self.temporary_directory.name)
+        self.gate = ToolApprovalGate(clock=lambda: NOW)
+        self.filesystem = ReadOnlyFilesystem(
+            ReadOnlyPathPolicy((self.root,), max_file_bytes=32),
+            self.gate,
+        )
+
+    @staticmethod
+    def authorize(tool_request):  # type: ignore[no-untyped-def]
+        return ToolAuthorization(
+            confirmed_by_user=True,
+            request_digest=tool_request_digest(tool_request),
+            confirmed_at=NOW,
+            expires_at=NOW + timedelta(minutes=1),
+        )
+
+    def test_read_text_requires_approval_and_does_not_modify_file(self) -> None:
+        path = self.root / "note.txt"
+        path.write_text("local only", encoding="utf-8")
+        tool_request = ReadTextRequest(path="note.txt", purpose="read local note")
+        with self.assertRaises(ToolApprovalError):
+            self.filesystem.execute(tool_request, None)
+        before = path.read_bytes()
+        result = self.filesystem.execute(tool_request, self.authorize(tool_request))
+        self.assertEqual(result.text, "local only")
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_read_text_is_truncated_by_character_limit(self) -> None:
+        (self.root / "note.txt").write_text("abcdef", encoding="utf-8")
+        tool_request = ReadTextRequest(
+            path="note.txt",
+            purpose="read local note",
+            max_chars=3,
+        )
+        result = self.filesystem.execute(tool_request, self.authorize(tool_request))
+        self.assertEqual(result.text, "abc")
+        self.assertTrue(result.truncated)
+
+    def test_binary_and_oversized_files_are_rejected(self) -> None:
+        (self.root / "binary.bin").write_bytes(b"abc\x00def")
+        binary_request = ReadTextRequest(path="binary.bin", purpose="inspect binary")
+        with self.assertRaises(ToolPolicyError):
+            self.filesystem.execute(binary_request, self.authorize(binary_request))
+
+        (self.root / "large.txt").write_text("x" * 33, encoding="utf-8")
+        large_request = ReadTextRequest(path="large.txt", purpose="inspect large text")
+        with self.assertRaises(ToolPolicyError):
+            self.filesystem.execute(large_request, self.authorize(large_request))
+
+    def test_directory_listing_is_sorted_bounded_and_non_recursive(self) -> None:
+        (self.root / "b.txt").write_text("b", encoding="utf-8")
+        (self.root / "A.txt").write_text("a", encoding="utf-8")
+        (self.root / "nested").mkdir()
+        (self.root / "nested" / "hidden.txt").write_text("hidden", encoding="utf-8")
+        tool_request = ListDirectoryRequest(
+            path=".",
+            purpose="list selected root",
+            max_entries=2,
+        )
+        result = self.filesystem.execute(tool_request, self.authorize(tool_request))
+        self.assertEqual([entry.name for entry in result.entries], ["A.txt", "b.txt"])
+        self.assertTrue(result.truncated)
+
+    def test_stat_returns_metadata_without_content(self) -> None:
+        (self.root / "note.txt").write_text("hello", encoding="utf-8")
+        tool_request = StatPathRequest(path="note.txt", purpose="inspect file metadata")
+        result = self.filesystem.execute(tool_request, self.authorize(tool_request))
+        self.assertEqual(result.kind, "file")
+        self.assertEqual(result.size_bytes, 5)
+
+    def test_parent_traversal_and_outside_absolute_path_are_rejected(self) -> None:
+        outside = self.root.parent / "outside.txt"
+        outside.write_text("outside", encoding="utf-8")
+        for path in ("../outside.txt", str(outside)):
+            tool_request = ReadTextRequest(path=path, purpose="attempt outside read")
+            with self.assertRaises(ToolPolicyError):
+                self.filesystem.execute(tool_request, self.authorize(tool_request))
+
+    def test_sensitive_paths_are_rejected(self) -> None:
+        (self.root / ".env").write_text("SECRET=value", encoding="utf-8")
+        tool_request = ReadTextRequest(path=".env", purpose="attempt secret read")
+        with self.assertRaises(ToolPolicyError):
+            self.filesystem.execute(tool_request, self.authorize(tool_request))
+
+    def test_sensitive_names_are_hidden_from_directory_listing(self) -> None:
+        (self.root / ".env").write_text("SECRET=value", encoding="utf-8")
+        (self.root / "public.txt").write_text("public", encoding="utf-8")
+        tool_request = ListDirectoryRequest(path=".", purpose="list selected root")
+        result = self.filesystem.execute(tool_request, self.authorize(tool_request))
+        self.assertEqual([entry.name for entry in result.entries], ["public.txt"])
+
+    def test_symlink_is_rejected_even_when_target_is_inside_root(self) -> None:
+        target = self.root / "target.txt"
+        target.write_text("target", encoding="utf-8")
+        link = self.root / "link.txt"
+        try:
+            link.symlink_to(target)
+        except OSError:
+            self.skipTest("symlink creation is unavailable")
+        tool_request = ReadTextRequest(path="link.txt", purpose="attempt symlink read")
+        with self.assertRaises(ToolPolicyError):
+            self.filesystem.execute(tool_request, self.authorize(tool_request))
+
+
 if __name__ == "__main__":
     unittest.main()
+
+    def test_command_request_cannot_enter_filesystem_executor(self) -> None:
+        tool_request = ReadOnlyCommandRequest(
+            argv=("git", "status"),
+            cwd=str(self.root),
+            purpose="inspect repository state",
+        )
+        with self.assertRaises(ToolPolicyError):
+            self.filesystem.execute(tool_request, self.authorize(tool_request))

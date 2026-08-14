@@ -133,6 +133,37 @@ class ToolAuthorization(StrictToolModel):
         return self
 
 
+class DirectoryEntry(StrictToolModel):
+    name: str = Field(min_length=1, max_length=255)
+    kind: Literal["file", "directory", "symlink", "other"]
+    size_bytes: int = Field(ge=0)
+
+
+class ListDirectoryResult(StrictToolModel):
+    request_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    tool: Literal["filesystem.list_directory"] = "filesystem.list_directory"
+    path: str = Field(min_length=1, max_length=4096)
+    entries: tuple[DirectoryEntry, ...]
+    truncated: bool = False
+
+
+class StatPathResult(StrictToolModel):
+    request_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    tool: Literal["filesystem.stat"] = "filesystem.stat"
+    path: str = Field(min_length=1, max_length=4096)
+    kind: Literal["file", "directory", "other"]
+    size_bytes: int = Field(ge=0)
+
+
+class ReadTextResult(StrictToolModel):
+    request_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    tool: Literal["filesystem.read_text"] = "filesystem.read_text"
+    path: str = Field(min_length=1, max_length=4096)
+    text: str = Field(max_length=1_000_000)
+    truncated: bool = False
+    size_bytes: int = Field(ge=0)
+
+
 def tool_request_digest(request: ToolRequest) -> str:
     payload = request.model_dump(mode="json", exclude_none=False)
     canonical = json.dumps(

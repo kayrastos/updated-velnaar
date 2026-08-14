@@ -1,8 +1,9 @@
 # KayraAI yerel tool-use v1
 
 Bu asama, model ile yerel araclar arasina varsayilan olarak reddeden bir
-guvenlik siniri koyar. Ilk surum gercek dosya veya komut calistirmaz; yalnizca
-istek, onizleme ve kullanici onayi sozlesmelerini tanimlar.
+guvenlik siniri koyar. Dosya listeleme, metadata ve metin okuma yalnizca acikca
+izin verilen koklerde ve her istek icin ayri kullanici onayiyla calisabilir.
+Komut calistirma henuz etkin degildir.
 
 ## Degismez ilkeler
 
@@ -41,15 +42,24 @@ yurutucu, komutu `shell=False` ile calistiracak ve arac/alt-komut/arguman
 duzeyinde allowlist uygulayacaktir. Politika tarafindan taninmayan her komut
 reddedilecektir.
 
+## Dosya politikasi
+
+- Goreli yollar ilk izinli koke gore cozumlenir; mutlak yollar da izinli bir
+  kokun icinde kalmalidir.
+- `..` ile ust dizin gecisi ve symlink yol bilesenleri reddedilir.
+- `.git`, `.ssh`, `.aws`, `.gnupg`, `.kube`, `.env`, ozel anahtar ve kimlik
+  bilgisi dosyalari varsayilan olarak reddedilir.
+- `read_text` yalnizca normal, UTF-8, NUL icermeyen ve politika boyut sinirini
+  asmayan dosyalari okur.
+- Dizin listeleme recursive degildir, siralidir, ust sinirlidir ve symlink
+  girdilerini izlemeksizin isaretler.
+
 ## Sonraki uygulama sirasi
 
-1. Izin verilen koklere hapsolmus dosya yolu politikasi
-2. Symlink kacisi, hassas dosya adi ve boyut siniri kontrolleri
-3. Salt-okunur dosya listeleme, metadata ve metin okuma yurutuculari
-4. Tam arguman dizisine gore allowlist kullanan komut politikasi
-5. `shell=False`, minimum ortam, timeout ve cikti sinirli komut yurutucu
-6. Kullanici arayuzu onizleme/onay akisi
-7. Yerel, kisisel veri icermeyen denetim olaylari
+1. Tam arguman dizisine gore allowlist kullanan komut politikasi
+2. `shell=False`, minimum ortam, timeout ve cikti sinirli komut yurutucu
+3. Kullanici arayuzu onizleme/onay akisi
+4. Yerel, kisisel veri icermeyen denetim olaylari
 
 ## Guven siniri
 
