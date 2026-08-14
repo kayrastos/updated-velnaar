@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import subprocess
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from pydantic import ValidationError
 
 from kayra_ai.tools import (
     TOOL_REQUEST_ADAPTER,
+    GitReadOnlyCommandPolicy,
     ListDirectoryRequest,
+    ReadOnlyCommandExecutor,
     ReadOnlyCommandRequest,
     ReadOnlyFilesystem,
     ReadOnlyPathPolicy,
@@ -282,10 +286,6 @@ class ReadOnlyFilesystemTests(unittest.TestCase):
         with self.assertRaises(ToolPolicyError):
             self.filesystem.execute(tool_request, self.authorize(tool_request))
 
-
-if __name__ == "__main__":
-    unittest.main()
-
     def test_command_request_cannot_enter_filesystem_executor(self) -> None:
         tool_request = ReadOnlyCommandRequest(
             argv=("git", "status"),
@@ -294,3 +294,123 @@ if __name__ == "__main__":
         )
         with self.assertRaises(ToolPolicyError):
             self.filesystem.execute(tool_request, self.authorize(tool_request))
+
+
+class ReadOnlyCommandExecutorTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary_directory.cleanup)
+        self.root = Path(self.temporary_directory.name)
+        path_policy = ReadOnlyPathPolicy((self.root,))
+        self.gate = ToolApprovalGate(clock=lambda: NOW)
+        self.policy = GitReadOnlyCommandPolicy(path_policy)
+        self.executor = ReadOnlyCommandExecutor(self.policy, self.gate)
+
+    @staticmethod
+    def authorize(tool_request):  # type: ignore[no-untyped-def]
+        return ToolAuthorization(
+            confirmed_by_user=True,
+            request_digest=tool_request_digest(tool_request),
+            confirmed_at=NOW,
+            expires_at=NOW + timedelta(minutes=1),
+        )
+
+    def command(self, argv=("git", "status", "--short"), **kwargs):  # type: ignore[no-untyped-def]
+        return ReadOnlyCommandRequest(
+            argv=argv,
+            cwd=str(self.root),
+            purpose="inspect repository state",
+            **kwargs,
+        )
+
+    def test_command_requires_explicit_user_approval(self) -> None:
+        with self.assertRaises(ToolApprovalError):
+            self.executor.execute(self.command(), None)
+
+    def test_non_git_and_unreviewed_git_arguments_are_rejected(self) -> None:
+        rejected = (
+            ("rm", "-rf", "."),
+            ("git", "status", ";", "touch", "owned"),
+            ("git", "diff", "--output=owned.txt"),
+            ("git", "clean", "-fd"),
+        )
+        for argv in rejected:
+            tool_request = self.command(argv)
+            with self.subTest(argv=argv), self.assertRaises(ToolPolicyError):
+                self.executor.execute(tool_request, self.authorize(tool_request))
+
+    def test_working_directory_must_remain_inside_allowed_root(self) -> None:
+        outside = self.root.parent
+        tool_request = ReadOnlyCommandRequest(
+            argv=("git", "status", "--short"),
+            cwd=str(outside),
+            purpose="attempt outside command",
+        )
+        with self.assertRaises(ToolPolicyError):
+            self.executor.execute(tool_request, self.authorize(tool_request))
+
+    def test_executor_uses_no_shell_minimum_environment_and_git_safety_flags(self) -> None:
+        tool_request = self.command(("git", "diff", "--check"))
+
+        def fake_run(argv, **kwargs):  # type: ignore[no-untyped-def]
+            kwargs["stdout"].write(b"clean\n")
+            self.assertFalse(kwargs["shell"])
+            self.assertIs(kwargs["stdin"], subprocess.DEVNULL)
+            self.assertNotIn("HOME", kwargs["env"])
+            self.assertEqual(kwargs["env"]["GIT_OPTIONAL_LOCKS"], "0")
+            self.assertEqual(kwargs["env"]["GIT_TERMINAL_PROMPT"], "0")
+            self.assertIn("--no-pager", argv)
+            self.assertIn("--no-ext-diff", argv)
+            self.assertIn("--no-textconv", argv)
+            return subprocess.CompletedProcess(argv, 0)
+
+        with patch("kayra_ai.tools.commands.subprocess.run", side_effect=fake_run):
+            result = self.executor.execute(tool_request, self.authorize(tool_request))
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "clean\n")
+        self.assertFalse(result.timed_out)
+
+    def test_reviewed_git_status_runs_in_temporary_repository(self) -> None:
+        subprocess.run(
+            (str(self.policy.git_executable), "init", "-q"),
+            cwd=self.root,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+            shell=False,
+        )
+        tool_request = self.command()
+        result = self.executor.execute(tool_request, self.authorize(tool_request))
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertFalse(result.timed_out)
+
+    def test_output_is_bounded_and_reported_as_truncated(self) -> None:
+        tool_request = self.command(max_output_chars=5)
+
+        def fake_run(argv, **kwargs):  # type: ignore[no-untyped-def]
+            kwargs["stdout"].write(b"0123456789")
+            kwargs["stderr"].write(b"abcdefghij")
+            return subprocess.CompletedProcess(argv, 0)
+
+        with patch("kayra_ai.tools.commands.subprocess.run", side_effect=fake_run):
+            result = self.executor.execute(tool_request, self.authorize(tool_request))
+        self.assertEqual(result.stdout, "01234")
+        self.assertEqual(result.stderr, "abcde")
+        self.assertTrue(result.stdout_truncated)
+        self.assertTrue(result.stderr_truncated)
+
+    def test_timeout_is_structured_result(self) -> None:
+        tool_request = self.command(timeout_seconds=0.1)
+        with patch(
+            "kayra_ai.tools.commands.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd=("git", "status"), timeout=0.1),
+        ):
+            result = self.executor.execute(tool_request, self.authorize(tool_request))
+        self.assertTrue(result.timed_out)
+        self.assertIsNone(result.returncode)
+
+
+if __name__ == "__main__":
+    unittest.main()

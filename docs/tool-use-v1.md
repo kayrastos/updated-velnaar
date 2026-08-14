@@ -3,7 +3,7 @@
 Bu asama, model ile yerel araclar arasina varsayilan olarak reddeden bir
 guvenlik siniri koyar. Dosya listeleme, metadata ve metin okuma yalnizca acikca
 izin verilen koklerde ve her istek icin ayri kullanici onayiyla calisabilir.
-Komut calistirma henuz etkin degildir.
+Komut katmani yalnizca kodda tanimli kesin Git sorgularini calistirabilir.
 
 ## Degismez ilkeler
 
@@ -37,10 +37,9 @@ Komut calistirma henuz etkin degildir.
 - `filesystem.read_text`
 - `command.run_readonly`
 
-`command.run_readonly` adi tek basina bir komutu guvenli yapmaz. Gelecek
-yurutucu, komutu `shell=False` ile calistiracak ve arac/alt-komut/arguman
-duzeyinde allowlist uygulayacaktir. Politika tarafindan taninmayan her komut
-reddedilecektir.
+`command.run_readonly` adi tek basina bir komutu guvenli yapmaz. Yurutucu komutu
+`shell=False` ile calistirir ve tum `argv` dizisini kesin allowlist ile
+karsilastirir. Politika tarafindan taninmayan her komut reddedilir.
 
 ## Dosya politikasi
 
@@ -54,12 +53,24 @@ reddedilecektir.
 - Dizin listeleme recursive degildir, siralidir, ust sinirlidir ve symlink
   girdilerini izlemeksizin isaretler.
 
+## Komut politikasi
+
+- Yalnizca sinirli `git status`, `git diff`, `git show` ve `git ls-files`
+  sorgularinin tam arguman dizileri kabul edilir.
+- Shell, pipe, yonlendirme, komut birlestirme, serbest executable ve serbest
+  Git secenekleri yoktur.
+- Calisma dizini dosya politikasindaki izinli koklerin icinde kalmalidir.
+- Git pager, terminal prompt, global/system config ve optional lock yazimlari
+  kapatilir; fsmonitor devre disi birakilir.
+- Diff/show calismalarinda external diff ve textconv devre disidir.
+- Alt surec minimum ortamla, `stdin=DEVNULL`, `shell=False`, timeout ve sinirli
+  sonuc okuma ile calisir.
+- Timeout ve cikti kesilmesi yapilandirilmis sonuc alanlarinda belirtilir.
+
 ## Sonraki uygulama sirasi
 
-1. Tam arguman dizisine gore allowlist kullanan komut politikasi
-2. `shell=False`, minimum ortam, timeout ve cikti sinirli komut yurutucu
-3. Kullanici arayuzu onizleme/onay akisi
-4. Yerel, kisisel veri icermeyen denetim olaylari
+1. Kullanici arayuzu onizleme/onay akisi
+2. Yerel, kisisel veri icermeyen denetim olaylari
 
 ## Guven siniri
 

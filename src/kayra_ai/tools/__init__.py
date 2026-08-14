@@ -1,12 +1,17 @@
 """User-approved, local-only tool-use security primitives for KayraAI."""
 
 from .approval import ToolApprovalError, ToolApprovalGate
+from .commands import (
+    GitReadOnlyCommandPolicy,
+    ReadOnlyCommandExecutor,
+)
 from .contracts import (
     TOOL_REQUEST_ADAPTER,
     DirectoryEntry,
     ListDirectoryRequest,
     ListDirectoryResult,
     ReadOnlyCommandRequest,
+    ReadOnlyCommandResult,
     ReadTextRequest,
     ReadTextResult,
     StatPathRequest,
@@ -22,9 +27,12 @@ from .policy import ReadOnlyPathPolicy, ToolPolicyError
 
 __all__ = [
     "DirectoryEntry",
+    "GitReadOnlyCommandPolicy",
     "ListDirectoryRequest",
     "ListDirectoryResult",
     "ReadOnlyCommandRequest",
+    "ReadOnlyCommandExecutor",
+    "ReadOnlyCommandResult",
     "ReadOnlyFilesystem",
     "ReadOnlyPathPolicy",
     "ReadTextRequest",

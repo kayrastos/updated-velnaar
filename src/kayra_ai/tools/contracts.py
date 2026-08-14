@@ -164,6 +164,28 @@ class ReadTextResult(StrictToolModel):
     size_bytes: int = Field(ge=0)
 
 
+class ReadOnlyCommandResult(StrictToolModel):
+    request_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    tool: Literal["command.run_readonly"] = "command.run_readonly"
+    argv: tuple[str, ...] = Field(min_length=1, max_length=64)
+    cwd: str = Field(min_length=1, max_length=4096)
+    returncode: int | None = None
+    stdout: str = Field(max_length=1_000_000)
+    stderr: str = Field(max_length=1_000_000)
+    stdout_truncated: bool = False
+    stderr_truncated: bool = False
+    timed_out: bool = False
+    duration_ms: float = Field(ge=0)
+
+    @model_validator(mode="after")
+    def timeout_state_is_consistent(self) -> "ReadOnlyCommandResult":
+        if self.timed_out and self.returncode is not None:
+            raise ValueError("timeout sonucunda returncode bulunamaz")
+        if not self.timed_out and self.returncode is None:
+            raise ValueError("tamamlanan komutta returncode gerekli")
+        return self
+
+
 def tool_request_digest(request: ToolRequest) -> str:
     payload = request.model_dump(mode="json", exclude_none=False)
     canonical = json.dumps(
