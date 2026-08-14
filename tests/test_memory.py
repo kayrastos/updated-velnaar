@@ -3,8 +3,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from kayra_ai.memory import (
     LexicalMemoryRetriever,
@@ -26,11 +28,67 @@ def authorization(purpose: str = "unit test memory mutation") -> WriteAuthorizat
 PASSPHRASE = "correct horse battery staple"
 
 
+class TrackingConnection(sqlite3.Connection):
+    was_closed = False
+
+    def close(self) -> None:
+        self.was_closed = True
+        super().close()
+
+
 def store_at(path: Path, **kwargs) -> MemoryStore:  # type: ignore[no-untyped-def]
     return MemoryStore(path, passphrase=PASSPHRASE, **kwargs)
 
 
 class MemoryStoreTests(unittest.TestCase):
+    def test_connections_close_after_success_and_transaction_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "memory.sqlite3"
+            real_connect = sqlite3.connect
+            connections: list[TrackingConnection] = []
+
+            def tracked_connect(*args, **kwargs):  # type: ignore[no-untyped-def]
+                connection = real_connect(
+                    *args,
+                    **kwargs,
+                    factory=TrackingConnection,
+                )
+                connections.append(connection)
+                return connection
+
+            with patch(
+                "kayra_ai.memory.store.sqlite3.connect",
+                side_effect=tracked_connect,
+            ):
+                store = store_at(db_path)
+                self.assertEqual(store.active_records(), [])
+                with patch.object(
+                    store,
+                    "_insert_event",
+                    side_effect=RuntimeError("forced transaction failure"),
+                ):
+                    with self.assertRaises(RuntimeError):
+                        store.add(
+                            MemoryDraft(
+                                content="Rollback ile kaydedilmemeli",
+                                kind="note",
+                                source="unit-test",
+                            ),
+                            authorization=authorization(),
+                        )
+                self.assertEqual(store.active_records(), [])
+                with self.assertRaises(MemoryDecryptionError):
+                    MemoryStore(
+                        db_path,
+                        passphrase="this passphrase is definitely wrong",
+                    )
+
+            self.assertGreaterEqual(len(connections), 5)
+            for connection in connections:
+                self.assertTrue(connection.was_closed)
+                with self.assertRaises(sqlite3.ProgrammingError):
+                    connection.execute("SELECT 1")
+
     def test_database_must_be_outside_repository(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -147,7 +205,7 @@ class MemoryStoreTests(unittest.TestCase):
                 ),
                 authorization=authorization(),
             )
-            with sqlite3.connect(db_path) as connection:
+            with closing(sqlite3.connect(db_path)) as connection, connection:
                 ciphertext = connection.execute(
                     "SELECT payload_ciphertext FROM memories WHERE id = ?", (record.id,)
                 ).fetchone()[0]

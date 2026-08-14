@@ -4,7 +4,7 @@ import io
 import sqlite3
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import closing, redirect_stdout
 from pathlib import Path
 
 from kayra_ai.memory.cli import main
@@ -81,7 +81,7 @@ class MemoryCliTests(unittest.TestCase):
                     working_directory=Path(temp_dir),
                 )
             self.assertEqual(code, 2)
-            with sqlite3.connect(db_path) as connection:
+            with closing(sqlite3.connect(db_path)) as connection:
                 count = connection.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
             self.assertEqual(count, 0)
 
