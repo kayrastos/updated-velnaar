@@ -68,6 +68,8 @@ class GitReadOnlyCommandPolicy:
             "--no-pager",
             "-c",
             "core.fsmonitor=false",
+            "-c",
+            "color.ui=false",
             subcommand,
         ]
         if subcommand in {"diff", "show"}:

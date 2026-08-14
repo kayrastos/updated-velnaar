@@ -360,6 +360,7 @@ class ReadOnlyCommandExecutorTests(unittest.TestCase):
             self.assertEqual(kwargs["env"]["GIT_OPTIONAL_LOCKS"], "0")
             self.assertEqual(kwargs["env"]["GIT_TERMINAL_PROMPT"], "0")
             self.assertIn("--no-pager", argv)
+            self.assertIn("color.ui=false", argv)
             self.assertIn("--no-ext-diff", argv)
             self.assertIn("--no-textconv", argv)
             return subprocess.CompletedProcess(argv, 0)

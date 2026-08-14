@@ -24,6 +24,7 @@ kayra-benchmark = "kayra_ai.evaluation.benchmark_cli:main"
 kayra-validate-model-artifact = "kayra_ai.validation.model_artifact:main"
 kayra-memory = "kayra_ai.memory.cli:main"
 kayra-memory-chat = "kayra_ai.memory.chat_cli:main"
+kayra-tools = "kayra_ai.tools.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

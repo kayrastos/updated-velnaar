@@ -67,10 +67,22 @@ karsilastirir. Politika tarafindan taninmayan her komut reddedilir.
   sonuc okuma ile calisir.
 - Timeout ve cikti kesilmesi yapilandirilmis sonuc alanlarinda belirtilir.
 
+## Kullanici onayli CLI
+
+`kayra-tools`, izinli koku `--root` ile acikca alir. Dosya yolu veya Git sorgusu
+katı sozlesmeye donusturulup kanonik SHA-256 ozetiyle birlikte onizlenir. Arac
+yalnizca kullanici terminale tam olarak `EVET` yazdiktan sonra calisir. Model
+ciktisi veya istek verisi kendi basina onay sayilmaz.
+
+CLI serbest komut metni kabul etmez. Git sorgulari `git-status`,
+`git-diff-check`, `git-diff-names`, `git-head` ve `git-ls-files` adli alt
+komutlardan guvenli `argv` dizilerine donusturulur. Dosya ve komut ciktilarindaki
+terminal kontrol/bicimlendirme karakterleri yazdirilmadan once kacislanir.
+
 ## Sonraki uygulama sirasi
 
-1. Kullanici arayuzu onizleme/onay akisi
-2. Yerel, kisisel veri icermeyen denetim olaylari
+1. Yerel, kisisel veri icermeyen denetim olaylari
+2. Model arac istegi ile CLI arasinda guvenilmeyen veri router'i
 
 ## Guven siniri
 
