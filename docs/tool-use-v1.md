@@ -234,3 +234,30 @@ gecerli olsa da bu sonuc uctan uca arac smoke testi icin `INCOMPLETE` sayilir.
 Ilk model ciktisi strict zarfa uymazsa CLI en fazla bir arac-calistirmayan
 duzeltme cagrisi yapabilir. Duzeltilmis cikti strict parserdan gecmeden onizleme
 olusturulmaz; model onayi veya authorization alani yine kabul edilmez.
+
+## Sifreli hafiza ile opt-in tool sohbeti
+
+`kayra-memory-tool-chat`, mevcut `kayra-memory-chat` davranisini degistirmeyen
+ayri ve acik opt-in entegrasyondur. `--tool-root` zorunludur; araclar yalniz
+kullanicinin bu argumanla sectigi kokte calisabilir. Sifreli hafiza veritabani
+Git deposunun ve izinli tool root'un disinda kalmalidir. Hafiza parolasi komut
+satiri argumaniyla alinmaz; mevcut gizli parola istemi kullanilir.
+
+Her kullanici turunda lexical retrieval yalniz ilk soru icin bir kez yapilir.
+`build_memory_context()` tarafindan uretilen, markup karakterleri kacirilmis
+`GUVENILMEYEN VERI` system bolumu hem ilk model isteginde hem de onayli arac
+sonrasi final istekte korunur. Arac sonucu yeni bir hafiza sorgusu baslatmaz ve
+mevcut `untrusted_tool_result_data` zarfinda talimat olmayan, boyutu sinirli
+veri olarak tasinir. Bu akista hafiza yazma, guncelleme veya silme API'si modele
+ya da tool host'a baglanmaz.
+
+Ornek yerel calistirma:
+
+```text
+PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python -m kayra_ai.memory.memory_tool_chat_cli --db /git/disinda/memory.sqlite3 --tool-root /acikca/izin/verilen/kok
+```
+
+Model bir arac onerirse mevcut strict parser, router, salt-okunur path/Git
+politikasi ve host onizlemesi kullanilir. Yalniz terminalde tam `EVET` cevabi
+tek kullanimlik authorization uretebilir. Komut allowlist'i, tool adim siniri,
+request digest ve replay korumalari guarded model-tool loop ile aynidir.
