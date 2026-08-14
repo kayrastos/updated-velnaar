@@ -79,10 +79,22 @@ CLI serbest komut metni kabul etmez. Git sorgulari `git-status`,
 komutlardan guvenli `argv` dizilerine donusturulur. Dosya ve komut ciktilarindaki
 terminal kontrol/bicimlendirme karakterleri yazdirilmadan once kacislanir.
 
+## Guvenilmeyen model istek router'i
+
+`UntrustedToolRequestRouter`, model tarafindan uretilen metni calistirilabilir
+talimat olarak degil, guvenilmeyen veri olarak ele alir. Yalnizca tek ve boyutu
+sinirli JSON nesnesi kabul edilir. Tekrar eden alanlar, kod bloklari, ek metin,
+sonlu olmayan sayilar, bilinmeyen alanlar ve sozlesme disi arac adlari reddedilir.
+
+Modelin verdigi `request_id` host tarafindan yenisiyle degistirilir.
+`confirmed_by_user` gibi sahte onay alanlari katı sozlesme nedeniyle reddedilir.
+Dosya yolu ve komut allowlist politikasi gectikten sonra router yalnizca
+`ToolPreview` uretir; onay nesnesi olusturmaz ve hicbir yurutucu cagiramaz.
+
 ## Sonraki uygulama sirasi
 
 1. Yerel, kisisel veri icermeyen denetim olaylari
-2. Model arac istegi ile CLI arasinda guvenilmeyen veri router'i
+2. Model sohbeti ile router arasinda sinirli arac istek protokolu
 
 ## Guven siniri
 

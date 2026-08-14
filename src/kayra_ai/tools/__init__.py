@@ -24,6 +24,7 @@ from .contracts import (
 )
 from .filesystem import ReadOnlyFilesystem
 from .policy import ReadOnlyPathPolicy, ToolPolicyError
+from .router import ToolRequestRoutingError, UntrustedToolRequestRouter
 
 __all__ = [
     "DirectoryEntry",
@@ -46,6 +47,8 @@ __all__ = [
     "ToolPreview",
     "ToolPolicyError",
     "ToolRequest",
+    "ToolRequestRoutingError",
+    "UntrustedToolRequestRouter",
     "build_tool_preview",
     "tool_request_digest",
 ]
