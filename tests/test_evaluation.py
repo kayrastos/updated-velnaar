@@ -584,7 +584,7 @@ class EvaluationPipelineTests(unittest.TestCase):
         self.assertEqual(1, len(backend.requests))
         request = backend.requests[0]
         self.assertEqual("system", request.messages[0].role)
-        self.assertIn("Sen Kayra", request.messages[0].content)
+        self.assertIn("Sen Fulgor AI", request.messages[0].content)
         self.assertEqual("user", request.messages[1].role)
         serialized = request.model_dump_json()
         self.assertNotIn("chat_template", serialized)

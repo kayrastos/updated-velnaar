@@ -1,11 +1,17 @@
-# Kayra AI
+# Fulgor AI
 
-Kayra AI, internet bağlantısı olmadan kişisel dizüstü bilgisayarda çalışması hedeflenen Türkçe öncelikli, kişisel ve genel amaçlı bir yapay zekâ asistanı projesidir.
+Fulgor AI, internet bağlantısı olmadan kişisel dizüstü bilgisayarda çalışan
+Türkçe öncelikli, kişisel ve genel amaçlı bir yapay zekâ asistanı projesidir.
+Asistanın çekirdeği **Fulgor Core**, etkin model sürümü ise
+**Fulgor Ray 1.0 "Genesis"** adını taşır.
 
-## Hedef mimari
+## Mevcut sistem
 
-- Temel model: Qwen3-14B
-- Nihai yerel artifact: GGUF Q4_K_M
+- Ana marka: Fulgor AI
+- Çekirdek: Fulgor Core
+- Etkin model: Fulgor Ray 1.0 "Genesis"
+- Teknik temel model: Qwen3.5-9B
+- Yerel artifact: GGUF Q4_K_M
 - Birincil çalışma zamanı: Windows üzerinde LM Studio
 - İkincil çalışma zamanı: llama.cpp server
 - İstemci sınırı: ortak Backend sözleşmesi; LM Studio için native v1, llama.cpp için OpenAI uyumlu HTTP
@@ -15,7 +21,19 @@ Kayra AI, internet bağlantısı olmadan kişisel dizüstü bilgisayarda çalı�
 - Kişisel bağlam: Model ağırlıklarından ayrı, ileride eklenecek yerel RAG
 - Veri geliştirme: Yapay zekâ öğretmen/üretici/eleştirmenler ve insan denetimi
 
-WSL'nin yaklaşık 7,5 GiB RAM görmesi varsayılan WSL sınırından kaynaklanır ve nihai modelin RAM sınırı değildir. Model Windows üzerinde çalıştırılırken yüksek RAM kullanan diğer uygulamalar kapatılacaktır. Buna rağmen 16 GB RAM ve 4 GB VRAM Qwen3-14B Q4_K_M için alt sınıra yakın olduğundan başlangıç profili 4096 token, tek kullanıcı ve aynı anda tek istek olarak tutulacak; daha yüksek değerler yalnızca benchmark sonucuyla kabul edilecektir.
+WSL'nin yaklaşık 7,5 GiB RAM görmesi varsayılan WSL sınırından kaynaklanır ve
+nihai modelin RAM sınırı değildir. Model Windows üzerinde çalıştırılırken yüksek
+RAM kullanan diğer uygulamalar kapatılacaktır. Mevcut Fulgor Ray 1.0 "Genesis"
+Qwen3.5-9B tabanını kullanır. Qwen3-14B Q4_K_M bu donanımda alt sınıra yakın
+bir **gelecek ölçekleme hedefidir**; etkin model veya mevcut artifact değildir.
+Başlangıç profili 4096 token, tek kullanıcı ve aynı anda tek istek olarak
+tutulur; daha yüksek değerler yalnızca benchmark sonucuyla kabul edilir.
+
+Marka, model ailesi, sürümleme, teknik provenance ve geriye uyumlu adlar için
+[marka ve model adları](docs/branding-and-model-names.md) belgesine bakın.
+`Kayra` adı yeni kullanıcıya dönük adlandırmada kullanılmaz; bu ilk geçiş
+aşamasında yalnız mevcut paket, CLI, ortam değişkeni, model/runtime kimliği ve
+şifreli hafıza yolu gibi legacy/internal compatibility identifier'larda korunur.
 
 LM Studio ve llama.cpp farklılıkları küçük adaptörlerde kalır. LM Studio adaptörü
 reasoning capability'sini ve native istatistikleri belgelenmiş `/api/v1/models`

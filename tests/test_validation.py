@@ -47,7 +47,7 @@ class SchemaTests(unittest.TestCase):
 class AssistantTests(unittest.TestCase):
     def test_assistant_definition_is_valid(self) -> None:
         assistant = validate_assistant(ROOT / "configs" / "assistant.yaml")
-        self.assertEqual("Kayra", assistant.name)
+        self.assertEqual("Fulgor AI", assistant.name)
         self.assertEqual(4096, assistant.generation_defaults["context_length"])
         self.assertFalse(assistant.privacy["embed_personal_data_in_weights"])
 

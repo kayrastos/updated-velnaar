@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kayra.local/schemas/assistant.schema.json",
-  "title": "Kayra assistant definition",
+  "title": "Fulgor AI assistant definition",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -116,4 +116,3 @@
     }
   }
 }
-

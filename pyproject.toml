@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kayra-ai"
 version = "0.1.0"
-description = "Kayra AI modelden bağımsız yerel çalışma zamanı ve değerlendirme altyapısı"
+description = "Fulgor AI modelden bağımsız yerel çalışma zamanı ve değerlendirme altyapısı"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
