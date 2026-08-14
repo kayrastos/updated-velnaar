@@ -33,6 +33,14 @@ from .host import (
 
 
 ConfirmationProvider = Callable[[str], str]
+ContinuationRequestBuilder = Callable[
+    [GenerationRequest, GenerationResponse, str],
+    GenerationRequest,
+]
+ModelOutputRepairBuilder = Callable[
+    [GenerationRequest, GenerationResponse],
+    GenerationRequest,
+]
 ModelLoopErrorCode: TypeAlias = Literal[
     "backend_failed",
     "model_output_rejected",
@@ -49,7 +57,7 @@ class StrictModelToolModel(BaseModel):
 
 
 class AssistantResponseProposal(StrictModelToolModel):
-    kind: Literal["assistant_response"] = "assistant_response"
+    kind: Literal["assistant"] = "assistant"
     content: str = Field(min_length=1, max_length=16_384)
 
     @field_validator("content")
@@ -258,6 +266,8 @@ class GuardedModelToolLoop:
         parser: StrictModelOutputParser | None = None,
         max_tool_steps: int = 1,
         max_tool_result_chars: int = 4096,
+        continuation_request_builder: ContinuationRequestBuilder | None = None,
+        model_output_repair_builder: ModelOutputRepairBuilder | None = None,
     ) -> None:
         if not isinstance(host, UserConfirmedToolExecutionHost):
             raise TypeError("guarded loop mevcut user-confirmed host'u kullanmali")
@@ -273,6 +283,16 @@ class GuardedModelToolLoop:
         self.parser = parser or StrictModelOutputParser()
         self.max_tool_steps = max_tool_steps
         self.max_tool_result_chars = max_tool_result_chars
+        self.continuation_request_builder = (
+            continuation_request_builder or self._default_continuation_request
+        )
+        if not callable(self.continuation_request_builder):
+            raise TypeError("continuation request builder callable olmali")
+        if model_output_repair_builder is not None and not callable(
+            model_output_repair_builder
+        ):
+            raise TypeError("model output repair builder callable olmali")
+        self.model_output_repair_builder = model_output_repair_builder
 
     def run(
         self,
@@ -298,6 +318,7 @@ class GuardedModelToolLoop:
         tool_steps = 0
         last_request_digest: str | None = None
         seen_request_fingerprints: set[str] = set()
+        repair_attempted = False
 
         while True:
             try:
@@ -325,6 +346,26 @@ class GuardedModelToolLoop:
             try:
                 proposal = self.parser.parse_response(response)
             except ModelOutputParseError:
+                if self.model_output_repair_builder is not None and not repair_attempted:
+                    repair_attempted = True
+                    try:
+                        repair_request = self.model_output_repair_builder(
+                            current_request,
+                            response,
+                        )
+                        if not isinstance(repair_request, GenerationRequest):
+                            raise TypeError("repair builder GenerationRequest dondurmedi")
+                        current_request = repair_request.model_copy(deep=True)
+                    except Exception:
+                        return self._failure(
+                            status="error",
+                            error_code="model_output_rejected",
+                            message="Model ciktisi guvenli bir strict duzeltme istegine donusturulemedi.",
+                            tool_steps=tool_steps,
+                            backend_calls=backend_calls,
+                            last_request_digest=last_request_digest,
+                        )
+                    continue
                 return self._failure(
                     status="rejected",
                     error_code="model_output_rejected",
@@ -415,16 +456,15 @@ class GuardedModelToolLoop:
                     request_digest=last_request_digest,
                     max_data_chars=self.max_tool_result_chars,
                 )
-                current_request = GenerationRequest(
-                    messages=[
-                        *current_request.messages,
-                        ChatMessage(role="assistant", content=response.content),
-                        ChatMessage(role="user", content=tool_data),
-                    ],
-                    settings=current_request.settings,
-                    requested_profile=current_request.requested_profile,
+                continuation = self.continuation_request_builder(
+                    current_request,
+                    response,
+                    tool_data,
                 )
-            except (ValidationError, TypeError, ValueError):
+                if not isinstance(continuation, GenerationRequest):
+                    raise TypeError("continuation builder GenerationRequest dondurmedi")
+                current_request = continuation.model_copy(deep=True)
+            except Exception:
                 return self._failure(
                     status="error",
                     error_code="tool_result_rejected",
@@ -433,6 +473,22 @@ class GuardedModelToolLoop:
                     backend_calls=backend_calls,
                     last_request_digest=last_request_digest,
                 )
+
+    @staticmethod
+    def _default_continuation_request(
+        current_request: GenerationRequest,
+        response: GenerationResponse,
+        tool_data: str,
+    ) -> GenerationRequest:
+        return GenerationRequest(
+            messages=[
+                *current_request.messages,
+                ChatMessage(role="assistant", content=response.content),
+                ChatMessage(role="user", content=tool_data),
+            ],
+            settings=current_request.settings,
+            requested_profile=current_request.requested_profile,
+        )
 
     def _consume_without_approval(self, prepared: ToolHostPrepared) -> None:
         try:

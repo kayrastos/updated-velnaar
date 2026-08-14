@@ -45,7 +45,7 @@ def generation(content: str) -> GenerationResponse:
 
 
 def assistant_proposal(content: str) -> str:
-    return json.dumps({"kind": "assistant_response", "content": content})
+    return json.dumps({"kind": "assistant", "content": content})
 
 
 def tool_proposal(
@@ -198,8 +198,8 @@ class GuardedModelToolLoopTests(unittest.TestCase):
             "{not-json}",
             f"{valid}{valid}",
             "[]",
-            '{"kind":"assistant_response","content":"x","content":"y"}',
-            json.dumps({"kind": "assistant_response", "content": "x" * 33_000}),
+            '{"kind":"assistant","content":"x","content":"y"}',
+            json.dumps({"kind": "assistant", "content": "x" * 33_000}),
         )
         for content in rejected:
             with self.subTest(content=content[:80]):
@@ -354,12 +354,32 @@ class GuardedModelToolLoopTests(unittest.TestCase):
                 unexpected=True,  # type: ignore[call-arg]
             )
 
+    def test_continuation_builder_failure_becomes_safe_strict_outcome(self) -> None:
+        backend = SequencedBackend(generation(tool_proposal()))
+
+        def fail_builder(*_args: object) -> GenerationRequest:
+            raise RuntimeError("PRIVATE CONTINUATION CANARY")
+
+        outcome = self.run_loop(
+            backend,
+            continuation_request_builder=fail_builder,
+        )
+
+        self.assertEqual(outcome.status, "error")
+        self.assertEqual(outcome.error_code, "tool_result_rejected")
+        self.assertEqual(outcome.tool_steps, 1)
+        self.assertNotIn("PRIVATE CONTINUATION CANARY", outcome.model_dump_json())
+
     def test_parser_accepts_only_documented_strict_envelope(self) -> None:
         parser = StrictModelOutputParser(max_input_bytes=2048)
         proposal = parser.parse_text(tool_proposal())
         self.assertIsInstance(proposal, ToolRequestProposal)
         with self.assertRaises(ModelOutputParseError):
-            parser.parse_text(json.dumps({"kind": "assistant_response", "content": 1}))
+            parser.parse_text(json.dumps({"kind": "assistant", "content": 1}))
+        with self.assertRaises(ModelOutputParseError):
+            parser.parse_text(
+                json.dumps({"kind": "assistant_response", "content": "legacy"})
+            )
         with self.assertRaises(ModelOutputParseError):
             StrictModelOutputParser(max_input_bytes=32).parse_text(
                 assistant_proposal("x" * 64)

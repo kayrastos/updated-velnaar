@@ -31,8 +31,10 @@ from .host import (
 )
 from .model_loop import (
     AssistantResponseProposal,
+    ContinuationRequestBuilder,
     GuardedModelToolLoop,
     GuardedModelToolLoopOutcome,
+    ModelOutputRepairBuilder,
     ModelOutputParseError,
     StrictModelOutputParser,
     ToolRequestProposal,
@@ -45,6 +47,7 @@ from .router import ToolRequestRoutingError, UntrustedToolRequestRouter
 
 __all__ = [
     "AssistantResponseProposal",
+    "ContinuationRequestBuilder",
     "DirectoryEntry",
     "GuardedModelToolLoop",
     "GuardedModelToolLoopOutcome",
@@ -68,6 +71,7 @@ __all__ = [
     "ToolHostOutcome",
     "ToolHostPrepared",
     "ModelOutputParseError",
+    "ModelOutputRepairBuilder",
     "ToolPreview",
     "ToolPolicyError",
     "ToolRequest",

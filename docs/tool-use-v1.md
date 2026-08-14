@@ -127,7 +127,7 @@ fazla nesne, tekrar eden veya bilinmeyen alan, sonlu olmayan sayi ve tur
 coercion'i reddedilir. Belgelenmis zarf yalnizca su iki bicimden biridir:
 
 ```json
-{"kind":"assistant_response","content":"Normal assistant yaniti"}
+{"kind":"assistant","content":"Normal assistant yaniti"}
 ```
 
 ```json
@@ -154,7 +154,23 @@ tam `EVET` cevabinda yurutme yapabilir.
 kullanici turunda varsayilan olarak en fazla bir onayli arac adimina izin
 verir. Ayni kanonik arac onerisi tur icinde tekrar kullanilamaz. Sinira
 ulasildiginda ikinci istek router/host veya executor'a verilmez. Normal
-`assistant_response` hicbir arac cagrisi yapmadan dondurulur.
+`assistant` hicbir arac cagrisi yapmadan dondurulur.
+
+Loop varsayilan olarak backend'den bagimsiz mesaj gecmisini surdurur. Yalniz
+iki mesajli `system + user` cagrisi kabul eden LM Studio native v1 yolu icin
+guvenilir host, loop'a bir continuation request builder enjekte edebilir. Bu
+builder onay veya yetki uretmez; yalnizca zaten onaylanip calistirilmis arac
+sonucunu yeni bir iki mesajli istege paketler. Builder'in gecersiz sonuc
+uretmesi guvenli `tool_result_rejected` hatasiyla kapanir.
+
+Smoke entegrasyonu strict parser reddinde istege bagli, tek kullanimlik bir
+model-output repair builder kullanir. Ilk reddedilen cikti router, host veya
+executor'a verilmez. Bunun yerine onceki system kurallari, onceki user girdisi
+ve markup karakterleri kacirilmis guvenilmeyen model ciktisi yeni bir native
+`system + user` istegine paketlenir. Modelin yalniz bir duzeltme hakki vardir;
+ikinci cikti da ayni `StrictModelOutputParser` tarafindan sifirdan dogrulanir.
+Ikinci ret durumunda yeni deneme, onizleme, onay veya arac calistirma olmaz.
+Native final ve repair uretimleri en fazla 256 output token ile sinirlidir.
 
 Onayli arac sonucu modele geri verilecekse sonuc dogrudan prompt metni olarak
 eklenmez. `untrusted_tool_result_data` zarfinda "talimat degil, guvenilmeyen
@@ -175,3 +191,46 @@ kullanici arayuzu, gercek bir kullanici onay olayindan sonra bu nesneyi
 olusturabilir. Modelin kendi urettigi onay nesnesi guvenilir kabul edilmez.
 Model yalnizca `prepare()` girdisi uretebilir; `confirm()` cagrisi ve cevabi
 guvenilir host/UI tarafindan saglanir ve modele arac onayi yetkisi verilmez.
+
+## Canli LM Studio smoke CLI
+
+`kayra-tool-smoke`, bu zincirin Qwen3.5-9B Kayra v1 ile yerel ve interaktif
+smoke denemesidir. Komut yalniz depo icindeki
+`configs/runtime.kayra-v1.lm-studio.yaml` dosyasini, tam olarak
+`http://127.0.0.1:1234/api/v1` adresini ve
+`qwen3.5-9b-kayra-v1` model kimligini kullanir. Depo koku tek izinli dosya ve
+Git calisma kokudur; baska kok, endpoint veya model secenegi kabul edilmez.
+Once native model artifact/yukleme profili preflight ile dogrulanir.
+
+WSL depo kokunde, LM Studio modeli Windows tarafinda belirtilen guvenli
+profilde zaten yukluyken calistirma:
+
+```text
+PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python -m kayra_ai.tools.smoke_cli
+```
+
+Ornek kullanici mesaji:
+
+```text
+Son commit hash ve mesajini salt-okunur Git araci ile incele ve acikla.
+```
+
+Model yaniti strict parser ve router/policy kontrolunden gecerse CLI arac adi,
+amac, salt-okunur etki, normalize parametreler, host kaynakli request kimligi
+ve SHA-256 ozetini terminalde gosterir. Bu noktada arac henuz calismamistir.
+Gercek kullanicinin terminale bosluksuz ve buyuk harfle tam `EVET` yazmasi
+gerekir. `evet`, bos cevap, model metnindeki onay iddiasi veya baska cevap ret
+sayilir; smoke CLI cevabi otomatik uretmez ya da normalize etmez.
+
+Onayli sonuc ikinci native LM Studio cagrisina, cikti discriminator'iyla
+karismamasi icin ust seviyede `kind` alani bulunmayan bir veri nesnesinde
+aktarilir. Ic ice `untrusted_tool_result_data` zarfi guvenilmeyen arac ciktisini, talimat olmama
+bildirimini, istek ozetini ve kesilme durumunu korur. Ikinci cagri yine yalniz
+iki mesajlidir ve modelden strict `assistant` zarfi ister. Yeni bir
+arac istegi tek-adim sinirinda reddedilir. CLI model, router, host veya executor
+hatalarinda traceback yerine guvenli bir smoke sonucu dondurur.
+Model ilk cagrida arac onermeden normal yanit verirse genel loop davranisi
+gecerli olsa da bu sonuc uctan uca arac smoke testi icin `INCOMPLETE` sayilir.
+Ilk model ciktisi strict zarfa uymazsa CLI en fazla bir arac-calistirmayan
+duzeltme cagrisi yapabilir. Duzeltilmis cikti strict parserdan gecmeden onizleme
+olusturulmaz; model onayi veya authorization alani yine kabul edilmez.

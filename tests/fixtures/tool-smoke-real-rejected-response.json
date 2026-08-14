@@ -1,0 +1,3 @@
+{
+  "content": "{\"kind\":\"tool_request\",\"request\":{\"name\":\"command.run_readonly\",\"arguments\":{\"cwd\":\".\",\"argv\":[\"git\",\"show\",\"-s\",\"--format=%H%n%s\",\"HEAD\"],\"purpose\":\"Son commit hash ve mesajını salt-okunur Git aracı ile incele.\"}}}"
+}
