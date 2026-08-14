@@ -29,11 +29,25 @@ from .host import (
     UserConfirmedToolExecutionHost,
     render_tool_preview,
 )
+from .model_loop import (
+    AssistantResponseProposal,
+    GuardedModelToolLoop,
+    GuardedModelToolLoopOutcome,
+    ModelOutputParseError,
+    StrictModelOutputParser,
+    ToolRequestProposal,
+    ToolResultDataEnvelope,
+    canonical_tool_request_json,
+    render_tool_result_for_model,
+)
 from .policy import ReadOnlyPathPolicy, ToolPolicyError
 from .router import ToolRequestRoutingError, UntrustedToolRequestRouter
 
 __all__ = [
+    "AssistantResponseProposal",
     "DirectoryEntry",
+    "GuardedModelToolLoop",
+    "GuardedModelToolLoopOutcome",
     "GitReadOnlyCommandPolicy",
     "ListDirectoryRequest",
     "ListDirectoryResult",
@@ -46,19 +60,25 @@ __all__ = [
     "ReadTextResult",
     "StatPathRequest",
     "StatPathResult",
+    "StrictModelOutputParser",
     "TOOL_REQUEST_ADAPTER",
     "ToolApprovalError",
     "ToolApprovalGate",
     "ToolAuthorization",
     "ToolHostOutcome",
     "ToolHostPrepared",
+    "ModelOutputParseError",
     "ToolPreview",
     "ToolPolicyError",
     "ToolRequest",
     "ToolRequestRoutingError",
+    "ToolRequestProposal",
+    "ToolResultDataEnvelope",
     "UntrustedToolRequestRouter",
     "UserConfirmedToolExecutionHost",
     "build_tool_preview",
+    "canonical_tool_request_json",
     "render_tool_preview",
+    "render_tool_result_for_model",
     "tool_request_digest",
 ]

@@ -118,10 +118,55 @@ kontrolleri de yurutme sinirinda tekrar uygulanir. Router, onay veya yurutme
 hatalari ham exception metni ya da traceback yerine ekstra alanlara kapali,
 guvenli Pydantic sonuclariyla bildirilir.
 
+## Model cikti zarfi ve sinirli tool loop
+
+`StrictModelOutputParser`, `GenerationResponse.content` alanini guvenilmeyen
+veri olarak ele alir. Model her cagri icin yalnizca tek, boyutu sinirli JSON
+nesnesi dondurebilir. Markdown code fence, JSON oncesi/sonrasi metin, birden
+fazla nesne, tekrar eden veya bilinmeyen alan, sonlu olmayan sayi ve tur
+coercion'i reddedilir. Belgelenmis zarf yalnizca su iki bicimden biridir:
+
+```json
+{"kind":"assistant_response","content":"Normal assistant yaniti"}
+```
+
+```json
+{
+  "kind": "tool_request",
+  "request": {
+    "tool": "filesystem.read_text",
+    "path": "docs/tool-use-v1.md",
+    "purpose": "guvenlik belgesini incele",
+    "max_chars": 4096
+  }
+}
+```
+
+`tool_request.request` mevcut strict `ToolRequest` union'idir; yeni arac,
+komut veya onay sozlesmesi tanimlamaz. `authorization`, `approved`,
+`confirmed_by_user`, `EVET` veya benzeri ekstra alanlar model tarafindan
+tasindiginda reddedilir. Gecerli istek kanonik JSON'a donusturulerek mevcut
+router'a, ardindan mevcut user-confirmed host'a aktarilir. Kullanici cevabi
+model zarfina degil ayri ve guvenilir UI callback'ine aittir; host yine yalnizca
+tam `EVET` cevabinda yurutme yapabilir.
+
+`GuardedModelToolLoop` backend arayuzunu dependency injection ile alir ve tek
+kullanici turunda varsayilan olarak en fazla bir onayli arac adimina izin
+verir. Ayni kanonik arac onerisi tur icinde tekrar kullanilamaz. Sinira
+ulasildiginda ikinci istek router/host veya executor'a verilmez. Normal
+`assistant_response` hicbir arac cagrisi yapmadan dondurulur.
+
+Onayli arac sonucu modele geri verilecekse sonuc dogrudan prompt metni olarak
+eklenmez. `untrusted_tool_result_data` zarfinda "talimat degil, guvenilmeyen
+veri" bildirimi, istek ozeti, kesilme bilgisi ve boyutu sinirli JSON metni
+tasir. Kontrol karakterleri ASCII JSON kacislarina; HTML/XML isaretleri ve
+Markdown backtick karakterleri acik Unicode kacislarina donusturulur. Boylece
+arac icerigindeki prompt veya markup metni talimat sinirini taklit edemez.
+
 ## Sonraki uygulama sirasi
 
 1. Yerel, kisisel veri icermeyen denetim olaylari
-2. Model sohbeti ile host arasinda sinirli arac istek protokolu
+2. Guvenilir UI ile guarded loop arasinda yerel sohbet entegrasyonu
 
 ## Guven siniri
 
