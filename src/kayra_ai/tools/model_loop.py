@@ -51,6 +51,11 @@ ModelLoopErrorCode: TypeAlias = Literal[
     "tool_step_limit",
     "request_replay",
 ]
+BackendFailurePhase: TypeAlias = Literal[
+    "initial_model_generate",
+    "repair_model_generate",
+    "final_model_generate",
+]
 
 
 class StrictModelToolModel(BaseModel):
@@ -245,6 +250,8 @@ class GuardedModelToolLoopOutcome(StrictModelToolModel):
     message: str = Field(min_length=3, max_length=500)
     tool_steps: int = Field(ge=0, le=3)
     backend_calls: int = Field(ge=0, le=4)
+    backend_failure_phase: BackendFailurePhase | None = None
+    backend_http_status: int | None = Field(default=None, ge=100, le=599)
     last_request_digest: str | None = Field(
         default=None,
         pattern=r"^[0-9a-f]{64}$",
@@ -259,6 +266,12 @@ class GuardedModelToolLoopOutcome(StrictModelToolModel):
             raise ValueError("reddedilen veya hatali loop sonucu guvenli hata tasimali")
         if self.tool_steps > self.backend_calls:
             raise ValueError("tool adimi backend cagri sayisini asamaz")
+        if self.error_code != "backend_failed" and (
+            self.backend_failure_phase is not None or self.backend_http_status is not None
+        ):
+            raise ValueError("backend tani bilgisi yalniz backend hatasinda bulunabilir")
+        if self.backend_http_status is not None and self.backend_failure_phase is None:
+            raise ValueError("HTTP durumu backend hata asamasi gerektirir")
         return self
 
 
@@ -326,6 +339,7 @@ class GuardedModelToolLoop:
         last_request_digest: str | None = None
         seen_request_fingerprints: set[str] = set()
         repair_attempted = False
+        backend_failure_phase: BackendFailurePhase = "initial_model_generate"
 
         while True:
             try:
@@ -339,6 +353,8 @@ class GuardedModelToolLoop:
                     tool_steps=tool_steps,
                     backend_calls=backend_calls,
                     last_request_digest=last_request_digest,
+                    backend_failure_phase=backend_failure_phase,
+                    backend_http_status=exc.info.status_code,
                 )
             except Exception:
                 return self._failure(
@@ -348,6 +364,7 @@ class GuardedModelToolLoop:
                     tool_steps=tool_steps,
                     backend_calls=backend_calls,
                     last_request_digest=last_request_digest,
+                    backend_failure_phase=backend_failure_phase,
                 )
 
             try:
@@ -363,6 +380,7 @@ class GuardedModelToolLoop:
                         if not isinstance(repair_request, GenerationRequest):
                             raise TypeError("repair builder GenerationRequest dondurmedi")
                         current_request = repair_request.model_copy(deep=True)
+                        backend_failure_phase = "repair_model_generate"
                     except Exception:
                         return self._failure(
                             status="error",
@@ -471,6 +489,7 @@ class GuardedModelToolLoop:
                 if not isinstance(continuation, GenerationRequest):
                     raise TypeError("continuation builder GenerationRequest dondurmedi")
                 current_request = continuation.model_copy(deep=True)
+                backend_failure_phase = "final_model_generate"
             except Exception:
                 return self._failure(
                     status="error",
@@ -516,6 +535,8 @@ class GuardedModelToolLoop:
         tool_steps: int = 0,
         backend_calls: int = 0,
         last_request_digest: str | None = None,
+        backend_failure_phase: BackendFailurePhase | None = None,
+        backend_http_status: int | None = None,
     ) -> GuardedModelToolLoopOutcome:
         return GuardedModelToolLoopOutcome(
             status=status,
@@ -523,5 +544,7 @@ class GuardedModelToolLoop:
             message=message,
             tool_steps=tool_steps,
             backend_calls=backend_calls,
+            backend_failure_phase=backend_failure_phase,
+            backend_http_status=backend_http_status,
             last_request_digest=last_request_digest,
         )

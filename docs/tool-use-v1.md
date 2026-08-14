@@ -215,6 +215,28 @@ Ornek kullanici mesaji:
 Son commit hash ve mesajini salt-okunur Git araci ile incele ve acikla.
 ```
 
+Varsayilan Git smoke davranisi degismemistir. Bagimsiz read-file smoke
+senaryosu acikca secilmeli ve arac koku depo kokune tam esit bir canonical
+yol olarak verilmelidir. Hedef verilmezse depo icindeki `README.md` kullanilir:
+
+```text
+PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python -u -m kayra_ai.tools.smoke_cli --scenario read-file --tool-root /mnt/d/YapayZeka/kayra-ai
+```
+
+Bu senaryoda modelin onerebildigi tek arac `filesystem.read_text`, tek hedef
+secili dosya ve okuma siniri 8192 karakterdir. Router baska dosya araclarini,
+Git veya shell komutlarini ve farkli bir hedefi reddeder. Onizlemede canonical
+yol, `read_only` etki ve istege bagli SHA-256 ozeti gosterilir. Dosya ancak
+kullanici tam `EVET` yazarsa bir kez okunur; sonuc sinirlandirilmis, markup'i
+kacirilmis ve acikca talimat olmayan veri zarfi icinde modele aktarilir.
+CLI, preflight ve ilk model isteginden once kisa durum satirlarini flush ederek
+gosterir. Read-file baslangic istegi sabit Kayra v1 model kimligini,
+`non_thinking` profilini, native `reasoning=off` degerini ve 256 output token
+sinirini kullanir. Read-file tasima ve backend watchdog suresi 90 saniyedir;
+ilk model cagrisi bu surede tamamlanmazsa onizleme veya arac calistirma olmadan
+acik bir timeout hatasi uretilir. `-u`, WSL/Windows terminal zincirindeki ek
+stdout buffering olasiligini da kaldirir.
+
 Model yaniti strict parser ve router/policy kontrolunden gecerse CLI arac adi,
 amac, salt-okunur etki, normalize parametreler, host kaynakli request kimligi
 ve SHA-256 ozetini terminalde gosterir. Bu noktada arac henuz calismamistir.
@@ -229,6 +251,16 @@ bildirimini, istek ozetini ve kesilme durumunu korur. Ikinci cagri yine yalniz
 iki mesajlidir ve modelden strict `assistant` zarfi ister. Yeni bir
 arac istegi tek-adim sinirinda reddedilir. CLI model, router, host veya executor
 hatalarinda traceback yerine guvenli bir smoke sonucu dondurur.
+Native v1 final cagrisi onceki response kimligini veya cok-rollerli message
+dizisini kullanmaz; `store=false` sinirinda yeni `system_prompt` ve string
+`input` ile baslar. Read-file arac verisi 4096 context profiline pay birakmak
+icin en fazla 2048 kacirilmis karaktere indirilir ve kesilme bayragi modele
+tasınır. Git sonucu genellikle bu sinira ulasmaz; iki senaryo ayni final
+sozlesmesini kullansa da ikinci `input` boyutlari bu nedenle farklidir.
+Backend RuntimeFailure olusturursa smoke sonucu guvenli
+`phase=initial_model_generate|repair_model_generate|final_model_generate` ve
+varsa sayisal `http_status` bilgisini ekler. HTTP body, header veya dosya
+icerigi tani mesajina eklenmez.
 Model ilk cagrida arac onermeden normal yanit verirse genel loop davranisi
 gecerli olsa da bu sonuc uctan uca arac smoke testi icin `INCOMPLETE` sayilir.
 Ilk model ciktisi strict zarfa uymazsa CLI en fazla bir arac-calistirmayan

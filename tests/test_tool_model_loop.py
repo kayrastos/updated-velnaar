@@ -16,6 +16,7 @@ from kayra_ai.runtime import (
     GenerationSettings,
     TimingMetrics,
 )
+from kayra_ai.runtime.errors import HTTPStatusFailure
 from kayra_ai.tools import (
     GitReadOnlyCommandPolicy,
     GuardedModelToolLoop,
@@ -330,6 +331,27 @@ class GuardedModelToolLoopTests(unittest.TestCase):
         self.assertEqual(backend_failure.status, "error")
         self.assertEqual(backend_failure.error_code, "backend_failed")
         self.assertNotIn(backend_canary, backend_failure.model_dump_json())
+
+        final_http_failure_backend = SequencedBackend(
+            generation(tool_proposal()),
+            HTTPStatusFailure(status_code=413),
+        )
+        with patch.object(
+            self.filesystem,
+            "execute",
+            wraps=self.filesystem.execute,
+        ) as execute:
+            final_http_failure = self.run_loop(final_http_failure_backend)
+        self.assertEqual(final_http_failure.status, "error")
+        self.assertEqual(final_http_failure.error_code, "backend_failed")
+        self.assertEqual(
+            final_http_failure.backend_failure_phase,
+            "final_model_generate",
+        )
+        self.assertEqual(final_http_failure.backend_http_status, 413)
+        self.assertEqual(final_http_failure.tool_steps, 1)
+        self.assertEqual(final_http_failure.backend_calls, 2)
+        execute.assert_called_once()
 
         executor_canary = "PRIVATE EXECUTOR CANARY"
         with patch.object(
