@@ -23,6 +23,12 @@ from .contracts import (
     tool_request_digest,
 )
 from .filesystem import ReadOnlyFilesystem
+from .host import (
+    ToolHostOutcome,
+    ToolHostPrepared,
+    UserConfirmedToolExecutionHost,
+    render_tool_preview,
+)
 from .policy import ReadOnlyPathPolicy, ToolPolicyError
 from .router import ToolRequestRoutingError, UntrustedToolRequestRouter
 
@@ -44,11 +50,15 @@ __all__ = [
     "ToolApprovalError",
     "ToolApprovalGate",
     "ToolAuthorization",
+    "ToolHostOutcome",
+    "ToolHostPrepared",
     "ToolPreview",
     "ToolPolicyError",
     "ToolRequest",
     "ToolRequestRoutingError",
     "UntrustedToolRequestRouter",
+    "UserConfirmedToolExecutionHost",
     "build_tool_preview",
+    "render_tool_preview",
     "tool_request_digest",
 ]

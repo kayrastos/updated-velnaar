@@ -91,13 +91,42 @@ Modelin verdigi `request_id` host tarafindan yenisiyle degistirilir.
 Dosya yolu ve komut allowlist politikasi gectikten sonra router yalnizca
 `ToolPreview` uretir; onay nesnesi olusturmaz ve hicbir yurutucu cagiramaz.
 
+## Kullanici onayli yurutme host'u
+
+`UserConfirmedToolExecutionHost`, router ile mevcut salt-okunur yurutucular
+arasindaki guvenilir host/UI siniridir. `prepare()` model JSON'unu router'dan
+gecirir, normalize edilmis istegi host icinde beklemeye alir ve arac adi, amac,
+salt-okunur etki, parametreler, host kaynakli `request_id` ve istek SHA-256
+ozetini iceren deterministik bir JSON onizlemesi dondurur. Dinamik metin ASCII
+JSON kacislariyla gosterildigi icin kontrol karakterleri onay ekranini
+degistiremez.
+
+Guvenilir UI, onizlemeyi kullaniciya gosterdikten sonra `confirm()` metoduna
+bekleyen `request_id`, ozet ve kullanicinin cevabini ayri host girdileri olarak
+verir. Yalnizca cevap tam olarak `EVET` ise ve kimlik ile ozet host'taki ayni
+bekleyen istekle eslesiyorsa bir dakikalik `ToolAuthorization` olusturulur.
+Bekleyen istek yurutmeden once tek kullanimlik olarak tuketilir. Ret, bos veya
+farkli cevap, kimlik/ozet uyusmazligi ve ikinci kullanim yurutme yapmadan
+yapilandirilmis bir host sonucu dondurur.
+
+Host yalnizca router ile ayni `ReadOnlyPathPolicy` nesnesini kullanan
+`ReadOnlyFilesystem` ve istege bagli `ReadOnlyCommandExecutor` kabul eder.
+Komut yurutucusu router'daki ayni kesin Git allowlist politikasina bagli
+olmalidir; iki yurutucu da ayni `ToolApprovalGate` nesnesini kullanir. Boylece
+host kontrolune ek olarak mevcut digest, sure ve authorization replay
+kontrolleri de yurutme sinirinda tekrar uygulanir. Router, onay veya yurutme
+hatalari ham exception metni ya da traceback yerine ekstra alanlara kapali,
+guvenli Pydantic sonuclariyla bildirilir.
+
 ## Sonraki uygulama sirasi
 
 1. Yerel, kisisel veri icermeyen denetim olaylari
-2. Model sohbeti ile router arasinda sinirli arac istek protokolu
+2. Model sohbeti ile host arasinda sinirli arac istek protokolu
 
 ## Guven siniri
 
 `ToolAuthorization` bir yetki uretme mekanizmasi degildir. Yalnizca guvenilir
 kullanici arayuzu, gercek bir kullanici onay olayindan sonra bu nesneyi
 olusturabilir. Modelin kendi urettigi onay nesnesi guvenilir kabul edilmez.
+Model yalnizca `prepare()` girdisi uretebilir; `confirm()` cagrisi ve cevabi
+guvenilir host/UI tarafindan saglanir ve modele arac onayi yetkisi verilmez.
