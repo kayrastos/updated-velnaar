@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Callable
 from typing import Annotated, Any, Literal, TypeAlias
 
@@ -192,11 +193,17 @@ class ToolResultDataEnvelope(StrictModelToolModel):
 
 
 def _escape_prompt_markup(value: str) -> str:
-    return (
+    escaped = (
         value.replace("&", "\\u0026")
         .replace("<", "\\u003c")
         .replace(">", "\\u003e")
         .replace("`", "\\u0060")
+    )
+    return re.sub(
+        r"/(?:no_)?think",
+        lambda match: "\\u002f" + match.group(0)[1:],
+        escaped,
+        flags=re.IGNORECASE,
     )
 
 

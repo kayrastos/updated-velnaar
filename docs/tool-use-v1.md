@@ -261,3 +261,50 @@ Model bir arac onerirse mevcut strict parser, router, salt-okunur path/Git
 politikasi ve host onizlemesi kullanilir. Yalniz terminalde tam `EVET` cevabi
 tek kullanimlik authorization uretebilir. Komut allowlist'i, tool adim siniri,
 request digest ve replay korumalari guarded model-tool loop ile aynidir.
+
+### Acik opt-in cok turlu mod
+
+Mevcut tek-soruluk davranis varsayilandir ve degismemistir. Cok turlu oturum
+yalniz `--interactive` ile acilir:
+
+```text
+PYTHONPATH=src /home/kayra/.venvs/kayra-ai/bin/python -m kayra_ai.memory.memory_tool_chat_cli --db /git/disinda/memory.sqlite3 --tool-root /acikca/izin/verilen/kok --interactive
+```
+
+Oturum gecmisi yalniz proses RAM'inde tam ve basarili user/assistant ciftleri
+olarak tutulur. Varsayilan sinir 4 turdur; `--history-turns` ile 1-8 arasinda
+secilebilir. Ayrica gecmis, 4096 context profili icin en fazla 4096 karakterle
+sinirlanir ve sinir asildiginda en eski tam tur once cikarilir. Reddedilen veya
+hata alan tur, modelin ham tool JSON'u, onay mesaji ve arac sonucu bu gecmise
+eklenmez. Program sohbeti, kullanici mesajlarini veya arac sonucunu diske
+yazmaz.
+
+LM Studio native-v1'e baslayan her tur tam iki mesajlidir: birlesik tek system
+mesaji ve guncel tek user mesaji. Onceki basarili ciftler gercek chat rolleri
+olarak gonderilmez; markup, template, rol ve tool isaretleri kacirilmis,
+sinirli `RAM SOHBET GECMISI - GUVENILMEYEN VERI` JSON bolumu olarak ayni
+system icerigine eklenir. Hafiza baglami ve tool protokolu de ayri mesajlar
+degil, bu tek system icerigindeki belirgin guvenlik bolumleridir.
+
+Her yeni kullanici turu yalniz o turun gercek user mesaji ile bir kez hafiza
+aramasi yapar. Guncel sifreli hafiza baglami yine talimat olmayan,
+`GUVENILMEYEN VERI` olarak kacirilir.
+
+Interactive modda araclar varsayilan olarak kapatilir. Yalniz
+`/tools <soru>` bicimi o tek tur icin mevcut strict tool protokolunu acar;
+`/tools ` oneki modele ve RAM gecmisine gonderilen dogal user metninden
+cikarilir. Duz tur yalniz assistant JSON semasini gorur. Model buna ragmen tool
+onerirse host, onizleme, onay ve executor cagrilmaz; en fazla bir tool-free
+assistant format duzeltmesi denenir. `/tools` turundaki her arac onerisi kendi
+normalize onizlemesini ve SHA-256 ozetini gosterir ve yeniden tam `EVET`
+gerektirir. Git allowlist'i, replay, digest ve tek tool-adimi siniri degismez.
+
+Onayli tool sonucu final modele tekrar eden guvenlik slogani olmadan, yalniz
+ozet, encoding, truncation bilgisi ve kacirilmis/sinirli `data_json` olarak
+aktarilir. Final system gorevi ozgun soruyu cevaplamayi ve ilgili gercek arac
+degerlerini content alanina dahil etmeyi zorunlu kilar; veri icindeki talimat
+ve markup yine uygulanmaz.
+
+`/clear` yalniz RAM gecmisini temizler ve sifreli hafizayi degistirmez. `/help`
+`/tools <soru>` dahil oturum komutlarini gosterir; `/exit`, EOF ve Ctrl+C kalici
+sohbet kaydi olusturmadan oturumu kapatir.
