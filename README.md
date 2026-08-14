@@ -31,9 +31,18 @@ tutulur; daha yüksek değerler yalnızca benchmark sonucuyla kabul edilir.
 
 Marka, model ailesi, sürümleme, teknik provenance ve geriye uyumlu adlar için
 [marka ve model adları](docs/branding-and-model-names.md) belgesine bakın.
-`Kayra` adı yeni kullanıcıya dönük adlandırmada kullanılmaz; bu ilk geçiş
-aşamasında yalnız mevcut paket, CLI, ortam değişkeni, model/runtime kimliği ve
+`Kayra` adı yeni kullanıcıya dönük adlandırmada kullanılmaz; geriye uyumluluk
+amacıyla yalnız mevcut paket, CLI, ortam değişkeni, model/runtime kimliği ve
 şifreli hafıza yolu gibi legacy/internal compatibility identifier'larda korunur.
+
+Yeni komut standardı `fulgor-*` adlarıdır; her mevcut `kayra-*` komutu aynı
+Python `main` fonksiyonuna yönelen bir `fulgor-*` alias'ına sahiptir. Eski
+`kayra-*` girişleri kaldırılmamış ve çıktılarına deprecation uyarısı
+eklenmemiştir. Yeni ortam değişkeni standardı `FULGOR_*` biçimidir. Karşılık
+gelen `KAYRA_*` adları geriye uyumlu çalışır; iki ad birlikte tanımlıysa yalnız
+aynı değeri taşıdıklarında kabul edilir. Farklı değerler güvenlik amacıyla
+backend preflight, araç veya hafıza işlemi başlamadan reddedilir ve değerler
+hata çıktısına yazılmaz.
 
 LM Studio ve llama.cpp farklılıkları küçük adaptörlerde kalır. LM Studio adaptörü
 reasoning capability'sini ve native istatistikleri belgelenmiş `/api/v1/models`

@@ -8,6 +8,7 @@ from typing import Callable, Sequence
 import yaml
 from pydantic import ValidationError
 
+from kayra_ai.environment import EnvironmentConfigurationError
 from kayra_ai.runtime import (
     ChatMessage,
     GenerationRequest,
@@ -90,7 +91,11 @@ def main(
     working_directory: Path | None = None,
     backend_factory: BackendFactory = build_backend,
 ) -> int:
-    args = build_parser().parse_args(argv)
+    try:
+        args = build_parser().parse_args(argv)
+    except EnvironmentConfigurationError as exc:
+        print(f"HATA: {exc}")
+        return 1
     working = (working_directory or Path.cwd()).resolve()
     repository = _repository_root(working)
     db_path = args.db.expanduser().resolve()
@@ -106,13 +111,14 @@ def main(
         if assistant.privacy.get("rag_enabled") is not True:
             raise ValueError("asistan yapilandirmasinda rag_enabled=true olmali")
 
+        resolved_backend = backend_factory(config)
         store = MemoryStore(
             db_path,
             passphrase=password_fn("Hafiza parolasi: "),
             repository_root=repository,
         )
         backend = MemoryAwareBackend(
-            backend_factory(config),
+            resolved_backend,
             LexicalMemoryRetriever(store),
             top_k=args.top_k,
             max_context_characters=args.max_context_characters,

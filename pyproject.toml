@@ -16,17 +16,29 @@ dependencies = [
 
 [project.scripts]
 kayra-validate = "kayra_ai.validation.validate_dataset:main"
+fulgor-validate = "kayra_ai.validation.validate_dataset:main"
 kayra-check-pii = "kayra_ai.validation.check_pii:main"
+fulgor-check-pii = "kayra_ai.validation.check_pii:main"
 kayra-check-overlap = "kayra_ai.validation.check_overlap:main"
+fulgor-check-overlap = "kayra_ai.validation.check_overlap:main"
 kayra-runtime-preflight = "kayra_ai.runtime.preflight:main"
+fulgor-runtime-preflight = "kayra_ai.runtime.preflight:main"
 kayra-eval = "kayra_ai.evaluation.cli:main"
+fulgor-eval = "kayra_ai.evaluation.cli:main"
 kayra-benchmark = "kayra_ai.evaluation.benchmark_cli:main"
+fulgor-benchmark = "kayra_ai.evaluation.benchmark_cli:main"
 kayra-validate-model-artifact = "kayra_ai.validation.model_artifact:main"
+fulgor-validate-model-artifact = "kayra_ai.validation.model_artifact:main"
 kayra-memory = "kayra_ai.memory.cli:main"
+fulgor-memory = "kayra_ai.memory.cli:main"
 kayra-memory-chat = "kayra_ai.memory.chat_cli:main"
+fulgor-memory-chat = "kayra_ai.memory.chat_cli:main"
 kayra-memory-tool-chat = "kayra_ai.memory.memory_tool_chat_cli:main"
+fulgor-memory-tool-chat = "kayra_ai.memory.memory_tool_chat_cli:main"
 kayra-tools = "kayra_ai.tools.cli:main"
+fulgor-tools = "kayra_ai.tools.cli:main"
 kayra-tool-smoke = "kayra_ai.tools.smoke_cli:main"
+fulgor-tool-smoke = "kayra_ai.tools.smoke_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

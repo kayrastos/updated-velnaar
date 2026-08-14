@@ -31,6 +31,7 @@ from kayra_ai.runtime.config import (
     resolve_backend_config,
 )
 from kayra_ai.runtime.errors import ConfigurationFailure, PrivacyPolicyFailure
+from kayra_ai.runtime.preflight import run_preflight
 
 
 class RuntimeConfigTests(unittest.TestCase):
@@ -181,6 +182,82 @@ class RuntimeConfigTests(unittest.TestCase):
             },
         )
         self.assertIsNone(resolved.api_key)
+
+    def test_fulgor_environment_names_resolve_without_legacy_names(self) -> None:
+        resolved = resolve_backend_config(
+            self.remote_config(),
+            environ={
+                "FULGOR_LM_STUDIO_BASE_URL": "http://localhost:1234/v1/",
+                "FULGOR_LM_STUDIO_MODEL": "local-model",
+                "FULGOR_LM_STUDIO_MODEL_REVISION": "local-revision",
+            },
+        )
+        self.assertEqual("http://localhost:1234/v1", resolved.api_root)
+        self.assertEqual("local-model", resolved.model_id)
+        self.assertEqual("local-revision", resolved.model_revision)
+
+    def test_legacy_environment_names_still_resolve(self) -> None:
+        resolved = resolve_backend_config(
+            self.remote_config(),
+            environ={
+                "KAYRA_LM_STUDIO_BASE_URL": "http://localhost:1234/v1/",
+                "KAYRA_LM_STUDIO_MODEL": "legacy-model",
+            },
+        )
+        self.assertEqual("http://localhost:1234/v1", resolved.api_root)
+        self.assertEqual("legacy-model", resolved.model_id)
+
+    def test_matching_fulgor_and_kayra_environment_values_are_accepted(self) -> None:
+        environment = {
+            "FULGOR_LM_STUDIO_BASE_URL": "http://localhost:1234/v1",
+            "KAYRA_LM_STUDIO_BASE_URL": "http://localhost:1234/v1",
+            "FULGOR_LM_STUDIO_MODEL": "same-model",
+            "KAYRA_LM_STUDIO_MODEL": "same-model",
+        }
+        resolved = resolve_backend_config(self.remote_config(), environ=environment)
+        self.assertEqual("same-model", resolved.model_id)
+
+    def test_conflicting_environment_values_fail_before_transport_without_secrets(self) -> None:
+        current_secret = "http://user:current-secret@localhost:1234/v1"
+        legacy_secret = "http://user:legacy-secret@localhost:1234/v1"
+        transport_factory_calls = 0
+
+        def forbidden_transport_factory(_network):  # type: ignore[no-untyped-def]
+            nonlocal transport_factory_calls
+            transport_factory_calls += 1
+            self.fail("transport factory must not be called")
+
+        with self.assertRaises(ConfigurationFailure) as caught:
+            run_preflight(
+                self.remote_config(),
+                environ={
+                    "FULGOR_LM_STUDIO_BASE_URL": current_secret,
+                    "KAYRA_LM_STUDIO_BASE_URL": legacy_secret,
+                    "FULGOR_LM_STUDIO_MODEL": "same-model",
+                    "KAYRA_LM_STUDIO_MODEL": "same-model",
+                },
+                transport_factory=forbidden_transport_factory,
+            )
+
+        message = str(caught.exception)
+        self.assertEqual(0, transport_factory_calls)
+        self.assertIn("FULGOR_LM_STUDIO_BASE_URL", message)
+        self.assertIn("KAYRA_LM_STUDIO_BASE_URL", message)
+        self.assertNotIn(current_secret, message)
+        self.assertNotIn(legacy_secret, message)
+
+    def test_fulgor_alias_preserves_default_lm_studio_model_identity(self) -> None:
+        config = load_runtime_config(
+            ROOT / "configs" / "runtime.kayra-v1.lm-studio.yaml"
+        )
+        resolved = resolve_backend_config(
+            config,
+            environ={
+                "FULGOR_LM_STUDIO_BASE_URL": "http://127.0.0.1:1234/api/v1",
+                "FULGOR_LM_STUDIO_MODEL": "qwen3.5-9b-kayra-v1",
+            },
+        )
+        self.assertEqual("qwen3.5-9b-kayra-v1", resolved.model_id)
 
     def test_optional_api_key_env_field_may_be_omitted(self) -> None:
         data = self.remote_config().model_dump(mode="python")

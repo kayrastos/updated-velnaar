@@ -73,21 +73,49 @@ gelecek ölçekleme hedefidir; etkin modelin provenance'i değildir.
 
 ## Geriye uyumlu geçiş tablosu
 
-| Önceki/teknik ad | Yeni kullanıcı adı | Birinci aşama durumu |
+| Önceki/teknik ad | Yeni kullanıcı adı | Geçiş durumu |
 | --- | --- | --- |
 | Kayra AI / Kayra | Fulgor AI | Yeni kullanıcıya dönük ana ad |
 | Kayra çekirdek altyapısı | Fulgor Core | Kavramsal ad; kod paketi değişmez |
 | Kayra v1 modeli | Fulgor Ray 1.0 "Genesis" | Görünen model adı |
 | `kayra_ai` | Fulgor Core Python paketi | Legacy/internal; bu aşamada değişmez |
-| `kayra-*` CLI komutları | Fulgor AI CLI yüzeyi | Legacy/internal; bu aşamada değişmez |
+| `kayra-*` CLI komutları | `fulgor-*` | Geriye uyumlu kalır; yeni adlar aynı `main` fonksiyonlarının alias'ıdır |
 | `kayra-general-tr` | Fulgor AI asistan tanımı | Config kimliği geriye uyum için değişmez |
 | `qwen3.5-9b-kayra-v1` | Fulgor Ray 1.0 "Genesis" | LM Studio kimliği bu aşamada değişmez |
-| `KAYRA_*` ortam değişkenleri | Fulgor AI runtime ayarları | Legacy/internal; bu aşamada değişmez |
+| `KAYRA_*` ortam değişkenleri | `FULGOR_*` | Geriye uyumlu kalır; yeni standart `FULGOR_*` adlarıdır |
 | `configs/runtime.kayra-v1.lm-studio.yaml` | Fulgor Ray runtime profili | Dosya yolu bu aşamada değişmez |
 | `KayraAI/memory/memory.sqlite3` | Fulgor AI şifreli hafızası | Veritabanı yolu ve biçimi değişmez |
 | `kayra-ai` depo/dizin adı | Fulgor AI kaynak deposu | Yerel yol uyumluluğu için değişmez |
 
 `Kayra` bundan sonra yeni marka, model veya özellik adı üretmek için kullanılmaz.
 Ad yalnız yukarıdaki mevcut legacy/internal compatibility identifier'ları
-açıklarken korunur. Bu kimliklerin ileride değiştirilmesi; alias, çift okuma,
-geri dönüş ve veri göçü planı olan ayrı bir teknik rename aşaması gerektirir.
+açıklarken korunur. Kalan kimliklerin ileride fiziksel olarak değiştirilmesi;
+mevcut alias'ları koruyan çift okuma, geri dönüş ve veri göçü planı gerektirir.
+
+## İkinci aşama teknik alias politikası
+
+Önerilen CLI adları `fulgor-*` biçimindedir. Her `kayra-*` komutu korunur ve
+karşılık gelen yeni adla aynı Python `main` fonksiyonuna yönelir. Legacy
+komutların stdout/stderr sözleşmesini değiştirecek deprecation uyarısı bu
+aşamada yoktur.
+
+Yeni ortam değişkeni standardı `FULGOR_*` biçimidir. Desteklenen eşlemeler:
+
+| Legacy ad | Yeni standart |
+| --- | --- |
+| `KAYRA_MEMORY_DB` | `FULGOR_MEMORY_DB` |
+| `KAYRA_LM_STUDIO_BASE_URL` | `FULGOR_LM_STUDIO_BASE_URL` |
+| `KAYRA_LM_STUDIO_MODEL` | `FULGOR_LM_STUDIO_MODEL` |
+| `KAYRA_LM_STUDIO_MODEL_REVISION` | `FULGOR_LM_STUDIO_MODEL_REVISION` |
+| `KAYRA_LM_STUDIO_API_KEY` | `FULGOR_LM_STUDIO_API_KEY` |
+| `KAYRA_LLAMA_CPP_BASE_URL` | `FULGOR_LLAMA_CPP_BASE_URL` |
+| `KAYRA_LLAMA_CPP_MODEL` | `FULGOR_LLAMA_CPP_MODEL` |
+| `KAYRA_LLAMA_CPP_MODEL_REVISION` | `FULGOR_LLAMA_CPP_MODEL_REVISION` |
+| `KAYRA_LLAMA_CPP_API_KEY` | `FULGOR_LLAMA_CPP_API_KEY` |
+
+Yalnız yeni ad varsa yeni değer, yalnız legacy ad varsa legacy değer kullanılır.
+İki ad aynı değere sahipse kabul edilir. İki ad farklıysa yapılandırma güvenli
+biçimde reddedilir; ağ bağlantısı, araç veya hafıza işlemi başlamaz. Hata yalnız
+değişken adlarını içerir, ortam değerlerini veya sırları içermez. Varsayılan
+şifreli hafıza yolu, veritabanı biçimi, anahtar türetimi, `kayra_ai` paketi ve
+`qwen3.5-9b-kayra-v1` LM Studio kimliği değişmez.

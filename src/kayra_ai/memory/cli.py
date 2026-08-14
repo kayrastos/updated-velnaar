@@ -7,6 +7,8 @@ from typing import Callable, Sequence
 
 from pydantic import ValidationError
 
+from kayra_ai.environment import EnvironmentConfigurationError
+
 from .contracts import MemoryDraft, MemoryQuery, WriteAuthorization
 from .retrieval import LexicalMemoryRetriever
 from .store import (
@@ -179,8 +181,12 @@ def main(
     password_fn: PasswordFn = getpass.getpass,
     working_directory: Path | None = None,
 ) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
+    try:
+        parser = build_parser()
+        args = parser.parse_args(argv)
+    except EnvironmentConfigurationError as exc:
+        print(f"HATA: {exc}")
+        return 1
     db_path = args.db.expanduser().resolve()
     try:
         store = _open_store(

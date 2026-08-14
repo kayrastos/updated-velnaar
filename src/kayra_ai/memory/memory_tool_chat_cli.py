@@ -11,6 +11,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
+from kayra_ai.environment import EnvironmentConfigurationError
 from kayra_ai.runtime import (
     ChatMessage,
     GenerationRequest,
@@ -665,7 +666,11 @@ def main(
     backend_factory: BackendFactory = build_backend,
     retriever_factory: RetrieverFactory = LexicalMemoryRetriever,
 ) -> int:
-    args = build_parser().parse_args(argv)
+    try:
+        args = build_parser().parse_args(argv)
+    except EnvironmentConfigurationError as exc:
+        print(f"HATA: {terminal_safe(str(exc))}")
+        return 1
     working = (working_directory or Path.cwd()).resolve()
     repository = _repository_root(working)
     db_path = args.db.expanduser().resolve()
@@ -690,6 +695,7 @@ def main(
         if assistant.privacy.get("rag_enabled") is not True:
             raise ValueError("asistan yapilandirmasinda rag_enabled=true olmali")
 
+        backend = backend_factory(config)
         store = MemoryStore(
             db_path,
             passphrase=password_fn("Hafiza parolasi: "),
@@ -699,7 +705,6 @@ def main(
         if not isinstance(retriever, LexicalMemoryRetriever):
             raise TypeError("memory-tool chat mevcut lexical retriever'i kullanmali")
 
-        backend = backend_factory(config)
         backend.preflight()
         profile = config.profiles.get(args.profile)
         settings = GenerationSettings(

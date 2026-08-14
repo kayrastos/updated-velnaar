@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import io
+import os
 import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from kayra_ai.memory import MemoryDraft, MemoryStore, WriteAuthorization
 from kayra_ai.memory.chat_cli import main
@@ -71,6 +73,44 @@ class CapturingBackend:
 
 
 class MemoryChatCliTests(unittest.TestCase):
+    def test_conflicting_memory_environment_fails_before_memory_or_backend(self) -> None:
+        legacy_value = "legacy-memory-secret.sqlite3"
+        current_value = "current-memory-secret.sqlite3"
+        output = io.StringIO()
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "KAYRA_MEMORY_DB": legacy_value,
+                    "FULGOR_MEMORY_DB": current_value,
+                },
+                clear=True,
+            ),
+            patch(
+                "kayra_ai.memory.chat_cli.MemoryStore",
+                side_effect=AssertionError("memory store must not be opened"),
+            ),
+            patch(
+                "pathlib.Path.open",
+                side_effect=AssertionError("file must not be opened"),
+            ),
+            redirect_stdout(output),
+        ):
+            code = main(
+                ["--db", "explicit-memory.sqlite3"],
+                input_fn=lambda _prompt: self.fail("question must not be read"),
+                password_fn=lambda _prompt: self.fail("password must not be read"),
+                working_directory=ROOT,
+                backend_factory=lambda _config: self.fail("backend must not be built"),
+            )
+
+        message = output.getvalue()
+        self.assertEqual(1, code)
+        self.assertIn("FULGOR_MEMORY_DB", message)
+        self.assertIn("KAYRA_MEMORY_DB", message)
+        self.assertNotIn(legacy_value, message)
+        self.assertNotIn(current_value, message)
+
     def test_relevant_memory_is_injected_and_local_response_is_printed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "memory.sqlite3"

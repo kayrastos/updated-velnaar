@@ -10,6 +10,8 @@ from urllib.parse import urlsplit, urlunsplit
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator, model_validator
 
+from kayra_ai.environment import EnvironmentConfigurationError, resolve_environment_value
+
 from .contracts import ProfileName
 from .errors import ConfigurationFailure, PrivacyPolicyFailure
 
@@ -372,8 +374,21 @@ def resolve_backend_config(
         raise ConfigurationFailure("Seçilen gerçek backend etkin değil.")
 
     values = os.environ if environ is None else environ
-    raw_api_root = values.get(backend.base_url_env)
-    raw_model_id = values.get(backend.model_id_env)
+    try:
+        raw_api_root = resolve_environment_value(values, backend.base_url_env)
+        raw_model_id = resolve_environment_value(values, backend.model_id_env)
+        model_revision = (
+            resolve_environment_value(values, backend.model_revision_env)
+            if backend.model_revision_env
+            else None
+        )
+        raw_api_key = (
+            resolve_environment_value(values, backend.api_key_env)
+            if backend.api_key_env
+            else None
+        )
+    except EnvironmentConfigurationError as exc:
+        raise ConfigurationFailure(str(exc)) from None
     if not raw_api_root:
         raise ConfigurationFailure(f"Gerekli ortam değişkeni tanımlı değil: {backend.base_url_env}.")
     if not raw_model_id:
@@ -386,8 +401,6 @@ def resolve_backend_config(
     )
     enforce_network_policy(api_root, config.network)
 
-    model_revision = values.get(backend.model_revision_env) if backend.model_revision_env else None
-    raw_api_key = values.get(backend.api_key_env) if backend.api_key_env else None
     api_key = SecretStr(raw_api_key) if raw_api_key else None
     try:
         return ResolvedBackendConfig(

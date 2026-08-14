@@ -13,6 +13,7 @@ from typing import Literal
 
 from pydantic import ValidationError
 
+from kayra_ai.environment import resolve_environment_value
 from kayra_ai.runtime import ChatMessage, GenerationRequest, GenerationSettings, build_backend
 from kayra_ai.runtime.backends.base import Backend
 from kayra_ai.runtime.config import (
@@ -221,8 +222,8 @@ def _resolved_runtime_values(
         configured.model_revision_env,
         configured.api_key_env,
     )
-    resolved = [values.get(name) for name in names if name]
-    raw_api_root = values.get(configured.base_url_env)
+    resolved = [resolve_environment_value(values, name) for name in names if name]
+    raw_api_root = resolve_environment_value(values, configured.base_url_env)
     if raw_api_root:
         normalizer = (
             normalize_lm_studio_native_api_root

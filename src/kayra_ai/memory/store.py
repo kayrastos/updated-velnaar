@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,6 +12,8 @@ from uuid import uuid4
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+
+from kayra_ai.environment import resolve_environment_value
 
 from .contracts import MemoryDraft, MemoryRecord, WriteAuthorization
 
@@ -32,14 +34,15 @@ class UnencryptedMemoryDatabaseError(ValueError):
     pass
 
 
-def default_memory_db_path() -> Path:
-    configured = os.environ.get("KAYRA_MEMORY_DB")
+def default_memory_db_path(*, environ: Mapping[str, str] | None = None) -> Path:
+    values = os.environ if environ is None else environ
+    configured = resolve_environment_value(values, "KAYRA_MEMORY_DB")
     if configured:
         return Path(configured).expanduser()
-    local_app_data = os.environ.get("LOCALAPPDATA")
+    local_app_data = values.get("LOCALAPPDATA")
     if local_app_data:
         return Path(local_app_data) / "KayraAI" / "memory" / "memory.sqlite3"
-    xdg_data_home = os.environ.get("XDG_DATA_HOME")
+    xdg_data_home = values.get("XDG_DATA_HOME")
     base = Path(xdg_data_home).expanduser() if xdg_data_home else Path.home() / ".local" / "share"
     return base / "kayra-ai" / "memory" / "memory.sqlite3"
 
