@@ -436,7 +436,7 @@ def main(
             )
         config_path = (repository / RUNTIME_CONFIG_PATH).resolve()
         if not config_path.is_file() or not config_path.is_relative_to(repository):
-            raise ValueError("sabit Kayra v1 LM Studio yapilandirmasi bulunamadi")
+            raise ValueError("sabit Fulgor Ray v1 LM Studio yapilandirmasi bulunamadi")
         config = load_runtime_config(config_path)
         if config.active_backend != "lm_studio":
             raise ValueError("smoke testi yalniz etkin LM Studio backend'i kullanir")
