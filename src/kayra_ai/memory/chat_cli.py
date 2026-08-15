@@ -48,13 +48,13 @@ def _repository_file(path: Path, repository: Path) -> Path:
     expanded = path.expanduser()
     resolved = expanded.resolve() if expanded.is_absolute() else (repository / expanded).resolve()
     if not resolved.is_relative_to(repository) or not resolved.is_file():
-        raise ValueError("yapilandirma dosyasi KayraAI Git deposunda bulunmali")
+        raise ValueError("yapilandirma dosyasi Fulgor AI Git deposunda bulunmali")
     return resolved
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="KayraAI yerel LM Studio ve sifreli hafiza sohbeti"
+        description="Fulgor AI yerel LM Studio ve sifreli hafiza sohbeti"
     )
     parser.add_argument(
         "--db",
@@ -66,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         default=Path("configs/runtime.kayra-v1.lm-studio.yaml"),
-        help="KayraAI deposundaki runtime YAML yolu",
+        help="Fulgor AI deposundaki runtime YAML yolu",
     )
     parser.add_argument(
         "--profile",
@@ -101,7 +101,7 @@ def main(
     db_path = args.db.expanduser().resolve()
     try:
         if repository is None:
-            raise ValueError("komut bir KayraAI Git deposunda calistirilmali")
+            raise ValueError("komut bir Fulgor AI Git deposunda calistirilmali")
         if not db_path.is_file():
             raise ValueError("hafiza veritabani yok; once kayra-memory add kullan")
         config = load_runtime_config(_repository_file(args.config, repository))
@@ -125,7 +125,7 @@ def main(
         )
         backend.preflight()
 
-        question = input_fn("Kayra'ya sorulacak soru: ").strip()
+        question = input_fn("Fulgor Ray'e sorulacak soru: ").strip()
         profile = config.profiles.get(args.profile)
         response = backend.generate(
             GenerationRequest(
@@ -143,7 +143,7 @@ def main(
                 requested_profile=args.profile,
             )
         )
-        print(f"Kayra: {response.content}")
+        print(f"Fulgor Ray: {response.content}")
         if response.timing.tokens_per_second is not None:
             print(f"Hiz: {response.timing.tokens_per_second:.2f} token/sn")
         return 0

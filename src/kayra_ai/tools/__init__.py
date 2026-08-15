@@ -1,4 +1,4 @@
-"""User-approved, local-only tool-use security primitives for KayraAI."""
+"""User-approved, local-only tool-use security primitives for Fulgor AI."""
 
 from .approval import ToolApprovalError, ToolApprovalGate
 from .commands import (

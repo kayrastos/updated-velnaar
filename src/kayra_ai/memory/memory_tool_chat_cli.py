@@ -99,8 +99,8 @@ tasima; nihai assistant yanitina sakla."""
 
 MEMORY_TOOL_MODEL_SYSTEM_PROMPT = (
     MODEL_TOOL_SYSTEM_PROMPT.replace(
-        "Kayra tool-use smoke testindesin.",
-        "Kayra sifreli hafiza destekli, kullanici-onayli yerel tool sohbetindesin.",
+        "Fulgor Ray tool-use smoke testindesin.",
+        "Fulgor Ray sifreli hafiza destekli, kullanici-onayli yerel tool sohbetindesin.",
         1,
     ).replace(
         _CONCRETE_COMMAND_REQUEST_EXAMPLE,
@@ -256,7 +256,7 @@ def _repository_file(path: Path, repository: Path) -> Path:
         else (repository / expanded).resolve()
     )
     if not resolved.is_relative_to(repository) or not resolved.is_file():
-        raise ValueError("yapilandirma dosyasi KayraAI Git deposunda bulunmali")
+        raise ValueError("yapilandirma dosyasi Fulgor AI Git deposunda bulunmali")
     return resolved
 
 
@@ -359,7 +359,7 @@ def _validated_history_messages(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="KayraAI sifreli hafiza ve kullanici-onayli yerel tool sohbeti"
+        description="Fulgor AI sifreli hafiza ve kullanici-onayli yerel tool sohbeti"
     )
     parser.add_argument(
         "--db",
@@ -377,7 +377,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         type=Path,
         default=Path("configs/runtime.kayra-v1.lm-studio.yaml"),
-        help="KayraAI deposundaki LM Studio runtime YAML yolu",
+        help="Fulgor AI deposundaki LM Studio runtime YAML yolu",
     )
     parser.add_argument(
         "--profile",
@@ -569,7 +569,7 @@ def _run_assistant_only_turn(
 
 def _print_outcome(outcome: GuardedModelToolLoopOutcome) -> None:
     if outcome.status == "assistant" and outcome.assistant_content is not None:
-        print(f"Kayra: {terminal_safe(outcome.assistant_content)}")
+        print(f"Fulgor Ray: {terminal_safe(outcome.assistant_content)}")
         return
     print(f"SOHBET {outcome.status.upper()}: {terminal_safe(outcome.message)}")
 
@@ -594,7 +594,7 @@ def _run_interactive_session(
     print("Cok turlu RAM oturumu acildi. Komutlar icin /help yazin.")
     while True:
         try:
-            raw_question = input_fn("Kayra'ya sorulacak soru (/help, /clear, /exit): ")
+            raw_question = input_fn("Fulgor Ray'e sorulacak soru (/help, /clear, /exit): ")
         except (EOFError, KeyboardInterrupt):
             print("Oturum guvenli bicimde sonlandirildi.")
             return 0
@@ -677,7 +677,7 @@ def main(
 
     try:
         if repository is None:
-            raise ValueError("komut bir KayraAI Git deposunda calistirilmali")
+            raise ValueError("komut bir Fulgor AI Git deposunda calistirilmali")
         if not db_path.is_file():
             raise ValueError("hafiza veritabani yok; once kayra-memory add kullan")
 
@@ -730,7 +730,7 @@ def main(
                 history_turns=args.history_turns,
             )
 
-        question = _validated_question(input_fn("Kayra'ya sorulacak soru: "))
+        question = _validated_question(input_fn("Fulgor Ray'e sorulacak soru: "))
         outcome = _run_memory_tool_turn(
             question,
             backend=backend,

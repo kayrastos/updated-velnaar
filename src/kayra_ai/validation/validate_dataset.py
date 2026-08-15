@@ -71,7 +71,7 @@ def validate_dataset(path: Path, kind: str, check_hash: bool = True) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Kayra veri setini çevrimdışı doğrula")
+    parser = argparse.ArgumentParser(description="Fulgor AI veri setini çevrimdışı doğrula")
     parser.add_argument("path", type=Path)
     parser.add_argument("--kind", required=True, choices=sorted(DATASET_MODELS))
     parser.add_argument("--skip-hash", action="store_true", help="SFT/preference hash kontrolünü atla")

@@ -180,7 +180,7 @@ def _print_result(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="KayraAI kullanici onayli salt-okunur yerel araclari"
+        description="Fulgor AI kullanici onayli salt-okunur yerel araclari"
     )
     parser.add_argument("--root", type=Path, required=True, help="Acikca izin verilen kok")
     parser.add_argument("--max-file-bytes", type=int, default=1_000_000)

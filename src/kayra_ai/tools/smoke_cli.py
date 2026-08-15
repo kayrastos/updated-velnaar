@@ -52,7 +52,7 @@ READ_FILE_RESULT_MAX_CHARS = 2048
 READ_FILE_INITIAL_MAX_OUTPUT_TOKENS = 256
 READ_FILE_BACKEND_TIMEOUT_SECONDS = 90.0
 
-MODEL_TOOL_SYSTEM_PROMPT = """Kayra tool-use smoke testindesin.
+MODEL_TOOL_SYSTEM_PROMPT = """Fulgor Ray tool-use smoke testindesin.
 Yanitin yalnizca asagidaki iki kesin JSON zarfindan biri olmali.
 JSON disinda metin, Markdown veya code fence uretme.
 
@@ -88,7 +88,7 @@ alanlarini asla uretme. Kullanici yerel dosya veya Git durumunu isterse
 bellekten cevaplama; uygun salt-okunur araci oner ve gercek sonucu bekle.
 Araci kendin calistirdigini iddia etme; router, kullanici ve host karar verir."""
 
-READ_FILE_MODEL_TOOL_SYSTEM_PROMPT = """Kayra read-file tool-use smoke testindesin.
+READ_FILE_MODEL_TOOL_SYSTEM_PROMPT = """Fulgor Ray read-file tool-use smoke testindesin.
 Yanitin yalnizca asagidaki iki kesin JSON zarfindan biri olmali.
 JSON disinda metin, Markdown veya code fence uretme.
 
@@ -108,7 +108,7 @@ asla kullanma. request_id, EVET, approved, authorization ve confirmed_by_user
 alanlarini asla uretme. Dosyayi kendin okudugunu iddia etme; router, kullanici
 ve host karar verir. Gercek arac sonucunu almadan proje ozeti uretme."""
 
-FINAL_RESPONSE_SYSTEM_PROMPT = """Kayra tool-use smoke testinin son adimindasin.
+FINAL_RESPONSE_SYSTEM_PROMPT = """Fulgor Ray tool-use smoke testinin son adimindasin.
 Yalniz su kesin bicimde bir gecerli JSON nesnesi dondur:
 {"kind":"assistant","content":"kullaniciya nihai yanit"}
 Nesnede tam olarak iki alan olmali: kind ve content. kind degeri tam olarak
@@ -231,7 +231,7 @@ def build_single_strict_output_repair(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="KayraAI LM Studio kullanici-onayli tool-use smoke testi"
+        description="Fulgor AI LM Studio kullanici-onayli tool-use smoke testi"
     )
     parser.add_argument(
         "--scenario",
@@ -288,7 +288,7 @@ def _read_file_smoke_host(
         configured_root = repository / configured_root
     path_policy = ReadOnlyPathPolicy((configured_root,))
     if path_policy.allowed_roots != (repository,):
-        raise ValueError("read-file tool root KayraAI depo kokune tam esit olmalidir")
+        raise ValueError("read-file tool root Fulgor AI depo kokune tam esit olmalidir")
     target = path_policy.resolve(read_path)
     approval_gate = ToolApprovalGate()
     return (
@@ -394,7 +394,7 @@ def main(
     repository = _repository_root(working)
     try:
         if repository is None:
-            raise ValueError("komut KayraAI Git deposunda calistirilmali")
+            raise ValueError("komut Fulgor AI Git deposunda calistirilmali")
         if args.scenario == "git":
             if args.tool_root is not None or args.read_path != "README.md":
                 raise ValueError(
@@ -463,7 +463,7 @@ def main(
         backend.preflight()
 
         if user_message is None:
-            user_message = input_fn("Kayra'ya mesaj: ").strip()
+            user_message = input_fn("Fulgor Ray'e mesaj: ").strip()
         if not user_message:
             raise ValueError("kullanici mesaji bos olamaz")
         if len(user_message) > 2048 or len(user_message.encode("utf-8")) > 2048:
@@ -521,7 +521,7 @@ def main(
             and outcome.tool_steps == 1
             and outcome.backend_calls in {2, 3}
         ):
-            print(f"Kayra: {terminal_safe(outcome.assistant_content)}", flush=True)
+            print(f"Fulgor Ray: {terminal_safe(outcome.assistant_content)}", flush=True)
             print(
                 f"SMOKE OK: backend_calls={outcome.backend_calls} "
                 f"tool_steps={outcome.tool_steps}",

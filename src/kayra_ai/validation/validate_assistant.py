@@ -49,7 +49,7 @@ def validate_assistant(path: Path) -> AssistantDefinition:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Kayra asistan tanımını doğrula")
+    parser = argparse.ArgumentParser(description="Fulgor AI asistan tanımını doğrula")
     parser.add_argument("path", type=Path)
     args = parser.parse_args()
     try:

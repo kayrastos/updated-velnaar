@@ -146,7 +146,7 @@ def _delete(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="KayraAI sifreli yerel hafiza yonetimi"
+        description="Fulgor AI sifreli yerel hafiza yonetimi"
     )
     parser.add_argument(
         "--db",

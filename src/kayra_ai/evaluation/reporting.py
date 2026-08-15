@@ -52,7 +52,7 @@ def summary_markdown_bytes(summary: RunSummary) -> bytes:
         if summary.errors
         else "- Yok"
     )
-    text = f"""# Kayra değerlendirme koşusu özeti
+    text = f"""# Fulgor AI değerlendirme koşusu özeti
 
 - Run kimliği: `{summary.run_id}`
 - Benzersiz vaka: {summary.distinct_case_count}

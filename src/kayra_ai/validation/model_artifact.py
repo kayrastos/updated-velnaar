@@ -137,7 +137,7 @@ def validate_model_artifact(path: str | Path) -> ModelArtifact:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Kayra model artifact manifestini doğrula")
+    parser = argparse.ArgumentParser(description="Fulgor AI model artifact manifestini doğrula")
     parser.add_argument("path", type=Path)
     args = parser.parse_args()
     try:

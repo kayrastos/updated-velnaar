@@ -29,7 +29,7 @@ def run_preflight(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Kayra güvenli yerel runtime bağlantı ön kontrolü")
+    parser = argparse.ArgumentParser(description="Fulgor AI güvenli yerel runtime bağlantı ön kontrolü")
     parser.add_argument("--config", required=True, help="Runtime YAML dosyası")
     parser.add_argument("--backend", choices=("mock", "lm_studio", "llama_cpp"))
     return parser

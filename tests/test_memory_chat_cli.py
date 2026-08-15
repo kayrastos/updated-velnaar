@@ -137,7 +137,7 @@ class MemoryChatCliTests(unittest.TestCase):
                     backend_factory=lambda _config: backend,
                 )
             self.assertEqual(code, 0)
-            self.assertIn("Kayra: yerel cevap", output.getvalue())
+            self.assertIn("Fulgor Ray: yerel cevap", output.getvalue())
             self.assertIn("Hiz: 12.34 token/sn", output.getvalue())
             assert backend.last_request is not None
             self.assertEqual(2, len(backend.last_request.messages))

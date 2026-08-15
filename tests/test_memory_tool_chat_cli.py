@@ -370,7 +370,7 @@ class MemoryToolChatCliTests(unittest.TestCase):
         self.assertEqual(retrievers.instance.search_calls, 1)
         self.assertIn("ARAC ONIZLEMESI", output)
         self.assertIn("request_sha256", output)
-        self.assertIn("Kayra: Lacivert tercihi", output)
+        self.assertIn("Fulgor Ray: Lacivert tercihi", output)
 
         first_system = backend.requests[0].messages[0].content
         final_system = backend.requests[1].messages[0].content
@@ -466,7 +466,7 @@ class MemoryToolChatCliTests(unittest.TestCase):
         code, output, retrievers = self.run_cli(backend, answers)
 
         self.assertEqual(code, 0)
-        self.assertIn("Kayra: Arayuz rengi lacivert", output)
+        self.assertIn("Fulgor Ray: Arayuz rengi lacivert", output)
         self.assertNotIn("ARAC ONIZLEMESI", output)
         self.assertEqual(len(backend.requests), 1)
         self.assertEqual(len(answers.prompts), 1)
@@ -547,7 +547,7 @@ class MemoryToolChatCliTests(unittest.TestCase):
             )
 
         self.assertEqual(code, 0)
-        self.assertIn("Kayra: MAVİ-LALE-42", output)
+        self.assertIn("Fulgor Ray: MAVİ-LALE-42", output)
         self.assertNotIn("ARAC ONIZLEMESI", output)
         prepare.assert_not_called()
         execute.assert_not_called()
@@ -599,8 +599,8 @@ class MemoryToolChatCliTests(unittest.TestCase):
         )
 
         self.assertEqual(code, 0)
-        self.assertIn("Kayra: Ilk normal cevap.", output)
-        self.assertIn("Kayra: Ikinci normal cevap.", output)
+        self.assertIn("Fulgor Ray: Ilk normal cevap.", output)
+        self.assertIn("Fulgor Ray: Ikinci normal cevap.", output)
         self.assertEqual(len(backend.requests), 2)
         self.assertEqual(
             [message.role for message in backend.requests[1].messages],

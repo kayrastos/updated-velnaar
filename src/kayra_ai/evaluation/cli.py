@@ -14,7 +14,7 @@ from .runner import EvaluationFailure, run_evaluation
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Kayra eval setini modelden bağımsız backend ile çalıştır")
+    parser = argparse.ArgumentParser(description="Fulgor AI eval setini modelden bağımsız backend ile çalıştır")
     parser.add_argument("--config", required=True, type=Path, help="Runtime YAML dosyası")
     parser.add_argument("--backend", choices=("mock", "lm_studio", "llama_cpp"))
     parser.add_argument("--eval", dest="eval_path", required=True, type=Path, help="Eval JSONL dosyası")

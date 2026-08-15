@@ -1,4 +1,4 @@
-"""User-controlled, local-only memory primitives for KayraAI."""
+"""User-controlled, local-only memory primitives for Fulgor AI."""
 
 from .backend import MemoryAugmentationError, MemoryAwareBackend
 from .context import build_memory_context
