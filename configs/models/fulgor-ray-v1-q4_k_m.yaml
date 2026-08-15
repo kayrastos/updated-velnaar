@@ -1,0 +1,12 @@
+schema_version: "1.0"
+id: fulgor-ray-v1-genesis
+repository: Qwen/Qwen3.5-9B
+commit: f8c2a121ee234afa9d26304a683e3c75a8dc2985
+license: Apache-2.0
+format: GGUF
+quantization: Q4_K_M
+context_length: 4096
+files:
+  - filename: kayraai-qwen3.5-9b-kayra-v1-Q4_K_M-no-mtp.gguf
+    size_bytes: 5629108576
+    sha256: 4ef803a9e021139abff93f6e6ecb358491c16ad9c6a841c3ad55fa512283c238

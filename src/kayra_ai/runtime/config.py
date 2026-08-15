@@ -21,9 +21,11 @@ SHA256_PATTERN = r"^[a-f0-9]{64}$"
 
 LEGACY_QWEN3_14B_MANIFEST = "configs/models/qwen3-14b-q4_k_m.yaml"
 KAYRA_V1_MANIFEST = "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml"
+FULGOR_RAY_V1_MANIFEST = "configs/models/fulgor-ray-v1-q4_k_m.yaml"
 NATIVE_MODEL_SIZES = {
     LEGACY_QWEN3_14B_MANIFEST: 9001752960,
     KAYRA_V1_MANIFEST: 5629108576,
+    FULGOR_RAY_V1_MANIFEST: 5629108576,
 }
 
 
@@ -98,6 +100,7 @@ class LMStudioBackendConfig(StrictModel):
     model_manifest: Literal[
         "configs/models/qwen3-14b-q4_k_m.yaml",
         "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml",
+        "configs/models/fulgor-ray-v1-q4_k_m.yaml",
     ] | None = None
     native_v1: LMStudioNativeV1Config | None = None
 

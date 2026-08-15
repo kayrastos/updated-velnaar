@@ -211,7 +211,8 @@
                   "model_manifest": {
                     "enum": [
                       "configs/models/qwen3-14b-q4_k_m.yaml",
-                      "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml"
+                      "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml",
+                      "configs/models/fulgor-ray-v1-q4_k_m.yaml"
                     ]
                   }
                 }

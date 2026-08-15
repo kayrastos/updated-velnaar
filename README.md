@@ -116,6 +116,31 @@ değilse `Authorization` header'ı gönderilmez.
 
 Çözümlenmiş gerçek-backend ortam değerleri log veya artifact'lere ham yazılmaz; model ve revision kimlikleri sonuçlarda tek yönlü `sha256:` tanımlayıcılarıyla temsil edilir.
 
+Fulgor Ray 1.0 "Genesis" için önerilen teknik profiller:
+
+- Model artifact profili: `configs/models/fulgor-ray-v1-q4_k_m.yaml`
+- LM Studio runtime profili: `configs/runtime.fulgor-ray-v1.lm-studio.yaml`
+
+Bu yollar geriye uyumlu adlandırma alias'larıdır; aynı Qwen3.5-9B GGUF
+Q4_K_M no-MTP artifact'ini ve aynı inference/güvenlik ayarlarını tanımlar.
+`configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml` ile
+`configs/runtime.kayra-v1.lm-studio.yaml` legacy compatibility profilleri
+olarak desteklenmeye devam eder. GGUF dosya adı ve LM Studio iç model kimliği
+`qwen3.5-9b-kayra-v1` bu aşamada değişmez.
+
+**Yer — WSL/Ubuntu terminali; yalnız yerel LM Studio API kapısı ayrıca
+verildiğinde.** Yeni adlarla preflight örneği:
+
+```bash
+export FULGOR_LM_STUDIO_BASE_URL=http://127.0.0.1:1234/api/v1
+export FULGOR_LM_STUDIO_MODEL=qwen3.5-9b-kayra-v1
+fulgor-runtime-preflight --config configs/runtime.fulgor-ray-v1.lm-studio.yaml
+```
+
+Legacy `KAYRA_LM_STUDIO_*` adları yalnız geriye uyumluluk içindir ve aynı anda
+tanımlanan `FULGOR_LM_STUDIO_*` karşılığıyla farklıysa preflight öncesinde
+reddedilir.
+
 **Yer — WSL/Ubuntu terminali.** Mock preflight:
 
 ```bash
