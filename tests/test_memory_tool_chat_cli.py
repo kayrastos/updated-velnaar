@@ -22,6 +22,7 @@ from kayra_ai.memory.memory_tool_chat_cli import (
     MEMORY_TOOL_FINAL_RESPONSE_PROMPT,
     MEMORY_TOOL_HISTORY_HEADER,
     MEMORY_TOOL_MODEL_SYSTEM_PROMPT,
+    MEMORY_TOOL_OBSERVED_HISTORY_HEADER,
     build_conversation_history_context,
     build_parser,
     main,
@@ -611,6 +612,34 @@ class MemoryToolChatCliTests(unittest.TestCase):
         self.assertIn('"user_data":"Ilk soru"', second_system)
         self.assertIn('"assistant_data":"Ilk normal cevap."', second_system)
         self.assertEqual(backend.requests[1].messages[1].content, "Ikinci soru")
+        assert retrievers.instance is not None
+        self.assertEqual(retrievers.instance.search_calls, 2)
+
+    def test_interactive_successful_read_is_available_as_host_observed_ram_state(self) -> None:
+        backend = SequencedBackend(
+            tool_proposal(path="note.txt"),
+            assistant_proposal("note.txt dosyasi okundu."),
+            assistant_proposal("note.txt"),
+        )
+        code, output, retrievers = self.run_cli(
+            backend,
+            Answers(
+                "/tools note.txt dosyasini salt-okunur aracla oku",
+                "EVET",
+                "Az once hangi dosyayi okudun?",
+                "/exit",
+            ),
+            extra_args=("--interactive",),
+        )
+
+        self.assertEqual(code, 0)
+        self.assertIn("ARAC ONIZLEMESI", output)
+        self.assertEqual(len(backend.requests), 3)
+        third_system = backend.requests[2].messages[0].content
+        self.assertIn(MEMORY_TOOL_OBSERVED_HISTORY_HEADER, third_system)
+        self.assertIn("filesystem.read_text", third_system)
+        self.assertIn("note.txt", third_system)
+        self.assertIn("\\u002f", third_system)
         assert retrievers.instance is not None
         self.assertEqual(retrievers.instance.search_calls, 2)
 
