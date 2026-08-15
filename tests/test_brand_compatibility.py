@@ -102,11 +102,11 @@ class BrandCompatibilityTests(unittest.TestCase):
             ),
         )
 
-    def test_tool_smoke_keeps_legacy_contract_and_model_identity(self) -> None:
+    def test_tool_smoke_uses_fulgor_env_and_keeps_model_identity(self) -> None:
         self.assertEqual(
             {
-                "KAYRA_LM_STUDIO_BASE_URL": "http://127.0.0.1:1234/api/v1",
-                "KAYRA_LM_STUDIO_MODEL": "qwen3.5-9b-kayra-v1",
+                "FULGOR_LM_STUDIO_BASE_URL": "http://127.0.0.1:1234/api/v1",
+                "FULGOR_LM_STUDIO_MODEL": "qwen3.5-9b-kayra-v1",
             },
             dict(LIVE_RUNTIME_ENV),
         )

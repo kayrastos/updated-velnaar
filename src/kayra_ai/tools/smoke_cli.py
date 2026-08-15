@@ -42,8 +42,8 @@ BackendFactory = Callable[..., Backend]
 RUNTIME_CONFIG_PATH = Path("configs/runtime.fulgor-ray-v1.lm-studio.yaml")
 LIVE_RUNTIME_ENV: Mapping[str, str] = MappingProxyType(
     {
-        "KAYRA_LM_STUDIO_BASE_URL": "http://127.0.0.1:1234/api/v1",
-        "KAYRA_LM_STUDIO_MODEL": "qwen3.5-9b-kayra-v1",
+        "FULGOR_LM_STUDIO_BASE_URL": "http://127.0.0.1:1234/api/v1",
+        "FULGOR_LM_STUDIO_MODEL": "qwen3.5-9b-kayra-v1",
     }
 )
 FINAL_MAX_OUTPUT_TOKENS = 256
@@ -455,7 +455,7 @@ def main(
             )
             print(
                 "READ-FILE: LM Studio preflight kontrolu yapiliyor "
-                f"(model={LIVE_RUNTIME_ENV['KAYRA_LM_STUDIO_MODEL']}).",
+                f"(model={LIVE_RUNTIME_ENV['FULGOR_LM_STUDIO_MODEL']}).",
                 flush=True,
             )
 

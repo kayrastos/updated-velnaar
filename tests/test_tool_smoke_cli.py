@@ -337,7 +337,7 @@ class ToolSmokeCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(len(backend.requests), 2)
         self.assertEqual(
-            factory.environ["KAYRA_LM_STUDIO_MODEL"],
+            factory.environ["FULGOR_LM_STUDIO_MODEL"],
             "qwen3.5-9b-kayra-v1",
         )
         self.assertEqual(
