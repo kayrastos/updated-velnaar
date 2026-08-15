@@ -273,7 +273,7 @@ class ToolSmokeCliTests(unittest.TestCase):
         config_source = (
             Path(__file__).resolve().parents[1]
             / "configs"
-            / "runtime.kayra-v1.lm-studio.yaml"
+            / "runtime.fulgor-ray-v1.lm-studio.yaml"
         )
         config_target = self.repository / "configs" / config_source.name
         config_target.parent.mkdir()

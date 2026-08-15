@@ -39,7 +39,7 @@ from .router import ToolRequestRoutingError, UntrustedToolRequestRouter
 InputFn = Callable[[str], str]
 BackendFactory = Callable[..., Backend]
 
-RUNTIME_CONFIG_PATH = Path("configs/runtime.kayra-v1.lm-studio.yaml")
+RUNTIME_CONFIG_PATH = Path("configs/runtime.fulgor-ray-v1.lm-studio.yaml")
 LIVE_RUNTIME_ENV: Mapping[str, str] = MappingProxyType(
     {
         "KAYRA_LM_STUDIO_BASE_URL": "http://127.0.0.1:1234/api/v1",
