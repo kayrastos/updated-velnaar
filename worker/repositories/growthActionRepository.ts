@@ -12,6 +12,15 @@
 import { GrowthActionRow, ActionResultRow } from '../../src/types/database';
 
 export class GrowthActionRepository {
+  private static assertDbOrDev(db: D1Database | undefined, environment: string = 'production'): void {
+    if (!db) {
+      const isDevOrTest = environment === 'development' || environment === 'test';
+      if (!isDevOrTest) {
+        throw new Error('DATABASE_NOT_CONFIGURED: In-memory fallback in GrowthActionRepository is prohibited in production.');
+      }
+    }
+  }
+
   private static memActions: GrowthActionRow[] = [
     {
       id: 'act_001',
@@ -54,8 +63,10 @@ export class GrowthActionRepository {
   public static async listActionsByOrg(
     db: D1Database | undefined,
     orgId: string,
-    businessId?: string
+    businessId?: string,
+    environment: string = 'production'
   ): Promise<GrowthActionRow[]> {
+    GrowthActionRepository.assertDbOrDev(db, environment);
     if (db) {
       let query = `
         SELECT id, leak_id, business_id, organization_id, market, title, hypothesis,
@@ -84,8 +95,10 @@ export class GrowthActionRepository {
   public static async listResultsByOrg(
     db: D1Database | undefined,
     orgId: string,
-    businessId?: string
+    businessId?: string,
+    environment: string = 'production'
   ): Promise<ActionResultRow[]> {
+    GrowthActionRepository.assertDbOrDev(db, environment);
     if (db) {
       let query = `
         SELECT id, growth_action_id, business_id, organization_id, status,
@@ -136,8 +149,10 @@ export class GrowthActionRepository {
     actionId: string,
     status: GrowthActionRow['approval_status'],
     userId: string,
-    orgId: string
+    orgId: string,
+    environment: string = 'production'
   ): Promise<GrowthActionRow | null> {
+    GrowthActionRepository.assertDbOrDev(db, environment);
     const now = new Date().toISOString();
 
     if (db) {

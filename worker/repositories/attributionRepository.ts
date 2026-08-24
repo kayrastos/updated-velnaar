@@ -12,6 +12,15 @@
 import { AttributionResult } from '../../src/types/attribution';
 
 export class AttributionRepository {
+  private static assertDbOrDev(db: D1Database | undefined, environment: string = 'production'): void {
+    if (!db) {
+      const isDevOrTest = environment === 'development' || environment === 'test';
+      if (!isDevOrTest) {
+        throw new Error('DATABASE_NOT_CONFIGURED: In-memory fallback in AttributionRepository is prohibited in production.');
+      }
+    }
+  }
+
   private static memResults: AttributionResult[] = [
     {
       id: 'attr_res_01',
@@ -55,8 +64,10 @@ export class AttributionRepository {
   public static async listResultsByOrg(
     db: D1Database | undefined,
     orgId: string,
-    businessId?: string
+    businessId?: string,
+    environment: string = 'production'
   ): Promise<AttributionResult[]> {
+    AttributionRepository.assertDbOrDev(db, environment);
     if (db) {
       let query = `
         SELECT id, organization_id, business_id, journey_id, revenue_type, confidence,

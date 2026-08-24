@@ -11,7 +11,8 @@ export async function handleGrowthActionsRoute(
   req: Request,
   user: AuthenticatedUser | null,
   url: URL,
-  db?: D1Database
+  db?: D1Database,
+  environment: string = 'production'
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
   const businessId = url.searchParams.get('businessId') || undefined;
@@ -27,11 +28,11 @@ export async function handleGrowthActionsRoute(
     }
 
     if (isProofRequest) {
-      const results = await GrowthActionRepository.listResultsByOrg(db, orgId, businessId);
+      const results = await GrowthActionRepository.listResultsByOrg(db, orgId, businessId, environment);
       return Response.json({ data: results, orgId });
     }
 
-    const actions = await GrowthActionRepository.listActionsByOrg(db, orgId, businessId);
+    const actions = await GrowthActionRepository.listActionsByOrg(db, orgId, businessId, environment);
     return Response.json({ data: actions, orgId });
   }
 
@@ -45,7 +46,7 @@ export async function handleGrowthActionsRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const updated = await GrowthActionRepository.updateActionApproval(db, body.actionId, body.status, user.userId, orgId);
+    const updated = await GrowthActionRepository.updateActionApproval(db, body.actionId, body.status, user.userId, orgId, environment);
     if (!updated) {
       return Response.json({ error: 'Action not found or does not belong to your organization.' }, { status: 404 });
     }

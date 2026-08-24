@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS action_results (
   growth_action_id TEXT NOT NULL,
   business_id TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('success', 'in_progress', 'failed')) DEFAULT 'in_progress',
-  revenue_recovered_amount REAL NOT NULL DEFAULT 0.0,
+  revenue_recovered_amount_minor INTEGER NOT NULL DEFAULT 0,
   metric_delta_json TEXT NOT NULL,
   verified_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   proof_notes TEXT NOT NULL,

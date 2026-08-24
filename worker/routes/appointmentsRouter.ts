@@ -12,7 +12,8 @@ export async function handleAppointmentsRoute(
   req: Request,
   user: AuthenticatedUser | null,
   url: URL,
-  db?: D1Database
+  db?: D1Database,
+  environment: string = 'production'
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
   const businessId = url.searchParams.get('businessId') || undefined;
@@ -24,7 +25,7 @@ export async function handleAppointmentsRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const appointments = await AppointmentRepository.listByOrg(db, orgId, businessId);
+    const appointments = await AppointmentRepository.listByOrg(db, orgId, businessId, environment);
     return Response.json({ data: appointments, orgId });
   }
 
@@ -36,7 +37,7 @@ export async function handleAppointmentsRoute(
     }
 
     const body = await req.json() as any;
-    const newAppointment = await AppointmentRepository.create(db, body, orgId);
+    const newAppointment = await AppointmentRepository.create(db, body, orgId, environment);
     return Response.json({ data: newAppointment, orgId }, { status: 201 });
   }
 
@@ -52,7 +53,7 @@ export async function handleAppointmentsRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const updated = await AppointmentRepository.updateStatus(db, body.appointmentId, body.status, orgId, body.reason);
+    const updated = await AppointmentRepository.updateStatus(db, body.appointmentId, body.status, orgId, body.reason, environment);
     if (!updated) {
       return Response.json({ error: 'Appointment not found or does not belong to your organization.' }, { status: 404 });
     }

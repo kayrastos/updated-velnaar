@@ -44,9 +44,31 @@ describe('VaultCryptoService (Standard Web Crypto AES-GCM-256 Envelope)', () => 
     await expect(VaultCryptoService.decrypt(tamperedPayload, orgAlpha, 'test')).rejects.toThrow();
   });
 
-  it('should fail-closed in production when master KMS secret is missing', async () => {
+  it('should fail-closed in production when master KMS secret is missing on encrypt', async () => {
     await expect(
       VaultCryptoService.encrypt('Test Plaintext', orgAlpha, 'production', undefined)
     ).rejects.toThrow(/VELNAR_MASTER_KMS_SECRET/);
+  });
+
+  it('should fail-closed in production when master KMS secret is missing on decrypt', async () => {
+    const payload: EncryptedVaultPayload = {
+      version: 1,
+      ciphertext: 'YWJj',
+      iv: 'MTIzNDU2Nzg5MDEy',
+      algorithm: 'AES-GCM-256',
+      tagLength: 128,
+      keyVersion: 1,
+    };
+    await expect(
+      VaultCryptoService.decrypt(payload, orgAlpha, 'production', undefined)
+    ).rejects.toThrow(/VELNAR_MASTER_KMS_SECRET/);
+  });
+
+  it('should succeed in production when valid master KMS secret is provided', async () => {
+    const prodSecret = 'velnar_prod_kms_secret_32_bytes_super_secure_key_123';
+    const rawPii = 'Production Secure Patient Record';
+    const encrypted = await VaultCryptoService.encrypt(rawPii, orgAlpha, 'production', prodSecret);
+    const decrypted = await VaultCryptoService.decrypt(encrypted, orgAlpha, 'production', prodSecret);
+    expect(decrypted).toBe(rawPii);
   });
 });

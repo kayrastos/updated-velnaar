@@ -14,6 +14,15 @@ import { AuditLogRow, UserRole } from '../../src/types/database';
 import { SafeLogger } from '../security/safeLogger';
 
 export class AuditRepository {
+  private static assertDbOrDev(db: D1Database | undefined, environment: string = 'production'): void {
+    if (!db) {
+      const isDevOrTest = environment === 'development' || environment === 'test';
+      if (!isDevOrTest) {
+        throw new Error('DATABASE_NOT_CONFIGURED: In-memory fallback in AuditRepository is prohibited in production.');
+      }
+    }
+  }
+
   private static memLogs: AuditLogRow[] = [
     {
       id: 'aud_init_01',
@@ -33,8 +42,10 @@ export class AuditRepository {
   public static async listByOrg(
     db: D1Database | undefined,
     orgId: string,
-    limit: number = 100
+    limit: number = 100,
+    environment: string = 'production'
   ): Promise<AuditLogRow[]> {
+    AuditRepository.assertDbOrDev(db, environment);
     if (db) {
       const { results } = await db.prepare(`
         SELECT id, organization_id, business_id, actor_id, actor_role, action,
@@ -56,8 +67,10 @@ export class AuditRepository {
   public static async append(
     db: D1Database | undefined,
     entry: Omit<AuditLogRow, 'id' | 'created_at'>,
-    orgId: string
+    orgId: string,
+    environment: string = 'production'
   ): Promise<AuditLogRow> {
+    AuditRepository.assertDbOrDev(db, environment);
     const safePayload = SafeLogger.redactData(JSON.parse(entry.payload_diff_json || '{}'));
     const id = `aud_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
     const now = new Date().toISOString();

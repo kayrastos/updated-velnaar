@@ -13,6 +13,15 @@
 import { Appointment, AppointmentStatus } from '../../src/types/appointment';
 
 export class AppointmentRepository {
+  private static assertDbOrDev(db: D1Database | undefined, environment: string = 'production'): void {
+    if (!db) {
+      const isDevOrTest = environment === 'development' || environment === 'test';
+      if (!isDevOrTest) {
+        throw new Error('DATABASE_NOT_CONFIGURED: In-memory fallback in AppointmentRepository is prohibited in production.');
+      }
+    }
+  }
+
   private static memAppointments: Appointment[] = [
     {
       id: 'apt_01',
@@ -60,8 +69,10 @@ export class AppointmentRepository {
   public static async listByOrg(
     db: D1Database | undefined,
     orgId: string,
-    businessId?: string
+    businessId?: string,
+    environment: string = 'production'
   ): Promise<Appointment[]> {
+    AppointmentRepository.assertDbOrDev(db, environment);
     if (db) {
       let query = `
         SELECT id, organization_id, business_id, pseudonymous_customer_id,
@@ -135,8 +146,10 @@ export class AppointmentRepository {
   public static async getById(
     db: D1Database | undefined,
     appointmentId: string,
-    orgId: string
+    orgId: string,
+    environment: string = 'production'
   ): Promise<Appointment | null> {
+    AppointmentRepository.assertDbOrDev(db, environment);
     if (db) {
       const r = await db.prepare(`
         SELECT id, organization_id, business_id, pseudonymous_customer_id,
@@ -201,8 +214,10 @@ export class AppointmentRepository {
   public static async create(
     db: D1Database | undefined,
     data: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt' | 'organizationId'>,
-    orgId: string
+    orgId: string,
+    environment: string = 'production'
   ): Promise<Appointment> {
+    AppointmentRepository.assertDbOrDev(db, environment);
     const id = `apt_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
     const now = new Date().toISOString();
     const newAppointment: Appointment = {
@@ -254,8 +269,10 @@ export class AppointmentRepository {
     appointmentId: string,
     status: AppointmentStatus,
     orgId: string,
-    reason?: string
+    reason?: string,
+    environment: string = 'production'
   ): Promise<Appointment | null> {
+    AppointmentRepository.assertDbOrDev(db, environment);
     const now = new Date().toISOString();
 
     if (db) {
@@ -265,7 +282,7 @@ export class AppointmentRepository {
         WHERE id = ? AND organization_id = ?
       `).bind(status, reason || null, now, appointmentId, orgId).run();
 
-      return AppointmentRepository.getById(db, appointmentId, orgId);
+      return AppointmentRepository.getById(db, appointmentId, orgId, environment);
     }
 
     const index = AppointmentRepository.memAppointments.findIndex(a => a.id === appointmentId && a.organizationId === orgId);

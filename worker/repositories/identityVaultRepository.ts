@@ -39,6 +39,15 @@ export class IdentityVaultRepository {
   private static memRecords: StoredVaultRecord[] = [];
   private static isInitialized = false;
 
+  private static assertDbOrDev(db: D1Database | undefined, environment: string = 'production'): void {
+    if (!db) {
+      const isDevOrTest = environment === 'development' || environment === 'test';
+      if (!isDevOrTest) {
+        throw new Error('DATABASE_NOT_CONFIGURED: In-memory fallback in IdentityVaultRepository is prohibited in production.');
+      }
+    }
+  }
+
   private static async initSeedMem(environment: string = 'test', masterSecret?: string): Promise<void> {
     if (this.isInitialized) return;
     this.isInitialized = true;
@@ -75,6 +84,7 @@ export class IdentityVaultRepository {
     environment: string = 'production',
     masterSecret?: string
   ): Promise<StoredVaultRecord> {
+    IdentityVaultRepository.assertDbOrDev(db, environment);
     const pseudonymId = data.pseudonymId || `cus_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
     
     // Encrypt each PII field individually with Tenant DEK
@@ -135,6 +145,7 @@ export class IdentityVaultRepository {
     environment: string = 'production',
     masterSecret?: string
   ): Promise<DecryptedIdentity | null> {
+    IdentityVaultRepository.assertDbOrDev(db, environment);
     let rawRecord: {
       id: string;
       organization_id?: string;
@@ -189,19 +200,23 @@ export class IdentityVaultRepository {
     }
 
     // Decrypt using Web Crypto AES-GCM under tenant context
-    const [fullName, email, phone] = await Promise.all([
-      VaultCryptoService.decrypt(rawRecord.encryptedNamePayload, orgId, environment, masterSecret),
-      VaultCryptoService.decrypt(rawRecord.encryptedEmailPayload, orgId, environment, masterSecret),
-      VaultCryptoService.decrypt(rawRecord.encryptedPhonePayload, orgId, environment, masterSecret),
-    ]);
+    try {
+      const [fullName, email, phone] = await Promise.all([
+        VaultCryptoService.decrypt(rawRecord.encryptedNamePayload, orgId, environment, masterSecret),
+        VaultCryptoService.decrypt(rawRecord.encryptedEmailPayload, orgId, environment, masterSecret),
+        VaultCryptoService.decrypt(rawRecord.encryptedPhonePayload, orgId, environment, masterSecret),
+      ]);
 
-    return {
-      pseudonymId,
-      organizationId: orgId,
-      fullName,
-      email,
-      phone,
-    };
+      return {
+        pseudonymId,
+        organizationId: orgId,
+        fullName,
+        email,
+        phone,
+      };
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -209,8 +224,10 @@ export class IdentityVaultRepository {
    */
   public static async listCiphertextRecords(
     db: D1Database | undefined,
-    orgId: string
+    orgId: string,
+    environment: string = 'production'
   ): Promise<StoredVaultRecord[]> {
+    IdentityVaultRepository.assertDbOrDev(db, environment);
     if (db) {
       const { results } = await db.prepare(`
         SELECT id, organization_id, pseudonym_id, encrypted_name_payload, encrypted_email_payload, encrypted_phone_payload, key_version, created_at, updated_at
@@ -242,7 +259,7 @@ export class IdentityVaultRepository {
       }));
     }
 
-    await this.initSeedMem();
+    await this.initSeedMem(environment);
     return IdentityVaultRepository.memRecords.filter(r => r.organizationId === orgId);
   }
 }

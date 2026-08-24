@@ -12,6 +12,15 @@
 import { RevenueLeakRow } from '../../src/types/database';
 
 export class RevenueLeakRepository {
+  private static assertDbOrDev(db: D1Database | undefined, environment: string = 'production'): void {
+    if (!db) {
+      const isDevOrTest = environment === 'development' || environment === 'test';
+      if (!isDevOrTest) {
+        throw new Error('DATABASE_NOT_CONFIGURED: In-memory fallback in RevenueLeakRepository is prohibited in production.');
+      }
+    }
+  }
+
   private static memLeaks: RevenueLeakRow[] = [
     {
       id: 'leak_001',
@@ -50,8 +59,10 @@ export class RevenueLeakRepository {
   public static async listByOrg(
     db: D1Database | undefined,
     orgId: string,
-    businessId?: string
+    businessId?: string,
+    environment: string = 'production'
   ): Promise<RevenueLeakRow[]> {
+    RevenueLeakRepository.assertDbOrDev(db, environment);
     if (db) {
       let query = `
         SELECT id, organization_id, business_id, market, title, category, severity,
@@ -110,8 +121,10 @@ export class RevenueLeakRepository {
   public static async getById(
     db: D1Database | undefined,
     leakId: string,
-    orgId: string
+    orgId: string,
+    environment: string = 'production'
   ): Promise<RevenueLeakRow | null> {
+    RevenueLeakRepository.assertDbOrDev(db, environment);
     if (db) {
       const r = await db.prepare(`
         SELECT id, organization_id, business_id, market, title, category, severity,

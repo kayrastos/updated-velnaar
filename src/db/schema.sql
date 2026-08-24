@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS businesses (
   FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
 
--- 5. Identity Vault (Zero-Knowledge AES-GCM Encrypted PII Storage)
+-- 5. Encrypted Identity Vault (AES-GCM Encrypted PII Storage)
 CREATE TABLE IF NOT EXISTS identity_vault (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL,

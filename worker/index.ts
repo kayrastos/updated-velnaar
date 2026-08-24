@@ -132,25 +132,35 @@ export default {
         return addCorsAndSecurityHeaders(unauthorizedResp, validatedOrigin);
       }
 
+      // If in production and DB binding is missing, fail-closed with 503 DATABASE_NOT_CONFIGURED
+      if (environment === 'production' && !env.DB) {
+        SafeLogger.error('[WORKER_CONFIG_ERROR] Cloudflare D1 Database binding (env.DB) is missing in production');
+        const dbNotConfiguredResp = Response.json({
+          error: 'DATABASE_NOT_CONFIGURED',
+          message: 'Database service is not configured or unavailable in production.',
+        }, { status: 503 });
+        return addCorsAndSecurityHeaders(dbNotConfiguredResp, validatedOrigin);
+      }
+
       // 4. Dispatch to Sub-Routers
       let response: Response;
 
       if (url.pathname.startsWith('/api/leads')) {
-        response = await handleLeadsRoute(request, user, url, env.DB);
+        response = await handleLeadsRoute(request, user, url, env.DB, environment);
       } else if (url.pathname.startsWith('/api/appointments')) {
-        response = await handleAppointmentsRoute(request, user, url, env.DB);
+        response = await handleAppointmentsRoute(request, user, url, env.DB, environment);
       } else if (url.pathname.startsWith('/api/leaks')) {
-        response = await handleRevenueLeaksRoute(request, user, url, env.DB);
+        response = await handleRevenueLeaksRoute(request, user, url, env.DB, environment);
       } else if (url.pathname.startsWith('/api/actions') || url.pathname.startsWith('/api/proof')) {
-        response = await handleGrowthActionsRoute(request, user, url, env.DB);
+        response = await handleGrowthActionsRoute(request, user, url, env.DB, environment);
       } else if (url.pathname.startsWith('/api/attribution')) {
-        response = await handleAttributionRoute(request, user, url, env.DB);
+        response = await handleAttributionRoute(request, user, url, env.DB, environment);
       } else if (url.pathname.startsWith('/api/vault')) {
         response = await handleVaultRoute(request, user, url, env.DB, env.VELNAR_MASTER_KMS_SECRET, environment);
       } else if (url.pathname.startsWith('/api/security')) {
         response = await handleSecurityRoute(request, user, url, env.DB, env.VELNAR_MASTER_KMS_SECRET, environment);
       } else if (url.pathname.startsWith('/api/audit')) {
-        response = await handleAuditRoute(request, user, url, env.DB);
+        response = await handleAuditRoute(request, user, url, env.DB, environment);
       } else if (url.pathname === '/api/auth/me') {
         response = Response.json({ data: user });
       } else {

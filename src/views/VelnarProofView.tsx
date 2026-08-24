@@ -18,7 +18,7 @@ export const VelnarProofView: React.FC = () => {
 
   const totalRecovered = actionResults
     .filter(r => r.status === 'success')
-    .reduce((sum, r) => sum + r.revenue_recovered_amount, 0);
+    .reduce((sum, r) => sum + ((r.revenue_recovered_amount_minor || 0) / 100), 0);
 
   const handleExportCertificate = () => {
     setDownloadSuccess(true);
@@ -154,7 +154,7 @@ export const VelnarProofView: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-emerald-400 font-bold text-sm">
-                        +{formatCurrency(result.revenue_recovered_amount)}
+                        +{formatCurrency((result.revenue_recovered_amount_minor || 0) / 100)}
                       </td>
                       <td className="px-4 py-3 text-[#A1A4B2] font-sans max-w-xs text-xs">
                         {result.proof_notes}

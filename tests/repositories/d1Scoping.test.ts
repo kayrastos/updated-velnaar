@@ -75,23 +75,23 @@ describe('Tenant Scoping in Repositories (Cloudflare D1 Prepared SQL / In-Memory
       currency: 'USD',
       status: 'confirmed',
       source: 'velnar_manual',
-    }, orgAlpha);
+    }, orgAlpha, 'test');
 
     expect(newApt.organizationId).toBe(orgAlpha);
     expect(newApt.expectedValueMinor).toBe(35000);
 
     // Cross-tenant update attempt should fail (return null)
-    const crossUpdate = await AppointmentRepository.updateStatus(undefined, newApt.id, 'cancelled', orgBeta, 'Malicious cancel');
+    const crossUpdate = await AppointmentRepository.updateStatus(undefined, newApt.id, 'cancelled', orgBeta, 'Malicious cancel', 'test');
     expect(crossUpdate).toBeNull();
 
     // Valid same-tenant update should succeed
-    const validUpdate = await AppointmentRepository.updateStatus(undefined, newApt.id, 'cancelled', orgAlpha, 'Customer requested');
+    const validUpdate = await AppointmentRepository.updateStatus(undefined, newApt.id, 'cancelled', orgAlpha, 'Customer requested', 'test');
     expect(validUpdate).not.toBeNull();
     expect(validUpdate?.status).toBe('cancelled');
   });
 
   it('GrowthActionRepository should track human approval with user ID and timestamp', async () => {
-    const actions = await GrowthActionRepository.listActionsByOrg(undefined, orgAlpha);
+    const actions = await GrowthActionRepository.listActionsByOrg(undefined, orgAlpha, undefined, 'test');
     expect(actions.length).toBeGreaterThan(0);
 
     const actionId = actions[0].id;
@@ -100,7 +100,8 @@ describe('Tenant Scoping in Repositories (Cloudflare D1 Prepared SQL / In-Memory
       actionId,
       'approved',
       'usr_owner_01',
-      orgAlpha
+      orgAlpha,
+      'test'
     );
 
     expect(updated).not.toBeNull();
@@ -143,9 +144,34 @@ describe('Tenant Scoping in Repositories (Cloudflare D1 Prepared SQL / In-Memory
         email: 'ceo@enterprise.com'
       }),
       ip_hash: '127.0.0.1'
-    }, orgAlpha);
+    }, orgAlpha, 'test');
 
     expect(log.organization_id).toBe(orgAlpha);
     expect(log.payload_diff_json).not.toContain('secret_key_12345');
+  });
+
+  it('All repositories must fail-closed in production if D1 Database binding is missing', async () => {
+    const leadRepo = new LeadRepository(undefined, 'production');
+    await expect(leadRepo.listByOrg(orgAlpha)).rejects.toThrow(/DATABASE_NOT_CONFIGURED/);
+
+    await expect(
+      AppointmentRepository.listByOrg(undefined, orgAlpha, undefined, 'production')
+    ).rejects.toThrow(/DATABASE_NOT_CONFIGURED/);
+
+    await expect(
+      RevenueLeakRepository.listByOrg(undefined, orgAlpha, undefined, 'production')
+    ).rejects.toThrow(/DATABASE_NOT_CONFIGURED/);
+
+    await expect(
+      GrowthActionRepository.listActionsByOrg(undefined, orgAlpha, undefined, 'production')
+    ).rejects.toThrow(/DATABASE_NOT_CONFIGURED/);
+
+    await expect(
+      IdentityVaultRepository.listCiphertextRecords(undefined, orgAlpha, 'production')
+    ).rejects.toThrow(/DATABASE_NOT_CONFIGURED/);
+
+    await expect(
+      AuditRepository.listByOrg(undefined, orgAlpha, 100, 'production')
+    ).rejects.toThrow(/DATABASE_NOT_CONFIGURED/);
   });
 });

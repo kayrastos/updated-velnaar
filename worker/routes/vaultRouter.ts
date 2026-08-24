@@ -13,7 +13,7 @@ export async function handleVaultRoute(
   user: AuthenticatedUser | null,
   url: URL,
   db?: D1Database,
-  envSecret?: string,
+  masterSecret?: string,
   environment: string = 'production'
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
@@ -30,8 +30,8 @@ export async function handleVaultRoute(
     const plaintext = body.plaintext || 'Customer Real Name: Ayşe Kaya | Phone: +90 532 999 8877';
 
     try {
-      const encrypted = await VaultCryptoService.encrypt(plaintext, targetOrg, environment, envSecret);
-      const decrypted = await VaultCryptoService.decrypt(encrypted, targetOrg, environment, envSecret);
+      const encrypted = await VaultCryptoService.encrypt(plaintext, targetOrg, environment, masterSecret);
+      const decrypted = await VaultCryptoService.decrypt(encrypted, targetOrg, environment, masterSecret);
 
       return Response.json({
         data: {
@@ -58,12 +58,12 @@ export async function handleVaultRoute(
     const pseudonymId = url.searchParams.get('pseudonymId');
     if (!pseudonymId) {
       // Return ciphertext metadata list (no raw PII)
-      const records = await IdentityVaultRepository.listCiphertextRecords(db, orgId);
+      const records = await IdentityVaultRepository.listCiphertextRecords(db, orgId, environment);
       return Response.json({ data: records, orgId });
     }
 
     try {
-      const decrypted = await IdentityVaultRepository.getDecryptedIdentity(db, pseudonymId, orgId, environment, envSecret);
+      const decrypted = await IdentityVaultRepository.getDecryptedIdentity(db, pseudonymId, orgId, environment, masterSecret);
       if (!decrypted) {
         return Response.json({ error: 'Identity not found for this pseudonym in this tenant.' }, { status: 404 });
       }
@@ -81,7 +81,7 @@ export async function handleVaultRoute(
     }
 
     const body = await req.json() as { fullName: string; email: string; phone: string; pseudonymId?: string };
-    const record = await IdentityVaultRepository.storeIdentity(db, body, orgId, environment, envSecret);
+    const record = await IdentityVaultRepository.storeIdentity(db, body, orgId, environment, masterSecret);
     return Response.json({
       data: {
         pseudonymId: record.pseudonymId,

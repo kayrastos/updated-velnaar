@@ -11,12 +11,13 @@ export async function handleLeadsRoute(
   req: Request,
   user: AuthenticatedUser | null,
   url: URL,
-  db: D1Database
+  db?: D1Database,
+  environment: string = 'production'
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
   const businessId = url.searchParams.get('businessId') || undefined;
 
-  const repo = new LeadRepository(db);
+  const repo = new LeadRepository(db, environment);
 
   // 1. GET /api/leads - List Leads
   if (req.method === 'GET') {

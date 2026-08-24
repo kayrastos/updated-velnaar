@@ -102,10 +102,10 @@ export class VaultCryptoService {
     plaintext: string,
     tenantId: string,
     environment: string,
-    envSecret?: string
+    masterSecret?: string
   ): Promise<EncryptedVaultPayload> {
-    const masterSecret = VaultCryptoService.getMasterSecret(environment, envSecret);
-    const dek = await VaultCryptoService.deriveTenantDEK(masterSecret, tenantId);
+    const resolvedSecret = VaultCryptoService.getMasterSecret(environment, masterSecret);
+    const dek = await VaultCryptoService.deriveTenantDEK(resolvedSecret, tenantId);
 
     // Generate unique 96-bit (12-byte) IV for AES-GCM per encryption
     const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -139,10 +139,10 @@ export class VaultCryptoService {
     payload: EncryptedVaultPayload,
     tenantId: string,
     environment: string,
-    envSecret?: string
+    masterSecret?: string
   ): Promise<string> {
-    const masterSecret = VaultCryptoService.getMasterSecret(environment, envSecret);
-    const dek = await VaultCryptoService.deriveTenantDEK(masterSecret, tenantId);
+    const resolvedSecret = VaultCryptoService.getMasterSecret(environment, masterSecret);
+    const dek = await VaultCryptoService.deriveTenantDEK(resolvedSecret, tenantId);
 
     const iv = new Uint8Array(VaultCryptoService.base64ToArrayBuffer(payload.iv));
     const ciphertextBuffer = VaultCryptoService.base64ToArrayBuffer(payload.ciphertext);

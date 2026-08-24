@@ -13,12 +13,37 @@
 import { SecurityTestResult, SecurityEvent } from '../types/security';
 import { AuditLogRow } from '../types/database';
 
+export interface AuthSession {
+  token: string;
+  userId: string;
+  organizationId: string;
+  role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF' | 'VIEWER';
+  expiresAt?: string;
+}
+
+export interface AuthProvider {
+  getSession(): Promise<AuthSession | null>;
+  login?(credentials: any): Promise<AuthSession>;
+  logout(): Promise<void>;
+}
+
 export class ApiClient {
-  private static authToken: string = 'Bearer test_user:usr_dev_owner:org_apex_holding:OWNER';
+  private static authToken: string | null = 
+    (typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV)
+      ? 'Bearer test_user:usr_dev_owner:org_apex_holding:OWNER'
+      : null;
   private static activeTenantId: string = 'org_apex_holding';
 
-  public static setAuthToken(token: string) {
+  public static setAuthToken(token: string | null) {
     this.authToken = token;
+  }
+
+  public static getAuthToken(): string | null {
+    return this.authToken;
+  }
+
+  public static isAuthenticated(): boolean {
+    return !!this.authToken;
   }
 
   public static setActiveTenantId(orgId: string) {
@@ -26,11 +51,14 @@ export class ApiClient {
   }
 
   private static getHeaders(): HeadersInit {
-    return {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': this.authToken,
       'X-Tenant-Id': this.activeTenantId,
     };
+    if (this.authToken) {
+      headers['Authorization'] = this.authToken;
+    }
+    return headers;
   }
 
   /**

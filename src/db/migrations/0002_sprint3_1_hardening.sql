@@ -5,7 +5,7 @@
 
 PRAGMA foreign_keys = ON;
 
--- 1. Identity Vault (Zero-Knowledge AES-GCM Encrypted PII Storage)
+-- 1. Identity Vault (Encrypted Identity Vault AES-GCM Encrypted PII Storage)
 CREATE TABLE IF NOT EXISTS identity_vault (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL,

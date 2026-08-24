@@ -16,7 +16,7 @@
     {
       "binding": "DB",
       "database_name": "velnar-production-db",
-      "database_id": "d1_velnar_prod_001",
+      "database_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
       "migrations_dir": "src/db/migrations"
     }
   ],

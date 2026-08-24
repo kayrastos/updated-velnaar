@@ -53,14 +53,28 @@ export const SecurityGuardView: React.FC = () => {
   const [partySize, setPartySize] = useState<number>(1);
   const [lastLoggedCheckIn, setLastLoggedCheckIn] = useState<string | null>(null);
 
+  const [testError, setTestError] = useState<string | null>(null);
+
   const handleRunSecurityTests = async () => {
     setIsRunningTests(true);
+    setTestError(null);
     try {
       const results = await TenantSecurityEngine.runCrossTenantTestsAsync(currentOrg.id);
       setTestResults(results);
     } catch (err: any) {
-      console.warn('Falling back to local test runner view:', err);
-      setTestResults(TenantSecurityEngine.runCrossTenantTests());
+      console.error('Security test run failed:', err);
+      const errorMessage = err?.message || 'Server-side security verification endpoint unavailable or failed.';
+      setTestError(errorMessage);
+      setTestResults([
+        {
+          testId: 'SEC_TEST_BACKEND_EXECUTION_FAILURE',
+          name: 'Server-Side Security Test Suite Runner',
+          passed: false,
+          details: `FAILED: Backend security test suite execution failed (${errorMessage}). No simulated PASS fallback permitted.`,
+          category: 'cross_tenant_isolation',
+          executedAt: new Date().toISOString(),
+        }
+      ]);
     } finally {
       setIsRunningTests(false);
     }

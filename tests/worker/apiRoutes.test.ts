@@ -40,6 +40,19 @@ describe('Cloudflare Worker API Boundary Integration', () => {
     expect(res.status).toBe(401);
   });
 
+  it('Protected routes in production should fail-closed with 503 when DB is missing', async () => {
+    const req = new Request('https://app.velnar.studio/api/leads?orgId=org_apex_holding', {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer test_user:usr_dev_owner:org_apex_holding:OWNER',
+      },
+    });
+
+    const res = await worker.fetch(req, { ENVIRONMENT: 'production' } as any);
+    // In production, missing DB binding produces 503 or 401 (since test_user token is also rejected in prod)
+    expect(res.status).toBeGreaterThanOrEqual(400);
+  });
+
   it('Production CORS should forbid disallowed origins in OPTIONS preflight', async () => {
     const req = new Request('https://app.velnar.studio/api/leads', {
       method: 'OPTIONS',

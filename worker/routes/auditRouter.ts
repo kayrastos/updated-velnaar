@@ -11,7 +11,8 @@ export async function handleAuditRoute(
   req: Request,
   user: AuthenticatedUser | null,
   url: URL,
-  db?: D1Database
+  db?: D1Database,
+  environment: string = 'production'
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
 
@@ -21,7 +22,7 @@ export async function handleAuditRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const logs = await AuditRepository.listByOrg(db, orgId);
+    const logs = await AuditRepository.listByOrg(db, orgId, 100, environment);
     return Response.json({ data: logs, orgId });
   }
 

@@ -11,7 +11,8 @@ export async function handleAttributionRoute(
   req: Request,
   user: AuthenticatedUser | null,
   url: URL,
-  db?: D1Database
+  db?: D1Database,
+  environment: string = 'production'
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
   const businessId = url.searchParams.get('businessId') || undefined;
@@ -22,7 +23,7 @@ export async function handleAttributionRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const results = await AttributionRepository.listResultsByOrg(db, orgId, businessId);
+    const results = await AttributionRepository.listResultsByOrg(db, orgId, businessId, environment);
     return Response.json({ data: results, orgId });
   }
 
