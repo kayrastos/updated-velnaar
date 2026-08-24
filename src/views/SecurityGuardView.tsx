@@ -70,18 +70,22 @@ export const SecurityGuardView: React.FC = () => {
     setIsEncrypting(true);
     setCryptoError(null);
     try {
-      // 1. Send plaintext to Worker API to encrypt with AES-GCM-256 and store in Zero-Trust Vault
-      const stored = await ApiClient.storeVaultIdentity({
-        fullName: plainTextInput.split('|')[0]?.replace('Customer Real Name:', '').trim() || 'Ayşe Kaya',
+      // Execute server-side Web Crypto AES-GCM-256 via Worker POST /api/vault/dev-demo
+      const demoResult = await ApiClient.executeVaultDevDemo(plainTextInput, currentOrg.id);
+
+      setStoredVaultRecord({
+        pseudonymId: demoResult.pseudonymId,
+        keyVersion: demoResult.keyVersion,
+        algorithm: demoResult.algorithm,
+        createdAt: demoResult.createdAt,
+      });
+
+      setDecryptedOutput({
+        pseudonymId: demoResult.pseudonymId,
+        fullName: demoResult.decryptedVerification.split('|')[0]?.replace('Customer Real Name:', '').trim() || 'Ayşe Kaya',
         email: 'ayse.kaya@customer-domain.com',
-        phone: plainTextInput.split('|')[1]?.replace('Phone:', '').trim() || '+90 532 999 8877',
-      }, currentOrg.id);
-
-      setStoredVaultRecord(stored);
-
-      // 2. Query Worker API to verify authenticated decryption under current tenant
-      const decrypted = await ApiClient.decryptVaultIdentity(stored.pseudonymId, currentOrg.id);
-      setDecryptedOutput(decrypted);
+        phone: demoResult.decryptedVerification.split('|')[1]?.replace('Phone:', '').trim() || '+90 532 999 8877',
+      });
     } catch (e: any) {
       setCryptoError(e.message || 'API encryption / decryption error');
       console.error(e);
@@ -275,7 +279,7 @@ export const SecurityGuardView: React.FC = () => {
           <div className="space-y-3 text-xs font-mono">
             <div>
               <label className="block text-[11px] text-[#8E909B] mb-1">
-                Plaintext Customer PII Input (Segregated into Zero-Knowledge Identity Vault via API)
+                Plaintext Customer PII Input (Segregated into Encrypted Identity Vault via API)
               </label>
               <textarea
                 rows={2}

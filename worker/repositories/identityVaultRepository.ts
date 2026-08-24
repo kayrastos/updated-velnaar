@@ -1,6 +1,6 @@
 /**
  * @file identityVaultRepository.ts
- * @description Cloudflare D1 Zero-Knowledge Encrypted Identity Vault Repository
+ * @description Cloudflare D1 Encrypted Identity Vault Repository
  * 
  * ============================================================================
  * MANDATES:
@@ -39,15 +39,15 @@ export class IdentityVaultRepository {
   private static memRecords: StoredVaultRecord[] = [];
   private static isInitialized = false;
 
-  private static async initSeedMem(masterSecret?: string, env?: { ENVIRONMENT?: string }): Promise<void> {
+  private static async initSeedMem(environment: string = 'test', masterSecret?: string): Promise<void> {
     if (this.isInitialized) return;
     this.isInitialized = true;
 
     try {
       const orgA = 'org_apex_holding';
-      const nameEnc = await VaultCryptoService.encrypt('Dr. Clara Vance', orgA, masterSecret, env);
-      const emailEnc = await VaultCryptoService.encrypt('clara@vanceaesthetics.com', orgA, masterSecret, env);
-      const phoneEnc = await VaultCryptoService.encrypt('+1 (415) 890-1122', orgA, masterSecret, env);
+      const nameEnc = await VaultCryptoService.encrypt('Dr. Clara Vance', orgA, environment, masterSecret);
+      const emailEnc = await VaultCryptoService.encrypt('clara@vanceaesthetics.com', orgA, environment, masterSecret);
+      const phoneEnc = await VaultCryptoService.encrypt('+1 (415) 890-1122', orgA, environment, masterSecret);
 
       this.memRecords.push({
         id: 'vrec_001',
@@ -72,16 +72,16 @@ export class IdentityVaultRepository {
     db: D1Database | undefined,
     data: { fullName: string; email: string; phone: string; pseudonymId?: string },
     orgId: string,
-    masterSecret?: string,
-    env?: { ENVIRONMENT?: string }
+    environment: string = 'production',
+    masterSecret?: string
   ): Promise<StoredVaultRecord> {
     const pseudonymId = data.pseudonymId || `cus_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
     
     // Encrypt each PII field individually with Tenant DEK
     const [nameEnc, emailEnc, phoneEnc] = await Promise.all([
-      VaultCryptoService.encrypt(data.fullName, orgId, masterSecret, env),
-      VaultCryptoService.encrypt(data.email, orgId, masterSecret, env),
-      VaultCryptoService.encrypt(data.phone, orgId, masterSecret, env),
+      VaultCryptoService.encrypt(data.fullName, orgId, environment, masterSecret),
+      VaultCryptoService.encrypt(data.email, orgId, environment, masterSecret),
+      VaultCryptoService.encrypt(data.phone, orgId, environment, masterSecret),
     ]);
 
     const id = `vrec_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
@@ -132,8 +132,8 @@ export class IdentityVaultRepository {
     db: D1Database | undefined,
     pseudonymId: string,
     orgId: string,
-    masterSecret?: string,
-    env?: { ENVIRONMENT?: string }
+    environment: string = 'production',
+    masterSecret?: string
   ): Promise<DecryptedIdentity | null> {
     let rawRecord: {
       id: string;
@@ -177,7 +177,7 @@ export class IdentityVaultRepository {
         };
       }
     } else {
-      await this.initSeedMem(masterSecret, env);
+      await this.initSeedMem(environment, masterSecret);
       const found = IdentityVaultRepository.memRecords.find(
         r => r.pseudonymId === pseudonymId && r.organizationId === orgId
       );
@@ -190,9 +190,9 @@ export class IdentityVaultRepository {
 
     // Decrypt using Web Crypto AES-GCM under tenant context
     const [fullName, email, phone] = await Promise.all([
-      VaultCryptoService.decrypt(rawRecord.encryptedNamePayload, orgId, masterSecret, env),
-      VaultCryptoService.decrypt(rawRecord.encryptedEmailPayload, orgId, masterSecret, env),
-      VaultCryptoService.decrypt(rawRecord.encryptedPhonePayload, orgId, masterSecret, env),
+      VaultCryptoService.decrypt(rawRecord.encryptedNamePayload, orgId, environment, masterSecret),
+      VaultCryptoService.decrypt(rawRecord.encryptedEmailPayload, orgId, environment, masterSecret),
+      VaultCryptoService.decrypt(rawRecord.encryptedPhonePayload, orgId, environment, masterSecret),
     ]);
 
     return {

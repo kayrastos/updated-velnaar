@@ -11,10 +11,12 @@ export async function handleLeadsRoute(
   req: Request,
   user: AuthenticatedUser | null,
   url: URL,
-  db?: D1Database
+  db: D1Database
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
   const businessId = url.searchParams.get('businessId') || undefined;
+
+  const repo = new LeadRepository(db);
 
   // 1. GET /api/leads - List Leads
   if (req.method === 'GET') {
@@ -23,7 +25,7 @@ export async function handleLeadsRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const leads = await LeadRepository.listByOrg(db, orgId, businessId);
+    const leads = await repo.listByOrg(orgId, businessId);
     return Response.json({ data: leads, orgId });
   }
 
@@ -35,7 +37,8 @@ export async function handleLeadsRoute(
     }
 
     const body = await req.json() as any;
-    const newLead = await LeadRepository.create(db, body, orgId);
+    // organization_id comes from authenticated tenant context, never request body authority
+    const newLead = await repo.create(body, orgId);
     return Response.json({ data: newLead, orgId }, { status: 201 });
   }
 
@@ -47,7 +50,7 @@ export async function handleLeadsRoute(
     }
 
     const body = await req.json() as { leadId: string; status: any };
-    const updated = await LeadRepository.updateStatus(db, body.leadId, body.status, orgId);
+    const updated = await repo.updateStatus(body.leadId, body.status, orgId);
     if (!updated) {
       return Response.json({ error: 'Lead not found or does not belong to your organization.' }, { status: 404 });
     }

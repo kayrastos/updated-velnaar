@@ -258,14 +258,14 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Opportunities = Uncaptured high-intent leads value + potential action uplift
     const uncapturedLeadValue = leads
       .filter(ld => ld.status === 'open' && ld.intent_score > 75)
-      .reduce((sum, ld) => sum + ld.estimated_deal_value, 0);
+      .reduce((sum, ld) => sum + ((ld.estimated_deal_value_minor || 0) / 100), 0);
 
     const pendingActions = actions.filter(a => a.approval_status === 'pending_approval');
     const waitingApprovalCount = pendingActions.length;
 
     const totalRevenueInfluenced = actionResults
       .filter(r => r.status === 'success')
-      .reduce((sum, r) => sum + r.revenue_recovered_amount, 0);
+      .reduce((sum, r) => sum + ((r.revenue_recovered_amount_minor || 0) / 100), 0);
 
     const criticalCount = activeLeaks.filter(l => l.severity === 'critical').length;
     const highCount = activeLeaks.filter(l => l.severity === 'high').length;

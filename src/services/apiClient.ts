@@ -14,7 +14,7 @@ import { SecurityTestResult, SecurityEvent } from '../types/security';
 import { AuditLogRow } from '../types/database';
 
 export class ApiClient {
-  private static authToken: string = 'Bearer dev_session_token_owner_01';
+  private static authToken: string = 'Bearer test_user:usr_dev_owner:org_apex_holding:OWNER';
   private static activeTenantId: string = 'org_apex_holding';
 
   public static setAuthToken(token: string) {
@@ -70,7 +70,29 @@ export class ApiClient {
   }
 
   /**
-   * Store identity into Zero-Trust Identity Vault via Worker Web Crypto API
+   * Execute server-side Web Crypto Vault development demo
+   */
+  public static async executeVaultDevDemo(
+    plaintext: string,
+    orgId: string = this.activeTenantId
+  ): Promise<{ pseudonymId: string; algorithm: string; keyVersion: number; createdAt: string; decryptedVerification: string }> {
+    const res = await fetch(`/api/vault/dev-demo?orgId=${encodeURIComponent(orgId)}`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ plaintext, orgId }),
+    });
+
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({ message: 'Failed to run server-side vault demo' }))) as { message?: string };
+      throw new Error(err.message || `HTTP ${res.status}`);
+    }
+
+    const json = (await res.json()) as { data: { pseudonymId: string; algorithm: string; keyVersion: number; createdAt: string; decryptedVerification: string } };
+    return json.data;
+  }
+
+  /**
+   * Store identity into Encrypted Identity Vault via Worker Web Crypto API
    */
   public static async storeVaultIdentity(
     data: { fullName: string; email: string; phone: string; pseudonymId?: string },
@@ -92,7 +114,7 @@ export class ApiClient {
   }
 
   /**
-   * Decrypt identity from Zero-Trust Identity Vault via Worker API
+   * Decrypt identity from Encrypted Identity Vault via Worker API
    */
   public static async decryptVaultIdentity(
     pseudonymId: string,

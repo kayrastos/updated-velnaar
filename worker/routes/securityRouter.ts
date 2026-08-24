@@ -20,7 +20,7 @@ export async function handleSecurityRoute(
   url: URL,
   db?: D1Database,
   masterSecret?: string,
-  env?: { ENVIRONMENT?: string }
+  environment: string = 'production'
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
 
@@ -42,7 +42,7 @@ export async function handleSecurityRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const testResults = await SecurityTestSuite.runSuite(db, masterSecret, env);
+    const testResults = await SecurityTestSuite.runSuite(db, masterSecret, environment);
     return Response.json({ data: testResults, orgId });
   }
 

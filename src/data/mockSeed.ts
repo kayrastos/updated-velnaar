@@ -103,7 +103,7 @@ export const mockBusinesses: Record<'TR' | 'GLOBAL', BusinessRow> = {
   },
 };
 
-// Market Isolated Revenue Leaks
+// Market Isolated Revenue Leaks (with integer minor units)
 export const initialRevenueLeaks: RevenueLeakRow[] = [
   // --- GLOBAL MARKET LEAKS ($) ---
   {
@@ -115,9 +115,10 @@ export const initialRevenueLeaks: RevenueLeakRow[] = [
     category: 'lead_decay',
     severity: 'critical',
     root_cause: 'High-intent demo requests from Tier-1 North America accounts sit in general distribution inbox without automated routing to senior enterprise reps.',
-    estimated_monthly_loss: 42500, // $42.5k / mo
+    estimated_monthly_loss_minor: 4250000, // $42.5k / mo (in cents)
     affected_funnel_stage: 'Inbound Ingestion → Discovery Call',
     confidence_score: 0.96,
+    confidence_level: 'HIGH',
     status: 'active',
     detected_at: '2026-08-22T10:14:00Z',
   },
@@ -130,9 +131,10 @@ export const initialRevenueLeaks: RevenueLeakRow[] = [
     category: 'checkout_abandonment',
     severity: 'high',
     root_cause: 'Standard MSA SLA clauses mismatch EMEA compliance requirements, causing deals over $100k to stall for 28+ days.',
-    estimated_monthly_loss: 34000, // $34k / mo
+    estimated_monthly_loss_minor: 3400000, // $34k / mo (in cents)
     affected_funnel_stage: 'Legal Redline → Closing',
     confidence_score: 0.91,
+    confidence_level: 'HIGH',
     status: 'active',
     detected_at: '2026-08-20T16:45:00Z',
   },
@@ -145,9 +147,10 @@ export const initialRevenueLeaks: RevenueLeakRow[] = [
     category: 'pricing_friction',
     severity: 'medium',
     root_cause: 'Missing intermediate 50-seat bundle creates a 65% drop-off between standard pilot and enterprise tiers.',
-    estimated_monthly_loss: 18500, // $18.5k / mo
+    estimated_monthly_loss_minor: 1850000, // $18.5k / mo (in cents)
     affected_funnel_stage: 'Proposal Customization',
     confidence_score: 0.88,
+    confidence_level: 'MEDIUM',
     status: 'active',
     detected_at: '2026-08-18T09:12:00Z',
   },
@@ -162,9 +165,10 @@ export const initialRevenueLeaks: RevenueLeakRow[] = [
     category: 'follow_up_bottleneck',
     severity: 'critical',
     root_cause: '₺500k+ endüstriyel ekipman tekliflerinde ilk 72 saat içinde teknik şartname teyidi yapılmadığında dönüşüm %58 oranında çöküyor.',
-    estimated_monthly_loss: 740000, // ₺740k / ay
+    estimated_monthly_loss_minor: 74000000, // ₺740k / ay (in kuruş)
     affected_funnel_stage: 'Teklif Gönderimi → Teknik Onay',
     confidence_score: 0.95,
+    confidence_level: 'HIGH',
     status: 'active',
     detected_at: '2026-08-23T08:30:00Z',
   },
@@ -177,9 +181,10 @@ export const initialRevenueLeaks: RevenueLeakRow[] = [
     category: 'lead_decay',
     severity: 'critical',
     root_cause: 'Mesai dışı ve hafta sonu gelen yüksek bütçeli fabrika alım talepleri 14+ saat yanıtsız kalıyor.',
-    estimated_monthly_loss: 520000, // ₺520k / ay
+    estimated_monthly_loss_minor: 52000000, // ₺520k / ay (in kuruş)
     affected_funnel_stage: 'İlk Talep → Satış Temsilcisi',
     confidence_score: 0.93,
+    confidence_level: 'HIGH',
     status: 'active',
     detected_at: '2026-08-22T14:10:00Z',
   },
@@ -192,9 +197,10 @@ export const initialRevenueLeaks: RevenueLeakRow[] = [
     category: 'pricing_friction',
     severity: 'high',
     root_cause: 'TL bazlı 60 gün vadeli tekliflerde dinamik kur sabitleme seçeneği sunulmaması sipariş onayında %32 iptale yol açıyor.',
-    estimated_monthly_loss: 380000, // ₺380k / ay
+    estimated_monthly_loss_minor: 38000000, // ₺380k / ay (in kuruş)
     affected_funnel_stage: 'Sözleşme & Finansal Onay',
     confidence_score: 0.89,
+    confidence_level: 'MEDIUM',
     status: 'active',
     detected_at: '2026-08-19T11:20:00Z',
   },
@@ -320,7 +326,7 @@ export const initialActionResults: ActionResultRow[] = [
     business_id: 'biz_global_apex_corp',
     organization_id: 'org_apex_holding',
     status: 'success',
-    revenue_recovered_amount: 148500, // $148.5k verified
+    revenue_recovered_amount_minor: 14850000, // $148.5k verified (in cents)
     metric_delta_json: JSON.stringify({
       metric: 'Quarterly Net Retention Rate (NRR)',
       baseline: '91.2%',
@@ -337,7 +343,7 @@ export const initialActionResults: ActionResultRow[] = [
     business_id: 'biz_tr_apex_turkey',
     organization_id: 'org_apex_holding',
     status: 'success',
-    revenue_recovered_amount: 2150000, // ₺2.15M verified
+    revenue_recovered_amount_minor: 215000000, // ₺2.15M verified (in kuruş)
     metric_delta_json: JSON.stringify({
       metric: 'Büyük Ölçekli Sipariş Dönüşüm Oranı',
       baseline: '18.4%',
@@ -452,7 +458,7 @@ export const initialLeads: LeadRow[] = [
     pseudonymous_customer_id: 'ps_cust_g_01',
     company_name: 'Vanguard Aerospace Systems',
     intent_score: 96,
-    estimated_deal_value: 120000,
+    estimated_deal_value_minor: 12000000, // $120k in cents
     funnel_stage: 'captured',
     leak_risk_factor: 'high_decay',
     status: 'open',
@@ -467,7 +473,7 @@ export const initialLeads: LeadRow[] = [
     pseudonymous_customer_id: 'ps_cust_g_02',
     company_name: 'Nordic Robotics GmbH',
     intent_score: 88,
-    estimated_deal_value: 75000,
+    estimated_deal_value_minor: 7500000, // $75k in cents
     funnel_stage: 'qualifying',
     leak_risk_factor: 'normal',
     status: 'open',
@@ -482,7 +488,7 @@ export const initialLeads: LeadRow[] = [
     pseudonymous_customer_id: 'ps_cust_g_03',
     company_name: 'Precision Heavy Forge Ltd',
     intent_score: 91,
-    estimated_deal_value: 185000,
+    estimated_deal_value_minor: 18500000, // $185k in cents
     funnel_stage: 'proposal_sent',
     leak_risk_factor: 'unassigned',
     status: 'open',
@@ -499,7 +505,7 @@ export const initialLeads: LeadRow[] = [
     pseudonymous_customer_id: 'ps_cust_tr_01',
     company_name: 'Özaltın Otomotiv Yan Sanayi A.Ş.',
     intent_score: 95,
-    estimated_deal_value: 1450000,
+    estimated_deal_value_minor: 145000000, // ₺1.45M in kuruş
     funnel_stage: 'captured',
     leak_risk_factor: 'high_decay',
     status: 'open',
@@ -514,7 +520,7 @@ export const initialLeads: LeadRow[] = [
     pseudonymous_customer_id: 'ps_cust_tr_02',
     company_name: 'Ege Çelik Yapı Endüstrisi',
     intent_score: 89,
-    estimated_deal_value: 820000,
+    estimated_deal_value_minor: 82000000, // ₺820k in kuruş
     funnel_stage: 'proposal_sent',
     leak_risk_factor: 'underpriced',
     status: 'open',

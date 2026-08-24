@@ -3,13 +3,14 @@
  * @description Standard Web Crypto AES-GCM Server-Side Envelope Encryption Service
  * 
  * ============================================================================
- * ARCHITECTURAL MANDATES:
- * 1. Standard Web Crypto API (crypto.subtle) - ZERO invented or fake crypto.
+ * ARCHITECTURAL MANDATES (Sprint 3.4):
+ * 1. Standard Web Crypto API (crypto.subtle) - ZERO invented crypto.
  * 2. AES-GCM 256-bit authenticated encryption with 96-bit unique IV per operation.
  * 3. Master Secret (KMS/Worker Env) + Tenant Context -> HKDF -> Tenant DEK.
- * 4. Fail-closed on Master Secret: Production MUST throw if KMS secret is missing.
- * 5. Tamper detection: GCM tag validation rejects altered ciphertexts deterministically.
- * 6. Cross-tenant isolation: Tenant A cannot decrypt Tenant B ciphertext.
+ * 4. Fail-closed: In production, missing VELNAR_MASTER_KMS_SECRET MUST throw CONFIGURATION_ERROR.
+ * 5. In development/test: Explicit dev fallback secret is allowed.
+ * 6. Tamper detection: GCM tag validation rejects altered ciphertexts deterministically.
+ * 7. Cross-tenant isolation: Tenant A cannot decrypt Tenant B ciphertext.
  * ============================================================================
  */
 
@@ -28,36 +29,34 @@ export class VaultCryptoService {
   private static readonly ALGORITHM = 'AES-GCM';
 
   /**
-   * Helper to check if current runtime is strictly development or test mode.
+   * Helper to check if environment is strictly development or test mode.
    */
-  public static isDevelopmentOrTest(env?: { ENVIRONMENT?: string }): boolean {
-    if (env?.ENVIRONMENT === 'production') {
-      return false;
-    }
-    if (env?.ENVIRONMENT === 'development' || env?.ENVIRONMENT === 'test') {
-      return true;
-    }
-    if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
-      return true;
-    }
-    return false;
+  public static isDevelopmentOrTest(environment?: string): boolean {
+    if (!environment) return false;
+    const normalized = environment.toLowerCase().trim();
+    return normalized === 'development' || normalized === 'test';
   }
 
   /**
-   * Resolve Master Secret from Worker Environment bindings or fail closed in production.
+   * Resolve Master Secret from Worker Environment bindings or fail closed.
+   * 
+   * Rules:
+   * - If envSecret is provided and valid (>= 16 chars), use it.
+   * - If environment is development/test, fallback to explicit dev secret.
+   * - If environment is production and envSecret is missing/invalid, THROW CONFIGURATION_ERROR.
    */
-  public static getMasterSecret(envSecret?: string, env?: { ENVIRONMENT?: string }): string {
+  public static getMasterSecret(environment: string, envSecret?: string): string {
     if (envSecret && envSecret.trim().length >= 16) {
-      return envSecret;
+      return envSecret.trim();
     }
 
-    if (VaultCryptoService.isDevelopmentOrTest(env)) {
+    if (VaultCryptoService.isDevelopmentOrTest(environment)) {
       return VaultCryptoService.DEV_DEFAULT_MASTER_SECRET;
     }
 
     // Production fail-closed: Never fall back to dev secret
     throw new Error(
-      'KMS_CONFIGURATION_ERROR: VELNAR_MASTER_KMS_SECRET environment secret is required in production and must be at least 16 characters.'
+      'CONFIGURATION_ERROR: VELNAR_MASTER_KMS_SECRET is required in production and must be at least 16 characters.'
     );
   }
 
@@ -102,10 +101,10 @@ export class VaultCryptoService {
   public static async encrypt(
     plaintext: string,
     tenantId: string,
-    envSecret?: string,
-    env?: { ENVIRONMENT?: string }
+    environment: string,
+    envSecret?: string
   ): Promise<EncryptedVaultPayload> {
-    const masterSecret = VaultCryptoService.getMasterSecret(envSecret, env);
+    const masterSecret = VaultCryptoService.getMasterSecret(environment, envSecret);
     const dek = await VaultCryptoService.deriveTenantDEK(masterSecret, tenantId);
 
     // Generate unique 96-bit (12-byte) IV for AES-GCM per encryption
@@ -139,10 +138,10 @@ export class VaultCryptoService {
   public static async decrypt(
     payload: EncryptedVaultPayload,
     tenantId: string,
-    envSecret?: string,
-    env?: { ENVIRONMENT?: string }
+    environment: string,
+    envSecret?: string
   ): Promise<string> {
-    const masterSecret = VaultCryptoService.getMasterSecret(envSecret, env);
+    const masterSecret = VaultCryptoService.getMasterSecret(environment, envSecret);
     const dek = await VaultCryptoService.deriveTenantDEK(masterSecret, tenantId);
 
     const iv = new Uint8Array(VaultCryptoService.base64ToArrayBuffer(payload.iv));
@@ -167,7 +166,7 @@ export class VaultCryptoService {
   }
 
   // --- Encoding Utilities ---
-  private static arrayBufferToBase64(buffer: ArrayBuffer): string {
+  public static arrayBufferToBase64(buffer: ArrayBuffer): string {
     const bytes = new Uint8Array(buffer);
     let binary = '';
     for (let i = 0; i < bytes.byteLength; i++) {
@@ -176,7 +175,7 @@ export class VaultCryptoService {
     return btoa(binary);
   }
 
-  private static base64ToArrayBuffer(base64: string): ArrayBuffer {
+  public static base64ToArrayBuffer(base64: string): ArrayBuffer {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {

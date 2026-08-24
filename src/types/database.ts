@@ -1,6 +1,11 @@
 /**
  * Cloudflare D1 Database Schema Types
- * Multi-Tenant B2B Revenue Intelligence Engine - Sprint 3.1 Hardening
+ * Multi-Tenant B2B Revenue Intelligence Engine - Sprint 3.4 Canonical Schema Agreement
+ * 
+ * Rules:
+ * 1. Financial/monetary values use integer minor units (e.g. *_minor) canonically.
+ * 2. PII is stored exclusively in encrypted identity_vault records.
+ * 3. Leads and Appointments reference pseudonymous customer identifiers.
  */
 
 export type UserRole = 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF' | 'VIEWER';
@@ -81,8 +86,7 @@ export interface LeadRow {
   pseudonymous_customer_id: string;
   company_name: string;
   intent_score: number; // 0 - 100
-  estimated_deal_value: number; // In standard major units for UI, minor in DB
-  estimated_deal_value_minor?: number;
+  estimated_deal_value_minor: number; // Canonical integer minor units (e.g. cents / kuruş)
   funnel_stage: 'captured' | 'qualifying' | 'proposal_sent' | 'negotiation' | 'stalled';
   leak_risk_factor: 'high_decay' | 'unassigned' | 'underpriced' | 'normal';
   status: 'open' | 'contacted' | 'recovered' | 'lost';
@@ -112,8 +116,7 @@ export interface RevenueLeakRow {
   category: LeakCategory;
   severity: LeakSeverity;
   root_cause: string;
-  estimated_monthly_loss: number; // In standard major units for display
-  estimated_monthly_loss_minor?: number;
+  estimated_monthly_loss_minor: number; // Canonical integer minor units
   affected_funnel_stage: string;
   confidence_score: number; // 0.0 - 1.0
   confidence_level?: 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
@@ -145,8 +148,7 @@ export interface ActionResultRow {
   business_id: string;
   organization_id: string;
   status: 'success' | 'in_progress' | 'failed';
-  revenue_recovered_amount: number;
-  revenue_recovered_amount_minor?: number;
+  revenue_recovered_amount_minor: number; // Canonical integer minor units
   metric_delta_json: string;
   verified_at: string;
   proof_notes: string;

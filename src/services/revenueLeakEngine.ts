@@ -321,7 +321,7 @@ export class RevenueLeakEngine {
     const stalledProposals = leads.filter(l => l.funnel_stage === 'proposal_sent' && l.status === 'open');
     if (stalledProposals.length > 0) {
       const count = stalledProposals.length;
-      const totalProposalValue = stalledProposals.reduce((s, l) => s + l.estimated_deal_value, 0);
+      const totalProposalValue = stalledProposals.reduce((s, l) => s + ((l.estimated_deal_value_minor || 0) / 100), 0);
       const closeRate = 0.35;
       const calculatedLoss = Math.round(totalProposalValue * closeRate);
 

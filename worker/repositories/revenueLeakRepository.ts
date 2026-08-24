@@ -22,7 +22,6 @@ export class RevenueLeakRepository {
       category: 'lead_decay',
       severity: 'critical',
       root_cause: 'Lead response latency averages 42 minutes, exceeding the 15-minute SLA threshold.',
-      estimated_monthly_loss: 45000,
       estimated_monthly_loss_minor: 4500000,
       affected_funnel_stage: 'Captured -> Qualifying',
       confidence_score: 0.92,
@@ -39,7 +38,6 @@ export class RevenueLeakRepository {
       category: 'no_show_decay',
       severity: 'high',
       root_cause: '4 scheduled high-value clinical treatments cancelled without automated rebooking workflow.',
-      estimated_monthly_loss: 28000,
       estimated_monthly_loss_minor: 2800000,
       affected_funnel_stage: 'Scheduled -> Treatment',
       confidence_score: 0.88,
@@ -94,7 +92,6 @@ export class RevenueLeakRepository {
         category: r.category,
         severity: r.severity,
         root_cause: r.root_cause,
-        estimated_monthly_loss: Math.round(r.estimated_monthly_loss_minor / 100),
         estimated_monthly_loss_minor: r.estimated_monthly_loss_minor,
         affected_funnel_stage: r.affected_funnel_stage,
         confidence_score: r.confidence_score,
@@ -148,7 +145,6 @@ export class RevenueLeakRepository {
         category: r.category,
         severity: r.severity,
         root_cause: r.root_cause,
-        estimated_monthly_loss: Math.round(r.estimated_monthly_loss_minor / 100),
         estimated_monthly_loss_minor: r.estimated_monthly_loss_minor,
         affected_funnel_stage: r.affected_funnel_stage,
         confidence_score: r.confidence_score,
@@ -158,7 +154,7 @@ export class RevenueLeakRepository {
       };
     }
 
-    const leak = RevenueLeakRepository.memLeaks.find(l => l.id === leakId && l.organization_id === orgId);
-    return leak || null;
+    const found = RevenueLeakRepository.memLeaks.find(l => l.id === leakId && l.organization_id === orgId);
+    return found || null;
   }
 }

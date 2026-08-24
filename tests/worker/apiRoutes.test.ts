@@ -7,12 +7,12 @@ describe('Cloudflare Worker API Boundary Integration', () => {
       method: 'GET',
     });
 
-    const res = await worker.fetch(req, { ENVIRONMENT: 'test' });
+    const res = await worker.fetch(req, { DB: {} as any, ENVIRONMENT: 'test' });
     expect(res.status).toBe(200);
 
     const json = (await res.json()) as any;
     expect(json.status).toBe('ok');
-    expect(json.version).toContain('3.2.0');
+    expect(json.version).toContain('3.4.0');
     expect(json.fulgorRay.status).toBe('DISABLED');
   });
 
@@ -21,7 +21,7 @@ describe('Cloudflare Worker API Boundary Integration', () => {
       method: 'GET',
     });
 
-    const res = await worker.fetch(req, { ENVIRONMENT: 'production' });
+    const res = await worker.fetch(req, { DB: {} as any, ENVIRONMENT: 'production' });
     expect(res.status).toBe(401);
 
     const json = (await res.json()) as any;
@@ -36,7 +36,7 @@ describe('Cloudflare Worker API Boundary Integration', () => {
       },
     });
 
-    const res = await worker.fetch(req, { ENVIRONMENT: 'production' });
+    const res = await worker.fetch(req, { DB: {} as any, ENVIRONMENT: 'production' });
     expect(res.status).toBe(401);
   });
 
@@ -49,6 +49,7 @@ describe('Cloudflare Worker API Boundary Integration', () => {
     });
 
     const res = await worker.fetch(req, {
+      DB: {} as any,
       ENVIRONMENT: 'production',
       ALLOWED_ORIGINS: 'https://app.velnar.studio,https://velnar.studio',
     });
@@ -65,6 +66,7 @@ describe('Cloudflare Worker API Boundary Integration', () => {
     });
 
     const res = await worker.fetch(req, {
+      DB: {} as any,
       ENVIRONMENT: 'production',
       ALLOWED_ORIGINS: 'https://app.velnar.studio,https://velnar.studio',
     });

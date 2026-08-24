@@ -7,7 +7,7 @@ describe('VaultCryptoService (Standard Web Crypto AES-GCM-256 Envelope)', () => 
 
   it('should encrypt and decrypt plaintext using Web Crypto AES-GCM-256 correctly', async () => {
     const rawPii = 'Dr. Clara Vance | +90 532 999 8877 | clara.vance@clinic.com';
-    const encrypted = await VaultCryptoService.encrypt(rawPii, orgAlpha);
+    const encrypted = await VaultCryptoService.encrypt(rawPii, orgAlpha, 'test');
 
     expect(encrypted.algorithm).toBe('AES-GCM-256');
     expect(encrypted.keyVersion).toBe(1);
@@ -16,20 +16,20 @@ describe('VaultCryptoService (Standard Web Crypto AES-GCM-256 Envelope)', () => 
     expect(encrypted.iv).toBeDefined();
     expect(encrypted.ciphertext).not.toContain(rawPii);
 
-    const decrypted = await VaultCryptoService.decrypt(encrypted, orgAlpha);
+    const decrypted = await VaultCryptoService.decrypt(encrypted, orgAlpha, 'test');
     expect(decrypted).toBe(rawPii);
   });
 
   it('should enforce HKDF tenant DEK separation (Org Beta cannot decrypt Org Alpha ciphertext)', async () => {
     const rawPii = 'Confidential Patient Alpha';
-    const encryptedAlpha = await VaultCryptoService.encrypt(rawPii, orgAlpha);
+    const encryptedAlpha = await VaultCryptoService.encrypt(rawPii, orgAlpha, 'test');
 
-    await expect(VaultCryptoService.decrypt(encryptedAlpha, orgBeta)).rejects.toThrow();
+    await expect(VaultCryptoService.decrypt(encryptedAlpha, orgBeta, 'test')).rejects.toThrow();
   });
 
   it('should reject tampered ciphertext with GCM authenticated tag verification failure', async () => {
     const rawPii = 'Tamper Detection Test';
-    const encrypted = await VaultCryptoService.encrypt(rawPii, orgAlpha);
+    const encrypted = await VaultCryptoService.encrypt(rawPii, orgAlpha, 'test');
 
     // Tamper single base64 char
     const bytes = atob(encrypted.ciphertext).split('');
@@ -41,13 +41,12 @@ describe('VaultCryptoService (Standard Web Crypto AES-GCM-256 Envelope)', () => 
       ciphertext: tamperedCiphertext,
     };
 
-    await expect(VaultCryptoService.decrypt(tamperedPayload, orgAlpha)).rejects.toThrow();
+    await expect(VaultCryptoService.decrypt(tamperedPayload, orgAlpha, 'test')).rejects.toThrow();
   });
 
   it('should fail-closed in production when master KMS secret is missing', async () => {
-    const prodEnv = { ENVIRONMENT: 'production' };
     await expect(
-      VaultCryptoService.encrypt('Test Plaintext', orgAlpha, undefined, prodEnv)
+      VaultCryptoService.encrypt('Test Plaintext', orgAlpha, 'production', undefined)
     ).rejects.toThrow(/VELNAR_MASTER_KMS_SECRET/);
   });
 });

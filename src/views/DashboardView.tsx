@@ -285,7 +285,7 @@ export const DashboardView: React.FC = () => {
                     {leak.severity.toUpperCase()}
                   </span>
                   <span className="text-xs font-mono font-bold text-red-400">
-                    -{formatCurrency(leak.estimated_monthly_loss)}/mo
+                    -{formatCurrency((leak.estimated_monthly_loss_minor || 0) / 100)}/mo
                   </span>
                 </div>
 

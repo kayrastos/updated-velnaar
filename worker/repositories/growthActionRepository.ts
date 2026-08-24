@@ -1,12 +1,11 @@
 /**
  * @file growthActionRepository.ts
- * @description Tenant-Scoped Cloudflare D1 Growth Action & Proof Result Repository
+ * @description Tenant-Scoped Cloudflare D1 Growth Action & Proof Attribution Ledger Repository
  * 
  * ============================================================================
  * ARCHITECTURAL MANDATES:
- * 1. Multi-tenant isolation: Every query scoped with WHERE organization_id = ?
- * 2. Revenue values in integer minor units.
- * 3. Human-in-the-loop approval state tracking.
+ * 1. Strict tenant boundary: WHERE organization_id = ?
+ * 2. Multi-role human approval tracking (approved_by_user_id, approved_at).
  * ============================================================================
  */
 
@@ -20,13 +19,12 @@ export class GrowthActionRepository {
       business_id: 'biz_beauty_salon',
       organization_id: 'org_apex_holding',
       market: 'GLOBAL',
-      title: 'Automated Instant Direct-Dial & WhatsApp Dispatch for Leads with Intent Score > 80',
-      hypothesis: 'Sub-3-minute response will elevate high-intent lead conversion from 18% to 32%.',
+      title: 'High-Intent Inbound SLA Router (< 5m)',
+      hypothesis: 'Routing high intent leads within 5 minutes will recover $38,500/mo.',
       action_type: 'high_intent_sla_dispatch',
       execution_payload_json: JSON.stringify({
-        channel: 'direct_dial_plus_whatsapp',
-        maxLatencySeconds: 180,
-        assignedDutyRepId: 'usr_staff_01',
+        slaTargetMinutes: 5,
+        intentThreshold: 80,
       }),
       requires_approval: 1,
       approval_status: 'pending_approval',
@@ -42,7 +40,6 @@ export class GrowthActionRepository {
       business_id: 'biz_beauty_salon',
       organization_id: 'org_apex_holding',
       status: 'success',
-      revenue_recovered_amount: 38500,
       revenue_recovered_amount_minor: 3850000,
       metric_delta_json: JSON.stringify({
         conversionRateDelta: '+14.2%',
@@ -79,60 +76,9 @@ export class GrowthActionRepository {
     }
 
     return GrowthActionRepository.memActions.filter(a => {
-      const orgMatch = a.organization_id === orgId;
-      return businessId ? orgMatch && a.business_id === businessId : orgMatch;
+      const match = a.organization_id === orgId;
+      return businessId ? match && a.business_id === businessId : match;
     });
-  }
-
-  public static async getActionById(
-    db: D1Database | undefined,
-    actionId: string,
-    orgId: string
-  ): Promise<GrowthActionRow | null> {
-    if (db) {
-      const r = await db.prepare(`
-        SELECT id, leak_id, business_id, organization_id, market, title, hypothesis,
-               action_type, execution_payload_json, requires_approval, approval_status,
-               approved_by_user_id, approved_at, guardrails_passed, created_at
-        FROM growth_actions
-        WHERE id = ? AND organization_id = ?
-      `).bind(actionId, orgId).first<GrowthActionRow>();
-      return r || null;
-    }
-
-    const act = GrowthActionRepository.memActions.find(a => a.id === actionId && a.organization_id === orgId);
-    return act || null;
-  }
-
-  public static async updateActionApproval(
-    db: D1Database | undefined,
-    actionId: string,
-    status: GrowthActionRow['approval_status'],
-    userId: string,
-    orgId: string
-  ): Promise<GrowthActionRow | null> {
-    const now = new Date().toISOString();
-
-    if (db) {
-      await db.prepare(`
-        UPDATE growth_actions
-        SET approval_status = ?, approved_by_user_id = ?, approved_at = ?
-        WHERE id = ? AND organization_id = ?
-      `).bind(status, userId, now, actionId, orgId).run();
-
-      return GrowthActionRepository.getActionById(db, actionId, orgId);
-    }
-
-    const idx = GrowthActionRepository.memActions.findIndex(a => a.id === actionId && a.organization_id === orgId);
-    if (idx === -1) return null;
-
-    GrowthActionRepository.memActions[idx] = {
-      ...GrowthActionRepository.memActions[idx],
-      approval_status: status,
-      approved_by_user_id: userId,
-      approved_at: now,
-    };
-    return GrowthActionRepository.memActions[idx];
   }
 
   public static async listResultsByOrg(
@@ -159,7 +105,7 @@ export class GrowthActionRepository {
         growth_action_id: string;
         business_id: string;
         organization_id: string;
-        status: 'success' | 'in_progress' | 'failed';
+        status: ActionResultRow['status'];
         revenue_recovered_amount_minor: number;
         metric_delta_json: string;
         verified_at: string;
@@ -172,7 +118,6 @@ export class GrowthActionRepository {
         business_id: r.business_id,
         organization_id: r.organization_id,
         status: r.status,
-        revenue_recovered_amount: Math.round(r.revenue_recovered_amount_minor / 100),
         revenue_recovered_amount_minor: r.revenue_recovered_amount_minor,
         metric_delta_json: r.metric_delta_json,
         verified_at: r.verified_at,
@@ -181,8 +126,39 @@ export class GrowthActionRepository {
     }
 
     return GrowthActionRepository.memResults.filter(r => {
-      const orgMatch = r.organization_id === orgId;
-      return businessId ? orgMatch && r.business_id === businessId : orgMatch;
+      const match = r.organization_id === orgId;
+      return businessId ? match && r.business_id === businessId : match;
     });
+  }
+
+  public static async updateActionApproval(
+    db: D1Database | undefined,
+    actionId: string,
+    status: GrowthActionRow['approval_status'],
+    userId: string,
+    orgId: string
+  ): Promise<GrowthActionRow | null> {
+    const now = new Date().toISOString();
+
+    if (db) {
+      const updated = await db.prepare(`
+        UPDATE growth_actions
+        SET approval_status = ?, approved_by_user_id = ?, approved_at = ?
+        WHERE id = ? AND organization_id = ?
+        RETURNING *
+      `).bind(status, userId, now, actionId, orgId).first<GrowthActionRow>();
+
+      return updated || null;
+    }
+
+    const action = GrowthActionRepository.memActions.find(
+      a => a.id === actionId && a.organization_id === orgId
+    );
+    if (!action) return null;
+
+    action.approval_status = status;
+    action.approved_by_user_id = userId;
+    action.approved_at = now;
+    return action;
   }
 }

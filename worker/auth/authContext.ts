@@ -3,11 +3,12 @@
  * @description Server-Side Authenticated Identity & Canonical Role Permission Matrix (Fail-Closed)
  * 
  * ============================================================================
- * ARCHITECTURAL MANDATES:
- * 1. Fail-closed: If no valid authenticated session/token exists, return null (HTTP 401).
- * 2. Production must NEVER fall back to a demo/default identity.
- * 3. Mock users exist ONLY behind explicit development/test environment checks.
- * 4. Browser-supplied user IDs or roles are NEVER trusted.
+ * ARCHITECTURAL MANDATES (Sprint 3.4):
+ * 1. Fail-closed: Missing or invalid Authorization header returns null (HTTP 401).
+ * 2. Production must NEVER fall back to a demo or default identity.
+ * 3. Test identities exist ONLY when ENVIRONMENT === 'test' or 'development'.
+ * 4. Browser-supplied organization or role is NEVER trusted.
+ * 5. Memberships and roles are resolved strictly from server-controlled/session sources.
  * ============================================================================
  */
 
@@ -108,20 +109,13 @@ export const CANONICAL_ROLE_PERMISSIONS: Record<UserRole, ResourceAction[]> = {
 
 export class AuthContextService {
   /**
-   * Check if current runtime environment is development or test mode.
-   * If env.ENVIRONMENT is explicitly set to 'production', it is strictly production.
+   * Strictly verify if environment is development or test.
+   * In production or unknown environments, this MUST return false.
    */
-  public static isDevelopmentOrTest(env?: { ENVIRONMENT?: string }): boolean {
-    if (env?.ENVIRONMENT === 'production') {
-      return false;
-    }
-    if (env?.ENVIRONMENT === 'development' || env?.ENVIRONMENT === 'test') {
-      return true;
-    }
-    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
-      return false;
-    }
-    return false;
+  public static isDevelopmentOrTest(environment?: string): boolean {
+    if (!environment) return false;
+    const normalized = environment.toLowerCase().trim();
+    return normalized === 'development' || normalized === 'test';
   }
 
   /**
@@ -134,34 +128,45 @@ export class AuthContextService {
 
   /**
    * Fail-Closed Session Authenticator
-   * In production: Requires a valid session token. Returns null if missing/invalid (causing HTTP 401).
-   * In dev/test: Supports structured test tokens e.g. "Bearer test_user:<userId>:<orgId>:<role>" or dev tokens.
+   * 
+   * Production rules:
+   * - missing Authorization header => null (401)
+   * - invalid Authorization format/token => null (401)
+   * - fake/test tokens in production => null (401)
+   * - browser-supplied organization or role is NEVER trusted
+   * - memberships/roles come strictly from server-controlled sources
    */
   public static resolveSessionUser(
-    authHeader?: string | null,
-    env?: { ENVIRONMENT?: string }
+    authHeader: string | null | undefined,
+    environment: string
   ): AuthenticatedUser | null {
+    // 1. Fail-closed on missing or malformed header
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      // Production & strict API requests without auth header ALWAYS return null (Fail-Closed 401)
       return null;
     }
 
     const token = authHeader.replace('Bearer ', '').trim();
-    if (!token) return null;
+    if (!token) {
+      return null;
+    }
 
-    // 1. Structured test token format: "test_user:<userId>:<orgId>:<role>" (Dev/Test only)
+    const isDevOrTest = AuthContextService.isDevelopmentOrTest(environment);
+
+    // 2. Test identity token: test_user:<userId>:<orgId>:<role>
+    // ONLY permitted if environment is explicitly 'test' or 'development'
     if (token.startsWith('test_user:')) {
-      if (!AuthContextService.isDevelopmentOrTest(env)) {
-        // Production rejects test tokens
+      if (!isDevOrTest) {
+        // In production, reject test token immediately (fail-closed)
         return null;
       }
+
       const parts = token.split(':');
       const userId = parts[1] || 'usr_test';
       const orgId = parts[2] || 'org_apex_holding';
-      const role = (parts[3] || 'OWNER').toUpperCase() as UserRole;
+      const rawRole = (parts[3] || 'OWNER').toUpperCase() as UserRole;
       
       const validRoles: UserRole[] = ['OWNER', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER'];
-      const effectiveRole = validRoles.includes(role) ? role : 'VIEWER';
+      const effectiveRole = validRoles.includes(rawRole) ? rawRole : 'VIEWER';
 
       return {
         userId,
@@ -171,9 +176,9 @@ export class AuthContextService {
       };
     }
 
-    // 2. Standard development token
+    // 3. Predefined development fixture tokens (Dev/Test only)
     if (token === 'dev_owner_token' || token === 'velnar_dev_secret_token') {
-      if (AuthContextService.isDevelopmentOrTest(env)) {
+      if (isDevOrTest) {
         return {
           userId: 'usr_dev_owner',
           email: 'founder@apexholding.com',
@@ -188,8 +193,8 @@ export class AuthContextService {
       return null;
     }
 
-    // 3. Signed JWT / Session parsing placeholder for production auth providers
-    // In production, unverified arbitrary bearer tokens return null (fail-closed)
+    // 4. Production JWT / server session token resolution
+    // In this runtime, unverified external tokens return null (fail-closed)
     return null;
   }
 }

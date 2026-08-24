@@ -80,25 +80,26 @@ CREATE TABLE IF NOT EXISTS businesses (
 CREATE TABLE IF NOT EXISTS leads (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
   market TEXT NOT NULL CHECK (market IN ('TR', 'GLOBAL')),
-  contact_name TEXT NOT NULL,
+  pseudonymous_customer_id TEXT NOT NULL,
   company_name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  phone TEXT,
   intent_score INTEGER NOT NULL CHECK (intent_score BETWEEN 0 AND 100) DEFAULT 50,
-  estimated_deal_value REAL NOT NULL DEFAULT 0.0,
+  estimated_deal_value_minor INTEGER NOT NULL DEFAULT 0,
   funnel_stage TEXT NOT NULL CHECK (funnel_stage IN ('captured', 'qualifying', 'proposal_sent', 'negotiation', 'stalled')),
   leak_risk_factor TEXT NOT NULL CHECK (leak_risk_factor IN ('high_decay', 'unassigned', 'underpriced', 'normal')) DEFAULT 'normal',
   status TEXT NOT NULL CHECK (status IN ('open', 'contacted', 'recovered', 'lost')) DEFAULT 'open',
   response_latency_minutes INTEGER NOT NULL DEFAULT 0,
   assigned_to_user_id TEXT,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE
+  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
   event_type TEXT NOT NULL,
   payload_json TEXT NOT NULL,
   actor_type TEXT NOT NULL CHECK (actor_type IN ('system', 'user', 'ai_gateway')),
@@ -110,17 +111,19 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE TABLE IF NOT EXISTS revenue_leaks (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
   market TEXT NOT NULL CHECK (market IN ('TR', 'GLOBAL')),
   title TEXT NOT NULL,
   category TEXT NOT NULL CHECK (category IN ('lead_decay', 'pricing_friction', 'follow_up_bottleneck', 'churn_anomaly', 'checkout_abandonment')),
   severity TEXT NOT NULL CHECK (severity IN ('critical', 'high', 'medium', 'low')),
   root_cause TEXT NOT NULL,
-  estimated_monthly_loss REAL NOT NULL DEFAULT 0.0,
+  estimated_monthly_loss_minor INTEGER NOT NULL DEFAULT 0,
   affected_funnel_stage TEXT NOT NULL,
   confidence_score REAL NOT NULL CHECK (confidence_score BETWEEN 0.0 AND 1.0) DEFAULT 0.85,
   status TEXT NOT NULL CHECK (status IN ('active', 'mitigated', 'ignored', 'investigating')) DEFAULT 'active',
   detected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE
+  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS growth_actions (

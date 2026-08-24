@@ -119,7 +119,7 @@ export const LeadInboxView: React.FC = () => {
                     </td>
 
                     <td className="px-4 py-3.5 text-[#F5F4F0] font-bold">
-                      {formatCurrency(lead.estimated_deal_value)}
+                      {formatCurrency((lead.estimated_deal_value_minor || 0) / 100)}
                     </td>
 
                     <td className="px-4 py-3.5">
