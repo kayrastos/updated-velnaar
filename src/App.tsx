@@ -13,9 +13,12 @@ import { ProductLoopHUD } from './components/common/ProductLoopHUD';
 import { DashboardView } from './views/DashboardView';
 import { RevenueLeakRadarView } from './views/RevenueLeakRadarView';
 import { GrowthActionsView } from './views/GrowthActionsView';
+import { AppointmentsView } from './views/AppointmentsView';
+import { AttributionEngineView } from './views/AttributionEngineView';
 import { VelnarProofView } from './views/VelnarProofView';
 import { LeadInboxView } from './views/LeadInboxView';
 import { BusinessTwinView } from './views/BusinessTwinView';
+import { SecurityGuardView } from './views/SecurityGuardView';
 import { OnboardingView } from './views/OnboardingView';
 import { SettingsView } from './views/SettingsView';
 
@@ -27,9 +30,12 @@ const MainContent: React.FC = () => {
       {currentRoute === '/dashboard' && <DashboardView />}
       {currentRoute === '/leaks' && <RevenueLeakRadarView />}
       {currentRoute === '/actions' && <GrowthActionsView />}
+      {currentRoute === '/appointments' && <AppointmentsView />}
+      {currentRoute === '/attribution' && <AttributionEngineView />}
       {currentRoute === '/proof' && <VelnarProofView />}
       {currentRoute === '/leads' && <LeadInboxView />}
       {currentRoute === '/business-twin' && <BusinessTwinView />}
+      {currentRoute === '/security' && <SecurityGuardView />}
       {currentRoute === '/onboarding' && <OnboardingView />}
       {currentRoute === '/settings' && <SettingsView />}
     </main>

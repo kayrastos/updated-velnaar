@@ -3,7 +3,6 @@ import {
   AppRoute, 
   Language, 
   MarketMetrics, 
-  AIGatewayModelConfig 
 } from '../types/app';
 import { 
   MarketType, 
@@ -33,6 +32,21 @@ import {
 import { translations } from '../i18n/translations';
 import { aiGateway } from '../services/aiGateway';
 
+// Sprint 3 Imports
+import { Appointment, AppointmentStatus, AppointmentSource } from '../types/appointment';
+import { Resource, CapacityUtilization } from '../types/capacity';
+import { POSTransactionSummary, DaypartPerformance } from '../types/pos';
+import { CallMetadataEvent } from '../types/telephony';
+import { CustomerJourney, AttributionResult } from '../types/attribution';
+import { SecurityEvent, DataRetentionPolicy, PlatformRole } from '../types/security';
+import { PhysicalCheckInEvent, CheckInType, CheckInSource } from '../types/checkin';
+import { RevenueImpactCalculation } from '../types/leakEngine';
+import { demoTemplatesMap, BusinessTemplateData } from '../data/demoTemplates';
+import { RevenueLeakEngine } from '../services/revenueLeakEngine';
+import { TenantSecurityEngine, defaultRetentionPolicies } from '../services/tenantSecurity';
+import { AppointmentEngine } from '../services/appointmentEngine';
+import { CheckInEngine } from '../services/checkInEngine';
+
 interface PlatformContextValue {
   currentRoute: AppRoute;
   setCurrentRoute: (route: AppRoute) => void;
@@ -45,6 +59,11 @@ interface PlatformContextValue {
   currentOrg: OrganizationRow;
   currentBusiness: BusinessRow;
   
+  // Sprint 3: Active Business Archetype Template
+  activeTemplateId: string;
+  setActiveTemplateId: (id: string) => void;
+  activeTemplate: BusinessTemplateData;
+
   // Market-Scoped State
   leaks: RevenueLeakRow[];
   actions: GrowthActionRow[];
@@ -54,6 +73,18 @@ interface PlatformContextValue {
   auditLogs: AuditLogRow[];
   aiRuns: AIRunRow[];
   
+  // Sprint 3 Engine Stores
+  appointments: Appointment[];
+  posTransactions: POSTransactionSummary[];
+  daypartPerformance: DaypartPerformance[];
+  callEvents: CallMetadataEvent[];
+  customerJourneys: CustomerJourney[];
+  attributionResults: AttributionResult[];
+  securityEvents: SecurityEvent[];
+  retentionPolicies: DataRetentionPolicy[];
+  checkInEvents: PhysicalCheckInEvent[];
+  calculatedLeaks: RevenueImpactCalculation[];
+
   // Computed Metrics
   metrics: MarketMetrics;
   t: typeof translations['en'];
@@ -68,6 +99,22 @@ interface PlatformContextValue {
   runLeakScan: () => Promise<void>;
   isScanning: boolean;
   
+  // Sprint 3 Operations
+  createManualAppointment: (params: {
+    customerName: string;
+    serviceName: string;
+    serviceCategory: string;
+    resourceStaffName: string;
+    scheduledStart: string;
+    durationMinutes: number;
+    expectedValueMinor: number;
+    currency: string;
+    notes?: string;
+  }) => Appointment;
+  updateAppointmentStatus: (appointmentId: string, status: AppointmentStatus, reason?: string) => void;
+  recordQuickCheckIn: (type: CheckInType, source: CheckInSource, partySize: number, service?: string) => PhysicalCheckInEvent;
+  runSecurityAuditTests: () => Array<{ testName: string; description: string; passed: boolean; statusText: string }>;
+
   // Formatting Utilities
   formatCurrency: (amount: number) => string;
 }
@@ -81,6 +128,10 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [currentRole, setCurrentRole] = useState<UserRole>('owner');
   const [isScanning, setIsScanning] = useState<boolean>(false);
 
+  // Active Template State (Beauty Salon, Restaurant, Auto Dealership)
+  const [activeTemplateId, setActiveTemplateId] = useState<string>('template_beauty_salon');
+  const activeTemplate = demoTemplatesMap[activeTemplateId] || demoTemplatesMap.template_beauty_salon;
+
   // Global State Stores
   const [allLeaks, setAllLeaks] = useState<RevenueLeakRow[]>(initialRevenueLeaks);
   const [allActions, setAllActions] = useState<GrowthActionRow[]>(initialGrowthActions);
@@ -90,12 +141,54 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [allAuditLogs, setAllAuditLogs] = useState<AuditLogRow[]>(initialAuditLogs);
   const [allAIRuns, setAllAIRuns] = useState<AIRunRow[]>(initialAIRuns);
 
+  // Sprint 3 Stores (Initialized from active template)
+  const [appointments, setAppointments] = useState<Appointment[]>(activeTemplate.appointments);
+  const [posTransactions, setPosTransactions] = useState<POSTransactionSummary[]>(activeTemplate.posTransactions);
+  const [daypartPerformance, setDaypartPerformance] = useState<DaypartPerformance[]>(activeTemplate.daypartPerformance);
+  const [callEvents, setCallEvents] = useState<CallMetadataEvent[]>(activeTemplate.callEvents);
+  const [customerJourneys, setCustomerJourneys] = useState<CustomerJourney[]>(activeTemplate.customerJourneys);
+  const [attributionResults, setAttributionResults] = useState<AttributionResult[]>(activeTemplate.attributionResults);
+  const [retentionPolicies, setRetentionPolicies] = useState<DataRetentionPolicy[]>(defaultRetentionPolicies);
+  const [checkInEvents, setCheckInEvents] = useState<PhysicalCheckInEvent[]>([]);
+  const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([
+    {
+      id: 'sec_ev_01',
+      organizationId: 'org_apex_holding',
+      eventType: 'cross_tenant_access.denied',
+      severity: 'HIGH',
+      sourceIpHash: '7f000001_d8e8fca2',
+      details: { attemptedOrgTarget: 'org_external_tenant_99', requestedResource: 'leads.read' },
+      enforcementAction: 'BLOCKED_IMMEDIATELY',
+      timestamp: '2026-08-24T04:12:00Z',
+    },
+    {
+      id: 'sec_ev_02',
+      organizationId: 'org_apex_holding',
+      eventType: 'rate_limit.triggered',
+      severity: 'MEDIUM',
+      sourceIpHash: 'a12b34cd_e44991aa',
+      details: { endpoint: '/api/v1/telephony/events', requestsIn60s: 340, threshold: 120 },
+      enforcementAction: 'RATE_LIMITED',
+      timestamp: '2026-08-24T03:45:00Z',
+    }
+  ]);
+
+  // Synchronize stores when demo template changes
+  useEffect(() => {
+    const tmpl = demoTemplatesMap[activeTemplateId] || demoTemplatesMap.template_beauty_salon;
+    setAppointments(tmpl.appointments);
+    setPosTransactions(tmpl.posTransactions);
+    setDaypartPerformance(tmpl.daypartPerformance);
+    setCallEvents(tmpl.callEvents);
+    setCustomerJourneys(tmpl.customerJourneys);
+    setAttributionResults(tmpl.attributionResults);
+  }, [activeTemplateId]);
+
   const currentOrg = mockOrganization;
   const currentBusiness = mockBusinesses[currentMarket];
-
   const t = translations[language];
 
-  // Filtered by current operational market (strict state isolation)
+  // Market-Filtered core data
   const leaks = useMemo(() => allLeaks.filter(l => l.market === currentMarket), [allLeaks, currentMarket]);
   const actions = useMemo(() => allActions.filter(a => a.market === currentMarket), [allActions, currentMarket]);
   const actionResults = useMemo(() => {
@@ -109,18 +202,42 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const auditLogs = allAuditLogs;
   const aiRuns = allAIRuns;
 
-  // Format Currency
+  // Format Currency Utility
   const formatCurrency = (amount: number): string => {
-    if (currentMarket === 'TR') {
+    const currency = activeTemplate.currency;
+    if (currency === 'TRY') {
       return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(amount);
     }
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
   };
 
+  // Deterministic Revenue Leak Evaluation
+  const calculatedLeaks = useMemo<RevenueImpactCalculation[]>(() => {
+    const deterministicEvaluations = RevenueLeakEngine.evaluateAll({
+      leads,
+      appointments,
+      capacity: activeTemplate.capacityUtilization,
+      calls: callEvents,
+      currency: activeTemplate.currency,
+      avgDealValue: activeTemplate.currency === 'TRY' ? 4500 : 25000,
+      historicalConversionRate: 0.28,
+    });
+
+    // Merge template-specific pre-calculated leaks with real-time rule outputs
+    const combined = [...activeTemplate.calculatedLeaks];
+    deterministicEvaluations.forEach(evalLeak => {
+      if (!combined.some(c => c.ruleId === evalLeak.ruleId)) {
+        combined.push(evalLeak);
+      }
+    });
+
+    return combined;
+  }, [leads, appointments, activeTemplate, callEvents]);
+
   // Compute Outcome Metrics
   const metrics = useMemo<MarketMetrics>(() => {
-    const activeLeaks = leaks.filter(l => l.status === 'active');
-    const totalRevenueAtRisk = activeLeaks.reduce((sum, l) => sum + l.estimated_monthly_loss, 0);
+    const activeLeaks = calculatedLeaks.filter(l => l.status === 'active');
+    const totalRevenueAtRisk = activeLeaks.reduce((sum, l) => sum + (l.estimatedImpactMinor / 100), 0);
     
     // Opportunities = Uncaptured high-intent leads value + potential action uplift
     const uncapturedLeadValue = leads
@@ -147,8 +264,8 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       growthOpportunities: uncapturedLeadValue,
       actionsWaitingApproval: waitingApprovalCount,
       revenueInfluenced: totalRevenueInfluenced,
-      currencySymbol: currentMarket === 'TR' ? '₺' : '$',
-      currencyCode: currentMarket === 'TR' ? 'TRY' : 'USD',
+      currencySymbol: activeTemplate.currencySymbol,
+      currencyCode: activeTemplate.currency,
       leaksCount: {
         critical: criticalCount,
         high: highCount,
@@ -157,7 +274,7 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       twinConfidenceScore,
       productLoopStep: waitingApprovalCount > 0 ? 'APPROVE' : 'DETECT',
     };
-  }, [leaks, actions, actionResults, leads, facts, currentMarket]);
+  }, [calculatedLeaks, actions, actionResults, leads, facts, activeTemplate]);
 
   // Append to Immutable Audit Log
   const logAuditEntry = (actionName: string, entityType: string, entityId: string, diff: Record<string, any>) => {
@@ -180,12 +297,16 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Action Approvals
   const approveAction = async (actionId: string): Promise<{ success: boolean; message: string }> => {
     // Check RBAC permission: only Owner and Admin can approve actions
-    if (currentRole === 'member' || currentRole === 'auditor') {
+    const authResult = TenantSecurityEngine.authorize(
+      { userId: 'usr_active', email: 'session@velnar.io', organizationId: currentOrg.id, role: currentRole.toUpperCase() as PlatformRole },
+      currentOrg.id,
+      'actions.approve'
+    );
+
+    if (!authResult.allowed) {
       return {
         success: false,
-        message: currentRole === 'auditor' 
-          ? 'Auditor role is restricted to read-only compliance inspection.' 
-          : 'Role insufficient: Action approval requires Owner or Admin privilege.'
+        message: authResult.reason || 'RBAC Permission Denied: Action approval requires Owner or Admin privilege.'
       };
     }
 
@@ -213,7 +334,6 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return a;
     }));
 
-    // Update corresponding leak status to mitigated
     if (action.leak_id) {
       setAllLeaks(prev => prev.map(l => {
         if (l.id === action.leak_id) {
@@ -236,8 +356,14 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const rejectAction = async (actionId: string): Promise<{ success: boolean; message: string }> => {
-    if (currentRole === 'member' || currentRole === 'auditor') {
-      return { success: false, message: 'Role insufficient for decision gate.' };
+    const authResult = TenantSecurityEngine.authorize(
+      { userId: 'usr_active', email: 'session@velnar.io', organizationId: currentOrg.id, role: currentRole.toUpperCase() as PlatformRole },
+      currentOrg.id,
+      'actions.reject'
+    );
+
+    if (!authResult.allowed) {
+      return { success: false, message: authResult.reason || 'Role insufficient for decision gate.' };
     }
 
     setAllActions(prev => prev.map(a => {
@@ -331,15 +457,95 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
+  // Sprint 3: Appointment Operations
+  const createManualAppointment = (params: {
+    customerName: string;
+    serviceName: string;
+    serviceCategory: string;
+    resourceStaffName: string;
+    scheduledStart: string;
+    durationMinutes: number;
+    expectedValueMinor: number;
+    currency: string;
+    notes?: string;
+  }): Appointment => {
+    const { appointment, event } = AppointmentEngine.createManualAppointment({
+      organizationId: currentOrg.id,
+      businessId: currentBusiness.id,
+      ...params
+    });
+
+    setAppointments(prev => [appointment, ...prev]);
+
+    logAuditEntry('APPOINTMENT_MANUAL_CREATED', 'appointments', appointment.id, {
+      customer: appointment.customerName,
+      service: appointment.serviceName,
+      expectedValueMinor: appointment.expectedValueMinor,
+    });
+
+    return appointment;
+  };
+
+  const updateAppointmentStatus = (appointmentId: string, status: AppointmentStatus, reason?: string) => {
+    setAppointments(prev => prev.map(apt => {
+      if (apt.id === appointmentId) {
+        return {
+          ...apt,
+          status,
+          cancellationReason: reason || apt.cancellationReason,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return apt;
+    }));
+
+    logAuditEntry('APPOINTMENT_STATUS_UPDATED', 'appointments', appointmentId, {
+      status: { new: status, reason }
+    });
+  };
+
+  // Sprint 3: Fallback Quick Check-In
+  const recordQuickCheckIn = (
+    type: CheckInType,
+    source: CheckInSource,
+    partySize: number,
+    service?: string
+  ): PhysicalCheckInEvent => {
+    const ev = CheckInEngine.logCheckIn({
+      organizationId: currentOrg.id,
+      businessId: currentBusiness.id,
+      locationId: 'loc_primary',
+      locationName: activeTemplate.name,
+      checkInType: type,
+      source,
+      partySize,
+      serviceRequested: service
+    });
+
+    setCheckInEvents(prev => [ev, ...prev]);
+
+    logAuditEntry('PHYSICAL_CHECK_IN_LOGGED', 'check_ins', ev.id, {
+      type,
+      source,
+      partySize
+    });
+
+    return ev;
+  };
+
+  // Sprint 3: Security Test Runner
+  const runSecurityAuditTests = () => {
+    return TenantSecurityEngine.runCrossTenantTests();
+  };
+
   const runLeakScan = async () => {
     setIsScanning(true);
     
-    // Simulate AI Gateway execution analysis
     const aiResult = await aiGateway.executeAnalysis({
       businessId: currentBusiness.id,
       market: currentMarket,
       pipelineStage: 'Full Revenue Funnel Ingestion',
-      rawSignals: { leadsCount: leads.length, factsCount: facts.length },
+      rawSignals: { leadsCount: leads.length, factsCount: facts.length, appointmentsCount: appointments.length },
       focusArea: 'leak_detection',
     });
 
@@ -379,6 +585,9 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setCurrentRole,
         currentOrg,
         currentBusiness,
+        activeTemplateId,
+        setActiveTemplateId,
+        activeTemplate,
         leaks,
         actions,
         actionResults,
@@ -386,6 +595,16 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         facts,
         auditLogs,
         aiRuns,
+        appointments,
+        posTransactions,
+        daypartPerformance,
+        callEvents,
+        customerJourneys,
+        attributionResults,
+        securityEvents,
+        retentionPolicies,
+        checkInEvents,
+        calculatedLeaks,
         metrics,
         t,
         approveAction,
@@ -394,6 +613,10 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         verifyFact,
         addFact,
         triggerFastLeadResponse,
+        createManualAppointment,
+        updateAppointmentStatus,
+        recordQuickCheckIn,
+        runSecurityAuditTests,
         runLeakScan,
         isScanning,
         formatCurrency,

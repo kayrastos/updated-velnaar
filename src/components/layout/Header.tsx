@@ -9,6 +9,7 @@ import {
   Languages, 
   Radio,
   SlidersHorizontal,
+  Sparkles,
   ChevronDown
 } from 'lucide-react';
 
@@ -20,7 +21,9 @@ export const Header: React.FC = () => {
     setLanguage, 
     currentRole, 
     setCurrentRole,
-    currentOrg,
+    activeTemplateId,
+    setActiveTemplateId,
+    activeTemplate,
     currentBusiness,
     runLeakScan,
     isScanning,
@@ -32,8 +35,8 @@ export const Header: React.FC = () => {
     <header id="platform-header" className="bg-[#090A0D] border-b border-[#232732] sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         
-        {/* Brand & Market Context */}
-        <div className="flex items-center space-x-4">
+        {/* Brand & Archetype Context */}
+        <div className="flex items-center space-x-3 sm:space-x-4">
           <div 
             onClick={() => setCurrentRoute('/dashboard')}
             className="flex items-center space-x-2.5 cursor-pointer group"
@@ -48,14 +51,31 @@ export const Header: React.FC = () => {
                   {t.brand.terminalMode}
                 </span>
               </div>
-              <p className="text-[10px] text-[#8E909B] font-mono hidden sm:block truncate max-w-[280px]">
-                {currentBusiness.name}
-              </p>
             </div>
+          </div>
+
+          {/* Demo Business Archetype Switcher */}
+          <div className="hidden md:flex items-center space-x-1.5 bg-[#10131A] rounded-lg px-2.5 py-1 border border-[#262B3A] text-xs font-mono">
+            <Building2 className="w-3.5 h-3.5 text-[#C5A880]" />
+            <select
+              value={activeTemplateId}
+              onChange={(e) => setActiveTemplateId(e.target.value)}
+              className="bg-transparent text-[#F5F4F0] font-medium focus:outline-none cursor-pointer text-xs"
+            >
+              <option value="template_beauty_salon" className="bg-[#10131A] text-[#F5F4F0]">
+                {t.demoSwitch.beauty}
+              </option>
+              <option value="template_restaurant" className="bg-[#10131A] text-[#F5F4F0]">
+                {t.demoSwitch.restaurant}
+              </option>
+              <option value="template_auto_dealership" className="bg-[#10131A] text-[#F5F4F0]">
+                {t.demoSwitch.dealership}
+              </option>
+            </select>
           </div>
         </div>
 
-        {/* Center/Right Controls: Market Switcher (TR vs Global), RBAC Role, Language, Scan */}
+        {/* Center/Right Controls: Market Switcher, RBAC Role, Language, Scan */}
         <div className="flex items-center space-x-2 sm:space-x-3">
           
           {/* Market Isolation Switcher */}
@@ -89,7 +109,7 @@ export const Header: React.FC = () => {
             </button>
           </div>
 
-          {/* RBAC Role Simulator Dropdown */}
+          {/* RBAC Role Simulator Dropdown (5 Enterprise Roles) */}
           <div className="hidden lg:flex items-center space-x-1 bg-[#10131A] rounded-lg px-2.5 py-1 border border-[#262B3A] text-xs font-mono">
             <ShieldCheck className="w-3.5 h-3.5 text-[#C5A880]" />
             <span className="text-[#8E909B] text-[11px]">Role:</span>
@@ -99,10 +119,11 @@ export const Header: React.FC = () => {
               onChange={(e) => setCurrentRole(e.target.value as UserRole)}
               className="bg-transparent text-[#F5F4F0] font-medium focus:outline-none cursor-pointer text-xs"
             >
-              <option value="owner" className="bg-[#10131A] text-[#F5F4F0]">Owner (Exec)</option>
-              <option value="admin" className="bg-[#10131A] text-[#F5F4F0]">Admin</option>
-              <option value="member" className="bg-[#10131A] text-[#F5F4F0]">Member</option>
-              <option value="auditor" className="bg-[#10131A] text-[#F5F4F0]">Auditor (RO)</option>
+              <option value="owner" className="bg-[#10131A] text-[#F5F4F0]">OWNER (Exec)</option>
+              <option value="admin" className="bg-[#10131A] text-[#F5F4F0]">ADMIN (Ops)</option>
+              <option value="manager" className="bg-[#10131A] text-[#F5F4F0]">MANAGER</option>
+              <option value="staff" className="bg-[#10131A] text-[#F5F4F0]">STAFF</option>
+              <option value="viewer" className="bg-[#10131A] text-[#F5F4F0]">VIEWER (RO)</option>
             </select>
           </div>
 
@@ -136,7 +157,7 @@ export const Header: React.FC = () => {
             className="flex items-center space-x-1.5 bg-[#181C26] hover:bg-[#202533] text-[#D8D6CD] hover:text-[#FFF] px-3 py-1.5 rounded-lg border border-[#303648] text-xs font-mono transition-all cursor-pointer disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-[#C5A880] ${isScanning ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{isScanning ? t.common.loading : 'Scan Radar'}</span>
+            <span className="hidden sm:inline">{isScanning ? t.common.loading : 'Scan'}</span>
           </button>
         </div>
 

@@ -17,9 +17,12 @@ export type AppRoute =
   | '/onboarding' 
   | '/leaks' 
   | '/actions' 
+  | '/appointments'
+  | '/attribution'
   | '/proof' 
   | '/leads' 
   | '/business-twin' 
+  | '/security'
   | '/settings';
 
 export type Language = 'en' | 'tr';

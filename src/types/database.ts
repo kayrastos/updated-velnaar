@@ -3,7 +3,7 @@
  * Multi-Tenant B2B Revenue Intelligence Engine
  */
 
-export type UserRole = 'owner' | 'admin' | 'member' | 'auditor';
+export type UserRole = 'owner' | 'admin' | 'manager' | 'staff' | 'viewer' | 'member' | 'auditor';
 export type MarketType = 'TR' | 'GLOBAL';
 export type LeakSeverity = 'critical' | 'high' | 'medium' | 'low';
 export type LeakCategory = 

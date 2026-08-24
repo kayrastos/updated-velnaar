@@ -12,6 +12,8 @@ import {
   Link2,
   ShieldAlert,
   Sliders,
+  Calendar,
+  GitMerge,
   ChevronRight
 } from 'lucide-react';
 
@@ -45,6 +47,18 @@ export const Sidebar: React.FC = () => {
       badgeColor: 'bg-[#C5A880] text-black font-bold',
     },
     {
+      route: '/appointments',
+      label: t.nav.appointments,
+      icon: Calendar,
+      badge: 'Live Sync',
+      badgeColor: 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/40',
+    },
+    {
+      route: '/attribution',
+      label: t.nav.attribution,
+      icon: GitMerge,
+    },
+    {
       route: '/proof',
       label: t.nav.proof,
       icon: Award,
@@ -60,6 +74,13 @@ export const Sidebar: React.FC = () => {
       icon: Cpu,
       badge: `${metrics.twinConfidenceScore}%`,
       badgeColor: 'bg-[#151923] text-[#C5A880] border border-[#C5A880]/30',
+    },
+    {
+      route: '/security',
+      label: t.nav.security,
+      icon: ShieldAlert,
+      badge: 'Zero-Trust',
+      badgeColor: 'bg-[#181C26] text-[#C5A880] border border-[#C5A880]/30',
     },
     {
       route: '/onboarding',
