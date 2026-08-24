@@ -1,0 +1,6 @@
+{
+  "name": "VELNAR Platform",
+  "description": "Executive revenue leak detection, business twin modeling, and verified growth orchestration platform for high-velocity B2B enterprises.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

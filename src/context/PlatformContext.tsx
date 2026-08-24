@@ -1,0 +1,413 @@
+import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import { 
+  AppRoute, 
+  Language, 
+  MarketMetrics, 
+  AIGatewayModelConfig 
+} from '../types/app';
+import { 
+  MarketType, 
+  UserRole, 
+  RevenueLeakRow, 
+  GrowthActionRow, 
+  ActionResultRow, 
+  LeadRow, 
+  BusinessTwinFactRow, 
+  AuditLogRow, 
+  AIRunRow,
+  OrganizationRow,
+  BusinessRow
+} from '../types/database';
+import { 
+  mockOrganization, 
+  mockBusinesses, 
+  mockUsers,
+  initialRevenueLeaks, 
+  initialGrowthActions, 
+  initialActionResults, 
+  initialBusinessTwinFacts, 
+  initialLeads, 
+  initialAuditLogs,
+  initialAIRuns
+} from '../data/mockSeed';
+import { translations } from '../i18n/translations';
+import { aiGateway } from '../services/aiGateway';
+
+interface PlatformContextValue {
+  currentRoute: AppRoute;
+  setCurrentRoute: (route: AppRoute) => void;
+  currentMarket: MarketType;
+  setMarket: (market: MarketType) => void;
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  currentRole: UserRole;
+  setCurrentRole: (role: UserRole) => void;
+  currentOrg: OrganizationRow;
+  currentBusiness: BusinessRow;
+  
+  // Market-Scoped State
+  leaks: RevenueLeakRow[];
+  actions: GrowthActionRow[];
+  actionResults: ActionResultRow[];
+  leads: LeadRow[];
+  facts: BusinessTwinFactRow[];
+  auditLogs: AuditLogRow[];
+  aiRuns: AIRunRow[];
+  
+  // Computed Metrics
+  metrics: MarketMetrics;
+  t: typeof translations['en'];
+  
+  // State Mutations & Actions
+  approveAction: (actionId: string) => Promise<{ success: boolean; message: string }>;
+  rejectAction: (actionId: string) => Promise<{ success: boolean; message: string }>;
+  deferAction: (actionId: string) => Promise<{ success: boolean; message: string }>;
+  verifyFact: (factId: string) => void;
+  addFact: (fact: Omit<BusinessTwinFactRow, 'id' | 'business_id' | 'market' | 'updated_at'>) => void;
+  triggerFastLeadResponse: (leadId: string) => void;
+  runLeakScan: () => Promise<void>;
+  isScanning: boolean;
+  
+  // Formatting Utilities
+  formatCurrency: (amount: number) => string;
+}
+
+const PlatformContext = createContext<PlatformContextValue | undefined>(undefined);
+
+export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>('/dashboard');
+  const [currentMarket, setCurrentMarket] = useState<MarketType>('GLOBAL');
+  const [language, setLanguage] = useState<Language>('en');
+  const [currentRole, setCurrentRole] = useState<UserRole>('owner');
+  const [isScanning, setIsScanning] = useState<boolean>(false);
+
+  // Global State Stores
+  const [allLeaks, setAllLeaks] = useState<RevenueLeakRow[]>(initialRevenueLeaks);
+  const [allActions, setAllActions] = useState<GrowthActionRow[]>(initialGrowthActions);
+  const [allActionResults, setAllActionResults] = useState<ActionResultRow[]>(initialActionResults);
+  const [allLeads, setAllLeads] = useState<LeadRow[]>(initialLeads);
+  const [allFacts, setAllFacts] = useState<BusinessTwinFactRow[]>(initialBusinessTwinFacts);
+  const [allAuditLogs, setAllAuditLogs] = useState<AuditLogRow[]>(initialAuditLogs);
+  const [allAIRuns, setAllAIRuns] = useState<AIRunRow[]>(initialAIRuns);
+
+  const currentOrg = mockOrganization;
+  const currentBusiness = mockBusinesses[currentMarket];
+
+  const t = translations[language];
+
+  // Filtered by current operational market (strict state isolation)
+  const leaks = useMemo(() => allLeaks.filter(l => l.market === currentMarket), [allLeaks, currentMarket]);
+  const actions = useMemo(() => allActions.filter(a => a.market === currentMarket), [allActions, currentMarket]);
+  const actionResults = useMemo(() => {
+    return allActionResults.filter(r => {
+      const biz = mockBusinesses[currentMarket];
+      return r.business_id === biz.id;
+    });
+  }, [allActionResults, currentMarket]);
+  const leads = useMemo(() => allLeads.filter(ld => ld.market === currentMarket), [allLeads, currentMarket]);
+  const facts = useMemo(() => allFacts.filter(f => f.market === currentMarket), [allFacts, currentMarket]);
+  const auditLogs = allAuditLogs;
+  const aiRuns = allAIRuns;
+
+  // Format Currency
+  const formatCurrency = (amount: number): string => {
+    if (currentMarket === 'TR') {
+      return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(amount);
+    }
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+  };
+
+  // Compute Outcome Metrics
+  const metrics = useMemo<MarketMetrics>(() => {
+    const activeLeaks = leaks.filter(l => l.status === 'active');
+    const totalRevenueAtRisk = activeLeaks.reduce((sum, l) => sum + l.estimated_monthly_loss, 0);
+    
+    // Opportunities = Uncaptured high-intent leads value + potential action uplift
+    const uncapturedLeadValue = leads
+      .filter(ld => ld.status === 'open' && ld.intent_score > 75)
+      .reduce((sum, ld) => sum + ld.estimated_deal_value, 0);
+
+    const pendingActions = actions.filter(a => a.approval_status === 'pending_approval');
+    const waitingApprovalCount = pendingActions.length;
+
+    const totalRevenueInfluenced = actionResults
+      .filter(r => r.status === 'success')
+      .reduce((sum, r) => sum + r.revenue_recovered_amount, 0);
+
+    const criticalCount = activeLeaks.filter(l => l.severity === 'critical').length;
+    const highCount = activeLeaks.filter(l => l.severity === 'high').length;
+    const mediumCount = activeLeaks.filter(l => l.severity === 'medium').length;
+
+    const verifiedFactsCount = facts.filter(f => f.verified_by_human === 1).length;
+    const totalFactsCount = facts.length || 1;
+    const twinConfidenceScore = Math.round((verifiedFactsCount / totalFactsCount) * 100);
+
+    return {
+      revenueAtRisk: totalRevenueAtRisk,
+      growthOpportunities: uncapturedLeadValue,
+      actionsWaitingApproval: waitingApprovalCount,
+      revenueInfluenced: totalRevenueInfluenced,
+      currencySymbol: currentMarket === 'TR' ? '₺' : '$',
+      currencyCode: currentMarket === 'TR' ? 'TRY' : 'USD',
+      leaksCount: {
+        critical: criticalCount,
+        high: highCount,
+        medium: mediumCount,
+      },
+      twinConfidenceScore,
+      productLoopStep: waitingApprovalCount > 0 ? 'APPROVE' : 'DETECT',
+    };
+  }, [leaks, actions, actionResults, leads, facts, currentMarket]);
+
+  // Append to Immutable Audit Log
+  const logAuditEntry = (actionName: string, entityType: string, entityId: string, diff: Record<string, any>) => {
+    const newLog: AuditLogRow = {
+      id: `aud_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`,
+      organization_id: currentOrg.id,
+      business_id: currentBusiness.id,
+      actor_id: mockUsers.find(u => u.role_global === 'founder')?.id || 'usr_owner_01',
+      actor_role: currentRole,
+      action: actionName,
+      target_entity_type: entityType,
+      target_entity_id: entityId,
+      payload_diff_json: JSON.stringify(diff),
+      ip_hash: Math.random().toString(36).substring(2, 12) + 'a9',
+      created_at: new Date().toISOString(),
+    };
+    setAllAuditLogs(prev => [newLog, ...prev]);
+  };
+
+  // Action Approvals
+  const approveAction = async (actionId: string): Promise<{ success: boolean; message: string }> => {
+    // Check RBAC permission: only Owner and Admin can approve actions
+    if (currentRole === 'member' || currentRole === 'auditor') {
+      return {
+        success: false,
+        message: currentRole === 'auditor' 
+          ? 'Auditor role is restricted to read-only compliance inspection.' 
+          : 'Role insufficient: Action approval requires Owner or Admin privilege.'
+      };
+    }
+
+    const action = allActions.find(a => a.id === actionId);
+    if (!action) return { success: false, message: 'Action not found.' };
+
+    // Run Guardrail Check via Neutral AI Gateway
+    const guardrailResult = await aiGateway.verifyActionGuardrails(JSON.parse(action.execution_payload_json));
+    if (!guardrailResult.passed) {
+      return {
+        success: false,
+        message: `Guardrail Failed: ${guardrailResult.violations.join(', ')}`
+      };
+    }
+
+    setAllActions(prev => prev.map(a => {
+      if (a.id === actionId) {
+        return {
+          ...a,
+          approval_status: 'approved',
+          approved_by_user_id: 'usr_owner_01',
+          approved_at: new Date().toISOString(),
+        };
+      }
+      return a;
+    }));
+
+    // Update corresponding leak status to mitigated
+    if (action.leak_id) {
+      setAllLeaks(prev => prev.map(l => {
+        if (l.id === action.leak_id) {
+          return { ...l, status: 'mitigated' };
+        }
+        return l;
+      }));
+    }
+
+    logAuditEntry('GROWTH_ACTION_APPROVED', 'growth_actions', actionId, {
+      status: { old: 'pending_approval', new: 'approved' },
+      role: currentRole,
+      guardrails: 'verified_pass'
+    });
+
+    return {
+      success: true,
+      message: language === 'tr' ? 'Aksiyon başarıyla onaylandı ve yürütmeye alındı.' : 'Action approved and dispatched to execution engine.'
+    };
+  };
+
+  const rejectAction = async (actionId: string): Promise<{ success: boolean; message: string }> => {
+    if (currentRole === 'member' || currentRole === 'auditor') {
+      return { success: false, message: 'Role insufficient for decision gate.' };
+    }
+
+    setAllActions(prev => prev.map(a => {
+      if (a.id === actionId) {
+        return { ...a, approval_status: 'rejected' };
+      }
+      return a;
+    }));
+
+    logAuditEntry('GROWTH_ACTION_REJECTED', 'growth_actions', actionId, {
+      status: { old: 'pending_approval', new: 'rejected' },
+      role: currentRole,
+    });
+
+    return {
+      success: true,
+      message: language === 'tr' ? 'Aksiyon reddedildi.' : 'Action rejected.'
+    };
+  };
+
+  const deferAction = async (actionId: string): Promise<{ success: boolean; message: string }> => {
+    setAllActions(prev => prev.map(a => {
+      if (a.id === actionId) {
+        return { ...a, approval_status: 'deferred' };
+      }
+      return a;
+    }));
+
+    logAuditEntry('GROWTH_ACTION_DEFERRED', 'growth_actions', actionId, {
+      status: { old: 'pending_approval', new: 'deferred' }
+    });
+
+    return {
+      success: true,
+      message: language === 'tr' ? 'Aksiyon incelemesi ertelendi.' : 'Action deferred.'
+    };
+  };
+
+  const verifyFact = (factId: string) => {
+    setAllFacts(prev => prev.map(f => {
+      if (f.id === factId) {
+        return { ...f, verified_by_human: 1, confidence_score: 0.99, updated_at: new Date().toISOString() };
+      }
+      return f;
+    }));
+
+    logAuditEntry('BUSINESS_TWIN_FACT_VERIFIED', 'business_twin_facts', factId, {
+      verified_by_human: { old: 0, new: 1 },
+      actor_role: currentRole
+    });
+  };
+
+  const addFact = (newFactData: Omit<BusinessTwinFactRow, 'id' | 'business_id' | 'market' | 'updated_at'>) => {
+    const newFact: BusinessTwinFactRow = {
+      id: `fact_${currentMarket.toLowerCase()}_${Date.now().toString(36)}`,
+      business_id: currentBusiness.id,
+      market: currentMarket,
+      fact_category: newFactData.fact_category,
+      fact_key: newFactData.fact_key,
+      fact_value_json: newFactData.fact_value_json,
+      confidence_score: newFactData.confidence_score,
+      verified_by_human: newFactData.verified_by_human,
+      source: newFactData.source,
+      updated_at: new Date().toISOString(),
+    };
+
+    setAllFacts(prev => [newFact, ...prev]);
+
+    logAuditEntry('BUSINESS_TWIN_FACT_INGESTED', 'business_twin_facts', newFact.id, {
+      key: newFact.fact_key,
+      category: newFact.fact_category
+    });
+  };
+
+  const triggerFastLeadResponse = (leadId: string) => {
+    setAllLeads(prev => prev.map(ld => {
+      if (ld.id === leadId) {
+        return {
+          ...ld,
+          status: 'contacted',
+          leak_risk_factor: 'normal',
+          response_latency_minutes: Math.min(ld.response_latency_minutes, 3),
+        };
+      }
+      return ld;
+    }));
+
+    logAuditEntry('LEAD_ACCELERATED_SLA_DISPATCH', 'leads', leadId, {
+      status: { old: 'open', new: 'contacted' },
+      sla_response: 'fast_tracked'
+    });
+  };
+
+  const runLeakScan = async () => {
+    setIsScanning(true);
+    
+    // Simulate AI Gateway execution analysis
+    const aiResult = await aiGateway.executeAnalysis({
+      businessId: currentBusiness.id,
+      market: currentMarket,
+      pipelineStage: 'Full Revenue Funnel Ingestion',
+      rawSignals: { leadsCount: leads.length, factsCount: facts.length },
+      focusArea: 'leak_detection',
+    });
+
+    const newAIRun: AIRunRow = {
+      id: aiResult.runId,
+      business_id: currentBusiness.id,
+      gateway_provider_id: aiResult.providerId,
+      model_identifier: aiResult.modelIdentifier,
+      prompt_tokens: aiResult.tokensUsed.prompt,
+      completion_tokens: aiResult.tokensUsed.completion,
+      latency_ms: aiResult.latencyMs,
+      status: 'completed',
+      purpose: 'Revenue Leak Radar Automated Forensics',
+      created_at: new Date().toISOString(),
+    };
+
+    setAllAIRuns(prev => [newAIRun, ...prev]);
+
+    logAuditEntry('REVENUE_LEAK_RADAR_SCAN_COMPLETED', 'revenue_leaks', aiResult.runId, {
+      findings: aiResult.findingsCount,
+      latency_ms: aiResult.latencyMs,
+    });
+
+    setIsScanning(false);
+  };
+
+  return (
+    <PlatformContext.Provider
+      value={{
+        currentRoute,
+        setCurrentRoute,
+        currentMarket,
+        setMarket: setCurrentMarket,
+        language,
+        setLanguage,
+        currentRole,
+        setCurrentRole,
+        currentOrg,
+        currentBusiness,
+        leaks,
+        actions,
+        actionResults,
+        leads,
+        facts,
+        auditLogs,
+        aiRuns,
+        metrics,
+        t,
+        approveAction,
+        rejectAction,
+        deferAction,
+        verifyFact,
+        addFact,
+        triggerFastLeadResponse,
+        runLeakScan,
+        isScanning,
+        formatCurrency,
+      }}
+    >
+      {children}
+    </PlatformContext.Provider>
+  );
+};
+
+export const usePlatform = () => {
+  const context = useContext(PlatformContext);
+  if (!context) {
+    throw new Error('usePlatform must be used within a PlatformProvider');
+  }
+  return context;
+};

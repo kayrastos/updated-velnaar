@@ -1,0 +1,598 @@
+import { 
+  OrganizationRow, 
+  UserRow, 
+  OrganizationMemberRow, 
+  BusinessRow, 
+  LeadRow, 
+  RevenueLeakRow, 
+  GrowthActionRow, 
+  ActionResultRow, 
+  BusinessTwinFactRow, 
+  AuditLogRow, 
+  AIRunRow 
+} from '../types/database';
+
+export const mockUsers: UserRow[] = [
+  {
+    id: 'usr_owner_01',
+    email: 'kayra@velnar.io',
+    full_name: 'Kayra K.',
+    role_global: 'founder',
+    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+    created_at: '2026-01-10T08:00:00Z',
+  },
+  {
+    id: 'usr_admin_02',
+    email: 'selin.arslan@velnar.io',
+    full_name: 'Selin Arslan',
+    role_global: 'admin',
+    avatar_url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&auto=format&fit=crop&q=80',
+    created_at: '2026-01-12T09:30:00Z',
+  },
+  {
+    id: 'usr_auditor_03',
+    email: 'compliance.lead@auditfirm.com',
+    full_name: 'Marcus Vance',
+    role_global: 'auditor',
+    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+    created_at: '2026-02-01T14:00:00Z',
+  }
+];
+
+export const mockOrganization: OrganizationRow = {
+  id: 'org_apex_holding',
+  name: 'Apex Industrial Dynamics',
+  slug: 'apex-industrial',
+  tier: 'enterprise',
+  default_market: 'GLOBAL',
+  created_at: '2026-01-05T00:00:00Z',
+  updated_at: '2026-08-20T12:00:00Z',
+};
+
+export const mockOrgMembers: OrganizationMemberRow[] = [
+  {
+    id: 'mem_01',
+    organization_id: 'org_apex_holding',
+    user_id: 'usr_owner_01',
+    role: 'owner',
+    status: 'active',
+    created_at: '2026-01-05T00:00:00Z',
+  },
+  {
+    id: 'mem_02',
+    organization_id: 'org_apex_holding',
+    user_id: 'usr_admin_02',
+    role: 'admin',
+    status: 'active',
+    created_at: '2026-01-12T09:30:00Z',
+  },
+  {
+    id: 'mem_03',
+    organization_id: 'org_apex_holding',
+    user_id: 'usr_auditor_03',
+    role: 'auditor',
+    status: 'active',
+    created_at: '2026-02-01T14:00:00Z',
+  },
+];
+
+export const mockBusinesses: Record<'TR' | 'GLOBAL', BusinessRow> = {
+  TR: {
+    id: 'biz_tr_apex_turkey',
+    organization_id: 'org_apex_holding',
+    name: 'Apex Türkiye Sanayi & Lojistik A.Ş.',
+    market: 'TR',
+    industry: 'B2B Equipment & Logistics Systems',
+    currency: 'TRY',
+    annual_revenue_run_rate: 48500000, // ₺48.5M ARR
+    baseline_margin_pct: 34.5,
+    status: 'active',
+    created_at: '2026-01-15T00:00:00Z',
+  },
+  GLOBAL: {
+    id: 'biz_global_apex_corp',
+    organization_id: 'org_apex_holding',
+    name: 'Apex Global Machinery & Supply Corp',
+    market: 'GLOBAL',
+    industry: 'Enterprise Industrial Tech & Automation',
+    currency: 'USD',
+    annual_revenue_run_rate: 14200000, // $14.2M ARR
+    baseline_margin_pct: 42.0,
+    status: 'active',
+    created_at: '2026-01-10T00:00:00Z',
+  },
+};
+
+// Market Isolated Revenue Leaks
+export const initialRevenueLeaks: RevenueLeakRow[] = [
+  // --- GLOBAL MARKET LEAKS ($) ---
+  {
+    id: 'leak_glob_01',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    title: 'Enterprise Inbound Response Latency Decay (> 45 min)',
+    category: 'lead_decay',
+    severity: 'critical',
+    root_cause: 'High-intent demo requests from Tier-1 North America accounts sit in general distribution inbox without automated routing to senior enterprise reps.',
+    estimated_monthly_loss: 42500, // $42.5k / mo
+    affected_funnel_stage: 'Inbound Ingestion → Discovery Call',
+    confidence_score: 0.96,
+    status: 'active',
+    detected_at: '2026-08-22T10:14:00Z',
+  },
+  {
+    id: 'leak_glob_02',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    title: 'Contract Redline Stagnation at Final Procurement Gate',
+    category: 'checkout_abandonment',
+    severity: 'high',
+    root_cause: 'Standard MSA SLA clauses mismatch EMEA compliance requirements, causing deals over $100k to stall for 28+ days.',
+    estimated_monthly_loss: 34000, // $34k / mo
+    affected_funnel_stage: 'Legal Redline → Closing',
+    confidence_score: 0.91,
+    status: 'active',
+    detected_at: '2026-08-20T16:45:00Z',
+  },
+  {
+    id: 'leak_glob_03',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    title: 'Mid-Market Tiering Pricing Friction',
+    category: 'pricing_friction',
+    severity: 'medium',
+    root_cause: 'Missing intermediate 50-seat bundle creates a 65% drop-off between standard pilot and enterprise tiers.',
+    estimated_monthly_loss: 18500, // $18.5k / mo
+    affected_funnel_stage: 'Proposal Customization',
+    confidence_score: 0.88,
+    status: 'active',
+    detected_at: '2026-08-18T09:12:00Z',
+  },
+  {
+    id: 'leak_glob_04',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    title: 'Year-1 Renewal Engagement Void at 90-Day Mark',
+    category: 'churn_anomaly',
+    severity: 'high',
+    root_cause: 'Accounts with zero executive touchpoints at month 9 show a 41% lower renewal probability.',
+    estimated_monthly_loss: 29000, // $29k / mo
+    affected_funnel_stage: 'Customer Retention & Expansion',
+    confidence_score: 0.94,
+    status: 'mitigated',
+    detected_at: '2026-08-15T11:00:00Z',
+  },
+
+  // --- TURKEY MARKET LEAKS (₺) ---
+  {
+    id: 'leak_tr_01',
+    business_id: 'biz_tr_apex_turkey',
+    market: 'TR',
+    title: 'Marmara Bölgesi Teklif Sonrası Takip Kesintisi',
+    category: 'follow_up_bottleneck',
+    severity: 'critical',
+    root_cause: '₺500k+ endüstriyel ekipman tekliflerinde ilk 72 saat içinde teknik şartname teyidi yapılmadığında dönüşüm %58 oranında çöküyor.',
+    estimated_monthly_loss: 740000, // ₺740k / ay
+    affected_funnel_stage: 'Teklif Gönderimi → Teknik Onay',
+    confidence_score: 0.95,
+    status: 'active',
+    detected_at: '2026-08-23T08:30:00Z',
+  },
+  {
+    id: 'leak_tr_02',
+    business_id: 'biz_tr_apex_turkey',
+    market: 'TR',
+    title: 'Web Sitesi WhatsApp & Telefon Talebi Yanıt Gecikmesi',
+    category: 'lead_decay',
+    severity: 'critical',
+    root_cause: 'Mesai dışı ve hafta sonu gelen yüksek bütçeli fabrika alım talepleri 14+ saat yanıtsız kalıyor.',
+    estimated_monthly_loss: 520000, // ₺520k / ay
+    affected_funnel_stage: 'İlk Talep → Satış Temsilcisi',
+    confidence_score: 0.93,
+    status: 'active',
+    detected_at: '2026-08-22T14:10:00Z',
+  },
+  {
+    id: 'leak_tr_03',
+    business_id: 'biz_tr_apex_turkey',
+    market: 'TR',
+    title: 'Vade ve Kur Riskine Bağlı Sipariş İptalleri',
+    category: 'pricing_friction',
+    severity: 'high',
+    root_cause: 'TL bazlı 60 gün vadeli tekliflerde dinamik kur sabitleme seçeneği sunulmaması sipariş onayında %32 iptale yol açıyor.',
+    estimated_monthly_loss: 380000, // ₺380k / ay
+    affected_funnel_stage: 'Sözleşme & Finansal Onay',
+    confidence_score: 0.89,
+    status: 'active',
+    detected_at: '2026-08-19T11:20:00Z',
+  },
+];
+
+// Market Isolated Growth Actions
+export const initialGrowthActions: GrowthActionRow[] = [
+  // --- GLOBAL MARKET ACTIONS ---
+  {
+    id: 'act_glob_01',
+    leak_id: 'leak_glob_01',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    title: 'Deploy High-Intent SLA Fast-Track Router (< 5 min)',
+    hypothesis: 'Triggering an executive direct-dial webhook for inbound enterprise leads with intent score > 85 will compress response latency from 52m to 4m, capturing $32,000/mo in lost pipeline.',
+    action_type: 'high_intent_sla_dispatch',
+    execution_payload_json: JSON.stringify({
+      slaTargetMinutes: 5,
+      intentThreshold: 85,
+      routingTier: 'enterprise_direct',
+      notificationChannels: ['slack_urgent', 'sms_rep'],
+      requiresHumanApproval: true,
+      maxAllowedOverride: false
+    }),
+    requires_approval: 1,
+    approval_status: 'pending_approval',
+    guardrails_passed: 1,
+    created_at: '2026-08-23T11:30:00Z',
+  },
+  {
+    id: 'act_glob_02',
+    leak_id: 'leak_glob_02',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    title: 'Pre-Approved EMEA Standard Compliance Annex Injection',
+    hypothesis: 'Injecting legal pre-vetted GDPR/EMEA clauses automatically during quote generation will reduce procurement cycle from 34 days to 14 days.',
+    action_type: 'workflow_automation',
+    execution_payload_json: JSON.stringify({
+      templateId: 'emea_standard_v4',
+      jurisdiction: 'EU_GDPR_STANDARD',
+      autoAttachOnQuote: true,
+      requiresHumanApproval: true
+    }),
+    requires_approval: 1,
+    approval_status: 'pending_approval',
+    guardrails_passed: 1,
+    created_at: '2026-08-21T15:00:00Z',
+  },
+  {
+    id: 'act_glob_03',
+    leak_id: 'leak_glob_04',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    title: 'Automate Executive QBR Trigger at Day 270',
+    hypothesis: 'Scheduling an automated executive business review with verifiable usage telemetry 90 days before renewal will prevent $29k/mo churn.',
+    action_type: 'churn_prevention_trigger',
+    execution_payload_json: JSON.stringify({
+      triggerDay: 270,
+      targetRoles: ['VP Operations', 'CTO'],
+      template: 'qbr_impact_summary_v2'
+    }),
+    requires_approval: 1,
+    approval_status: 'approved',
+    approved_by_user_id: 'usr_owner_01',
+    approved_at: '2026-08-16T14:22:00Z',
+    guardrails_passed: 1,
+    created_at: '2026-08-15T13:00:00Z',
+  },
+
+  // --- TURKEY MARKET ACTIONS ---
+  {
+    id: 'act_tr_01',
+    leak_id: 'leak_tr_01',
+    business_id: 'biz_tr_apex_turkey',
+    market: 'TR',
+    title: '72 Saatlik Otomatik Teknik Şartname Teyit Sekansı',
+    hypothesis: 'Teklif iletildikten sonraki 48. saatte teknik müdürlük onaylı soru-cevap özetinin iletilmesi, Marmara bölgesi teklif kabul oranını %24 artıracaktır.',
+    action_type: 're_engagement_sequence',
+    execution_payload_json: JSON.stringify({
+      delayHours: 48,
+      channel: 'direct_email_and_whatsapp',
+      targetMinQuoteVal: 250000,
+      requiresHumanApproval: true
+    }),
+    requires_approval: 1,
+    approval_status: 'pending_approval',
+    guardrails_passed: 1,
+    created_at: '2026-08-23T09:15:00Z',
+  },
+  {
+    id: 'act_tr_02',
+    leak_id: 'leak_tr_02',
+    business_id: 'biz_tr_apex_turkey',
+    market: 'TR',
+    title: 'Mesai Dışı Yüksek Niyetli Talep Otomatik Karşılama & Ön Eleme',
+    hypothesis: 'Hafta sonu gelen fabrika yöneticisi taleplerine 3 dakika içinde ön teknik form ile yanıt verilmesi, kaçan ₺520k/aylık hacmi kurtaracaktır.',
+    action_type: 'high_intent_sla_dispatch',
+    execution_payload_json: JSON.stringify({
+      autoResponderType: 'interactive_intake',
+      escalateToDutyEngineer: true,
+      maxWaitMinutes: 5,
+      requiresHumanApproval: true
+    }),
+    requires_approval: 1,
+    approval_status: 'pending_approval',
+    guardrails_passed: 1,
+    created_at: '2026-08-22T17:00:00Z',
+  },
+];
+
+// VELNAR Proof Attribution Ledger
+export const initialActionResults: ActionResultRow[] = [
+  {
+    id: 'res_glob_01',
+    growth_action_id: 'act_glob_03',
+    business_id: 'biz_global_apex_corp',
+    status: 'success',
+    revenue_recovered_amount: 148500, // $148.5k verified
+    metric_delta_json: JSON.stringify({
+      metric: 'Quarterly Net Retention Rate (NRR)',
+      baseline: '91.2%',
+      current: '107.8%',
+      delta: '+16.6%',
+      sampleSizeAccounts: 24
+    }),
+    verified_at: '2026-08-22T18:00:00Z',
+    proof_notes: 'Retained 4 at-risk Tier-1 manufacturing accounts through automated QBR intelligence briefings before contract anniversary.',
+  },
+  {
+    id: 'res_tr_01',
+    growth_action_id: 'act_tr_historical',
+    business_id: 'biz_tr_apex_turkey',
+    status: 'success',
+    revenue_recovered_amount: 2150000, // ₺2.15M verified
+    metric_delta_json: JSON.stringify({
+      metric: 'Büyük Ölçekli Sipariş Dönüşüm Oranı',
+      baseline: '18.4%',
+      current: '31.2%',
+      delta: '+12.8%',
+      sampleSizeAccounts: 48
+    }),
+    verified_at: '2026-08-20T12:00:00Z',
+    proof_notes: 'İmalat sanayi tekliflerinde teknik doğrulama adımıyla 7 büyük fabrika siparişi kesinleştirildi.',
+  },
+];
+
+// Business Twin Verified Facts
+export const initialBusinessTwinFacts: BusinessTwinFactRow[] = [
+  // GLOBAL
+  {
+    id: 'fact_glob_01',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    fact_category: 'unit_economics',
+    fact_key: 'Customer Lifetime Value (LTV)',
+    fact_value_json: JSON.stringify({ value: 185000, currency: 'USD', grossMargin: '42%' }),
+    confidence_score: 0.98,
+    verified_by_human: 1,
+    source: 'Verified Stripe & NetSuite Financial Ledger',
+    updated_at: '2026-08-15T00:00:00Z',
+  },
+  {
+    id: 'fact_glob_02',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    fact_category: 'operating_constraints',
+    fact_key: 'Max Onboarding Concurrency',
+    fact_value_json: JSON.stringify({ maxActiveDeploymentsPerMonth: 8, leadTimeWeeks: 3 }),
+    confidence_score: 0.94,
+    verified_by_human: 1,
+    source: 'Operations VP Sign-off',
+    updated_at: '2026-08-10T00:00:00Z',
+  },
+  {
+    id: 'fact_glob_03',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    fact_category: 'ideal_customer_profile',
+    fact_key: 'Enterprise Target Criteria',
+    fact_value_json: JSON.stringify({ employeeCount: '250-5000', techStack: ['SAP', 'Salesforce', 'MES'], minARR: '$20M' }),
+    confidence_score: 0.95,
+    verified_by_human: 1,
+    source: 'Executive Strategy Matrix',
+    updated_at: '2026-08-01T00:00:00Z',
+  },
+  {
+    id: 'fact_glob_04',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    fact_category: 'pricing_matrix',
+    fact_key: 'Contract Ceiling & Floor',
+    fact_value_json: JSON.stringify({ floorAnnualValue: 36000, ceilingAnnualValue: 450000, maxDiscountAllowedPct: 15 }),
+    confidence_score: 0.99,
+    verified_by_human: 1,
+    source: 'CFO Pricing Mandate 2026',
+    updated_at: '2026-08-05T00:00:00Z',
+  },
+
+  // TURKEY
+  {
+    id: 'fact_tr_01',
+    business_id: 'biz_tr_apex_turkey',
+    market: 'TR',
+    fact_category: 'unit_economics',
+    fact_key: 'Ortalama Sipariş Tutarı & Brüt Marj',
+    fact_value_json: JSON.stringify({ ortalamaSiparis: 650000, paraBirimi: 'TRY', brutKarMarji: '%34.5' }),
+    confidence_score: 0.97,
+    verified_by_human: 1,
+    source: 'Mikro ERP ve Resmi Muhasebe Kaydı',
+    updated_at: '2026-08-18T00:00:00Z',
+  },
+  {
+    id: 'fact_tr_02',
+    business_id: 'biz_tr_apex_turkey',
+    market: 'TR',
+    fact_category: 'operating_constraints',
+    fact_key: 'Marmara & Ege Bölgesi Kurulum Kapasitesi',
+    fact_value_json: JSON.stringify({ aylikMaksimumHatKurulum: 12, teknikEkipSayisi: 18 }),
+    confidence_score: 0.93,
+    verified_by_human: 1,
+    source: 'Saha Operasyon Direktörlüğü',
+    updated_at: '2026-08-12T00:00:00Z',
+  },
+  {
+    id: 'fact_tr_03',
+    business_id: 'biz_tr_apex_turkey',
+    market: 'TR',
+    fact_category: 'pricing_matrix',
+    fact_key: 'Kur Riski & Vade Politikası',
+    fact_value_json: JSON.stringify({ maksimumVadeGun: 45, dovizEndeksliSatisKotasi: '%60' }),
+    confidence_score: 0.96,
+    verified_by_human: 1,
+    source: 'Yönetim Kurulu Finans Komitesi',
+    updated_at: '2026-08-14T00:00:00Z',
+  },
+];
+
+// Lead Velocity Inbox Seed
+export const initialLeads: LeadRow[] = [
+  // GLOBAL
+  {
+    id: 'lead_g_01',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    contact_name: 'David Sterling',
+    company_name: 'Vanguard Aerospace Systems',
+    email: 'd.sterling@vanguard-aero.com',
+    phone: '+1 (415) 890-4421',
+    intent_score: 96,
+    estimated_deal_value: 120000,
+    funnel_stage: 'captured',
+    leak_risk_factor: 'high_decay',
+    status: 'open',
+    response_latency_minutes: 58,
+    created_at: '2026-08-24T03:45:00Z',
+  },
+  {
+    id: 'lead_g_02',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    contact_name: 'Elena Rostova',
+    company_name: 'Nordic Robotics GmbH',
+    email: 'elena.rostova@nordicrobotics.de',
+    phone: '+49 89 2314 990',
+    intent_score: 88,
+    estimated_deal_value: 75000,
+    funnel_stage: 'qualifying',
+    leak_risk_factor: 'normal',
+    status: 'open',
+    response_latency_minutes: 12,
+    created_at: '2026-08-24T04:20:00Z',
+  },
+  {
+    id: 'lead_g_03',
+    business_id: 'biz_global_apex_corp',
+    market: 'GLOBAL',
+    contact_name: 'Arthur Pendelton',
+    company_name: 'Precision Heavy Forge Ltd',
+    email: 'a.pendelton@precisionforge.co.uk',
+    phone: '+44 20 7946 0912',
+    intent_score: 91,
+    estimated_deal_value: 185000,
+    funnel_stage: 'proposal_sent',
+    leak_risk_factor: 'unassigned',
+    status: 'open',
+    response_latency_minutes: 140,
+    created_at: '2026-08-23T22:10:00Z',
+  },
+
+  // TURKEY
+  {
+    id: 'lead_tr_01',
+    business_id: 'biz_tr_apex_turkey',
+    market: 'TR',
+    contact_name: 'Mustafa Yılmaz',
+    company_name: 'Özaltın Otomotiv Yan Sanayi A.Ş.',
+    email: 'mustafa.yilmaz@ozaltinoto.com.tr',
+    phone: '+90 532 441 9088',
+    intent_score: 95,
+    estimated_deal_value: 1450000,
+    funnel_stage: 'captured',
+    leak_risk_factor: 'high_decay',
+    status: 'open',
+    response_latency_minutes: 42,
+    created_at: '2026-08-24T04:10:00Z',
+  },
+  {
+    id: 'lead_tr_02',
+    business_id: 'biz_tr_apex_turkey',
+    market: 'TR',
+    contact_name: 'Burcu Demir',
+    company_name: 'Ege Çelik Yapı Endüstrisi',
+    email: 'burcu.demir@egecelik.com.tr',
+    phone: '+90 544 320 1122',
+    intent_score: 89,
+    estimated_deal_value: 820000,
+    funnel_stage: 'proposal_sent',
+    leak_risk_factor: 'underpriced',
+    status: 'open',
+    response_latency_minutes: 18,
+    created_at: '2026-08-24T02:30:00Z',
+  },
+];
+
+// Audit Log Initial Stream
+export const initialAuditLogs: AuditLogRow[] = [
+  {
+    id: 'aud_001',
+    organization_id: 'org_apex_holding',
+    business_id: 'biz_global_apex_corp',
+    actor_id: 'usr_owner_01',
+    actor_role: 'owner',
+    action: 'GROWTH_ACTION_APPROVED',
+    target_entity_type: 'growth_actions',
+    target_entity_id: 'act_glob_03',
+    payload_diff_json: JSON.stringify({ status: { old: 'pending_approval', new: 'approved' } }),
+    ip_hash: 'd8e8fca2dc64539822e0e980d331a0f8',
+    created_at: '2026-08-16T14:22:00Z',
+  },
+  {
+    id: 'aud_002',
+    organization_id: 'org_apex_holding',
+    business_id: 'biz_global_apex_corp',
+    actor_id: 'usr_admin_02',
+    actor_role: 'admin',
+    action: 'BUSINESS_TWIN_FACT_VERIFIED',
+    target_entity_type: 'business_twin_facts',
+    target_entity_id: 'fact_glob_01',
+    payload_diff_json: JSON.stringify({ verified_by_human: { old: 0, new: 1 } }),
+    ip_hash: '3f7b2a99e011cd87b41198f12a338210',
+    created_at: '2026-08-15T00:00:00Z',
+  },
+  {
+    id: 'aud_003',
+    organization_id: 'org_apex_holding',
+    business_id: 'biz_tr_apex_turkey',
+    actor_id: 'usr_owner_01',
+    actor_role: 'owner',
+    action: 'MARKET_CALIBRATION_INGESTION',
+    target_entity_type: 'businesses',
+    target_entity_id: 'biz_tr_apex_turkey',
+    payload_diff_json: JSON.stringify({ market: 'TR', status: 'calibrated' }),
+    ip_hash: '9a10fc77a288bd993120ea4412ef9011',
+    created_at: '2026-08-18T09:00:00Z',
+  },
+];
+
+export const initialAIRuns: AIRunRow[] = [
+  {
+    id: 'airun_01',
+    business_id: 'biz_global_apex_corp',
+    gateway_provider_id: 'gateway-engine-alpha',
+    model_identifier: 'reasoning-xl-v4',
+    prompt_tokens: 1420,
+    completion_tokens: 410,
+    latency_ms: 380,
+    status: 'completed',
+    purpose: 'Revenue Leak Root Cause Synthesis',
+    created_at: '2026-08-23T11:25:00Z',
+  },
+  {
+    id: 'airun_02',
+    business_id: 'biz_tr_apex_turkey',
+    gateway_provider_id: 'gateway-engine-beta',
+    model_identifier: 'heuristic-flash-v2',
+    prompt_tokens: 890,
+    completion_tokens: 280,
+    latency_ms: 135,
+    status: 'completed',
+    purpose: 'Lead Response Latency Anomaly Detection',
+    created_at: '2026-08-24T04:15:00Z',
+  },
+];
