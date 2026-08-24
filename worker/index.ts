@@ -23,13 +23,9 @@ import { handleVaultRoute } from './routes/vaultRouter';
 import { handleSecurityRoute } from './routes/securityRouter';
 import { handleAuditRoute } from './routes/auditRouter';
 import { SafeLogger } from './security/safeLogger';
+import { WorkerEnv } from './env';
 
-export interface WorkerEnv {
-  DB: D1Database;
-  VELNAR_MASTER_KMS_SECRET?: string;
-  ENVIRONMENT: string;
-  ALLOWED_ORIGINS?: string;
-}
+export type { WorkerEnv };
 
 const PROD_ALLOWED_ORIGINS = [
   'https://velnar.studio',

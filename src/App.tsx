@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { PlatformProvider, usePlatform } from './context/PlatformContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { ProductLoopHUD } from './components/common/ProductLoopHUD';
@@ -44,20 +45,22 @@ const MainContent: React.FC = () => {
 
 export default function App() {
   return (
-    <PlatformProvider>
-      <div className="min-h-screen bg-[#090A0D] text-[#F5F4F0] flex flex-col font-sans selection:bg-[#C5A880]/30 selection:text-white">
-        {/* Top Executive Header */}
-        <Header />
+    <ThemeProvider>
+      <PlatformProvider>
+        <div className="min-h-screen bg-theme-bg text-theme-primary flex flex-col font-sans transition-colors duration-200">
+          {/* Top Executive Header */}
+          <Header />
 
-        {/* 7-Step Core Product Loop HUD */}
-        <ProductLoopHUD />
+          {/* 7-Step Core Product Loop HUD */}
+          <ProductLoopHUD />
 
-        {/* Workspace Body: Sidebar + Dynamic Main Content */}
-        <div className="flex-1 flex flex-col md:flex-row min-h-0">
-          <Sidebar />
-          <MainContent />
+          {/* Workspace Body: Sidebar + Dynamic Main Content */}
+          <div className="flex-1 flex flex-col md:flex-row min-h-0 bg-theme-bg">
+            <Sidebar />
+            <MainContent />
+          </div>
         </div>
-      </div>
-    </PlatformProvider>
+      </PlatformProvider>
+    </ThemeProvider>
   );
 }
