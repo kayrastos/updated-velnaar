@@ -6,7 +6,7 @@
  * ARCHITECTURAL MANDATES:
  * 1. Strict tenant isolation: Every query includes WHERE organization_id = ?
  * 2. Strict Integer Minor Units for money (expected_value_minor).
- * 3. Pseudonymous customer ID segregation.
+ * 3. Pseudonymous customer ID segregation (Zero raw PII in appointments table).
  * ============================================================================
  */
 
@@ -64,7 +64,7 @@ export class AppointmentRepository {
   ): Promise<Appointment[]> {
     if (db) {
       let query = `
-        SELECT id, organization_id, business_id, pseudonymous_customer_id, customer_display_name,
+        SELECT id, organization_id, business_id, pseudonymous_customer_id,
                service_name, service_category, resource_staff_id, resource_staff_name,
                scheduled_start, scheduled_end, duration_minutes, expected_value_minor,
                currency, status, source, external_reference_id, cancellation_reason, notes,
@@ -84,7 +84,6 @@ export class AppointmentRepository {
         organization_id: string;
         business_id: string;
         pseudonymous_customer_id: string;
-        customer_display_name: string;
         service_name: string;
         service_category: string;
         resource_staff_id: string;
@@ -107,7 +106,7 @@ export class AppointmentRepository {
         id: r.id,
         organizationId: r.organization_id,
         businessId: r.business_id,
-        customerName: r.customer_display_name,
+        customerName: r.pseudonymous_customer_id,
         customerPseudonymId: r.pseudonymous_customer_id,
         serviceName: r.service_name,
         serviceCategory: r.service_category,
@@ -140,7 +139,7 @@ export class AppointmentRepository {
   ): Promise<Appointment | null> {
     if (db) {
       const r = await db.prepare(`
-        SELECT id, organization_id, business_id, pseudonymous_customer_id, customer_display_name,
+        SELECT id, organization_id, business_id, pseudonymous_customer_id,
                service_name, service_category, resource_staff_id, resource_staff_name,
                scheduled_start, scheduled_end, duration_minutes, expected_value_minor,
                currency, status, source, external_reference_id, cancellation_reason, notes,
@@ -152,7 +151,6 @@ export class AppointmentRepository {
         organization_id: string;
         business_id: string;
         pseudonymous_customer_id: string;
-        customer_display_name: string;
         service_name: string;
         service_category: string;
         resource_staff_id: string;
@@ -176,7 +174,7 @@ export class AppointmentRepository {
         id: r.id,
         organizationId: r.organization_id,
         businessId: r.business_id,
-        customerName: r.customer_display_name,
+        customerName: r.pseudonymous_customer_id,
         customerPseudonymId: r.pseudonymous_customer_id,
         serviceName: r.service_name,
         serviceCategory: r.service_category,
@@ -218,17 +216,16 @@ export class AppointmentRepository {
     if (db) {
       await db.prepare(`
         INSERT INTO appointments (
-          id, organization_id, business_id, pseudonymous_customer_id, customer_display_name,
+          id, organization_id, business_id, pseudonymous_customer_id,
           service_name, service_category, resource_staff_id, resource_staff_name,
           scheduled_start, scheduled_end, duration_minutes, expected_value_minor,
           currency, status, source, cancellation_reason, notes, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         id,
         orgId,
         data.businessId,
         data.customerPseudonymId || 'cus_anonymous',
-        data.customerName || 'Customer',
         data.serviceName,
         data.serviceCategory || 'General',
         data.resourceStaffId || 'stf_01',

@@ -79,10 +79,7 @@ export interface LeadRow {
   organization_id: string;
   market: MarketType;
   pseudonymous_customer_id: string;
-  contact_name: string;
   company_name: string;
-  email: string;
-  phone?: string;
   intent_score: number; // 0 - 100
   estimated_deal_value: number; // In standard major units for UI, minor in DB
   estimated_deal_value_minor?: number;

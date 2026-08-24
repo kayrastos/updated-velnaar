@@ -102,8 +102,9 @@ export const LeadInboxView: React.FC = () => {
                         <Building2 className="w-3.5 h-3.5 text-[#C5A880]" />
                         {lead.company_name}
                       </div>
-                      <div className="text-[11px] text-[#8E909B] font-sans mt-0.5">
-                        {lead.contact_name} · {lead.email}
+                      <div className="text-[11px] text-[#8E909B] font-mono mt-0.5 flex items-center gap-1">
+                        <span className="text-[10px] text-[#C5A880]/80 bg-[#181C26] px-1.5 py-0.2 rounded border border-[#C5A880]/20">VAULT</span>
+                        <span>{lead.pseudonymous_customer_id}</span>
                       </div>
                     </td>
 

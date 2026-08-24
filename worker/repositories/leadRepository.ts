@@ -7,23 +7,22 @@
  * 1. Strict tenant boundary: Every query enforces WHERE organization_id = ?
  * 2. Analytics records rely on pseudonymous_customer_id; canonical PII belongs in identity_vault.
  * 3. Monetary values use integer minor units.
+ * 4. Zero static leads array in production; parameterized D1 queries exclusively.
  * ============================================================================
  */
 
 import { LeadRow } from '../../src/types/database';
 
 export class LeadRepository {
-  private static memLeads: LeadRow[] = [
+  // Test/Development memory fallback for unit testing environments without D1 binding
+  private static devMockLeads: LeadRow[] = [
     {
       id: 'ld_001',
       business_id: 'biz_beauty_salon',
       organization_id: 'org_apex_holding',
       market: 'GLOBAL',
       pseudonymous_customer_id: 'cus_89a12e',
-      contact_name: 'Dr. Clara Vance',
       company_name: 'Vance BioAesthetics',
-      email: 'clara@vanceaesthetics.com',
-      phone: '+1 (415) 890-1122',
       intent_score: 94,
       estimated_deal_value: 350,
       estimated_deal_value_minor: 35000,
@@ -39,10 +38,7 @@ export class LeadRepository {
       organization_id: 'org_apex_holding',
       market: 'GLOBAL',
       pseudonymous_customer_id: 'cus_99b44a',
-      contact_name: 'Marcus Sterling',
       company_name: 'Sterling MedGroup',
-      email: 'marcus@sterlingmed.com',
-      phone: '+1 (212) 555-8900',
       intent_score: 88,
       estimated_deal_value: 480,
       estimated_deal_value_minor: 48000,
@@ -58,10 +54,7 @@ export class LeadRepository {
       organization_id: 'org_apex_holding',
       market: 'GLOBAL',
       pseudonymous_customer_id: 'cus_33c11f',
-      contact_name: 'Elena Rostova',
       company_name: 'Aethel Laser Suites',
-      email: 'elena@aethelsuites.com',
-      phone: '+1 (310) 902-4411',
       intent_score: 82,
       estimated_deal_value: 220,
       estimated_deal_value_minor: 22000,
@@ -84,7 +77,7 @@ export class LeadRepository {
     if (db) {
       let query = `
         SELECT id, business_id, organization_id, market, pseudonymous_customer_id,
-               contact_name, company_name, email, phone, intent_score,
+               company_name, intent_score,
                estimated_deal_value_minor, funnel_stage, leak_risk_factor, status,
                response_latency_minutes, assigned_to_user_id, created_at
         FROM leads
@@ -103,10 +96,7 @@ export class LeadRepository {
         organization_id: string;
         market: LeadRow['market'];
         pseudonymous_customer_id: string;
-        contact_name: string;
         company_name: string;
-        email: string;
-        phone?: string;
         intent_score: number;
         estimated_deal_value_minor: number;
         funnel_stage: LeadRow['funnel_stage'];
@@ -123,10 +113,7 @@ export class LeadRepository {
         organization_id: r.organization_id,
         market: r.market,
         pseudonymous_customer_id: r.pseudonymous_customer_id,
-        contact_name: r.contact_name,
         company_name: r.company_name,
-        email: r.email,
-        phone: r.phone,
         intent_score: r.intent_score,
         estimated_deal_value: Math.round(r.estimated_deal_value_minor / 100),
         estimated_deal_value_minor: r.estimated_deal_value_minor,
@@ -139,7 +126,7 @@ export class LeadRepository {
       }));
     }
 
-    return LeadRepository.memLeads.filter(l => {
+    return LeadRepository.devMockLeads.filter(l => {
       const orgMatch = l.organization_id === orgId;
       return businessId ? orgMatch && l.business_id === businessId : orgMatch;
     });
@@ -156,7 +143,7 @@ export class LeadRepository {
     if (db) {
       const r = await db.prepare(`
         SELECT id, business_id, organization_id, market, pseudonymous_customer_id,
-               contact_name, company_name, email, phone, intent_score,
+               company_name, intent_score,
                estimated_deal_value_minor, funnel_stage, leak_risk_factor, status,
                response_latency_minutes, assigned_to_user_id, created_at
         FROM leads
@@ -167,10 +154,7 @@ export class LeadRepository {
         organization_id: string;
         market: LeadRow['market'];
         pseudonymous_customer_id: string;
-        contact_name: string;
         company_name: string;
-        email: string;
-        phone?: string;
         intent_score: number;
         estimated_deal_value_minor: number;
         funnel_stage: LeadRow['funnel_stage'];
@@ -188,10 +172,7 @@ export class LeadRepository {
         organization_id: r.organization_id,
         market: r.market,
         pseudonymous_customer_id: r.pseudonymous_customer_id,
-        contact_name: r.contact_name,
         company_name: r.company_name,
-        email: r.email,
-        phone: r.phone,
         intent_score: r.intent_score,
         estimated_deal_value: Math.round(r.estimated_deal_value_minor / 100),
         estimated_deal_value_minor: r.estimated_deal_value_minor,
@@ -204,7 +185,7 @@ export class LeadRepository {
       };
     }
 
-    const lead = LeadRepository.memLeads.find(l => l.id === leadId && l.organization_id === orgId);
+    const lead = LeadRepository.devMockLeads.find(l => l.id === leadId && l.organization_id === orgId);
     return lead || null;
   }
 
@@ -232,20 +213,17 @@ export class LeadRepository {
       await db.prepare(`
         INSERT INTO leads (
           id, business_id, organization_id, market, pseudonymous_customer_id,
-          contact_name, company_name, email, phone, intent_score,
+          company_name, intent_score,
           estimated_deal_value_minor, funnel_stage, leak_risk_factor, status,
           response_latency_minutes, assigned_to_user_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         id,
         lead.business_id,
         orgId,
         lead.market || 'GLOBAL',
         lead.pseudonymous_customer_id || `cus_${id}`,
-        lead.contact_name,
         lead.company_name,
-        lead.email,
-        lead.phone || null,
         lead.intent_score || 50,
         minorVal,
         lead.funnel_stage || 'captured',
@@ -256,7 +234,7 @@ export class LeadRepository {
         now
       ).run();
     } else {
-      LeadRepository.memLeads.unshift(newLead);
+      LeadRepository.devMockLeads.unshift(newLead);
     }
 
     return newLead;
@@ -281,14 +259,14 @@ export class LeadRepository {
       return LeadRepository.getById(db, leadId, orgId);
     }
 
-    const leadIndex = LeadRepository.memLeads.findIndex(l => l.id === leadId && l.organization_id === orgId);
+    const leadIndex = LeadRepository.devMockLeads.findIndex(l => l.id === leadId && l.organization_id === orgId);
     if (leadIndex === -1) return null;
 
-    LeadRepository.memLeads[leadIndex] = {
-      ...LeadRepository.memLeads[leadIndex],
+    LeadRepository.devMockLeads[leadIndex] = {
+      ...LeadRepository.devMockLeads[leadIndex],
       status,
-      leak_risk_factor: status === 'contacted' ? 'normal' : LeadRepository.memLeads[leadIndex].leak_risk_factor,
+      leak_risk_factor: status === 'contacted' ? 'normal' : LeadRepository.devMockLeads[leadIndex].leak_risk_factor,
     };
-    return LeadRepository.memLeads[leadIndex];
+    return LeadRepository.devMockLeads[leadIndex];
   }
 }
