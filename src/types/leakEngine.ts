@@ -1,6 +1,14 @@
 /**
  * @file leakEngine.ts
- * @description Revenue Leak Engine v0.1 Rule Engine & Impact Mathematical Models
+ * @description Revenue Leak Engine v0.1 - Deterministic Rule Engine, Provenance & Mathematical Models
+ * 
+ * ============================================================================
+ * CORE GOVERNANCE PRINCIPLES:
+ * 1. NO EVIDENCE -> NO CLAIM.
+ * 2. Never invent numbers. Every assumption has a declared provenance source and sample size.
+ * 3. Support "INSUFFICIENT DATA" state safely.
+ * 4. Deterministic Confidence: HIGH, MEDIUM, LOW, INSUFFICIENT.
+ * ============================================================================
  */
 
 export type RuleIdentifier = 
@@ -15,6 +23,22 @@ export type RuleIdentifier =
 
 export type MetricValueClassification = 'OBSERVED' | 'CALCULATED' | 'AI_ESTIMATED';
 
+export type MetricProvenanceSource = 
+  | 'HISTORICAL_BUSINESS_DATA' 
+  | 'BUSINESS_CONFIGURED' 
+  | 'SECTOR_BASELINE' 
+  | 'INSUFFICIENT_DATA';
+
+export type LeakConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'INSUFFICIENT';
+
+export interface MetricProvenance {
+  source: MetricProvenanceSource;
+  sampleSize?: number;
+  timeRange?: string;
+  confidence: LeakConfidenceLevel;
+  notes?: string;
+}
+
 export interface LeakRuleConfig {
   id: RuleIdentifier;
   name: string;
@@ -27,6 +51,7 @@ export interface LeakRuleConfig {
     capacityMinUtilizationPct?: number;
     funnelDropPct?: number;
     inventoryAgingDays?: number;
+    minSampleSizeForCalculation?: number;
   };
 }
 
@@ -35,8 +60,19 @@ export interface MetricComponent {
   valueString: string;
   numericValue: number;
   unit: string;
-  classification: MetricValueClassification; // Explicitly distinguishes OBSERVED vs CALCULATED vs AI_ESTIMATED
+  classification: MetricValueClassification; // OBSERVED vs CALCULATED vs AI_ESTIMATED
   sourceDataSource: string;
+  provenance?: MetricProvenance;
+}
+
+export interface InventoryItemTelemetry {
+  id: string;
+  sku: string;
+  name: string;
+  holdingDays: number;
+  unitCostMinor: number;
+  quantityOnHand: number;
+  dailyCarryingBps: number; // e.g. 5 bps = 0.05% daily carrying cost
 }
 
 export interface RevenueImpactCalculation {
@@ -46,15 +82,21 @@ export interface RevenueImpactCalculation {
   severity: 'critical' | 'high' | 'medium' | 'low';
   category: string;
   
-  // Mathematical breakdown
+  // Tripartite Evidence Model
   observedFacts: string[];
   calculatedMetrics: MetricComponent[];
-  calculationFormula: string; // e.g. "14 high-intent leads × 25% conversion × ₺4,000 avg deal = ₺14,000"
+  calculationFormula: string;
+  
+  // Provenance & Insufficient Data Handling
+  isDataInsufficient?: boolean;
+  insufficientDataReason?: string;
+  
   estimatedImpactMinor: number; // in currency minor units (e.g. 1400000 = ₺14,000)
   currency: string;
-  confidenceLevel: 'HIGH' | 'MEDIUM' | 'LOW';
+  confidenceLevel: LeakConfidenceLevel;
+  confidenceReason?: string;
   dataSources: string[];
-  timeRange: string; // e.g. "Last 30 Days (2026-07-24 to 2026-08-24)"
+  timeRange: string;
   
   recommendedAction: {
     actionType: string;

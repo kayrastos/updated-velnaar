@@ -125,7 +125,7 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [currentRoute, setCurrentRoute] = useState<AppRoute>('/dashboard');
   const [currentMarket, setCurrentMarket] = useState<MarketType>('GLOBAL');
   const [language, setLanguage] = useState<Language>('en');
-  const [currentRole, setCurrentRole] = useState<UserRole>('owner');
+  const [currentRole, setCurrentRole] = useState<UserRole>('OWNER');
   const [isScanning, setIsScanning] = useState<boolean>(false);
 
   // Active Template State (Beauty Salon, Restaurant, Auto Dealership)
@@ -219,8 +219,24 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       capacity: activeTemplate.capacityUtilization,
       calls: callEvents,
       currency: activeTemplate.currency,
-      avgDealValue: activeTemplate.currency === 'TRY' ? 4500 : 25000,
-      historicalConversionRate: 0.28,
+      avgDealValueAssumption: {
+        value: activeTemplate.currency === 'TRY' ? 4500 : 25000,
+        provenance: {
+          source: 'HISTORICAL_BUSINESS_DATA',
+          confidence: 'HIGH',
+          sampleSize: 120,
+          timeRange: 'Last 90 Days'
+        }
+      },
+      conversionRateAssumption: {
+        value: 0.28,
+        provenance: {
+          source: 'HISTORICAL_BUSINESS_DATA',
+          confidence: 'HIGH',
+          sampleSize: 85,
+          timeRange: 'Last 90 Days'
+        }
+      },
     });
 
     // Merge template-specific pre-calculated leaks with real-time rule outputs

@@ -11,6 +11,7 @@ export type SecurityEventType =
   | 'authentication.failed' 
   | 'rate_limit.triggered' 
   | 'cross_tenant_access.denied' 
+  | 'authorization.denied'
   | 'connector.anomaly' 
   | 'unusual_event_volume' 
   | 'suspicious_export_attempt' 
@@ -44,6 +45,30 @@ export interface SecurityEvent {
   details: Record<string, unknown>;
   enforcementAction: 'BLOCKED_IMMEDIATELY' | 'FLAGGED_FOR_AUDIT' | 'RATE_LIMITED' | 'SESSION_TERMINATED';
   timestamp: string;
+}
+
+export interface TenantSecurityContext {
+  userId: string;
+  email: string;
+  organizationId: string;
+  role: PlatformRole;
+}
+
+export interface SecurityTestResult {
+  testId: string;
+  name: string;
+  passed: boolean;
+  details: string;
+  category?: string;
+  executedAt?: string;
+  durationMs?: number;
+}
+
+export interface CrossTenantViolationAttempt {
+  sourceTenantId: string;
+  targetTenantId: string;
+  resourceRequested: string;
+  actorRole: PlatformRole;
 }
 
 /**

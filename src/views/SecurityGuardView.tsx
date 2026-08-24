@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { usePlatform } from '../context/PlatformContext';
 import { 
-  ShieldAlert, 
   ShieldCheck, 
   Lock, 
   Key, 
@@ -9,58 +8,66 @@ import {
   AlertTriangle, 
   RefreshCw, 
   Play, 
-  Server, 
   EyeOff, 
   FileText, 
   Radio, 
   UserCheck,
   Smartphone,
-  QrCode
+  QrCode,
+  Terminal
 } from 'lucide-react';
 import { TenantSecurityEngine } from '../services/tenantSecurity';
+import { VaultCryptoService, EncryptedVaultPayload } from '../../worker/crypto/vaultCrypto';
+import { SecurityTestResult } from '../types/security';
 
 export const SecurityGuardView: React.FC = () => {
   const { 
-    securityEvents, 
     retentionPolicies, 
-    runSecurityAuditTests, 
     recordQuickCheckIn,
-    currentRole,
     currentOrg,
     t 
   } = usePlatform();
 
-  const [testResults, setTestResults] = useState<Array<{
-    testName: string;
-    description: string;
-    passed: boolean;
-    statusText: string;
-  }>>([]);
-
+  const [testResults, setTestResults] = useState<SecurityTestResult[]>([]);
   const [isRunningTests, setIsRunningTests] = useState(false);
   const [activeTab, setActiveTab] = useState<'tests' | 'envelope' | 'rbac' | 'retention' | 'checkin'>('tests');
 
-  // Encryption Visualizer State
+  // Real Web Crypto AES-GCM Visualizer State
   const [plainTextInput, setPlainTextInput] = useState('Customer Real Name: Ayşe Kaya | Phone: +90 532 999 8877');
-  const [encryptedOutput, setEncryptedOutput] = useState<{ ciphertext: string; keyVersion: number } | null>(null);
+  const [encryptedOutput, setEncryptedOutput] = useState<EncryptedVaultPayload | null>(null);
+  const [decryptedOutput, setDecryptedOutput] = useState<string | null>(null);
+  const [isEncrypting, setIsEncrypting] = useState(false);
 
   // Quick Check-In Form State
   const [checkInType, setCheckInType] = useState<'appointment_arrival' | 'walk_in' | 'vip_arrival'>('appointment_arrival');
   const [partySize, setPartySize] = useState<number>(1);
   const [lastLoggedCheckIn, setLastLoggedCheckIn] = useState<string | null>(null);
 
-  const handleRunSecurityTests = () => {
+  const handleRunSecurityTests = async () => {
     setIsRunningTests(true);
-    setTimeout(() => {
-      const results = runSecurityAuditTests();
+    try {
+      const results = await TenantSecurityEngine.runCrossTenantTestsAsync();
       setTestResults(results);
+    } catch (err) {
+      // Fallback
+      setTestResults(TenantSecurityEngine.runCrossTenantTests());
+    } finally {
       setIsRunningTests(false);
-    }, 400);
+    }
   };
 
-  const handleEncryptSimulation = () => {
-    const res = TenantSecurityEngine.mockEnvelopeEncrypt(currentOrg.id, plainTextInput);
-    setEncryptedOutput(res);
+  const handleEncryptSimulation = async () => {
+    setIsEncrypting(true);
+    try {
+      const enc = await VaultCryptoService.encrypt(plainTextInput, currentOrg.id);
+      setEncryptedOutput(enc);
+      const dec = await VaultCryptoService.decrypt(enc, currentOrg.id);
+      setDecryptedOutput(dec);
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setIsEncrypting(false);
+    }
   };
 
   const handleLogCheckIn = (e: React.FormEvent) => {
@@ -81,7 +88,7 @@ export const SecurityGuardView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2 text-[10px] font-mono tracking-widest text-[#C5A880] uppercase">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>ENTERPRISE GOVERNANCE & IDENTITY VAULT</span>
+            <span>ENTERPRISE HARDENING GATE & ZERO-TRUST VAULT</span>
           </div>
           <h1 className="text-xl font-medium text-[#F5F4F0] mt-1">
             {t.securityView.title}
@@ -94,7 +101,7 @@ export const SecurityGuardView: React.FC = () => {
         <div className="flex items-center gap-3">
           <div className="bg-[#141620] px-3.5 py-2.5 rounded-lg border border-[#272C3D] flex items-center space-x-2 text-xs font-mono text-emerald-400">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Zero-Trust Vault Active</span>
+            <span>Web Crypto AES-GCM-256 Active</span>
           </div>
         </div>
       </div>
@@ -103,7 +110,7 @@ export const SecurityGuardView: React.FC = () => {
       <div className="bg-[#090A0D] p-4 rounded-xl border border-sky-900/40 bg-gradient-to-r from-sky-950/20 to-transparent flex items-start space-x-3">
         <EyeOff className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
         <div className="text-xs space-y-1">
-          <strong className="text-sky-300 font-mono">CALL BRIDGE PRIVACY MANDATE:</strong>
+          <strong className="text-sky-300 font-mono">CALL BRIDGE PRIVACY MANDATE & VAULT SEGREGATION:</strong>
           <p className="text-[#D8D6CD] leading-relaxed">
             {t.securityView.privacyCallNotice}
           </p>
@@ -111,58 +118,58 @@ export const SecurityGuardView: React.FC = () => {
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex border-b border-[#232732] gap-2 font-mono text-xs">
+      <div className="flex border-b border-[#232732] gap-2 font-mono text-xs overflow-x-auto">
         <button
           onClick={() => setActiveTab('tests')}
-          className={`px-4 py-2.5 rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2.5 rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'tests'
               ? 'bg-[#090A0D] text-[#F5F4F0] border-t border-x border-[#232732] font-semibold'
               : 'text-[#8E909B] hover:text-[#E6E4DC]'
           }`}
         >
           <Play className="w-3.5 h-3.5 text-[#C5A880]" />
-          <span>Cross-Tenant Test Suite</span>
+          <span>Security Hardening Gate Tests (10)</span>
         </button>
 
         <button
           onClick={() => setActiveTab('envelope')}
-          className={`px-4 py-2.5 rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2.5 rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'envelope'
               ? 'bg-[#090A0D] text-[#F5F4F0] border-t border-x border-[#232732] font-semibold'
               : 'text-[#8E909B] hover:text-[#E6E4DC]'
           }`}
         >
           <Lock className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Envelope Encryption</span>
+          <span>Web Crypto AES-GCM Vault</span>
         </button>
 
         <button
           onClick={() => setActiveTab('rbac')}
-          className={`px-4 py-2.5 rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2.5 rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'rbac'
               ? 'bg-[#090A0D] text-[#F5F4F0] border-t border-x border-[#232732] font-semibold'
               : 'text-[#8E909B] hover:text-[#E6E4DC]'
           }`}
         >
           <UserCheck className="w-3.5 h-3.5 text-purple-400" />
-          <span>5-Role RBAC Matrix</span>
+          <span>Canonical 5-Role RBAC Matrix</span>
         </button>
 
         <button
           onClick={() => setActiveTab('retention')}
-          className={`px-4 py-2.5 rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2.5 rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'retention'
               ? 'bg-[#090A0D] text-[#F5F4F0] border-t border-x border-[#232732] font-semibold'
               : 'text-[#8E909B] hover:text-[#E6E4DC]'
           }`}
         >
           <FileText className="w-3.5 h-3.5 text-amber-400" />
-          <span>Data Retention & Anomaly</span>
+          <span>Retention & Anomaly Receiver</span>
         </button>
 
         <button
           onClick={() => setActiveTab('checkin')}
-          className={`px-4 py-2.5 rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2.5 rounded-t-lg transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'checkin'
               ? 'bg-[#090A0D] text-[#F5F4F0] border-t border-x border-[#232732] font-semibold'
               : 'text-[#8E909B] hover:text-[#E6E4DC]'
@@ -182,7 +189,7 @@ export const SecurityGuardView: React.FC = () => {
                 {t.securityView.testSuiteTitle}
               </h3>
               <p className="text-xs text-[#8E909B] mt-0.5">
-                Executes simulated adversarial tenant boundary penetration attempts to prove zero data leakage.
+                Executes 10 automated verification tests: Cross-tenant isolation, real AES-GCM tamper detection, RBAC gate, and log redaction.
               </p>
             </div>
 
@@ -192,16 +199,16 @@ export const SecurityGuardView: React.FC = () => {
               className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-[#C5A880] text-black font-medium text-xs hover:bg-[#D4BC98] transition-colors cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRunningTests ? 'animate-spin' : ''}`} />
-              <span>{isRunningTests ? 'Executing Tests...' : t.securityView.runTestsBtn}</span>
+              <span>{isRunningTests ? 'Executing Live Crypto & Security Tests...' : 'Execute Hardening Suite (10 Tests)'}</span>
             </button>
           </div>
 
           {testResults.length === 0 ? (
             <div className="bg-[#141620] p-8 rounded-lg border border-[#1E2230] text-center space-y-2">
               <ShieldCheck className="w-8 h-8 text-[#C5A880] mx-auto opacity-70" />
-              <div className="text-xs font-mono text-[#E6E4DC]">Security Regression Suite Ready</div>
+              <div className="text-xs font-mono text-[#E6E4DC]">Security Regression Suite Ready (10 Hardening Tests)</div>
               <p className="text-[11px] text-[#717482] max-w-md mx-auto">
-                Click "Execute Security Breach Tests" to simulate cross-tenant lead queries, unauthorized action approvals, and RBAC boundary checks.
+                Click "Execute Hardening Suite" to run cryptographic key derivation, cross-tenant isolation, tamper resistance, and RBAC boundary verification.
               </p>
             </div>
           ) : (
@@ -215,13 +222,13 @@ export const SecurityGuardView: React.FC = () => {
                       ) : (
                         <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
                       )}
-                      <span>{tCase.testName}</span>
+                      <span>{tCase.name}</span>
+                      <span className="text-[10px] font-mono text-[#717482]">[{tCase.testId}]</span>
                     </div>
-                    <p className="text-[11px] text-[#8E909B]">{tCase.description}</p>
-                    <div className="text-[10px] font-mono text-[#C5A880]">{tCase.statusText}</div>
+                    <p className="text-[11px] text-[#8E909B] font-mono">{tCase.details}</p>
                   </div>
 
-                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                  <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded ${
                     tCase.passed ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/40' : 'bg-red-950 text-red-400'
                   }`}>
                     {tCase.passed ? 'PASSED' : 'FAILED'}
@@ -233,22 +240,22 @@ export const SecurityGuardView: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 2: Server-Side Envelope Encryption Simulator */}
+      {/* Tab 2: Server-Side Web Crypto AES-GCM Envelope Simulator */}
       {activeTab === 'envelope' && (
         <div className="bg-[#090A0D] rounded-xl border border-[#232732] p-6 space-y-5">
           <div>
             <h3 className="text-sm font-medium text-[#F5F4F0]">
-              {t.securityView.envelopeTitle}
+              Standard Web Crypto (crypto.subtle) AES-GCM-256 Envelope Encryption
             </h3>
             <p className="text-xs text-[#8E909B] mt-0.5">
-              {t.securityView.envelopeDesc}
+              Master Secret + Tenant Context → HKDF → Tenant DEK (256-bit AES-GCM + 96-bit unique IV + 128-bit authentication tag). Zero fake encryption.
             </p>
           </div>
 
           <div className="space-y-3 text-xs font-mono">
             <div>
               <label className="block text-[11px] text-[#8E909B] mb-1">
-                Plaintext PII Input (Segregated into Identity Vault)
+                Plaintext Customer PII Input (Segregated into Zero-Knowledge Identity Vault)
               </label>
               <textarea
                 rows={2}
@@ -260,39 +267,55 @@ export const SecurityGuardView: React.FC = () => {
 
             <button
               onClick={handleEncryptSimulation}
-              className="px-4 py-2 rounded-lg bg-[#C5A880] text-black font-medium text-xs hover:bg-[#D4BC98] transition-colors cursor-pointer"
+              disabled={isEncrypting}
+              className="px-4 py-2 rounded-lg bg-[#C5A880] text-black font-medium text-xs hover:bg-[#D4BC98] transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
-              Simulate Server-Side KMS & DEK Envelope Encryption
+              <Lock className="w-3.5 h-3.5" />
+              <span>{isEncrypting ? 'Deriving DEK & Encrypting...' : 'Execute Real Web Crypto AES-GCM Encryption'}</span>
             </button>
 
             {encryptedOutput && (
-              <div className="bg-[#141620] p-4 rounded-lg border border-[#1E2230] space-y-2 text-xs">
-                <div className="text-[#C5A880] font-semibold flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5" />
-                  <span>Envelope Encryption Output (Stored in DB):</span>
+              <div className="space-y-3 pt-2">
+                <div className="bg-[#141620] p-4 rounded-lg border border-[#1E2230] space-y-2 text-xs">
+                  <div className="text-[#C5A880] font-semibold flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5" />
+                    <span>Ciphertext Payload Envelope (Stored in D1 / DB):</span>
+                  </div>
+                  <pre className="bg-[#0B0D13] p-2.5 rounded border border-[#1A1D27] text-emerald-400 break-all text-[10px] overflow-x-auto">
+                    {JSON.stringify(encryptedOutput, null, 2)}
+                  </pre>
+                  <div className="text-[10px] text-[#717482] flex justify-between">
+                    <span>Algorithm: {encryptedOutput.algorithm}</span>
+                    <span>Tag Length: {encryptedOutput.tagLength} bits (Tamper-Resistant)</span>
+                  </div>
                 </div>
-                <div className="bg-[#0B0D13] p-2.5 rounded border border-[#1A1D27] text-emerald-400 break-all">
-                  {encryptedOutput.ciphertext}
-                </div>
-                <div className="text-[10px] text-[#717482] flex justify-between">
-                  <span>Tenant DEK Version: {encryptedOutput.keyVersion}</span>
-                  <span>Zero Plaintext Stored in Event Telemetry</span>
-                </div>
+
+                {decryptedOutput && (
+                  <div className="bg-[#141620] p-3.5 rounded-lg border border-[#1E2230] space-y-1 text-xs">
+                    <div className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Decrypted Plaintext (Authorized Under Tenant [{currentOrg.id}]):</span>
+                    </div>
+                    <div className="text-[#D8D6CD] font-mono text-[11px]">
+                      {decryptedOutput}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Tab 3: 5-Role RBAC Matrix */}
+      {/* Tab 3: Canonical 5-Role RBAC Matrix */}
       {activeTab === 'rbac' && (
         <div className="bg-[#090A0D] rounded-xl border border-[#232732] p-6 space-y-4">
           <div>
             <h3 className="text-sm font-medium text-[#F5F4F0]">
-              5 Enterprise Roles & Access Matrix
+              Canonical 5-Role Deterministic RBAC Permission Matrix
             </h3>
             <p className="text-xs text-[#8E909B] mt-0.5">
-              Strict deterministic role enforcement. AI never decides or alters user permissions.
+              Strict deterministic role enforcement. Server-side TenantGuard validates every API mutation and query.
             </p>
           </div>
 
@@ -302,9 +325,9 @@ export const SecurityGuardView: React.FC = () => {
                 <tr className="border-b border-[#1E222D] text-[10px] text-[#717482] uppercase bg-[#0D0F15]">
                   <th className="py-2.5 px-3">Role</th>
                   <th className="py-2.5 px-3">Appointments</th>
-                  <th className="py-2.5 px-3">Lead Velocity</th>
+                  <th className="py-2.5 px-3">Leads & SLA</th>
                   <th className="py-2.5 px-3">Action Approval</th>
-                  <th className="py-2.5 px-3">Settings & RBAC</th>
+                  <th className="py-2.5 px-3">Settings & Security</th>
                   <th className="py-2.5 px-3">Identity Vault</th>
                 </tr>
               </thead>
@@ -323,7 +346,7 @@ export const SecurityGuardView: React.FC = () => {
                   <td className="py-2.5 px-3 text-emerald-400">Full Access</td>
                   <td className="py-2.5 px-3 text-emerald-400">Approve & Execute</td>
                   <td className="py-2.5 px-3 text-emerald-400">Config Only</td>
-                  <td className="py-2.5 px-3 text-zinc-600">Restricted</td>
+                  <td className="py-2.5 px-3 text-zinc-600">Restricted (403)</td>
                 </tr>
                 <tr>
                   <td className="py-2.5 px-3 text-purple-400 font-bold">MANAGER</td>
@@ -331,7 +354,7 @@ export const SecurityGuardView: React.FC = () => {
                   <td className="py-2.5 px-3 text-emerald-400">Dispatch Leads</td>
                   <td className="py-2.5 px-3 text-amber-400">Operational Only</td>
                   <td className="py-2.5 px-3 text-zinc-600">Read-Only</td>
-                  <td className="py-2.5 px-3 text-zinc-600">Restricted</td>
+                  <td className="py-2.5 px-3 text-zinc-600">Restricted (403)</td>
                 </tr>
                 <tr>
                   <td className="py-2.5 px-3 text-zinc-300 font-bold">STAFF</td>
@@ -339,7 +362,7 @@ export const SecurityGuardView: React.FC = () => {
                   <td className="py-2.5 px-3 text-emerald-400">View Inbound</td>
                   <td className="py-2.5 px-3 text-red-400">Blocked (403)</td>
                   <td className="py-2.5 px-3 text-red-400">Blocked (403)</td>
-                  <td className="py-2.5 px-3 text-zinc-600">Restricted</td>
+                  <td className="py-2.5 px-3 text-zinc-600">Restricted (403)</td>
                 </tr>
                 <tr>
                   <td className="py-2.5 px-3 text-zinc-500 font-bold">VIEWER</td>
@@ -347,7 +370,7 @@ export const SecurityGuardView: React.FC = () => {
                   <td className="py-2.5 px-3 text-zinc-400">Read-Only</td>
                   <td className="py-2.5 px-3 text-red-400">Blocked (403)</td>
                   <td className="py-2.5 px-3 text-zinc-400">Read-Only</td>
-                  <td className="py-2.5 px-3 text-zinc-600">Restricted</td>
+                  <td className="py-2.5 px-3 text-zinc-600">Restricted (403)</td>
                 </tr>
               </tbody>
             </table>
@@ -375,17 +398,17 @@ export const SecurityGuardView: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-[#090A0D] rounded-xl border border-purple-900/30 bg-gradient-to-br from-purple-950/10 to-[#090A0D] p-5 space-y-2">
-            <div className="flex items-center space-x-2 text-xs font-mono text-purple-400">
+          <div className="bg-[#090A0D] rounded-xl border border-zinc-800 p-5 space-y-2">
+            <div className="flex items-center space-x-2 text-xs font-mono text-zinc-400">
               <Radio className="w-3.5 h-3.5" />
-              <span>{t.securityView.fulgorRayTitle}</span>
+              <span>Fulgor Ray Provider-Neutral Anomaly Telemetry Adapter</span>
             </div>
-            <p className="text-xs text-[#D8D6CD] leading-relaxed">
-              {t.securityView.fulgorRayDesc}
+            <p className="text-xs text-[#8E909B] leading-relaxed">
+              Fulgor Ray is a future offline security and anomaly telemetry receiver. In accordance with Sprint 3.1 hardening mandates, this adapter is currently <strong>DISABLED / UNCONFIGURED</strong> and possesses zero authorization or identity authorities.
             </p>
-            <div className="pt-2 text-[10px] font-mono text-[#8E909B] flex items-center justify-between">
-              <span>Adapter State: <strong>Online & Streaming Anonymized Telemetry</strong></span>
-              <span className="text-purple-300">Active Behavioral Score: 0.02 (Nominal)</span>
+            <div className="pt-2 text-[10px] font-mono text-[#8E909B] flex items-center justify-between border-t border-[#1C202B]">
+              <span>Adapter State: <strong className="text-amber-400">DISABLED (Offline Sink Only)</strong></span>
+              <span className="text-zinc-500">Zero In-Path Authorization Impact</span>
             </div>
           </div>
         </div>

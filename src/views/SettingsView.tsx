@@ -311,8 +311,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-              {(['owner', 'admin', 'member', 'auditor'] as UserRole[]).map((role) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs font-mono">
+              {(['OWNER', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER'] as UserRole[]).map((role) => (
                 <div
                   key={role}
                   id={`role-select-${role}`}
@@ -328,7 +328,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
                     {currentRole === role && <span className="text-[10px] bg-[#C5A880] text-black font-bold px-1.5 py-0.2 rounded">ACTIVE</span>}
                   </div>
                   <p className="text-[11px] text-[#8E909B] font-sans">
-                    {t.settings.rbac.roles[role]}
+                    {role === 'OWNER' && 'Full executive authority, Identity Vault decrypt, and billing configuration.'}
+                    {role === 'ADMIN' && 'System configuration, growth action approval, and connector management.'}
+                    {role === 'MANAGER' && 'Operational team dispatch, lead inbox review, and appointment overview.'}
+                    {role === 'STAFF' && 'Appointment scheduling, physical desk check-in, and customer communication.'}
+                    {role === 'VIEWER' && 'Read-only analytics and audit trail monitoring. Action execution blocked.'}
                   </p>
                 </div>
               ))}
