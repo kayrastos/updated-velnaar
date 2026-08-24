@@ -9,8 +9,9 @@ import { AttributionRepository } from '../repositories/attributionRepository';
 
 export async function handleAttributionRoute(
   req: Request,
-  user: AuthenticatedUser,
-  url: URL
+  user: AuthenticatedUser | null,
+  url: URL,
+  db?: D1Database
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
   const businessId = url.searchParams.get('businessId') || undefined;
@@ -21,7 +22,7 @@ export async function handleAttributionRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const results = await AttributionRepository.listResultsByOrg(orgId, businessId);
+    const results = await AttributionRepository.listResultsByOrg(db, orgId, businessId);
     return Response.json({ data: results, orgId });
   }
 

@@ -9,9 +9,11 @@ import { IdentityVaultRepository } from '../repositories/identityVaultRepository
 
 export async function handleVaultRoute(
   req: Request,
-  user: AuthenticatedUser,
+  user: AuthenticatedUser | null,
   url: URL,
-  envSecret?: string
+  db?: D1Database,
+  envSecret?: string,
+  env?: { ENVIRONMENT?: string }
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
 
@@ -25,12 +27,12 @@ export async function handleVaultRoute(
     const pseudonymId = url.searchParams.get('pseudonymId');
     if (!pseudonymId) {
       // Return ciphertext metadata list (no raw PII)
-      const records = await IdentityVaultRepository.listCiphertextRecords(orgId);
+      const records = await IdentityVaultRepository.listCiphertextRecords(db, orgId);
       return Response.json({ data: records, orgId });
     }
 
     try {
-      const decrypted = await IdentityVaultRepository.getDecryptedIdentity(pseudonymId, orgId, envSecret);
+      const decrypted = await IdentityVaultRepository.getDecryptedIdentity(db, pseudonymId, orgId, envSecret, env);
       if (!decrypted) {
         return Response.json({ error: 'Identity not found for this pseudonym in this tenant.' }, { status: 404 });
       }
@@ -48,7 +50,7 @@ export async function handleVaultRoute(
     }
 
     const body = await req.json() as { fullName: string; email: string; phone: string; pseudonymId?: string };
-    const record = await IdentityVaultRepository.storeIdentity(body, orgId, envSecret);
+    const record = await IdentityVaultRepository.storeIdentity(db, body, orgId, envSecret, env);
     return Response.json({
       data: {
         pseudonymId: record.pseudonymId,

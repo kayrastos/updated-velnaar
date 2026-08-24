@@ -3,10 +3,11 @@
  * @description Server-Side Tenant Boundary & Canonical RBAC Authorization Guard
  * 
  * ============================================================================
- * CRITICAL RULE:
- * The React frontend must NEVER decide whether a user may access another tenant's resource.
- * All queries and mutations are authorized and scoped server-side.
- * Never trust organizationId or businessId supplied by browser input.
+ * CRITICAL ARCHITECTURAL RULES:
+ * 1. The React frontend must NEVER decide whether a user may access another tenant's resource.
+ * 2. All queries and mutations are authorized and scoped server-side.
+ * 3. Never trust organizationId or businessId supplied by browser input.
+ * 4. Fail-closed: Unauthenticated requests return 401; cross-tenant or unauthorized return 403.
  * ============================================================================
  */
 
@@ -27,13 +28,22 @@ export class TenantGuard {
    * Authorize a request against the target organization and required resource action.
    */
   public static authorize(
-    user: AuthenticatedUser,
+    user: AuthenticatedUser | null | undefined,
     targetOrgId: string,
     action: ResourceAction,
     sourceIpHash: string = '127.0.0.1_local'
   ): AuthorizationResult {
-    // 1. Validate Organization Membership
-    const membership = user.memberships.find(m => m.organizationId === targetOrgId);
+    // 1. Authentication Check
+    if (!user) {
+      return {
+        authorized: false,
+        statusCode: 401,
+        errorMessage: 'UNAUTHENTICATED: Valid session or bearer authorization token is required.'
+      };
+    }
+
+    // 2. Validate Organization Membership
+    const membership = user.memberships?.find(m => m.organizationId === targetOrgId);
 
     if (!membership && !user.isSuperAdmin) {
       // Record Cross-Tenant Boundary Violation
@@ -45,7 +55,7 @@ export class TenantGuard {
         actorUserId: user.userId,
         details: {
           attemptedOrgTarget: targetOrgId,
-          userOrgs: user.memberships.map(m => m.organizationId),
+          userOrgs: user.memberships?.map(m => m.organizationId) || [],
           requestedAction: action,
         },
         enforcementAction: 'BLOCKED_IMMEDIATELY',
@@ -68,7 +78,7 @@ export class TenantGuard {
 
     const effectiveRole: UserRole = user.isSuperAdmin ? 'OWNER' : (membership?.role || 'VIEWER');
 
-    // 2. Validate RBAC Action Permission
+    // 3. Validate RBAC Action Permission
     const hasPerm = AuthContextService.hasPermission(effectiveRole, action);
     if (!hasPerm) {
       SecurityPipeline.recordEvent({

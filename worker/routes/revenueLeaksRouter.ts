@@ -9,8 +9,9 @@ import { RevenueLeakRepository } from '../repositories/revenueLeakRepository';
 
 export async function handleRevenueLeaksRoute(
   req: Request,
-  user: AuthenticatedUser,
-  url: URL
+  user: AuthenticatedUser | null,
+  url: URL,
+  db?: D1Database
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
   const businessId = url.searchParams.get('businessId') || undefined;
@@ -21,7 +22,7 @@ export async function handleRevenueLeaksRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const leaks = await RevenueLeakRepository.listByOrg(orgId, businessId);
+    const leaks = await RevenueLeakRepository.listByOrg(db, orgId, businessId);
     return Response.json({ data: leaks, orgId });
   }
 

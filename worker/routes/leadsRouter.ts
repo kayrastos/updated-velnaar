@@ -9,8 +9,9 @@ import { LeadRepository } from '../repositories/leadRepository';
 
 export async function handleLeadsRoute(
   req: Request,
-  user: AuthenticatedUser,
-  url: URL
+  user: AuthenticatedUser | null,
+  url: URL,
+  db?: D1Database
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
   const businessId = url.searchParams.get('businessId') || undefined;
@@ -22,8 +23,7 @@ export async function handleLeadsRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const leads = await LeadRepository.listByOrg(orgId, businessId);
-    // Minimize response DTO - strip unnecessary fields if requested
+    const leads = await LeadRepository.listByOrg(db, orgId, businessId);
     return Response.json({ data: leads, orgId });
   }
 
@@ -35,11 +35,11 @@ export async function handleLeadsRoute(
     }
 
     const body = await req.json() as any;
-    const newLead = await LeadRepository.create(body, orgId);
+    const newLead = await LeadRepository.create(db, body, orgId);
     return Response.json({ data: newLead, orgId }, { status: 201 });
   }
 
-  // 3. PATCH /api/leads/dispatch or update status
+  // 3. PATCH /api/leads - Update status / dispatch
   if (req.method === 'PATCH') {
     const auth = TenantGuard.authorize(user, orgId, 'leads.dispatch');
     if (!auth.authorized) {
@@ -47,7 +47,7 @@ export async function handleLeadsRoute(
     }
 
     const body = await req.json() as { leadId: string; status: any };
-    const updated = await LeadRepository.updateStatus(body.leadId, body.status, orgId);
+    const updated = await LeadRepository.updateStatus(db, body.leadId, body.status, orgId);
     if (!updated) {
       return Response.json({ error: 'Lead not found or does not belong to your organization.' }, { status: 404 });
     }

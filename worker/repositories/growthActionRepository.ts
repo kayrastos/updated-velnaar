@@ -1,12 +1,19 @@
 /**
  * @file growthActionRepository.ts
- * @description Tenant-Scoped Growth Action & Proof Result Repository
+ * @description Tenant-Scoped Cloudflare D1 Growth Action & Proof Result Repository
+ * 
+ * ============================================================================
+ * ARCHITECTURAL MANDATES:
+ * 1. Multi-tenant isolation: Every query scoped with WHERE organization_id = ?
+ * 2. Revenue values in integer minor units.
+ * 3. Human-in-the-loop approval state tracking.
+ * ============================================================================
  */
 
 import { GrowthActionRow, ActionResultRow } from '../../src/types/database';
 
 export class GrowthActionRepository {
-  private static actions: GrowthActionRow[] = [
+  private static memActions: GrowthActionRow[] = [
     {
       id: 'act_001',
       leak_id: 'leak_001',
@@ -28,7 +35,7 @@ export class GrowthActionRepository {
     }
   ];
 
-  private static results: ActionResultRow[] = [
+  private static memResults: ActionResultRow[] = [
     {
       id: 'res_001',
       growth_action_id: 'act_001',
@@ -47,38 +54,133 @@ export class GrowthActionRepository {
     }
   ];
 
-  public static async listActionsByOrg(orgId: string, businessId?: string): Promise<GrowthActionRow[]> {
-    return GrowthActionRepository.actions.filter(a => {
+  public static async listActionsByOrg(
+    db: D1Database | undefined,
+    orgId: string,
+    businessId?: string
+  ): Promise<GrowthActionRow[]> {
+    if (db) {
+      let query = `
+        SELECT id, leak_id, business_id, organization_id, market, title, hypothesis,
+               action_type, execution_payload_json, requires_approval, approval_status,
+               approved_by_user_id, approved_at, guardrails_passed, created_at
+        FROM growth_actions
+        WHERE organization_id = ?
+      `;
+      const params: string[] = [orgId];
+      if (businessId) {
+        query += ` AND business_id = ?`;
+        params.push(businessId);
+      }
+      query += ` ORDER BY created_at DESC`;
+
+      const { results } = await db.prepare(query).bind(...params).all<GrowthActionRow>();
+      return results || [];
+    }
+
+    return GrowthActionRepository.memActions.filter(a => {
       const orgMatch = a.organization_id === orgId;
       return businessId ? orgMatch && a.business_id === businessId : orgMatch;
     });
   }
 
-  public static async getActionById(actionId: string, orgId: string): Promise<GrowthActionRow | null> {
-    const act = GrowthActionRepository.actions.find(a => a.id === actionId && a.organization_id === orgId);
+  public static async getActionById(
+    db: D1Database | undefined,
+    actionId: string,
+    orgId: string
+  ): Promise<GrowthActionRow | null> {
+    if (db) {
+      const r = await db.prepare(`
+        SELECT id, leak_id, business_id, organization_id, market, title, hypothesis,
+               action_type, execution_payload_json, requires_approval, approval_status,
+               approved_by_user_id, approved_at, guardrails_passed, created_at
+        FROM growth_actions
+        WHERE id = ? AND organization_id = ?
+      `).bind(actionId, orgId).first<GrowthActionRow>();
+      return r || null;
+    }
+
+    const act = GrowthActionRepository.memActions.find(a => a.id === actionId && a.organization_id === orgId);
     return act || null;
   }
 
   public static async updateActionApproval(
+    db: D1Database | undefined,
     actionId: string,
     status: GrowthActionRow['approval_status'],
     userId: string,
     orgId: string
   ): Promise<GrowthActionRow | null> {
-    const idx = GrowthActionRepository.actions.findIndex(a => a.id === actionId && a.organization_id === orgId);
+    const now = new Date().toISOString();
+
+    if (db) {
+      await db.prepare(`
+        UPDATE growth_actions
+        SET approval_status = ?, approved_by_user_id = ?, approved_at = ?
+        WHERE id = ? AND organization_id = ?
+      `).bind(status, userId, now, actionId, orgId).run();
+
+      return GrowthActionRepository.getActionById(db, actionId, orgId);
+    }
+
+    const idx = GrowthActionRepository.memActions.findIndex(a => a.id === actionId && a.organization_id === orgId);
     if (idx === -1) return null;
 
-    GrowthActionRepository.actions[idx] = {
-      ...GrowthActionRepository.actions[idx],
+    GrowthActionRepository.memActions[idx] = {
+      ...GrowthActionRepository.memActions[idx],
       approval_status: status,
       approved_by_user_id: userId,
-      approved_at: new Date().toISOString(),
+      approved_at: now,
     };
-    return GrowthActionRepository.actions[idx];
+    return GrowthActionRepository.memActions[idx];
   }
 
-  public static async listResultsByOrg(orgId: string, businessId?: string): Promise<ActionResultRow[]> {
-    return GrowthActionRepository.results.filter(r => {
+  public static async listResultsByOrg(
+    db: D1Database | undefined,
+    orgId: string,
+    businessId?: string
+  ): Promise<ActionResultRow[]> {
+    if (db) {
+      let query = `
+        SELECT id, growth_action_id, business_id, organization_id, status,
+               revenue_recovered_amount_minor, metric_delta_json, verified_at, proof_notes
+        FROM action_results
+        WHERE organization_id = ?
+      `;
+      const params: string[] = [orgId];
+      if (businessId) {
+        query += ` AND business_id = ?`;
+        params.push(businessId);
+      }
+      query += ` ORDER BY verified_at DESC`;
+
+      const { results } = await db.prepare(query).bind(...params).all<{
+        id: string;
+        growth_action_id: string;
+        business_id: string;
+        organization_id: string;
+        status: 'success' | 'in_progress' | 'failed';
+        revenue_recovered_amount_minor: number;
+        metric_delta_json: string;
+        verified_at: string;
+        proof_notes: string;
+      }>();
+
+      return (results || []).map(r => ({
+        id: r.id,
+        growth_action_id: r.growth_action_id,
+        business_id: r.business_id,
+        organization_id: r.organization_id,
+        status: r.status,
+        revenue_recovered_amount: Math.round(r.revenue_recovered_amount_minor / 100),
+        revenue_recovered_amount_minor: r.revenue_recovered_amount_minor,
+        metric_delta_json: r.metric_delta_json,
+        verified_at: r.verified_at,
+        proof_notes: r.proof_notes,
+      }));
+    }
+
+    return GrowthActionRepository.memResults.filter(r => {
       const orgMatch = r.organization_id === orgId;
       return businessId ? orgMatch && r.business_id === businessId : orgMatch;
     });

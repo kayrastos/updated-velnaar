@@ -13,11 +13,10 @@ import {
   Radio, 
   UserCheck,
   Smartphone,
-  QrCode,
-  Terminal
+  QrCode
 } from 'lucide-react';
 import { TenantSecurityEngine } from '../services/tenantSecurity';
-import { VaultCryptoService, EncryptedVaultPayload } from '../../worker/crypto/vaultCrypto';
+import { ApiClient } from '../services/apiClient';
 import { SecurityTestResult } from '../types/security';
 
 export const SecurityGuardView: React.FC = () => {
@@ -32,11 +31,22 @@ export const SecurityGuardView: React.FC = () => {
   const [isRunningTests, setIsRunningTests] = useState(false);
   const [activeTab, setActiveTab] = useState<'tests' | 'envelope' | 'rbac' | 'retention' | 'checkin'>('tests');
 
-  // Real Web Crypto AES-GCM Visualizer State
+  // Server-Side Web Crypto API Visualizer State
   const [plainTextInput, setPlainTextInput] = useState('Customer Real Name: Ayşe Kaya | Phone: +90 532 999 8877');
-  const [encryptedOutput, setEncryptedOutput] = useState<EncryptedVaultPayload | null>(null);
-  const [decryptedOutput, setDecryptedOutput] = useState<string | null>(null);
+  const [storedVaultRecord, setStoredVaultRecord] = useState<{
+    pseudonymId: string;
+    keyVersion: number;
+    algorithm: string;
+    createdAt: string;
+  } | null>(null);
+  const [decryptedOutput, setDecryptedOutput] = useState<{
+    pseudonymId: string;
+    fullName: string;
+    email: string;
+    phone: string;
+  } | null>(null);
   const [isEncrypting, setIsEncrypting] = useState(false);
+  const [cryptoError, setCryptoError] = useState<string | null>(null);
 
   // Quick Check-In Form State
   const [checkInType, setCheckInType] = useState<'appointment_arrival' | 'walk_in' | 'vip_arrival'>('appointment_arrival');
@@ -46,10 +56,10 @@ export const SecurityGuardView: React.FC = () => {
   const handleRunSecurityTests = async () => {
     setIsRunningTests(true);
     try {
-      const results = await TenantSecurityEngine.runCrossTenantTestsAsync();
+      const results = await TenantSecurityEngine.runCrossTenantTestsAsync(currentOrg.id);
       setTestResults(results);
-    } catch (err) {
-      // Fallback
+    } catch (err: any) {
+      console.warn('Falling back to local test runner view:', err);
       setTestResults(TenantSecurityEngine.runCrossTenantTests());
     } finally {
       setIsRunningTests(false);
@@ -58,12 +68,22 @@ export const SecurityGuardView: React.FC = () => {
 
   const handleEncryptSimulation = async () => {
     setIsEncrypting(true);
+    setCryptoError(null);
     try {
-      const enc = await VaultCryptoService.encrypt(plainTextInput, currentOrg.id);
-      setEncryptedOutput(enc);
-      const dec = await VaultCryptoService.decrypt(enc, currentOrg.id);
-      setDecryptedOutput(dec);
+      // 1. Send plaintext to Worker API to encrypt with AES-GCM-256 and store in Zero-Trust Vault
+      const stored = await ApiClient.storeVaultIdentity({
+        fullName: plainTextInput.split('|')[0]?.replace('Customer Real Name:', '').trim() || 'Ayşe Kaya',
+        email: 'ayse.kaya@customer-domain.com',
+        phone: plainTextInput.split('|')[1]?.replace('Phone:', '').trim() || '+90 532 999 8877',
+      }, currentOrg.id);
+
+      setStoredVaultRecord(stored);
+
+      // 2. Query Worker API to verify authenticated decryption under current tenant
+      const decrypted = await ApiClient.decryptVaultIdentity(stored.pseudonymId, currentOrg.id);
+      setDecryptedOutput(decrypted);
     } catch (e: any) {
+      setCryptoError(e.message || 'API encryption / decryption error');
       console.error(e);
     } finally {
       setIsEncrypting(false);
@@ -140,7 +160,7 @@ export const SecurityGuardView: React.FC = () => {
           }`}
         >
           <Lock className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Web Crypto AES-GCM Vault</span>
+          <span>Worker Web Crypto AES-GCM Vault API</span>
         </button>
 
         <button
@@ -240,22 +260,22 @@ export const SecurityGuardView: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 2: Server-Side Web Crypto AES-GCM Envelope Simulator */}
+      {/* Tab 2: Server-Side Web Crypto AES-GCM Envelope Visualizer via Worker API */}
       {activeTab === 'envelope' && (
         <div className="bg-[#090A0D] rounded-xl border border-[#232732] p-6 space-y-5">
           <div>
             <h3 className="text-sm font-medium text-[#F5F4F0]">
-              Standard Web Crypto (crypto.subtle) AES-GCM-256 Envelope Encryption
+              Worker Web Crypto (crypto.subtle) AES-GCM-256 Envelope Encryption API
             </h3>
             <p className="text-xs text-[#8E909B] mt-0.5">
-              Master Secret + Tenant Context → HKDF → Tenant DEK (256-bit AES-GCM + 96-bit unique IV + 128-bit authentication tag). Zero fake encryption.
+              Master Secret + Tenant Context → HKDF → Tenant DEK (256-bit AES-GCM + 96-bit unique IV + 128-bit authentication tag). Executed exclusively on Cloudflare Worker.
             </p>
           </div>
 
           <div className="space-y-3 text-xs font-mono">
             <div>
               <label className="block text-[11px] text-[#8E909B] mb-1">
-                Plaintext Customer PII Input (Segregated into Zero-Knowledge Identity Vault)
+                Plaintext Customer PII Input (Segregated into Zero-Knowledge Identity Vault via API)
               </label>
               <textarea
                 rows={2}
@@ -271,22 +291,28 @@ export const SecurityGuardView: React.FC = () => {
               className="px-4 py-2 rounded-lg bg-[#C5A880] text-black font-medium text-xs hover:bg-[#D4BC98] transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>{isEncrypting ? 'Deriving DEK & Encrypting...' : 'Execute Real Web Crypto AES-GCM Encryption'}</span>
+              <span>{isEncrypting ? 'Calling Worker Vault API...' : 'Execute Server-Side AES-GCM Vault API Call'}</span>
             </button>
 
-            {encryptedOutput && (
+            {cryptoError && (
+              <div className="p-3 bg-red-950/30 border border-red-800/40 rounded text-red-400 text-xs">
+                {cryptoError}
+              </div>
+            )}
+
+            {storedVaultRecord && (
               <div className="space-y-3 pt-2">
                 <div className="bg-[#141620] p-4 rounded-lg border border-[#1E2230] space-y-2 text-xs">
                   <div className="text-[#C5A880] font-semibold flex items-center gap-1.5">
                     <Key className="w-3.5 h-3.5" />
-                    <span>Ciphertext Payload Envelope (Stored in D1 / DB):</span>
+                    <span>Worker Stored Vault Metadata Record:</span>
                   </div>
                   <pre className="bg-[#0B0D13] p-2.5 rounded border border-[#1A1D27] text-emerald-400 break-all text-[10px] overflow-x-auto">
-                    {JSON.stringify(encryptedOutput, null, 2)}
+                    {JSON.stringify(storedVaultRecord, null, 2)}
                   </pre>
                   <div className="text-[10px] text-[#717482] flex justify-between">
-                    <span>Algorithm: {encryptedOutput.algorithm}</span>
-                    <span>Tag Length: {encryptedOutput.tagLength} bits (Tamper-Resistant)</span>
+                    <span>Algorithm: {storedVaultRecord.algorithm}</span>
+                    <span>Pseudonym: {storedVaultRecord.pseudonymId}</span>
                   </div>
                 </div>
 
@@ -294,10 +320,10 @@ export const SecurityGuardView: React.FC = () => {
                   <div className="bg-[#141620] p-3.5 rounded-lg border border-[#1E2230] space-y-1 text-xs">
                     <div className="text-emerald-400 font-semibold flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Decrypted Plaintext (Authorized Under Tenant [{currentOrg.id}]):</span>
+                      <span>Decrypted Plaintext from Worker (Authorized Under Tenant [{currentOrg.id}]):</span>
                     </div>
                     <div className="text-[#D8D6CD] font-mono text-[11px]">
-                      {decryptedOutput}
+                      Full Name: {decryptedOutput.fullName} | Email: {decryptedOutput.email} | Phone: {decryptedOutput.phone}
                     </div>
                   </div>
                 )}

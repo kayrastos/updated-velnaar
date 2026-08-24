@@ -1,13 +1,20 @@
 /**
  * @file auditRepository.ts
- * @description Append-Only Immutable Tenant Audit Repository
+ * @description Append-Only Immutable Cloudflare D1 Tenant Audit Repository
+ * 
+ * ============================================================================
+ * ARCHITECTURAL MANDATES:
+ * 1. Append-only compliance log
+ * 2. Mandatory tenant isolation with organization_id
+ * 3. Log redaction of all sensitive secrets
+ * ============================================================================
  */
 
 import { AuditLogRow, UserRole } from '../../src/types/database';
 import { SafeLogger } from '../security/safeLogger';
 
 export class AuditRepository {
-  private static auditLogs: AuditLogRow[] = [
+  private static memLogs: AuditLogRow[] = [
     {
       id: 'aud_init_01',
       organization_id: 'org_apex_holding',
@@ -23,26 +30,69 @@ export class AuditRepository {
     }
   ];
 
-  public static async listByOrg(orgId: string, limit: number = 100): Promise<AuditLogRow[]> {
-    return AuditRepository.auditLogs
+  public static async listByOrg(
+    db: D1Database | undefined,
+    orgId: string,
+    limit: number = 100
+  ): Promise<AuditLogRow[]> {
+    if (db) {
+      const { results } = await db.prepare(`
+        SELECT id, organization_id, business_id, actor_id, actor_role, action,
+               target_entity_type, target_entity_id, payload_diff_json, ip_hash, created_at
+        FROM audit_logs
+        WHERE organization_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+      `).bind(orgId, limit).all<AuditLogRow>();
+
+      return results || [];
+    }
+
+    return AuditRepository.memLogs
       .filter(l => l.organization_id === orgId)
       .slice(0, limit);
   }
 
   public static async append(
+    db: D1Database | undefined,
     entry: Omit<AuditLogRow, 'id' | 'created_at'>,
     orgId: string
   ): Promise<AuditLogRow> {
     const safePayload = SafeLogger.redactData(JSON.parse(entry.payload_diff_json || '{}'));
+    const id = `aud_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
+    const now = new Date().toISOString();
+
     const log: AuditLogRow = {
-      id: `aud_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`,
-      created_at: new Date().toISOString(),
+      id,
+      created_at: now,
       ...entry,
       organization_id: orgId, // Always force server-side organization_id
       payload_diff_json: JSON.stringify(safePayload),
     };
 
-    AuditRepository.auditLogs.unshift(log);
+    if (db) {
+      await db.prepare(`
+        INSERT INTO audit_logs (
+          id, organization_id, business_id, actor_id, actor_role, action,
+          target_entity_type, target_entity_id, payload_diff_json, ip_hash, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        id,
+        orgId,
+        entry.business_id || 'biz_global',
+        entry.actor_id,
+        entry.actor_role,
+        entry.action,
+        entry.target_entity_type,
+        entry.target_entity_id,
+        JSON.stringify(safePayload),
+        entry.ip_hash || '127.0.0.1_hash',
+        now
+      ).run();
+    } else {
+      AuditRepository.memLogs.unshift(log);
+    }
+
     SafeLogger.info(`[AUDIT_TRAIL] [${log.action}] by [${log.actor_role}] on [${log.target_entity_type}:${log.target_entity_id}] (Org: ${orgId})`);
     return log;
   }

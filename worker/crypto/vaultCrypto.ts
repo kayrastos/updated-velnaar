@@ -7,8 +7,9 @@
  * 1. Standard Web Crypto API (crypto.subtle) - ZERO invented or fake crypto.
  * 2. AES-GCM 256-bit authenticated encryption with 96-bit unique IV per operation.
  * 3. Master Secret (KMS/Worker Env) + Tenant Context -> HKDF -> Tenant DEK.
- * 4. Tamper detection: GCM tag validation rejects altered ciphertexts deterministically.
- * 5. Cross-tenant isolation: Tenant A cannot decrypt Tenant B ciphertext even with same Master Secret.
+ * 4. Fail-closed on Master Secret: Production MUST throw if KMS secret is missing.
+ * 5. Tamper detection: GCM tag validation rejects altered ciphertexts deterministically.
+ * 6. Cross-tenant isolation: Tenant A cannot decrypt Tenant B ciphertext.
  * ============================================================================
  */
 
@@ -27,14 +28,37 @@ export class VaultCryptoService {
   private static readonly ALGORITHM = 'AES-GCM';
 
   /**
-   * Resolve Master Secret from Worker Environment bindings or local development fallback.
+   * Helper to check if current runtime is strictly development or test mode.
    */
-  public static getMasterSecret(envSecret?: string): string {
+  public static isDevelopmentOrTest(env?: { ENVIRONMENT?: string }): boolean {
+    if (env?.ENVIRONMENT === 'production') {
+      return false;
+    }
+    if (env?.ENVIRONMENT === 'development' || env?.ENVIRONMENT === 'test') {
+      return true;
+    }
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Resolve Master Secret from Worker Environment bindings or fail closed in production.
+   */
+  public static getMasterSecret(envSecret?: string, env?: { ENVIRONMENT?: string }): string {
     if (envSecret && envSecret.trim().length >= 16) {
       return envSecret;
     }
-    // Safe dev fallback explicitly named
-    return VaultCryptoService.DEV_DEFAULT_MASTER_SECRET;
+
+    if (VaultCryptoService.isDevelopmentOrTest(env)) {
+      return VaultCryptoService.DEV_DEFAULT_MASTER_SECRET;
+    }
+
+    // Production fail-closed: Never fall back to dev secret
+    throw new Error(
+      'KMS_CONFIGURATION_ERROR: VELNAR_MASTER_KMS_SECRET environment secret is required in production and must be at least 16 characters.'
+    );
   }
 
   /**
@@ -73,36 +97,36 @@ export class VaultCryptoService {
   }
 
   /**
-   * Encrypt a sensitive PII field (e.g. name, email, phone) using Tenant-Scoped AES-GCM.
+   * Encrypt plaintext under Tenant DEK using standard Web Crypto AES-GCM
    */
   public static async encrypt(
     plaintext: string,
     tenantId: string,
-    masterSecret?: string,
-    keyVersion: number = VaultCryptoService.CURRENT_KEY_VERSION
+    envSecret?: string,
+    env?: { ENVIRONMENT?: string }
   ): Promise<EncryptedVaultPayload> {
-    const effectiveSecret = VaultCryptoService.getMasterSecret(masterSecret);
-    const tenantKey = await VaultCryptoService.deriveTenantDEK(effectiveSecret, tenantId);
+    const masterSecret = VaultCryptoService.getMasterSecret(envSecret, env);
+    const dek = await VaultCryptoService.deriveTenantDEK(masterSecret, tenantId);
 
-    // Generate cryptographically random 96-bit (12 byte) IV
+    // Generate unique 96-bit (12-byte) IV for AES-GCM per encryption
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encoder = new TextEncoder();
-    const data = encoder.encode(plaintext);
+    const encodedPlaintext = encoder.encode(plaintext);
 
     const ciphertextBuffer = await crypto.subtle.encrypt(
       {
         name: VaultCryptoService.ALGORITHM,
         iv,
-        tagLength: 128,
+        tagLength: 128, // 128-bit authentication tag
       },
-      tenantKey,
-      data
+      dek,
+      encodedPlaintext
     );
 
     return {
       version: 1,
       algorithm: 'AES-GCM-256',
-      keyVersion,
+      keyVersion: VaultCryptoService.CURRENT_KEY_VERSION,
       iv: VaultCryptoService.arrayBufferToBase64(iv.buffer),
       ciphertext: VaultCryptoService.arrayBufferToBase64(ciphertextBuffer),
       tagLength: 128,
@@ -110,42 +134,39 @@ export class VaultCryptoService {
   }
 
   /**
-   * Decrypt an encrypted vault payload using Tenant-Scoped AES-GCM.
-   * Fails and throws if ciphertext was tampered with or if queried by wrong tenantId.
+   * Decrypt ciphertext under Tenant DEK with tamper validation
    */
   public static async decrypt(
     payload: EncryptedVaultPayload,
     tenantId: string,
-    masterSecret?: string
+    envSecret?: string,
+    env?: { ENVIRONMENT?: string }
   ): Promise<string> {
-    const effectiveSecret = VaultCryptoService.getMasterSecret(masterSecret);
-    const tenantKey = await VaultCryptoService.deriveTenantDEK(effectiveSecret, tenantId);
+    const masterSecret = VaultCryptoService.getMasterSecret(envSecret, env);
+    const dek = await VaultCryptoService.deriveTenantDEK(masterSecret, tenantId);
 
-    const iv = VaultCryptoService.base64ToArrayBuffer(payload.iv);
-    const ciphertext = VaultCryptoService.base64ToArrayBuffer(payload.ciphertext);
+    const iv = new Uint8Array(VaultCryptoService.base64ToArrayBuffer(payload.iv));
+    const ciphertextBuffer = VaultCryptoService.base64ToArrayBuffer(payload.ciphertext);
 
     try {
       const decryptedBuffer = await crypto.subtle.decrypt(
         {
           name: VaultCryptoService.ALGORITHM,
-          iv: new Uint8Array(iv),
+          iv,
           tagLength: payload.tagLength || 128,
         },
-        tenantKey,
-        ciphertext
+        dek,
+        ciphertextBuffer
       );
 
       const decoder = new TextDecoder();
       return decoder.decode(decryptedBuffer);
     } catch (err) {
-      throw new Error(
-        `VAULT_DECRYPTION_FAILED: Cryptographic verification failed. Ciphertext may be tampered, corrupted, or accessed under invalid tenant context [${tenantId}].`
-      );
+      throw new Error(`VAULT_DECRYPTION_FAILED: GCM authentication tag verification failed or wrong tenant DEK.`);
     }
   }
 
-  // --- Binary Conversion Helpers ---
-
+  // --- Encoding Utilities ---
   private static arrayBufferToBase64(buffer: ArrayBuffer): string {
     const bytes = new Uint8Array(buffer);
     let binary = '';
@@ -156,11 +177,10 @@ export class VaultCryptoService {
   }
 
   private static base64ToArrayBuffer(base64: string): ArrayBuffer {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
     }
     return bytes.buffer;
   }

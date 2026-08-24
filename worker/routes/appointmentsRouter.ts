@@ -10,8 +10,9 @@ import { AppointmentStatus } from '../../src/types/appointment';
 
 export async function handleAppointmentsRoute(
   req: Request,
-  user: AuthenticatedUser,
-  url: URL
+  user: AuthenticatedUser | null,
+  url: URL,
+  db?: D1Database
 ): Promise<Response> {
   const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
   const businessId = url.searchParams.get('businessId') || undefined;
@@ -23,7 +24,7 @@ export async function handleAppointmentsRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const appointments = await AppointmentRepository.listByOrg(orgId, businessId);
+    const appointments = await AppointmentRepository.listByOrg(db, orgId, businessId);
     return Response.json({ data: appointments, orgId });
   }
 
@@ -35,11 +36,11 @@ export async function handleAppointmentsRoute(
     }
 
     const body = await req.json() as any;
-    const newAppointment = await AppointmentRepository.create(body, orgId);
+    const newAppointment = await AppointmentRepository.create(db, body, orgId);
     return Response.json({ data: newAppointment, orgId }, { status: 201 });
   }
 
-  // PATCH /api/appointments/status - Update Status (Complete, Cancel, No-Show, Confirm)
+  // PATCH /api/appointments - Update Status
   if (req.method === 'PATCH') {
     const body = await req.json() as { appointmentId: string; status: AppointmentStatus; reason?: string };
     const requiredAction = (body.status === 'cancelled' || body.status === 'no_show') 
@@ -51,7 +52,7 @@ export async function handleAppointmentsRoute(
       return Response.json({ error: auth.errorMessage }, { status: auth.statusCode });
     }
 
-    const updated = await AppointmentRepository.updateStatus(body.appointmentId, body.status, orgId, body.reason);
+    const updated = await AppointmentRepository.updateStatus(db, body.appointmentId, body.status, orgId, body.reason);
     if (!updated) {
       return Response.json({ error: 'Appointment not found or does not belong to your organization.' }, { status: 404 });
     }

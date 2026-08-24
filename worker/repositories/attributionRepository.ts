@@ -1,12 +1,18 @@
 /**
  * @file attributionRepository.ts
- * @description Tenant-Scoped Multi-Touch Attribution Repository
+ * @description Tenant-Scoped Cloudflare D1 Multi-Touch Attribution Repository
+ * 
+ * ============================================================================
+ * ARCHITECTURAL MANDATES:
+ * 1. Multi-tenant isolation: Scoped by organization_id
+ * 2. Integer Minor Units for money
+ * ============================================================================
  */
 
-import { AttributionResult, CustomerJourney } from '../../src/types/attribution';
+import { AttributionResult } from '../../src/types/attribution';
 
 export class AttributionRepository {
-  private static results: AttributionResult[] = [
+  private static memResults: AttributionResult[] = [
     {
       id: 'attr_res_01',
       journeyId: 'jrn_beauty_01',
@@ -46,11 +52,65 @@ export class AttributionRepository {
     }
   ];
 
-  public static async listResultsByOrg(orgId: string, businessId?: string): Promise<AttributionResult[]> {
-    // In production, multi-tenant results table includes organization_id
-    return AttributionRepository.results.filter(r => {
-      // Mock tenant filtering
-      return orgId === 'org_apex_holding';
+  public static async listResultsByOrg(
+    db: D1Database | undefined,
+    orgId: string,
+    businessId?: string
+  ): Promise<AttributionResult[]> {
+    if (db) {
+      let query = `
+        SELECT id, organization_id, business_id, journey_id, revenue_type, confidence,
+               attribution_method, gross_amount_minor, currency, evidence_summary,
+               data_sources_json, time_window_description, touchpoints_breakdown_json, calculated_at
+        FROM attribution_results
+        WHERE organization_id = ?
+      `;
+      const params: string[] = [orgId];
+      if (businessId) {
+        query += ` AND business_id = ?`;
+        params.push(businessId);
+      }
+      query += ` ORDER BY calculated_at DESC`;
+
+      const { results } = await db.prepare(query).bind(...params).all<{
+        id: string;
+        organization_id: string;
+        business_id: string;
+        journey_id: string;
+        revenue_type: AttributionResult['revenueType'];
+        confidence: AttributionResult['confidence'];
+        attribution_method: AttributionResult['attributionMethod'];
+        gross_amount_minor: number;
+        currency: 'TRY' | 'USD' | 'EUR';
+        evidence_summary: string;
+        data_sources_json: string;
+        time_window_description: string;
+        touchpoints_breakdown_json: string;
+        calculated_at: string;
+      }>();
+
+      return (results || []).map(r => ({
+        id: r.id,
+        journeyId: r.journey_id,
+        businessId: r.business_id,
+        revenueType: r.revenue_type,
+        confidence: r.confidence,
+        attributionMethod: r.attribution_method,
+        grossAmountMinor: r.gross_amount_minor,
+        currency: r.currency,
+        dataSources: JSON.parse(r.data_sources_json || '[]'),
+        evidenceSummary: r.evidence_summary,
+        timeWindowDescription: r.time_window_description,
+        touchpointsBreakdown: JSON.parse(r.touchpoints_breakdown_json || '[]'),
+        calculatedAt: r.calculated_at,
+      }));
+    }
+
+    if (orgId !== 'org_apex_holding') {
+      return [];
+    }
+    return AttributionRepository.memResults.filter(r => {
+      return businessId ? r.businessId === businessId : true;
     });
   }
 }
