@@ -427,7 +427,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
                 </div>
                 {theme === 'dark' && <span className="text-[10px] bg-theme-accent text-black font-bold px-1.5 py-0.2 rounded">SELECTED</span>}
               </div>
-              <div className="h-12 rounded-lg bg-[#090A0D] border border-[#232732] p-2 flex items-center justify-between">
+              <div className="h-12 rounded-lg bg-[#090A0D] border border-theme-border p-2 flex items-center justify-between">
                 <span className="text-[11px] text-[#F5F4F0] font-sans">Velvet Black & Champagne Gold</span>
                 <span className="w-3 h-3 rounded-full bg-[#D4AF37]"></span>
               </div>

@@ -85,7 +85,7 @@ export class IdentityVaultRepository {
     masterSecret?: string
   ): Promise<StoredVaultRecord> {
     IdentityVaultRepository.assertDbOrDev(db, environment);
-    const pseudonymId = data.pseudonymId || `cus_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
+    const pseudonymId = data.pseudonymId || `cus_${crypto.randomUUID()}`;
     
     // Encrypt each PII field individually with Tenant DEK
     const [nameEnc, emailEnc, phoneEnc] = await Promise.all([
@@ -94,7 +94,7 @@ export class IdentityVaultRepository {
       VaultCryptoService.encrypt(data.phone, orgId, environment, masterSecret),
     ]);
 
-    const id = `vrec_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
+    const id = `vrec_${crypto.randomUUID()}`;
     const now = new Date().toISOString();
 
     const record: StoredVaultRecord = {

@@ -20,7 +20,7 @@ export class SecurityPipeline {
    * Record a verified Security Event server-side.
    */
   public static recordEvent(event: Omit<SecurityEvent, 'id' | 'timestamp'>): SecurityEvent {
-    const id = `sec_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+    const id = `sec_${crypto.randomUUID()}`;
     const fullEvent: SecurityEvent = {
       id,
       timestamp: new Date().toISOString(),

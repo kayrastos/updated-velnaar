@@ -124,11 +124,29 @@ body.dark {
 .text-theme-accent {
   color: var(--accent);
 }
+.text-theme-success {
+  color: var(--success);
+}
+.text-theme-warning {
+  color: var(--warning);
+}
+.text-theme-danger {
+  color: var(--danger);
+}
 .bg-theme-accent {
   background-color: var(--accent);
 }
 .bg-theme-accent-muted {
   background-color: var(--accent-muted);
+}
+.bg-theme-success-muted {
+  background-color: var(--success-muted);
+}
+.bg-theme-warning-muted {
+  background-color: var(--warning-muted);
+}
+.bg-theme-danger-muted {
+  background-color: var(--danger-muted);
 }
 .border-theme-border {
   border-color: var(--border);

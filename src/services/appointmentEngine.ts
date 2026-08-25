@@ -66,7 +66,7 @@ export class AppointmentEngine {
     else if (newStatus === 'completed') eventType = 'appointment.completed';
 
     return {
-      id: `ev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `ev_${crypto.randomUUID()}`,
       organizationId: orgId,
       businessId: bizId,
       appointmentId,
@@ -98,8 +98,8 @@ export class AppointmentEngine {
     currency: string;
     notes?: string;
   }): { appointment: Appointment; event: AppointmentEvent } {
-    const aptId = `apt_man_${Date.now()}`;
-    const pseudonym = `c_ps_${Math.random().toString(36).substring(2, 8)}`;
+    const aptId = `apt_man_${crypto.randomUUID()}`;
+    const pseudonym = `c_ps_${crypto.randomUUID()}`;
     const startTime = new Date(params.scheduledStart);
     const endTime = new Date(startTime.getTime() + params.durationMinutes * 60000);
 
@@ -111,7 +111,7 @@ export class AppointmentEngine {
       customerPseudonymId: pseudonym,
       serviceName: params.serviceName,
       serviceCategory: params.serviceCategory,
-      resourceStaffId: `res_${Math.random().toString(36).substring(2, 6)}`,
+      resourceStaffId: `res_${crypto.randomUUID()}`,
       resourceStaffName: params.resourceStaffName,
       scheduledStart: startTime.toISOString(),
       scheduledEnd: endTime.toISOString(),

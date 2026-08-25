@@ -218,7 +218,7 @@ export class AppointmentRepository {
     environment: string = 'production'
   ): Promise<Appointment> {
     AppointmentRepository.assertDbOrDev(db, environment);
-    const id = `apt_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
+    const id = `apt_${crypto.randomUUID()}`;
     const now = new Date().toISOString();
     const newAppointment: Appointment = {
       id,

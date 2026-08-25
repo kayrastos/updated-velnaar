@@ -113,7 +113,6 @@ interface PlatformContextValue {
   }) => Appointment;
   updateAppointmentStatus: (appointmentId: string, status: AppointmentStatus, reason?: string) => void;
   recordQuickCheckIn: (type: CheckInType, source: CheckInSource, partySize: number, service?: string) => PhysicalCheckInEvent;
-  runSecurityAuditTests: () => Array<{ testName: string; description: string; passed: boolean; statusText: string }>;
 
   // Formatting Utilities
   formatCurrency: (amount: number) => string;
@@ -295,7 +294,7 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Append to Immutable Audit Log
   const logAuditEntry = (actionName: string, entityType: string, entityId: string, diff: Record<string, any>) => {
     const newLog: AuditLogRow = {
-      id: `aud_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`,
+      id: `aud_${crypto.randomUUID()}`,
       organization_id: currentOrg.id,
       business_id: currentBusiness.id,
       actor_id: mockUsers.find(u => u.role_global === 'founder')?.id || 'usr_owner_01',
@@ -304,7 +303,7 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       target_entity_type: entityType,
       target_entity_id: entityId,
       payload_diff_json: JSON.stringify(diff),
-      ip_hash: Math.random().toString(36).substring(2, 12) + 'a9',
+      ip_hash: crypto.randomUUID().replace(/-/g, '').substring(0, 10) + 'a9',
       created_at: new Date().toISOString(),
     };
     setAllAuditLogs(prev => [newLog, ...prev]);
@@ -549,11 +548,6 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return ev;
   };
 
-  // Sprint 3: Security Test Runner
-  const runSecurityAuditTests = () => {
-    return TenantSecurityEngine.runCrossTenantTests();
-  };
-
   const runLeakScan = async () => {
     setIsScanning(true);
     
@@ -632,7 +626,6 @@ export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         createManualAppointment,
         updateAppointmentStatus,
         recordQuickCheckIn,
-        runSecurityAuditTests,
         runLeakScan,
         isScanning,
         formatCurrency,

@@ -86,13 +86,13 @@ class NeutralAIGatewayService implements AIGatewayInterface {
   }
 
   public async executeAnalysis(request: AIAnalysisRequest): Promise<AIAnalysisResult> {
-    // Deterministic simulation adhering to mock provider rules
+    // Explicit synthetic simulation values for latency and token counts (Mock AI Gateway Demo)
     const latency = Math.floor(Math.random() * 200) + 220;
     const promptTokens = Math.floor(Math.random() * 400) + 850;
     const completionTokens = Math.floor(Math.random() * 300) + 320;
     
     return {
-      runId: `run_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
+      runId: `run_${crypto.randomUUID()}`,
       providerId: 'gateway-engine-alpha',
       modelIdentifier: 'reasoning-xl-v4',
       findingsCount: 3,

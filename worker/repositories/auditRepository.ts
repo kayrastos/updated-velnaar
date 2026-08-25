@@ -72,7 +72,7 @@ export class AuditRepository {
   ): Promise<AuditLogRow> {
     AuditRepository.assertDbOrDev(db, environment);
     const safePayload = SafeLogger.redactData(JSON.parse(entry.payload_diff_json || '{}'));
-    const id = `aud_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
+    const id = `aud_${crypto.randomUUID()}`;
     const now = new Date().toISOString();
 
     const log: AuditLogRow = {

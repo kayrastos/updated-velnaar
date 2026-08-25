@@ -37,14 +37,14 @@ export class CheckInEngine {
     serviceRequested?: string;
   }): PhysicalCheckInEvent {
     const event: PhysicalCheckInEvent = {
-      id: `chk_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      id: `chk_${crypto.randomUUID()}`,
       organizationId: params.organizationId,
       businessId: params.businessId,
       locationId: params.locationId,
       locationName: params.locationName,
       checkInType: params.checkInType,
       source: params.source,
-      pseudonymousVisitorId: `vis_anon_${Math.random().toString(36).substring(2, 8)}`,
+      pseudonymousVisitorId: `vis_anon_${crypto.randomUUID()}`,
       partySize: params.partySize || 1,
       serviceRequested: params.serviceRequested,
       timestamp: new Date().toISOString(),

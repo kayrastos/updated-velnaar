@@ -164,7 +164,7 @@ export class LeadRepository {
   ): Promise<LeadRow> {
     this.assertDbOrDev();
 
-    const id = `ld_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
+    const id = `ld_${crypto.randomUUID()}`;
     const now = new Date().toISOString();
     const minorVal = lead.estimated_deal_value_minor || 0;
 

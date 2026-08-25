@@ -43,16 +43,16 @@ export const RevenueLeakRadarView: React.FC = () => {
 
   const getSourceIcon = (source: string) => {
     const s = source.toLowerCase();
-    if (s.includes('call') || s.includes('phone')) return <PhoneCall className="w-3 h-3 text-sky-400" />;
-    if (s.includes('calendar') || s.includes('appointment')) return <Calendar className="w-3 h-3 text-purple-400" />;
-    if (s.includes('pos') || s.includes('payment') || s.includes('cogs')) return <CreditCard className="w-3 h-3 text-emerald-400" />;
-    return <Inbox className="w-3 h-3 text-[#C5A880]" />;
+    if (s.includes('call') || s.includes('phone')) return <PhoneCall className="w-3 h-3 text-sky-500" />;
+    if (s.includes('calendar') || s.includes('appointment')) return <Calendar className="w-3 h-3 text-purple-500" />;
+    if (s.includes('pos') || s.includes('payment') || s.includes('cogs')) return <CreditCard className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />;
+    return <Inbox className="w-3 h-3 text-theme-accent" />;
   };
 
   const getConfidenceBadge = (confidence: string, isInsufficient?: boolean) => {
     if (isInsufficient || confidence === 'INSUFFICIENT') {
       return (
-        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-amber-300 border border-amber-800/40 font-semibold flex items-center gap-1">
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold flex items-center gap-1">
           <HelpCircle className="w-3 h-3" />
           <span>INSUFFICIENT DATA</span>
         </span>
@@ -60,11 +60,11 @@ export const RevenueLeakRadarView: React.FC = () => {
     }
     switch (confidence) {
       case 'HIGH':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 font-semibold">CONFIDENCE: HIGH (Deterministic)</span>;
+        return <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold">CONFIDENCE: HIGH (Deterministic)</span>;
       case 'MEDIUM':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-950/80 text-amber-400 border border-amber-800/40 font-semibold">CONFIDENCE: MEDIUM</span>;
+        return <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold">CONFIDENCE: MEDIUM</span>;
       default:
-        return <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-300 font-semibold">CONFIDENCE: LOW (Model Estimate)</span>;
+        return <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-theme-surface-elevated text-theme-secondary border border-theme-border font-semibold">CONFIDENCE: LOW (Model Estimate)</span>;
     }
   };
 
@@ -72,41 +72,41 @@ export const RevenueLeakRadarView: React.FC = () => {
     <div id="revenue-leak-radar-view" className="space-y-6">
       
       {/* Header & Overview */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#0D0F15] p-5 rounded-xl border border-[#232732]">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-theme-surface p-5 rounded-xl border border-theme-border">
         <div>
           <div className="flex items-center space-x-2.5">
-            <Radar className="w-5 h-5 text-red-400" />
-            <h1 className="text-xl font-editorial font-bold text-[#F5F4F0] tracking-wide">
+            <Radar className="w-5 h-5 text-red-500" />
+            <h1 className="text-xl font-editorial font-bold text-theme-primary tracking-wide">
               {t.leaks.title}
             </h1>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-800/40">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/15 text-red-500 border border-red-500/30">
               Deterministic 8-Rule Engine Live
             </span>
           </div>
-          <p className="text-xs text-[#8E909B] mt-1 max-w-2xl">
+          <p className="text-xs text-theme-secondary mt-1 max-w-2xl">
             {t.leaks.subtitle}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="bg-[#141620] px-4 py-3 rounded-lg border border-[#272C3D] flex items-center space-x-4 font-mono">
+          <div className="bg-theme-surface-elevated px-4 py-3 rounded-lg border border-theme-border flex items-center space-x-4 font-mono">
             <div>
-              <div className="text-[10px] text-[#7E8292] uppercase">{t.hero.revenueAtRisk}</div>
-              <div className="text-lg font-bold text-red-400">
-                {formatCurrency(totalRevenueAtRisk)}<span className="text-xs text-[#7E8292]">/mo</span>
+              <div className="text-[10px] text-theme-muted uppercase">{t.hero.revenueAtRisk}</div>
+              <div className="text-lg font-bold text-red-500">
+                {formatCurrency(totalRevenueAtRisk)}<span className="text-xs text-theme-muted">/mo</span>
               </div>
             </div>
-            <div className="h-8 w-px bg-[#272C3D]" />
+            <div className="h-8 w-px bg-theme-border" />
             <div>
-              <div className="text-[10px] text-[#7E8292] uppercase">{t.leaks.activeCount}</div>
-              <div className="text-lg font-bold text-[#F5F4F0]">{filteredLeaks.length}</div>
+              <div className="text-[10px] text-theme-muted uppercase">{t.leaks.activeCount}</div>
+              <div className="text-lg font-bold text-theme-primary">{filteredLeaks.length}</div>
             </div>
           </div>
 
           <button
             onClick={() => runLeakScan()}
             disabled={isScanning}
-            className="flex items-center space-x-2 px-3.5 py-3 rounded-lg bg-[#181C26] hover:bg-[#202533] text-[#C5A880] border border-[#C5A880]/30 font-mono text-xs cursor-pointer transition-all disabled:opacity-50"
+            className="flex items-center space-x-2 px-3.5 py-3 rounded-lg bg-theme-surface-elevated hover:bg-theme-surface-muted text-theme-accent border border-theme-border font-mono text-xs cursor-pointer transition-all disabled:opacity-50"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
             <span>{isScanning ? 'Scanning...' : 'Rescan Radar'}</span>
@@ -115,19 +115,19 @@ export const RevenueLeakRadarView: React.FC = () => {
       </div>
 
       {/* Filter Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0F121A] p-3 rounded-xl border border-[#232732] text-xs font-mono">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-theme-surface p-3 rounded-xl border border-theme-border text-xs font-mono">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-1.5 text-[#8E909B]">
+          <div className="flex items-center space-x-1.5 text-theme-muted">
             <Filter className="w-3.5 h-3.5" />
             <span>Filter Radar:</span>
           </div>
 
           {/* Status Filter */}
-          <div className="flex rounded-lg bg-[#161924] p-0.5 border border-[#282D3D]">
+          <div className="flex rounded-lg bg-theme-surface-elevated p-0.5 border border-theme-border">
             <button
               onClick={() => setSelectedStatus('active')}
               className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
-                selectedStatus === 'active' ? 'bg-[#C5A880] text-black font-semibold' : 'text-[#8E909B] hover:text-[#E6E4DC]'
+                selectedStatus === 'active' ? 'bg-theme-accent text-black font-semibold' : 'text-theme-muted hover:text-theme-primary'
               }`}
             >
               Active Leaks Only
@@ -135,7 +135,7 @@ export const RevenueLeakRadarView: React.FC = () => {
             <button
               onClick={() => setSelectedStatus('all')}
               className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
-                selectedStatus === 'all' ? 'bg-[#C5A880] text-black font-semibold' : 'text-[#8E909B] hover:text-[#E6E4DC]'
+                selectedStatus === 'all' ? 'bg-theme-accent text-black font-semibold' : 'text-theme-muted hover:text-theme-primary'
               }`}
             >
               All Leaks
@@ -146,7 +146,7 @@ export const RevenueLeakRadarView: React.FC = () => {
           <select
             value={selectedSeverity}
             onChange={(e) => setSelectedSeverity(e.target.value)}
-            className="bg-[#161924] text-[#D8D6CD] px-3 py-1 rounded-lg border border-[#282D3D] focus:outline-none cursor-pointer"
+            className="bg-theme-surface-elevated text-theme-primary px-3 py-1 rounded-lg border border-theme-border focus:outline-none cursor-pointer"
           >
             <option value="all">{t.leaks.allSeverities}</option>
             <option value="critical">{t.leaks.severities.critical}</option>
@@ -156,8 +156,8 @@ export const RevenueLeakRadarView: React.FC = () => {
           </select>
         </div>
 
-        <div className="text-[11px] text-[#717482]">
-          Principle: <strong className="text-[#C5A880]">NO EVIDENCE → NO CLAIM.</strong>
+        <div className="text-[11px] text-theme-muted">
+          Principle: <strong className="text-theme-accent">NO EVIDENCE → NO CLAIM.</strong>
         </div>
       </div>
 
@@ -173,7 +173,7 @@ export const RevenueLeakRadarView: React.FC = () => {
             <div
               key={leak.leakId}
               id={`leak-card-${leak.leakId}`}
-              className="bg-[#0F121A] border border-[#232732] hover:border-[#C5A880]/50 rounded-xl p-5 transition-all space-y-4 relative flex flex-col justify-between"
+              className="bg-theme-surface border border-theme-border hover:border-theme-accent/50 rounded-xl p-5 transition-all space-y-4 relative flex flex-col justify-between shadow-xs"
             >
               <div>
                 {/* Top row: Severity, Loss & Confidence */}
@@ -181,10 +181,10 @@ export const RevenueLeakRadarView: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded ${
                       leak.severity === 'critical' 
-                        ? 'bg-red-950/80 text-red-400 border border-red-800/40' 
+                        ? 'bg-red-500/15 text-red-500 border border-red-500/30' 
                         : leak.severity === 'high'
-                        ? 'bg-amber-950/80 text-amber-400 border border-amber-800/40'
-                        : 'bg-blue-950/80 text-blue-300 border border-blue-800/40'
+                        ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
+                        : 'bg-blue-500/15 text-blue-500 border border-blue-500/30'
                     }`}>
                       {t.leaks.severities[leak.severity] || leak.severity.toUpperCase()}
                     </span>
@@ -194,43 +194,43 @@ export const RevenueLeakRadarView: React.FC = () => {
 
                   <div className="text-right">
                     {isInsufficient ? (
-                      <div className="text-xs font-mono font-bold text-amber-400">
+                      <div className="text-xs font-mono font-bold text-amber-500">
                         INSUFFICIENT DATA
                       </div>
                     ) : (
-                      <div className="text-sm font-mono font-bold text-red-400">
+                      <div className="text-sm font-mono font-bold text-red-500">
                         -{formatCurrency(leak.estimatedImpactMinor / 100)}
-                        <span className="text-[10px] font-normal text-[#8E909B]">/mo</span>
+                        <span className="text-[10px] font-normal text-theme-muted">/mo</span>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Title */}
-                <h3 className="text-base font-semibold text-[#F5F4F0] leading-snug">
+                <h3 className="text-base font-semibold text-theme-primary leading-snug">
                   {leak.title}
                 </h3>
 
                 {/* Insufficient Data Explanation Banner */}
                 {isInsufficient && leak.insufficientDataReason && (
-                  <div className="mt-2.5 p-2.5 rounded bg-amber-950/30 border border-amber-800/40 text-amber-300 text-xs font-mono flex items-start gap-2">
-                    <HelpCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+                  <div className="mt-2.5 p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-300 text-xs font-mono flex items-start gap-2">
+                    <HelpCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
                     <div>
                       <strong className="block text-[11px] uppercase">Revenue Estimate Suspended:</strong>
-                      <span className="text-[11px] font-sans text-amber-200/90">{leak.insufficientDataReason}</span>
+                      <span className="text-[11px] font-sans text-theme-secondary">{leak.insufficientDataReason}</span>
                     </div>
                   </div>
                 )}
 
                 {/* Explicit Tripartite Evidence Box: OBSERVED vs CALCULATED */}
-                <div className="mt-3.5 space-y-2 text-[11px] font-mono bg-[#141620] p-3 rounded-lg border border-[#1E2230]">
+                <div className="mt-3.5 space-y-2 text-[11px] font-mono bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
                   {/* 1. Observed Facts */}
                   <div>
-                    <div className="text-[#C5A880] text-[10px] font-semibold flex items-center gap-1.5 uppercase mb-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#C5A880]"></span>
+                    <div className="text-theme-accent text-[10px] font-semibold flex items-center gap-1.5 uppercase mb-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-theme-accent"></span>
                       <span>1. Observed Evidence (Deterministic Facts):</span>
                     </div>
-                    <ul className="space-y-1 text-[#D8D6CD] font-sans pl-3 text-xs">
+                    <ul className="space-y-1 text-theme-primary font-sans pl-3 text-xs">
                       {observedList.map((factStr, i) => (
                         <li key={i} className="list-disc leading-tight">
                           {factStr}
@@ -240,12 +240,12 @@ export const RevenueLeakRadarView: React.FC = () => {
                   </div>
 
                   {/* 2. Calculation Formula & Metric Components */}
-                  <div className="pt-2 border-t border-[#1E2230]">
-                    <div className="text-[#7E8292] text-[10px] uppercase font-semibold flex items-center gap-1 mb-0.5">
-                      <Calculator className="w-3 h-3 text-[#7E8292]" />
+                  <div className="pt-2 border-t border-theme-border">
+                    <div className="text-theme-muted text-[10px] uppercase font-semibold flex items-center gap-1 mb-0.5">
+                      <Calculator className="w-3 h-3 text-theme-muted" />
                       <span>2. Mathematical Formula & Provenance:</span>
                     </div>
-                    <div className="text-[#A1A4B2] font-mono text-[10px] bg-[#0B0D13] p-1.5 rounded border border-[#1A1D27]">
+                    <div className="text-theme-secondary font-mono text-[10px] bg-theme-surface p-1.5 rounded border border-theme-border">
                       {leak.calculationFormula}
                     </div>
 
@@ -255,11 +255,11 @@ export const RevenueLeakRadarView: React.FC = () => {
                         {leak.calculatedMetrics.map((m, mIdx) => (
                           <span 
                             key={mIdx} 
-                            className="text-[9px] px-1.5 py-0.5 rounded bg-[#1A1E2B] text-[#D8D6CD] border border-[#2B3142]"
+                            className="text-[9px] px-1.5 py-0.5 rounded bg-theme-surface text-theme-secondary border border-theme-border"
                             title={m.provenance ? `Source: ${m.provenance.source} (${m.provenance.sampleSize || 'N/A'} samples)` : m.sourceDataSource}
                           >
-                            <span className="text-[#8E909B]">{m.label}:</span> <strong>{m.valueString}</strong>
-                            <span className="ml-1 text-[8px] text-[#C5A880] uppercase">[{m.classification}]</span>
+                            <span className="text-theme-muted">{m.label}:</span> <strong>{m.valueString}</strong>
+                            <span className="ml-1 text-[8px] text-theme-accent uppercase">[{m.classification}]</span>
                           </span>
                         ))}
                       </div>
@@ -267,11 +267,11 @@ export const RevenueLeakRadarView: React.FC = () => {
                   </div>
 
                   {/* 3. Connected Source Systems */}
-                  <div className="pt-2 border-t border-[#1E2230] flex items-center justify-between">
-                    <span className="text-[10px] text-[#717482] uppercase">Source Systems:</span>
+                  <div className="pt-2 border-t border-theme-border flex items-center justify-between">
+                    <span className="text-[10px] text-theme-muted uppercase">Source Systems:</span>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {sourceList.map((sys, idx) => (
-                        <span key={idx} className="flex items-center gap-1 text-[10px] text-[#A1A4B2] bg-[#090A0E] px-1.5 py-0.5 rounded border border-[#1C202B]">
+                        <span key={idx} className="flex items-center gap-1 text-[10px] text-theme-secondary bg-theme-surface px-1.5 py-0.5 rounded border border-theme-border">
                           {getSourceIcon(sys)}
                           <span>{sys}</span>
                         </span>
@@ -282,11 +282,11 @@ export const RevenueLeakRadarView: React.FC = () => {
               </div>
 
               {/* Card Footer Actions */}
-              <div className="pt-3 border-t border-[#1C202B] flex items-center justify-between gap-3 mt-4">
+              <div className="pt-3 border-t border-theme-border flex items-center justify-between gap-3 mt-4">
                 <button
                   id={`inspect-forensics-${leak.leakId}`}
                   onClick={() => setActiveForensicLeak(leak)}
-                  className="text-xs font-mono text-[#8E909B] hover:text-[#F5F4F0] flex items-center gap-1.5 cursor-pointer"
+                  className="text-xs font-mono text-theme-secondary hover:text-theme-primary flex items-center gap-1.5 cursor-pointer"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   <span>Inspect Evidence</span>
@@ -295,7 +295,7 @@ export const RevenueLeakRadarView: React.FC = () => {
                 <button
                   id={`synthesize-action-${leak.leakId}`}
                   onClick={() => setCurrentRoute('/actions')}
-                  className="text-xs font-mono bg-[#181C26] hover:bg-[#202533] text-[#C5A880] hover:text-[#D4AF37] px-3 py-1.5 rounded-lg border border-[#C5A880]/30 transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="text-xs font-mono bg-theme-surface-elevated hover:bg-theme-surface-muted text-theme-accent px-3 py-1.5 rounded-lg border border-theme-border transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Prepare Action</span>
@@ -311,53 +311,53 @@ export const RevenueLeakRadarView: React.FC = () => {
       {/* Forensic Deep Dive Modal */}
       {activeForensicLeak && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#0F121A] border border-[#2A2F40] rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl relative">
+          <div className="bg-theme-surface border border-theme-border rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl relative">
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center space-x-2 mb-1">
-                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-red-950/80 text-red-400 border border-red-800/40 font-bold">
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-red-500/15 text-red-500 border border-red-500/30 font-bold">
                     REVENUE LEAK AUDIT RECORD
                   </span>
-                  <span className="text-xs font-mono text-[#7E8292]">RULE: {activeForensicLeak.ruleId}</span>
+                  <span className="text-xs font-mono text-theme-muted">RULE: {activeForensicLeak.ruleId}</span>
                 </div>
-                <h3 className="text-lg font-bold text-[#F5F4F0]">
+                <h3 className="text-lg font-bold text-theme-primary">
                   {activeForensicLeak.title}
                 </h3>
               </div>
               <button 
                 onClick={() => setActiveForensicLeak(null)}
-                className="text-[#8E909B] hover:text-[#FFF] p-1 cursor-pointer"
+                className="text-theme-muted hover:text-theme-primary p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-3 text-xs font-mono">
-              <div className="bg-[#141622] p-3 rounded-lg border border-[#232736] space-y-1.5">
-                <span className="text-[#C5A880] font-semibold uppercase">Recommended Next Action</span>
-                <p className="text-[#D8D6CD] font-sans text-sm font-medium">{activeForensicLeak.recommendedAction?.headline || 'Review and dispatch targeted growth action.'}</p>
+              <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border space-y-1.5">
+                <span className="text-theme-accent font-semibold uppercase">Recommended Next Action</span>
+                <p className="text-theme-primary font-sans text-sm font-medium">{activeForensicLeak.recommendedAction?.headline || 'Review and dispatch targeted growth action.'}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[#141622] p-3 rounded-lg border border-[#232736]">
-                  <span className="text-[#7E8292] block">Est. Annualized Leak</span>
-                  <span className="text-base font-bold text-red-400">
+                <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
+                  <span className="text-theme-muted block">Est. Annualized Leak</span>
+                  <span className="text-base font-bold text-red-500">
                     {activeForensicLeak.isDataInsufficient 
                       ? 'INSUFFICIENT DATA'
                       : `${formatCurrency((activeForensicLeak.estimatedImpactMinor / 100) * 12)} / year`}
                   </span>
                 </div>
-                <div className="bg-[#141622] p-3 rounded-lg border border-[#232736]">
-                  <span className="text-[#7E8292] block">Confidence Level</span>
-                  <span className="text-base font-bold text-[#C5A880]">
+                <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
+                  <span className="text-theme-muted block">Confidence Level</span>
+                  <span className="text-base font-bold text-theme-accent">
                     {activeForensicLeak.confidenceLevel || 'HIGH'} (Deterministic Verification)
                   </span>
                 </div>
               </div>
 
-              <div className="bg-[#141622] p-3 rounded-lg border border-[#232736] space-y-2">
-                <span className="text-[#C5A880] font-semibold uppercase">Forensic Evidence Chain</span>
-                <ul className="list-disc pl-4 space-y-1 text-[#A1A4B2] font-sans text-xs">
+              <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border space-y-2">
+                <span className="text-theme-accent font-semibold uppercase">Forensic Evidence Chain</span>
+                <ul className="list-disc pl-4 space-y-1 text-theme-secondary font-sans text-xs">
                   {activeForensicLeak.observedFacts.map((factStr, i) => (
                     <li key={i}>
                       {factStr}
@@ -366,16 +366,16 @@ export const RevenueLeakRadarView: React.FC = () => {
                 </ul>
               </div>
 
-              <div className="bg-[#141622] p-3 rounded-lg border border-[#232736] space-y-1">
-                <span className="text-[#7E8292] font-semibold uppercase text-[10px]">Mathematical Formula</span>
-                <p className="text-xs text-[#C5A880] font-mono">{activeForensicLeak.calculationFormula}</p>
+              <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border space-y-1">
+                <span className="text-theme-muted font-semibold uppercase text-[10px]">Mathematical Formula</span>
+                <p className="text-xs text-theme-accent font-mono">{activeForensicLeak.calculationFormula}</p>
               </div>
             </div>
 
-            <div className="pt-3 border-t border-[#232736] flex justify-end space-x-3">
+            <div className="pt-3 border-t border-theme-border flex justify-end space-x-3">
               <button
                 onClick={() => setActiveForensicLeak(null)}
-                className="px-4 py-2 rounded-lg text-xs font-mono text-[#8E909B] hover:text-[#FFF] border border-[#282D3D] cursor-pointer"
+                className="px-4 py-2 rounded-lg text-xs font-mono text-theme-secondary hover:text-theme-primary border border-theme-border cursor-pointer"
               >
                 Close Record
               </button>
@@ -384,7 +384,7 @@ export const RevenueLeakRadarView: React.FC = () => {
                   setActiveForensicLeak(null);
                   setCurrentRoute('/actions');
                 }}
-                className="px-4 py-2 rounded-lg text-xs font-mono font-semibold bg-[#C5A880] hover:bg-[#D4AF37] text-black cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 rounded-lg text-xs font-mono font-semibold bg-theme-accent hover:bg-theme-accent/90 text-black cursor-pointer flex items-center gap-1.5 shadow-xs"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Queue Prescribed Action</span>
