@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import worker from '../../worker/index';
+import worker, { getValidatedCorsOrigin } from '../../worker/index';
 
 describe('Cloudflare Worker API Boundary Integration', () => {
-  it('GET /api/health should be open and report hardened zero-trust status', async () => {
+  it('GET /api/health should be open and report hardened zero-trust status with vault capability', async () => {
     const req = new Request('https://app.velnar.studio/api/health', {
       method: 'GET',
     });
@@ -13,6 +13,8 @@ describe('Cloudflare Worker API Boundary Integration', () => {
     const json = (await res.json()) as any;
     expect(json.status).toBe('ok');
     expect(json.version).toContain('3.4.0');
+    expect(json.vaultCryptoCapability).toBe('AES-GCM-256');
+    expect(typeof json.vaultConfigured).toBe('boolean');
     expect(json.fulgorRay.status).toBe('DISABLED');
   });
 
@@ -49,42 +51,100 @@ describe('Cloudflare Worker API Boundary Integration', () => {
     });
 
     const res = await worker.fetch(req, { ENVIRONMENT: 'production' } as any);
-    // In production, missing DB binding produces 503 or 401 (since test_user token is also rejected in prod)
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
-  it('Production CORS should forbid disallowed origins in OPTIONS preflight', async () => {
-    const req = new Request('https://app.velnar.studio/api/leads', {
-      method: 'OPTIONS',
-      headers: {
-        'Origin': 'https://malicious-site.com',
-      },
+  describe('CORS Enforcement & ALLOWED_ORIGINS single source of truth', () => {
+    it('Production CORS allows valid configured origins', async () => {
+      const allowed = ['https://app.velnar.studio', 'https://velnar.studio'];
+      for (const origin of allowed) {
+        const req = new Request('https://app.velnar.studio/api/leads', {
+          method: 'OPTIONS',
+          headers: { 'Origin': origin },
+        });
+
+        const res = await worker.fetch(req, {
+          DB: {} as any,
+          ENVIRONMENT: 'production',
+          ALLOWED_ORIGINS: 'https://app.velnar.studio,https://velnar.studio',
+        });
+
+        expect(res.status).toBe(204);
+        expect(res.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+      }
     });
 
-    const res = await worker.fetch(req, {
-      DB: {} as any,
-      ENVIRONMENT: 'production',
-      ALLOWED_ORIGINS: 'https://app.velnar.studio,https://velnar.studio',
+    it('Production CORS blocks malicious origins and does not use substring matching', async () => {
+      const maliciousOrigins = [
+        'https://velnar.studio.attacker.com',
+        'https://malicious-velnar.studio',
+        'https://app.velnar.studio.fake.org',
+        'https://random-site.xyz',
+        'http://localhost:3000', // Localhost disallowed in production without explicit config
+      ];
+
+      for (const origin of maliciousOrigins) {
+        const req = new Request('https://app.velnar.studio/api/leads', {
+          method: 'OPTIONS',
+          headers: { 'Origin': origin },
+        });
+
+        const res = await worker.fetch(req, {
+          DB: {} as any,
+          ENVIRONMENT: 'production',
+          ALLOWED_ORIGINS: 'https://app.velnar.studio,https://velnar.studio',
+        });
+
+        expect(res.status).toBe(403);
+        expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+      }
     });
 
-    expect(res.status).toBe(403);
-  });
+    it('Preview configured origin is allowed when explicitly in ALLOWED_ORIGINS', async () => {
+      const previewOrigin = 'https://preview.velnar.studio';
+      const req = new Request('https://preview.velnar.studio/api/leads', {
+        method: 'OPTIONS',
+        headers: { 'Origin': previewOrigin },
+      });
 
-  it('Production CORS should allow legitimate origins in OPTIONS preflight', async () => {
-    const req = new Request('https://app.velnar.studio/api/leads', {
-      method: 'OPTIONS',
-      headers: {
-        'Origin': 'https://app.velnar.studio',
-      },
+      const res = await worker.fetch(req, {
+        DB: {} as any,
+        ENVIRONMENT: 'preview',
+        ALLOWED_ORIGINS: 'https://preview.velnar.studio,http://localhost:3000',
+      });
+
+      expect(res.status).toBe(204);
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe(previewOrigin);
     });
 
-    const res = await worker.fetch(req, {
-      DB: {} as any,
-      ENVIRONMENT: 'production',
-      ALLOWED_ORIGINS: 'https://app.velnar.studio,https://velnar.studio',
+    it('Unknown preview origin is strictly denied', async () => {
+      const unknownPreviewOrigin = 'https://unknown-preview.velnar.studio';
+      const req = new Request('https://preview.velnar.studio/api/leads', {
+        method: 'OPTIONS',
+        headers: { 'Origin': unknownPreviewOrigin },
+      });
+
+      const res = await worker.fetch(req, {
+        DB: {} as any,
+        ENVIRONMENT: 'preview',
+        ALLOWED_ORIGINS: 'https://preview.velnar.studio,http://localhost:3000',
+      });
+
+      expect(res.status).toBe(403);
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
     });
 
-    expect(res.status).toBe(204);
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://app.velnar.studio');
+    it('getValidatedCorsOrigin unit tests verify exact matching without reflection', () => {
+      // Null origin
+      expect(getValidatedCorsOrigin(null, 'production', 'https://velnar.studio')).toBeNull();
+
+      // Configured production
+      expect(getValidatedCorsOrigin('https://velnar.studio', 'production', 'https://velnar.studio,https://app.velnar.studio')).toBe('https://velnar.studio');
+      expect(getValidatedCorsOrigin('https://velnar.studio.malicious.com', 'production', 'https://velnar.studio')).toBeNull();
+
+      // Configured preview
+      expect(getValidatedCorsOrigin('https://preview.velnar.studio', 'preview', 'https://preview.velnar.studio')).toBe('https://preview.velnar.studio');
+      expect(getValidatedCorsOrigin('https://evil-preview.velnar.studio', 'preview', 'https://preview.velnar.studio')).toBeNull();
+    });
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePlatform } from '../context/PlatformContext';
 import { 
   ShieldCheck, 
@@ -30,6 +30,39 @@ export const SecurityGuardView: React.FC = () => {
   const [testResults, setTestResults] = useState<SecurityTestResult[]>([]);
   const [isRunningTests, setIsRunningTests] = useState(false);
   const [activeTab, setActiveTab] = useState<'tests' | 'envelope' | 'rbac' | 'retention' | 'checkin'>('tests');
+
+  // Server-Verified Vault Capability State
+  const [vaultStatus, setVaultStatus] = useState<{
+    capability: string;
+    configured: boolean | null;
+  }>({
+    capability: 'AES-GCM-256',
+    configured: null,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    ApiClient.getHealth()
+      .then((health) => {
+        if (isMounted) {
+          setVaultStatus({
+            capability: health.vaultCryptoCapability || 'AES-GCM-256',
+            configured: typeof health.vaultConfigured === 'boolean' ? health.vaultConfigured : true,
+          });
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setVaultStatus({
+            capability: 'AES-GCM-256',
+            configured: null,
+          });
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Server-Side Web Crypto API Visualizer State
   const [plainTextInput, setPlainTextInput] = useState('Customer Real Name: Ayşe Kaya | Phone: +90 532 999 8877');
@@ -138,10 +171,22 @@ export const SecurityGuardView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="bg-theme-surface-elevated px-3.5 py-2.5 rounded-lg border border-theme-border flex items-center space-x-2 text-xs font-mono text-emerald-600 dark:text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Web Crypto AES-GCM-256 Active</span>
-          </div>
+          {vaultStatus.configured === true ? (
+            <div id="crypto-status-badge" className="bg-theme-surface-elevated px-3.5 py-2.5 rounded-lg border border-theme-border flex items-center space-x-2 text-xs font-mono text-emerald-600 dark:text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>{vaultStatus.capability} · CONFIGURED</span>
+            </div>
+          ) : vaultStatus.configured === false ? (
+            <div id="crypto-status-badge" className="bg-theme-surface-elevated px-3.5 py-2.5 rounded-lg border border-theme-border flex items-center space-x-2 text-xs font-mono text-amber-500">
+              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+              <span>{vaultStatus.capability} · NOT CONFIGURED</span>
+            </div>
+          ) : (
+            <div id="crypto-status-badge" className="bg-theme-surface-elevated px-3.5 py-2.5 rounded-lg border border-theme-border flex items-center space-x-2 text-xs font-mono text-theme-secondary">
+              <Lock className="w-3.5 h-3.5 text-theme-accent" />
+              <span>Encryption Architecture · AES-GCM-256</span>
+            </div>
+          )}
         </div>
       </div>
 

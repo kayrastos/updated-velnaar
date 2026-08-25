@@ -50,6 +50,27 @@ export class ApiClient {
     this.activeTenantId = orgId;
   }
 
+  /**
+   * Fetch public health and capability status from Worker API
+   */
+  public static async getHealth(): Promise<{
+    status: string;
+    version: string;
+    environment: string;
+    d1Status?: string;
+    guard?: string;
+    crypto?: string;
+    vaultCryptoCapability?: string;
+    vaultConfigured?: boolean;
+    roles?: string[];
+  }> {
+    const res = await fetch('/api/health');
+    if (!res.ok) {
+      throw new Error(`Health check endpoint returned HTTP ${res.status}`);
+    }
+    return await res.json();
+  }
+
   private static getHeaders(): HeadersInit {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

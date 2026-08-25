@@ -27,39 +27,56 @@ import { WorkerEnv } from './env';
 
 export type { WorkerEnv };
 
-const PROD_ALLOWED_ORIGINS = [
-  'https://velnar.studio',
-  'https://app.velnar.studio'
-];
-
-const DEV_ALLOWED_ORIGINS = [
-  'https://velnar.studio',
-  'https://app.velnar.studio',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:5173'
-];
-
 /**
  * Strict CORS origin verification.
+ * Parses env.ALLOWED_ORIGINS as the single authoritative configured allowlist.
  * Returns the validated origin string if allowed, or null if disallowed/unknown.
  * Never reflects arbitrary origins.
+ * Never uses substring matching for production origins.
  */
-export function getValidatedCorsOrigin(origin: string | null, environment: string): string | null {
+export function getValidatedCorsOrigin(
+  origin: string | null,
+  environment: string,
+  configuredAllowedOrigins?: string
+): string | null {
   if (!origin) return null;
 
-  const isDevOrTest = environment === 'development' || environment === 'test';
-  
-  if (isDevOrTest) {
-    if (DEV_ALLOWED_ORIGINS.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+  // Authoritative parsed list from configured environment variable
+  const parsedOrigins = (configuredAllowedOrigins || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(o => o.length > 0);
+
+  // If ALLOWED_ORIGINS was configured, check exact match
+  if (parsedOrigins.length > 0) {
+    if (parsedOrigins.includes(origin)) {
       return origin;
     }
     return null;
   }
 
-  // Production environment: strictly check allowlist
-  if (PROD_ALLOWED_ORIGINS.includes(origin)) {
+  // Environment fallback behaviors when ALLOWED_ORIGINS is unset
+  if (environment === 'development' || environment === 'test') {
+    const defaultDevOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5173',
+      'https://app.velnar.studio',
+      'https://velnar.studio'
+    ];
+    if (defaultDevOrigins.includes(origin)) {
+      return origin;
+    }
+    return null;
+  }
+
+  // Production fallback: strictly limited to canonical production domains
+  const defaultProdOrigins = [
+    'https://velnar.studio',
+    'https://app.velnar.studio'
+  ];
+  if (defaultProdOrigins.includes(origin)) {
     return origin;
   }
 
@@ -71,7 +88,7 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin');
     const environment = env?.ENVIRONMENT || 'production';
-    const validatedOrigin = getValidatedCorsOrigin(origin, environment);
+    const validatedOrigin = getValidatedCorsOrigin(origin, environment, env?.ALLOWED_ORIGINS);
 
     // 1. Handle CORS Preflight
     if (request.method === 'OPTIONS') {
@@ -97,6 +114,10 @@ export default {
     try {
       // 2. Health & Public Discovery Endpoint (Unauthenticated)
       if (url.pathname === '/api/health') {
+        const isVaultConfigured = environment === 'production'
+          ? Boolean(env.VELNAR_MASTER_KMS_SECRET && env.VELNAR_MASTER_KMS_SECRET.trim().length > 0)
+          : true; // In dev/test/preview fallback test secret is available
+
         const healthResponse = Response.json({
           status: 'ok',
           version: '3.4.0-hardened',
@@ -105,6 +126,8 @@ export default {
           d1Status: env.DB ? 'ATTACHED' : 'NOT_BOUND',
           guard: 'Cloudflare Worker Zero-Trust Active',
           crypto: 'AES-GCM-256 Web Crypto Enabled',
+          vaultCryptoCapability: 'AES-GCM-256',
+          vaultConfigured: isVaultConfigured,
           roles: ['OWNER', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER'],
           fulgorRay: { status: 'DISABLED', mode: 'MOCK_OFFLINE_RECEIVER' }
         });

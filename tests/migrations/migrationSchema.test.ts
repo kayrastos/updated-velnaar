@@ -2,15 +2,37 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
-describe('Cloudflare D1 Migration Schema Verification', () => {
-  const migrationsDir = path.resolve(__dirname, '../../migrations');
+describe('Cloudflare D1 Migration Schema & Source of Truth Verification', () => {
+  const rootDir = path.resolve(__dirname, '../..');
+  const migrationsDir = path.join(rootDir, 'migrations');
+  const wranglerPath = path.join(rootDir, 'wrangler.jsonc');
 
-  it('should contain root migration files with numbered prefix', () => {
+  it('wrangler.jsonc migrations_dir must be configured strictly as "migrations"', () => {
+    expect(fs.existsSync(wranglerPath)).toBe(true);
+    const wranglerContent = fs.readFileSync(wranglerPath, 'utf-8');
+    
+    // Parse jsonc or check migrations_dir property
+    expect(wranglerContent).toContain('"migrations_dir": "migrations"');
+  });
+
+  it('Root /migrations directory must be the sole D1 migration source and contain canonical migrations', () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const files = fs.readdirSync(migrationsDir);
     expect(files.length).toBeGreaterThanOrEqual(2);
     expect(files).toContain('0001_initial_schema.sql');
     expect(files).toContain('0002_indexes_and_performance.sql');
+  });
+
+  it('Legacy src/db/migrations directory must not exist or be referenced for deployment', () => {
+    const legacyDir = path.join(rootDir, 'src/db/migrations');
+    expect(fs.existsSync(legacyDir), 'Legacy src/db/migrations must not exist').toBe(false);
+
+    // Check package.json, vite.config.ts, wrangler.jsonc for references to src/db/migrations
+    const packageJson = fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8');
+    const wranglerJson = fs.readFileSync(wranglerPath, 'utf-8');
+
+    expect(packageJson).not.toContain('src/db/migrations');
+    expect(wranglerJson).not.toContain('src/db/migrations');
   });
 
   it('should contain all 23 canonical tables in 0001_initial_schema.sql', () => {
