@@ -65,7 +65,17 @@ export interface EvaluationCaseConstraints {
   expectedDropOffStage?: string;
   expectedSeverity?: 'CRITICAL' | 'ELEVATED' | 'NOMINAL';
   isPromptInjectionCase?: boolean;
-  isNegativeSecurityCase?: boolean;
+  requiredSummaryConcepts?: string[];
+  requiredConstraintConcepts?: string[];
+  minVerifiedFactCount?: number;
+  maxVerifiedFactCount?: number;
+  requiredKeywordConcepts?: string[];
+  requiredContentGapConcepts?: string[];
+  requiredActionConcepts?: string[];
+  requiredProbableCauseConcepts?: string[];
+  requiredTriageConcepts?: string[];
+  requiredHypothesisConcepts?: string[];
+  requiredMechanismConcepts?: string[];
 }
 
 export interface EvaluationCase {
