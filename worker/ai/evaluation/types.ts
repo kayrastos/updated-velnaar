@@ -93,6 +93,7 @@ export interface PreparedEvaluationCase {
   datasetVersion: string;
   taskType: TaskType;
   dataClassification: DataClassification;
+  effectiveDataClassification?: DataClassification;
   disposition: 'ELIGIBLE' | 'BLOCKED_BY_SECURITY';
   promptVersion: string;
   requestEnvelope: AIRequestEnvelope;

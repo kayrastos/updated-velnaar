@@ -1,0 +1,455 @@
+
+> react-example@0.0.0 test
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/app/applet[39m
+
+(node:2001) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[90mstderr[2m | tests/security/phaseA12B1AIRunProtocol.test.ts[2m > [22m[2mPhase A.12B.1A: AIRun Database & Protocol Final Seal[2m > [22m[2m5. Deterministic AIRunRepository Error Codes & Failure Mapping[2m > [22m[2mthrows AI_RUN_WRITE_FAILED when D1 insertion encounters database error
+[22m[39m[VELNAR:ERROR] [2026-08-31T11:35:23.188Z] [AI_RUN_D1_WRITE_FAILED] {"runId":"run_repo_test_01","organizationId":"org_apex_holding","businessId":"biz_apex_turkey","errorCode":"AI_RUN_D1_WRITE_FAILED"}
+
+[90mstderr[2m | tests/security/phaseA12B1AIRunProtocol.test.ts[2m > [22m[2mPhase A.12B.1A: AIRun Database & Protocol Final Seal[2m > [22m[2m5. Deterministic AIRunRepository Error Codes & Failure Mapping[2m > [22m[2mthrows AI_RUN_READ_FAILED when D1 read encounters database error
+[22m[39m[VELNAR:ERROR] [2026-08-31T11:35:23.190Z] [AI_RUN_D1_READ_FAILED] {"organizationId":"org_apex_holding","businessId":"biz_apex_turkey","errorCode":"AI_RUN_D1_READ_FAILED"}
+
+[90mstderr[2m | tests/security/phaseA12B1AIRunProtocol.test.ts[2m > [22m[2mPhase A.12B.1A: AIRun Database & Protocol Final Seal[2m > [22m[2m5. Deterministic AIRunRepository Error Codes & Failure Mapping[2m > [22m[2mthrows AI_RUN_READ_FAILED when D1 returns malformed rows failing canonical validation
+[22m[39m[VELNAR:ERROR] [2026-08-31T11:35:23.192Z] [AI_RUN_D1_READ_FAILED] {"organizationId":"org_apex_holding","businessId":"biz_apex_turkey","errorCode":"AI_RUN_D1_READ_FAILED"}
+
+[90mstderr[2m | tests/security/phaseA12B1AIRunProtocol.test.ts[2m > [22m[2mPhase A.12B.1A: AIRun Database & Protocol Final Seal[2m > [22m[2m7. GET /api/ai/runs Route Hardening[2m > [22m[2mreturns 403 BUSINESS_CROSS_TENANT_FORBIDDEN when businessId belongs to different organization
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:23.263Z] [BUSINESS_CROSS_TENANT_DENIAL] {"businessId":"biz_other_org","organizationId":"org_apex_holding","reason":"Business does not belong to specified organization or does not exist in D1."}
+
+ [32m✓[39m tests/security/phaseA12B1AIRunProtocol.test.ts [2m([22m[2m48 tests[22m[2m)[22m[33m 333[2mms[22m[39m
+ [32m✓[39m tests/ai/shadowEvaluationHarness.test.ts [2m([22m[2m53 tests[22m[2m)[22m[32m 191[2mms[22m[39m
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPOST /api/appointments without query businessId -> 400 BUSINESS_ID_REQUIRED
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.789Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPOST /api/appointments rejects body.businessId with 400 BAD_REQUEST
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.795Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPOST /api/appointments rejects body.currency with 400 BAD_REQUEST
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.797Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPOST /api/appointments rejects body.customerName with 400 BAD_REQUEST
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.800Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPOST /api/appointments rejects body.status and body.source with 400 BAD_REQUEST
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.804Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPOST /api/appointments rejects body.status and body.source with 400 BAD_REQUEST
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.806Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPOST /api/appointments rejects cross-tenant query businessId with 404
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.808Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstderr[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPOST /api/appointments rejects cross-tenant query businessId with 404
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:24.808Z] [BUSINESS_CROSS_TENANT_DENIAL_MEM] {"businessId":"biz_bosphorus_grill","organizationId":"org_apex_holding","mappedOrg":"org_istanbul_dining"}
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPOST /api/appointments creates appointment and returns 201 with server-owned currency, status scheduled, source velnar_manual, and auditLogId
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.810Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments without query businessId -> 400 BUSINESS_ID_REQUIRED
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.825Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments rejects body.businessId with 400 BAD_REQUEST
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.827Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments with appointment belonging to different business in same org -> 404 APPOINTMENT_NOT_FOUND
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.828Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments valid transition scheduled -> confirmed -> 200 + auditLogId
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.830Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments valid transition scheduled -> confirmed -> 200 + auditLogId
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.831Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments same status scheduled -> scheduled -> 400 INVALID_APPOINTMENT_STATE_TRANSITION
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.833Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments same status scheduled -> scheduled -> 400 INVALID_APPOINTMENT_STATE_TRANSITION
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.834Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments invalid terminal transition completed -> scheduled -> 400 INVALID_APPOINTMENT_STATE_TRANSITION
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.835Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments invalid terminal transition completed -> scheduled -> 400 INVALID_APPOINTMENT_STATE_TRANSITION
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.836Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments invalid terminal transition completed -> scheduled -> 400 INVALID_APPOINTMENT_STATE_TRANSITION
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.837Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments invalid terminal transition completed -> scheduled -> 400 INVALID_APPOINTMENT_STATE_TRANSITION
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.838Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mremoves fake /api/appointment-events route
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.839Z] [WORKER_ROUTER] GET /api/appointment-events for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mGET /api/appointments requires query businessId
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.840Z] [WORKER_ROUTER] GET /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mGET /api/appointments rejects cross-tenant businessId with 404
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.841Z] [WORKER_ROUTER] GET /api/appointments for user [usr_dev_owner] 
+
+[90mstderr[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mGET /api/appointments rejects cross-tenant businessId with 404
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:24.841Z] [BUSINESS_CROSS_TENANT_DENIAL_MEM] {"businessId":"biz_bosphorus_grill","organizationId":"org_apex_holding","mappedOrg":"org_istanbul_dining"}
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mGET /api/appointments returns business-scoped appointments
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.842Z] [WORKER_ROUTER] GET /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments rejects reasonCode for confirmed and completed transitions
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.844Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments rejects reasonCode for confirmed and completed transitions
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.845Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments rejects reasonCode for confirmed and completed transitions
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.846Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments rejects reasonCode for confirmed and completed transitions
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.846Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments allows reasonCode for cancelled and no_show, and rejects invalid reason code
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.847Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments allows reasonCode for cancelled and no_show, and rejects invalid reason code
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.848Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments allows reasonCode for cancelled and no_show, and rejects invalid reason code
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.849Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments allows reasonCode for cancelled and no_show, and rejects invalid reason code
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.850Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts[2m > [22m[2mPHASE A.11 SEAL: Evidence Completeness & Appointment Mutation Seal[2m > [22m[2m2. Phase A.12A: Appointment Mutation Zero-Compromise Seal[2m > [22m[2mPATCH /api/appointments allows reasonCode for cancelled and no_show, and rejects invalid reason code
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:24.850Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+ [32m✓[39m tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 161[2mms[22m[39m
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m1. Business Configuration Failure Semantics[2m > [22m[2mreturns exact HTTP 503 BUSINESS_CONFIGURATION_UNAVAILABLE when OrganizationRepository.getBusinessById throws
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.364Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m1. Business Configuration Failure Semantics[2m > [22m[2mreturns HTTP 503 BUSINESS_SCOPE_LOOKUP_FAILED when initial business scope query fails in D1
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.372Z] [WORKER_ROUTER] GET /api/appointments for user [usr_dev_owner] 
+
+[90mstderr[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m1. Business Configuration Failure Semantics[2m > [22m[2mreturns HTTP 503 BUSINESS_SCOPE_LOOKUP_FAILED when initial business scope query fails in D1
+[22m[39m[VELNAR:ERROR] [2026-08-31T11:35:25.373Z] [BUSINESS_TENANT_GUARD_D1_ERROR] {"businessId":"biz_beauty_salon","organizationId":"org_apex_holding","errorCode":"BUSINESS_LOOKUP_D1_FAILED"}
+
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m3. Authorization Before Business Lookup Pipeline[2m > [22m[2mUnauthorized GET denies at TenantGuard and NEVER calls BusinessTenantGuard or AppointmentRepository
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.386Z] [WORKER_ROUTER] GET /api/appointments for user [ANONYMOUS] 
+
+[90mstderr[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m3. Authorization Before Business Lookup Pipeline[2m > [22m[2mUnauthorized GET denies at TenantGuard and NEVER calls BusinessTenantGuard or AppointmentRepository
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:25.386Z] [AUTH_DENIAL] Unauthorized access attempt to /api/appointments (Missing or invalid token) 
+
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m3. Authorization Before Business Lookup Pipeline[2m > [22m[2mCross-tenant GET denies at TenantGuard and NEVER calls BusinessTenantGuard or AppointmentRepository
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.388Z] [WORKER_ROUTER] GET /api/appointments for user [usr_dev_owner] 
+
+[90mstderr[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m3. Authorization Before Business Lookup Pipeline[2m > [22m[2mCross-tenant GET denies at TenantGuard and NEVER calls BusinessTenantGuard or AppointmentRepository
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:25.389Z] [SECURITY_INCIDENT] [cross_tenant_access.denied] [Severity: CRITICAL] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"attemptedOrgTarget":"org_apex_holding","userOrgs":["org_istanbul_dining"],"requestedAction":"appointment.read"}}
+
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m3. Authorization Before Business Lookup Pipeline[2m > [22m[2mUnauthorized PATCH (VIEWER role) denies at TenantGuard and NEVER calls BusinessTenantGuard or getByIdForBusiness
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.391Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_viewer] 
+
+[90mstderr[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m3. Authorization Before Business Lookup Pipeline[2m > [22m[2mUnauthorized PATCH (VIEWER role) denies at TenantGuard and NEVER calls BusinessTenantGuard or getByIdForBusiness
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:25.392Z] [SECURITY_INCIDENT] [authorization.denied] [Severity: MEDIUM] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"role":"VIEWER","attemptedAction":"appointment.update"}}
+
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m4. Identity Vault Lookup Infrastructure Failure vs Missing Pseudonym[2m > [22m[2mreturns HTTP 503 IDENTITY_VAULT_UNAVAILABLE when IdentityVaultRepository throws infrastructure error
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.394Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m4. Identity Vault Lookup Infrastructure Failure vs Missing Pseudonym[2m > [22m[2mreturns HTTP 404 CUSTOMER_REFERENCE_NOT_FOUND when pseudonym does not exist (clean false)
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.396Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m5. Resource Lookup Infrastructure Failure vs Missing Resource[2m > [22m[2mreturns HTTP 503 APPOINTMENT_RESOURCE_UNAVAILABLE when AppointmentResourceRepository throws infrastructure error
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.399Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m5. Resource Lookup Infrastructure Failure vs Missing Resource[2m > [22m[2mreturns HTTP 404 APPOINTMENT_RESOURCE_NOT_FOUND when resource is missing (null)
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.408Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m5. Resource Lookup Infrastructure Failure vs Missing Resource[2m > [22m[2mreturns HTTP 400 APPOINTMENT_RESOURCE_UNAVAILABLE when resource status is maintenance or offline
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.410Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A5AppointmentSealEvidence.test.ts[2m > [22m[2mSPRINT 4 — PHASE A.12A.5A: Appointment Seal & Deterministic Evidence Tests[2m > [22m[2m5. Resource Lookup Infrastructure Failure vs Missing Resource[2m > [22m[2mreturns HTTP 400 APPOINTMENT_RESOURCE_UNAVAILABLE when resource status is maintenance or offline
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.412Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+ [32m✓[39m tests/security/phaseA12A5AppointmentSealEvidence.test.ts [2m([22m[2m41 tests[22m[2m)[22m[32m 138[2mms[22m[39m
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m1. Failure Semantics & Distinction (DB Failure 503 vs Not Found 404)[2m > [22m[2mreturns 503 BUSINESS_SCOPE_LOOKUP_FAILED when D1 database throws during business verification
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.982Z] [WORKER_ROUTER] GET /api/appointments for user [usr_dev_owner] 
+
+[90mstderr[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m1. Failure Semantics & Distinction (DB Failure 503 vs Not Found 404)[2m > [22m[2mreturns 503 BUSINESS_SCOPE_LOOKUP_FAILED when D1 database throws during business verification
+[22m[39m[VELNAR:ERROR] [2026-08-31T11:35:25.986Z] [BUSINESS_TENANT_GUARD_D1_ERROR] {"businessId":"biz_beauty_salon","organizationId":"org_apex_holding","errorCode":"BUSINESS_LOOKUP_D1_FAILED"}
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m1. Failure Semantics & Distinction (DB Failure 503 vs Not Found 404)[2m > [22m[2mreturns 503 BUSINESS_CONFIGURATION_UNAVAILABLE when OrganizationRepository.getBusinessById throws in POST
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.993Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m1. Failure Semantics & Distinction (DB Failure 503 vs Not Found 404)[2m > [22m[2mreturns stable 404 BUSINESS_NOT_FOUND for non-existent or cross-tenant business
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.996Z] [WORKER_ROUTER] GET /api/appointments for user [usr_dev_owner] 
+
+[90mstderr[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m1. Failure Semantics & Distinction (DB Failure 503 vs Not Found 404)[2m > [22m[2mreturns stable 404 BUSINESS_NOT_FOUND for non-existent or cross-tenant business
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:25.997Z] [BUSINESS_CROSS_TENANT_DENIAL_MEM] {"businessId":"biz_non_existent","organizationId":"org_apex_holding","mappedOrg":"UNMAPPED"}
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m1. Failure Semantics & Distinction (DB Failure 503 vs Not Found 404)[2m > [22m[2mreturns 404 CUSTOMER_REFERENCE_NOT_FOUND when customer pseudonym does not exist in Identity Vault
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:25.998Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m1. Failure Semantics & Distinction (DB Failure 503 vs Not Found 404)[2m > [22m[2mreturns 404 APPOINTMENT_RESOURCE_NOT_FOUND when resource does not exist in business scope
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.012Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m1. Failure Semantics & Distinction (DB Failure 503 vs Not Found 404)[2m > [22m[2mreturns 400 APPOINTMENT_RESOURCE_UNAVAILABLE when resource is maintenance/offline
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.015Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m5. Strict Cancellation Reason Code Enforcement[2m > [22m[2mcreates appointment successfully for status transition tests
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.034Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m5. Strict Cancellation Reason Code Enforcement[2m > [22m[2mPATCH /api/appointments to cancelled WITHOUT reasonCode -> 400 BAD_REQUEST
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.036Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m5. Strict Cancellation Reason Code Enforcement[2m > [22m[2mPATCH /api/appointments with invalid reasonCode -> 400 BAD_REQUEST
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.039Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m5. Strict Cancellation Reason Code Enforcement[2m > [22m[2mPATCH /api/appointments to confirmed WITH reasonCode -> 400 BAD_REQUEST
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.041Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m5. Strict Cancellation Reason Code Enforcement[2m > [22m[2mPATCH /api/appointments to confirmed succeeds without reasonCode and increments rowVersion
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.043Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m5. Strict Cancellation Reason Code Enforcement[2m > [22m[2mPATCH /api/appointments to cancelled with valid reasonCode succeeds
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.045Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m5. Strict Cancellation Reason Code Enforcement[2m > [22m[2mterminal state cannot be modified further -> 400 INVALID_APPOINTMENT_STATE_TRANSITION
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.047Z] [WORKER_ROUTER] PATCH /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m6. Strict RFC3339 & Duration Validator Regression[2m > [22m[2mrejects timestamps without explicit timezone or timezone offset
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.048Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m6. Strict RFC3339 & Duration Validator Regression[2m > [22m[2mrejects start timestamp equal to or greater than end timestamp
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.051Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m7. Production IP Handling & Zero PII Leakage[2m > [22m[2muses CF-Connecting-IP in production and ignores spoofed X-Forwarded-For
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.053Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m7. Production IP Handling & Zero PII Leakage[2m > [22m[2mrejects VIEWER role from appointment write mutations with 403
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.057Z] [WORKER_ROUTER] POST /api/appointments for user [usr_dev_viewer] 
+
+[90mstderr[2m | tests/security/phaseA12A3AppointmentFinalSeal.test.ts[2m > [22m[2mSPRINT 4 FINAL SEAL — PHASE A.12A.3 / A.12A.4: Appointment Failure-Semantics & Second-Boundary Seal[2m > [22m[2m7. Production IP Handling & Zero PII Leakage[2m > [22m[2mrejects VIEWER role from appointment write mutations with 403
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:26.058Z] [SECURITY_INCIDENT] [authorization.denied] [Severity: MEDIUM] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"role":"VIEWER","attemptedAction":"appointment.create"}}
+
+ [32m✓[39m tests/security/phaseA12A3AppointmentFinalSeal.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 142[2mms[22m[39m
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mProtected routes should fail-closed with 401 when Authorization header is missing
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.581Z] [WORKER_ROUTER] GET /api/leads for user [ANONYMOUS] 
+
+[90mstderr[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mProtected routes should fail-closed with 401 when Authorization header is missing
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:26.582Z] [AUTH_DENIAL] Unauthorized access attempt to /api/leads (Missing or invalid token) 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mProtected routes should fail-closed with 401 in production when mock token is provided
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.585Z] [WORKER_ROUTER] GET /api/leads for user [ANONYMOUS] 
+
+[90mstderr[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mProtected routes should fail-closed with 401 in production when mock token is provided
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:26.585Z] [AUTH_DENIAL] Unauthorized access attempt to /api/leads (Missing or invalid token) 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mProtected routes in production should fail-closed with 503 when DB is missing
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.591Z] [WORKER_ROUTER] GET /api/leads for user [ANONYMOUS] 
+
+[90mstderr[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mProtected routes in production should fail-closed with 503 when DB is missing
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:26.592Z] [AUTH_DENIAL] Unauthorized access attempt to /api/leads (Missing or invalid token) 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mStrict Tenant ID Isolation & Zero Fallbacks across Route Handlers[2m > [22m[2mreturns 400 TENANT_ID_REQUIRED for /api/leads when orgId query parameter and header are omitted
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.595Z] [WORKER_ROUTER] GET /api/leads for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mStrict Tenant ID Isolation & Zero Fallbacks across Route Handlers[2m > [22m[2mreturns 400 TENANT_ID_REQUIRED for /api/appointments when orgId query parameter and header are omitted
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.597Z] [WORKER_ROUTER] GET /api/appointments for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mStrict Tenant ID Isolation & Zero Fallbacks across Route Handlers[2m > [22m[2mreturns 400 TENANT_ID_REQUIRED for /api/actions when orgId query parameter and header are omitted
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.600Z] [WORKER_ROUTER] GET /api/actions for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mStrict Tenant ID Isolation & Zero Fallbacks across Route Handlers[2m > [22m[2mreturns 400 TENANT_ID_REQUIRED for /api/leaks when orgId query parameter and header are omitted
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.602Z] [WORKER_ROUTER] GET /api/leaks for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mStrict Tenant ID Isolation & Zero Fallbacks across Route Handlers[2m > [22m[2mreturns 400 TENANT_ID_REQUIRED for /api/attribution when orgId query parameter and header are omitted
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.604Z] [WORKER_ROUTER] GET /api/attribution for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mStrict Tenant ID Isolation & Zero Fallbacks across Route Handlers[2m > [22m[2mreturns 400 TENANT_ID_REQUIRED for /api/audit when orgId query parameter and header are omitted
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.605Z] [WORKER_ROUTER] GET /api/audit for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mStrict Tenant ID Isolation & Zero Fallbacks across Route Handlers[2m > [22m[2mreturns 400 TENANT_ID_REQUIRED for /api/security/events when orgId query parameter and header are omitted
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.607Z] [WORKER_ROUTER] GET /api/security/events for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mStrict Tenant ID Isolation & Zero Fallbacks across Route Handlers[2m > [22m[2mreturns 400 TENANT_ID_REQUIRED for /api/vault when orgId query parameter and header are omitted
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.608Z] [WORKER_ROUTER] GET /api/vault for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mStrict Tenant ID Isolation & Zero Fallbacks across Route Handlers[2m > [22m[2mreturns 400 TENANT_ID_REQUIRED for /api/ai/status when orgId query parameter and header are omitted
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.610Z] [WORKER_ROUTER] GET /api/ai/status for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mStrict Tenant ID Isolation & Zero Fallbacks across Route Handlers[2m > [22m[2m/api/vault/dev-demo returns 400 PLAINTEXT_REQUIRED in dev if plaintext is empty
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.617Z] [WORKER_ROUTER] POST /api/vault/dev-demo for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mPOST /api/actions Worker Authority & Policy Validation[2m > [22m[2msuccessfully approves action when guardrails pass and records audit log
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.626Z] [WORKER_ROUTER] POST /api/actions for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mPOST /api/actions Worker Authority & Policy Validation[2m > [22m[2msuccessfully approves action when guardrails pass and records audit log
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.628Z] [AUDIT_TRAIL] [GROWTH_ACTION_APPROVED] by [OWNER] on [growth_actions:act_global_01] (Org: org_apex_holding) 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mPOST /api/actions Worker Authority & Policy Validation[2m > [22m[2mrejects action approval when client attempts to substitute execution payload (400 BAD_REQUEST)
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.630Z] [WORKER_ROUTER] POST /api/actions for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mPOST /api/actions Worker Authority & Policy Validation[2m > [22m[2mrejects action approval with 422 GUARDRAIL_VIOLATION when stored action discount exceeds tenant policy limit
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.632Z] [WORKER_ROUTER] POST /api/actions for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mPOST /api/actions Worker Authority & Policy Validation[2m > [22m[2msuccessfully rejects action
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.633Z] [WORKER_ROUTER] POST /api/actions for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mPOST /api/actions Worker Authority & Policy Validation[2m > [22m[2msuccessfully rejects action
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.636Z] [AUDIT_TRAIL] [GROWTH_ACTION_REJECTED] by [OWNER] on [growth_actions:act_global_01] (Org: org_apex_holding) 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mPOST /api/actions Worker Authority & Policy Validation[2m > [22m[2msuccessfully defers action
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.637Z] [WORKER_ROUTER] POST /api/actions for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mPOST /api/actions Worker Authority & Policy Validation[2m > [22m[2msuccessfully defers action
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.638Z] [AUDIT_TRAIL] [GROWTH_ACTION_DEFERRED] by [OWNER] on [growth_actions:act_global_01] (Org: org_apex_holding) 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mPOST /api/actions Worker Authority & Policy Validation[2m > [22m[2mreturns 400 when status is invalid or actionId is missing
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.639Z] [WORKER_ROUTER] POST /api/actions for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2m/api/action-policy authenticated CRUD and invariants[2m > [22m[2mGET /api/action-policy allows settings.read role and returns policy
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.641Z] [WORKER_ROUTER] GET /api/action-policy for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2m/api/action-policy authenticated CRUD and invariants[2m > [22m[2mGET /api/action-policy rejects unauthorized roles or missing auth
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.642Z] [WORKER_ROUTER] GET /api/action-policy for user [ANONYMOUS] 
+
+[90mstderr[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2m/api/action-policy authenticated CRUD and invariants[2m > [22m[2mGET /api/action-policy rejects unauthorized roles or missing auth
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:26.643Z] [AUTH_DENIAL] Unauthorized access attempt to /api/action-policy (Missing or invalid token) 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2m/api/action-policy authenticated CRUD and invariants[2m > [22m[2mGET /api/action-policy rejects unauthorized roles or missing auth
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.643Z] [WORKER_ROUTER] GET /api/action-policy for user [usr_dev_owner] 
+
+[90mstderr[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2m/api/action-policy authenticated CRUD and invariants[2m > [22m[2mGET /api/action-policy rejects unauthorized roles or missing auth
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:26.644Z] [SECURITY_INCIDENT] [cross_tenant_access.denied] [Severity: CRITICAL] Target Org: org_foreign_tenant {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"attemptedOrgTarget":"org_foreign_tenant","userOrgs":["org_apex_holding"],"requestedAction":"settings.read"}}
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2m/api/action-policy authenticated CRUD and invariants[2m > [22m[2mPATCH /api/action-policy allows settings.edit to update policy
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.645Z] [WORKER_ROUTER] PATCH /api/action-policy for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2m/api/action-policy authenticated CRUD and invariants[2m > [22m[2mPATCH /api/action-policy rejects attempts to disable human approval or enable auto execution
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.647Z] [WORKER_ROUTER] PATCH /api/action-policy for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2m/api/action-policy authenticated CRUD and invariants[2m > [22m[2mPATCH /api/action-policy rejects unknown fields
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.648Z] [WORKER_ROUTER] PATCH /api/action-policy for user [usr_dev_owner] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mGET /api/session & /api/bootstrap[2m > [22m[2mreturns server-derived identity context without trusting client input
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.649Z] [WORKER_ROUTER] GET /api/session for user [usr_test_member] 
+
+[90mstdout[2m | tests/worker/apiRoutes.test.ts[2m > [22m[2mCloudflare Worker API Boundary Integration[2m > [22m[2mGET /api/session & /api/bootstrap[2m > [22m[2mreturns null activeOrganizationId and null role when orgId is omitted
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:26.650Z] [WORKER_ROUTER] GET /api/session for user [usr_test_member] 
+
+ [32m✓[39m tests/worker/apiRoutes.test.ts [2m([22m[2m39 tests[22m[2m)[22m[32m 148[2mms[22m[39m
+[90mstderr[2m | tests/ai/repairGateRegression.test.ts[2m > [22m[2mSprint 4.0 Final Seal Repair - AI Intelligence Foundation Hardening[2m > [22m[2m10. Route level: Cross-tenant authorization failure (user in Org A requesting Org B returns 403)
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:27.104Z] [SECURITY_INCIDENT] [cross_tenant_access.denied] [Severity: CRITICAL] Target Org: org_competitor {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"attemptedOrgTarget":"org_competitor","userOrgs":["org_acme"],"requestedAction":"actions.read"}}
+
+[90mstdout[2m | tests/ai/repairGateRegression.test.ts[2m > [22m[2mSprint 4.0 Final Seal Repair - AI Intelligence Foundation Hardening[2m > [22m[2m11. Provider Preflight Order: Primary priced, fallback unpriced -> primary executes
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:27.114Z] [AI_EXECUTION_COMPLETED] {"runId":"run_8ba99f89-c839-4b3f-8c1a-a5a50bb249f4","organizationId":"org_test_fallback_order","taskType":"LEAK_EXPLANATION","tokens":{"prompt":100,"completion":50},"latencyMs":120,"costMicroUsd":30,"redactionCount":0,"isMock":false}
+
+[90mstderr[2m | tests/ai/repairGateRegression.test.ts[2m > [22m[2mSprint 4.0 Final Seal Repair - AI Intelligence Foundation Hardening[2m > [22m[2m12. Provider Preflight Order: Primary fails, fallback unpriced -> fallback generate count = 0
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:27.117Z] [AI_PROVIDER_FAILOVER] {"providerId":"gemini","taskType":"LEAK_EXPLANATION","errorCode":"ERR_PROVIDER_EXECUTION_FAILED","fallbackAttempted":true}
+[VELNAR:WARN] [2026-08-31T11:35:27.117Z] [AI_PREFLIGHT_SKIPPED] {"providerId":"deepseek","taskType":"LEAK_EXPLANATION","errorCode":"AI_PRICING_NOT_CONFIGURED","organizationId":"org_test_fallback_order_fail"}
+
+[90mstderr[2m | tests/ai/repairGateRegression.test.ts[2m > [22m[2mSprint 4.0 Final Seal Repair - AI Intelligence Foundation Hardening[2m > [22m[2m13. Provider Preflight Order: Primary fails, privacy-safe fallback has exact pricing -> fallback executes
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:27.118Z] [AI_PROVIDER_FAILOVER] {"providerId":"gemini","taskType":"LEAK_EXPLANATION","errorCode":"ERR_PROVIDER_EXECUTION_FAILED","fallbackAttempted":true}
+
+[90mstdout[2m | tests/ai/repairGateRegression.test.ts[2m > [22m[2mSprint 4.0 Final Seal Repair - AI Intelligence Foundation Hardening[2m > [22m[2m13. Provider Preflight Order: Primary fails, privacy-safe fallback has exact pricing -> fallback executes
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:27.119Z] [AI_EXECUTION_COMPLETED] {"runId":"run_470c7c98-7 *** **18c-8388-f4d1be017447","organizationId":"org_test_fallback_success","taskType":"LEAK_EXPLANATION","tokens":{"prompt":120,"completion":60},"latencyMs":150,"costMicroUsd":18,"redactionCount":0,"isMock":false}
+
+ [32m✓[39m tests/ai/repairGateRegression.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 123[2mms[22m[39m
+ [32m✓[39m tests/security/phaseA12B1BEvidenceProvenance.test.ts [2m([22m[2m49 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+[90mstderr[2m | tests/security/safeLoggerRegression.test.ts[2m > [22m[2mSafeLogger & Worker Error Sanitization Regressions[2m > [22m[2mWorker Fatal Error Handling in Production vs Development[2m > [22m[2min production, fatal server errors return generic INTERNAL_ERROR without leaking raw error message or stack
+[22m[39m[VELNAR:ERROR] [2026-08-31T11:35:28.067Z] [WORKER_FATAL_ERROR] {"route":"/api/auth/me","method":"GET","errorType":"Error","safeErrorCode":"ERR_WORKER_INTERNAL"}
+
+[90mstderr[2m | tests/security/safeLoggerRegression.test.ts[2m > [22m[2mSafeLogger & Worker Error Sanitization Regressions[2m > [22m[2mWorker Fatal Error Handling in Production vs Development[2m > [22m[2min development, fatal server errors include message for debugging
+[22m[39m[VELNAR:ERROR] [2026-08-31T11:35:28.082Z] [WORKER_FATAL_ERROR] {"route":"/api/auth/me","method":"GET","errorType":"Error","message":"Dev Debug Internal Fault","stack":"Error: Dev Debug Internal Fault\n    at _Headers.value (/app/applet/tests/security/safeLoggerRegression.test.ts:124:19)\n    at Object.fetch (/app/applet/worker/index.ts:153:42)\n    at /app/applet/tests/security/safeLoggerRegression.test.ts:135:32\n    at file:///app/applet/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11\n    at file:///app/applet/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26\n    at file:///app/applet/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///app/applet/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)\n    at file:///app/applet/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)"}
+
+ [32m✓[39m tests/security/safeLoggerRegression.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+ [32m✓[39m tests/ai/outputValidator.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+[90mstderr[2m | tests/security/tenantGuard.test.ts[2m > [22m[2mTenantGuard & RBAC Authorization Engine[2m > [22m[2m2. Cross-Tenant Boundary Enforcement[2m > [22m[2mshould block cross-tenant read attempts with 403
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:28.780Z] [SECURITY_INCIDENT] [cross_tenant_access.denied] [Severity: CRITICAL] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"attemptedOrgTarget":"org_apex_holding","userOrgs":["org_istanbul_dining"],"requestedAction":"leads.read"}}
+
+[90mstderr[2m | tests/security/tenantGuard.test.ts[2m > [22m[2mTenantGuard & RBAC Authorization Engine[2m > [22m[2m2. Cross-Tenant Boundary Enforcement[2m > [22m[2mshould block cross-tenant write attempts with 403
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:28.782Z] [SECURITY_INCIDENT] [cross_tenant_access.denied] [Severity: CRITICAL] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"attemptedOrgTarget":"org_apex_holding","userOrgs":["org_istanbul_dining"],"requestedAction":"appointment.create"}}
+
+[90mstderr[2m | tests/security/tenantGuard.test.ts[2m > [22m[2mTenantGuard & RBAC Authorization Engine[2m > [22m[2m3. Canonical 5-Role RBAC Matrix Enforcement[2m > [22m[2mADMIN should approve actions but CANNOT read identity vault raw PII
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:28.784Z] [SECURITY_INCIDENT] [authorization.denied] [Severity: MEDIUM] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"role":"ADMIN","attemptedAction":"identity_vault.read"}}
+[VELNAR:WARN] [2026-08-31T11:35:28.784Z] [SECURITY_INCIDENT] [authorization.denied] [Severity: MEDIUM] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"role":"ADMIN","attemptedAction":"identity_vault.read"}}
+
+[90mstderr[2m | tests/security/tenantGuard.test.ts[2m > [22m[2mTenantGuard & RBAC Authorization Engine[2m > [22m[2m3. Canonical 5-Role RBAC Matrix Enforcement[2m > [22m[2mMANAGER can dispatch leads but CANNOT approve growth actions or read vault
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:28.785Z] [SECURITY_INCIDENT] [authorization.denied] [Severity: MEDIUM] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"role":"MANAGER","attemptedAction":"actions.approve"}}
+[VELNAR:WARN] [2026-08-31T11:35:28.786Z] [SECURITY_INCIDENT] [authorization.denied] [Severity: MEDIUM] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"role":"MANAGER","attemptedAction":"identity_vault.read"}}
+
+[90mstderr[2m | tests/security/tenantGuard.test.ts[2m > [22m[2mTenantGuard & RBAC Authorization Engine[2m > [22m[2m3. Canonical 5-Role RBAC Matrix Enforcement[2m > [22m[2mSTAFF can view leads and manage appointments but CANNOT approve actions or mutate settings
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:28.786Z] [SECURITY_INCIDENT] [authorization.denied] [Severity: MEDIUM] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"role":"STAFF","attemptedAction":"actions.approve"}}
+[VELNAR:WARN] [2026-08-31T11:35:28.787Z] [SECURITY_INCIDENT] [authorization.denied] [Severity: MEDIUM] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"role":"STAFF","attemptedAction":"settings.edit"}}
+
+[90mstderr[2m | tests/security/tenantGuard.test.ts[2m > [22m[2mTenantGuard & RBAC Authorization Engine[2m > [22m[2m3. Canonical 5-Role RBAC Matrix Enforcement[2m > [22m[2mVIEWER is strictly read-only and cannot mutate appointments or approve actions
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:28.787Z] [SECURITY_INCIDENT] [authorization.denied] [Severity: MEDIUM] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"role":"VIEWER","attemptedAction":"appointment.create"}}
+[VELNAR:WARN] [2026-08-31T11:35:28.788Z] [SECURITY_INCIDENT] [authorization.denied] [Severity: MEDIUM] Target Org: org_apex_holding {"enforcement":"BLOCKED_IMMEDIATELY","sourceIpHash":"UNKNOWN","details":{"role":"VIEWER","attemptedAction":"actions.approve"}}
+
+ [32m✓[39m tests/security/tenantGuard.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m tests/security/phaseA8FinalIsolation.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 41[2mms[22m[39m
+[90mstdout[2m | tests/repositories/d1Scoping.test.ts[2m > [22m[2mTenant Scoping in Repositories (Cloudflare D1 Prepared SQL / In-Memory Fallback)[2m > [22m[2mGrowthActionRepository should track human approval with user ID and timestamp
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:29.532Z] [AUDIT_TRAIL] [GROWTH_ACTION_APPROVED] by [OWNER] on [growth_actions:act_001] (Org: org_apex_holding) 
+
+[90mstdout[2m | tests/repositories/d1Scoping.test.ts[2m > [22m[2mTenant Scoping in Repositories (Cloudflare D1 Prepared SQL / In-Memory Fallback)[2m > [22m[2mIdentityVaultRepository should encrypt PII into ciphertext before storage and decrypt on demand
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:29.536Z] [IDENTITY_VAULT] Encrypted identity record created for pseudonym [cus_b41993c4-d0ff-4711-99d7-89c680801f4e] under tenant [org_apex_holding] 
+
+[90mstdout[2m | tests/repositories/d1Scoping.test.ts[2m > [22m[2mTenant Scoping in Repositories (Cloudflare D1 Prepared SQL / In-Memory Fallback)[2m > [22m[2mAuditRepository should append immutable logs with redacted payloads and enforced orgId
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:29.540Z] [AUDIT_TRAIL] [SECURITY_VAULT_DECRYPT] by [OWNER] on [identity_vault:cus_ps_99] (Org: org_apex_holding) 
+
+ [32m✓[39m tests/repositories/d1Scoping.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m tests/crypto/vaultCrypto.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+[90mstderr[2m | tests/ai/actionPolicyEngine.test.ts[2m > [22m[2mSprint 4 - Deterministic Action Policy Engine & Business Scoping[2m > [22m[2mActionPolicyRepository business-scoped precedence[2m > [22m[2mfails closed and throws on D1 read error in production
+[22m[39m[VELNAR:ERROR] [2026-08-31T11:35:30.254Z] [BUSINESS_TENANT_GUARD_D1_ERROR] {"businessId":"biz_prod","organizationId":"org_prod","errorCode":"BUSINESS_LOOKUP_D1_FAILED"}
+
+[90mstdout[2m | tests/ai/actionPolicyEngine.test.ts[2m > [22m[2mSprint 4 - Deterministic Action Policy Engine & Business Scoping[2m > [22m[2mGrowthActionRepository transitionWithAudit hardening[2m > [22m[2mapproves an action when guardrailStatus is PASSED and records metadata
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:30.262Z] [AUDIT_TRAIL] [GROWTH_ACTION_APPROVED] by [OWNER] on [growth_actions:act_001] (Org: org_apex_holding) 
+
+[90mstdout[2m | tests/ai/actionPolicyEngine.test.ts[2m > [22m[2mSprint 4 - Deterministic Action Policy Engine & Business Scoping[2m > [22m[2mGrowthActionRepository transitionWithAudit hardening[2m > [22m[2mnullifies approver fields when action is rejected or deferred
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:30.263Z] [AUDIT_TRAIL] [GROWTH_ACTION_REJECTED] by [OWNER] on [growth_actions:act_001] (Org: org_apex_holding) 
+
+ [32m✓[39m tests/ai/actionPolicyEngine.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m tests/ai/zeroFrontendSecrets.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+[90mstderr[2m | tests/security/phaseA3Hardening.test.ts[2m > [22m[2mSprint 4 Phase A.3 - Zero-Compromise Hardening & Tenant Boundary Verification[2m > [22m[2m1. Business-to-Organization Tenant Integrity (BusinessTenantGuard)[2m > [22m[2mblocks business belonging to a different organization (Cross-Tenant Attack)
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:30.896Z] [BUSINESS_CROSS_TENANT_DENIAL_MEM] {"businessId":"biz_beauty_salon","organizationId":"org_istanbul_dining","mappedOrg":"org_apex_holding"}
+
+[90mstderr[2m | tests/security/phaseA3Hardening.test.ts[2m > [22m[2mSprint 4 Phase A.3 - Zero-Compromise Hardening & Tenant Boundary Verification[2m > [22m[2m1. Business-to-Organization Tenant Integrity (BusinessTenantGuard)[2m > [22m[2massertBusinessBelongsToOrganization throws 403 error on mismatch
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:30.899Z] [BUSINESS_CROSS_TENANT_DENIAL_MEM] {"businessId":"biz_beauty_salon","organizationId":"org_other_corp","mappedOrg":"org_apex_holding"}
+
+[90mstderr[2m | tests/security/phaseA3Hardening.test.ts[2m > [22m[2mSprint 4 Phase A.3 - Zero-Compromise Hardening & Tenant Boundary Verification[2m > [22m[2m2. Action Policy Hardening & Fail-Closed D1 Logic[2m > [22m[2mActionPolicyRepository enforces business ownership before reading policy
+[22m[39m[VELNAR:WARN] [2026-08-31T11:35:30.904Z] [BUSINESS_CROSS_TENANT_DENIAL_MEM] {"businessId":"biz_beauty_salon","organizationId":"org_istanbul_dining","mappedOrg":"org_apex_holding"}
+
+[90mstderr[2m | tests/security/phaseA3Hardening.test.ts[2m > [22m[2mSprint 4 Phase A.3 - Zero-Compromise Hardening & Tenant Boundary Verification[2m > [22m[2m2. Action Policy Hardening & Fail-Closed D1 Logic[2m > [22m[2mActionPolicyRepository throws on D1 database failure in production (no silent fallback)
+[22m[39m[VELNAR:ERROR] [2026-08-31T11:35:30.905Z] [BUSINESS_TENANT_GUARD_D1_ERROR] {"businessId":"biz_prod_1","organizationId":"org_prod_1","errorCode":"BUSINESS_LOOKUP_D1_FAILED"}
+
+[90mstdout[2m | tests/security/phaseA3Hardening.test.ts[2m > [22m[2mSprint 4 Phase A.3 - Zero-Compromise Hardening & Tenant Boundary Verification[2m > [22m[2m4. Audit Repository Integrity[2m > [22m[2mdoes not invent fake business ID or IP hashes
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:30.915Z] [AUDIT_TRAIL] [ACTION_APPROVED] by [OWNER] on [growth_actions:act_01] (Org: org_target) 
+
+ [32m✓[39m tests/security/phaseA3Hardening.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+[90mstdout[2m | tests/ai/aiRouterOrchestration.test.ts[2m > [22m[2mSprint 4 - AI Router Orchestration & Telemetry[2m > [22m[2mexecutes development fallback with explicit isMock: true flag and logs telemetry
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:31.280Z] [AI_EXECUTION_COMPLETED] {"runId":"run_1e7af111-567d-4d5a-96fb-86aaed43411c","organizationId":"org_apex_holding","taskType":"GROWTH_ACTION_DRAFT","tokens":{"prompt":0,"completion":0},"latencyMs":15,"costMicroUsd":0,"redactionCount":0,"isMock":true}
+
+ [32m✓[39m tests/ai/aiRouterOrchestration.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+[90mstdout[2m | tests/security/phaseA5Regression.test.ts[2m > [22m[2mPhase A.5 Production Hardening & Invariant Seal Regression Tests[2m > [22m[2m3. GrowthActionRepository Atomic Transition & Approval Isolation[2m > [22m[2mtransitionWithAudit enforces valid state transitions and audit logging in memory/D1
+[22m[39m[VELNAR:INFO] [2026-08-31T11:35:31.722Z] [AUDIT_TRAIL] [GROWTH_ACTION_APPROVED] by [OWNER] on [growth_actions:act_001] (Org: org_apex_holding) 
+
+ [32m✓[39m tests/security/phaseA5Regression.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m tests/ai/phaseA12B2BControlledLiveEvaluation.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m tests/ai/redactionAndPrivacy.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/security/cryptoSecurity.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/security/noWorkerImportsInSrc.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 12[2mms[22m[39m
+[90mstderr[2m | tests/ai/budgetAndCost.test.ts[2m > [22m[2mSprint 4 - AI Integer microUSD Cost & Budget Enforcement[2m > [22m[2mreturns UNAVAILABLE status in production when D1 is unconfigured or errors
+[22m[39m[VELNAR:ERROR] [2026-08-31T11:35:33.337Z] [AI_SPEND_TELEMETRY_D1_FAILED] {"organizationId":"org_test_123","errorCode":"AI_SPEND_TELEMETRY_D1_FAILED"}
+
+ [32m✓[39m tests/ai/budgetAndCost.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m tests/ai/dataClassification.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/theme/themeColorRegression.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/migrations/migrationSchema.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/security/securitySnapshotIntegrity.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/theme/themeSystem.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/integrations/fulgorRay.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m30 passed[39m[22m[90m (30)[39m
+[2m      Tests [22m [1m[32m463 passed[39m[22m[90m (463)[39m
+[2m   Start at [22m 11:35:21
+[2m   Duration [22m 13.25s[2m (transform 1.58s, setup 0ms, import 3.10s, tests 1.85s, environment 5ms)[22m
+
