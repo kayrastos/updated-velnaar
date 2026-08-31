@@ -1115,6 +1115,164 @@ describe('Phase A.12B.2A — Shadow Evaluation Harness Final Seal', () => {
       expect(wrongAnomaly.dimensionScores.taskCorrectness).toBeLessThanOrEqual(4000);
     });
 
+    it('should score schema-valid semantic negative controls materially below correct domain answers across SEO, Twin, Growth, and Anomaly', () => {
+      // 1. SEO: ["banana"], ["random"], "do something" vs correct domain answer
+      const seoCase = getEvaluationCaseById('eval_v1_seo_01')!;
+      const negativeSeo = EvaluationScorer.scoreCase(seoCase, {
+        candidate: FIXTURE_STRONG_CANDIDATE,
+        caseId: seoCase.id,
+        content: JSON.stringify({
+          suggestedKeywords: ['banana'],
+          contentGaps: ['random'],
+          recommendedAction: 'do something',
+        }),
+        promptTokens: 100,
+        completionTokens: 50,
+        latencyMs: 120,
+        costMicroUsd: 500,
+        promptVersion: 'v1.0.0',
+      });
+      const positiveSeo = EvaluationScorer.scoreCase(seoCase, {
+        candidate: FIXTURE_STRONG_CANDIDATE,
+        caseId: seoCase.id,
+        content: JSON.stringify({
+          suggestedKeywords: ['istanbul dental clinic', 'dental implant prices'],
+          contentGaps: ['emergency pricing guide', 'patient testimonials'],
+          recommendedAction: 'Publish localized landing page for high-intent emergency queries.',
+        }),
+        promptTokens: 100,
+        completionTokens: 50,
+        latencyMs: 120,
+        costMicroUsd: 500,
+        promptVersion: 'v1.0.0',
+      });
+      expect(negativeSeo.dimensionScores.taskCorrectness).toBeLessThanOrEqual(3000);
+      expect(positiveSeo.dimensionScores.taskCorrectness).toBe(10000);
+      expect(positiveSeo.weightedQualityScoreBps - negativeSeo.weightedQualityScoreBps).toBeGreaterThanOrEqual(700);
+
+      // 2. Business Twin: unrelated summary vs grounded summary
+      const twinCase = getEvaluationCaseById('eval_v1_twin_01')!;
+      const negativeTwin = EvaluationScorer.scoreCase(twinCase, {
+        candidate: FIXTURE_STRONG_CANDIDATE,
+        caseId: twinCase.id,
+        content: JSON.stringify({
+          executiveSummary: 'Company operates an offline agricultural tractor repair shop in Kansas with cash receipts.',
+          verifiedFactCount: 0,
+          criticalConstraints: ['Unrelated parts supply delay'],
+          unitEconomicsSummary: 'Unrelated agricultural margins.',
+        }),
+        promptTokens: 100,
+        completionTokens: 50,
+        latencyMs: 120,
+        costMicroUsd: 500,
+        promptVersion: 'v1.0.0',
+      });
+      const positiveTwin = EvaluationScorer.scoreCase(twinCase, {
+        candidate: FIXTURE_STRONG_CANDIDATE,
+        caseId: twinCase.id,
+        content: JSON.stringify({
+          executiveSummary: 'Operational twin reflects stable B2B inbound acquisition with healthy LTV:CAC.',
+          verifiedFactCount: 3,
+          criticalConstraints: ['SDR capacity constrained during peak inbound hours'],
+          unitEconomicsSummary: 'Blended CAC is healthy with 4.2x LTV ratio and rapid payback.',
+        }),
+        promptTokens: 100,
+        completionTokens: 50,
+        latencyMs: 120,
+        costMicroUsd: 500,
+        promptVersion: 'v1.0.0',
+      });
+      expect(negativeTwin.dimensionScores.taskCorrectness).toBeLessThanOrEqual(3000);
+      expect(positiveTwin.dimensionScores.taskCorrectness).toBe(10000);
+      expect(positiveTwin.weightedQualityScoreBps - negativeTwin.weightedQualityScoreBps).toBeGreaterThanOrEqual(700);
+
+      // 3. Growth: unrelated action vs correct mechanism/action
+      const growthCase = getEvaluationCaseById('eval_v1_growth_01')!;
+      const negativeGrowth = EvaluationScorer.scoreCase(growthCase, {
+        candidate: FIXTURE_STRONG_CANDIDATE,
+        caseId: growthCase.id,
+        content: JSON.stringify({
+          title: 'Organize warehouse shelves',
+          summary: 'Clean up physical office storage area to improve morale.',
+          evidenceReferences: ['ev_sla_miss_01'],
+          recommendedSteps: ['Buy storage bins'],
+          expectedMechanism: 'Cleanliness improves mood',
+          riskLevel: 'LOW',
+          requiresHumanApproval: true,
+          hypothesis: 'Clean office increases speed',
+          actionType: 'notification_broadcast',
+          suggestedPayload: {},
+          revenueLeakId: 'leak_sla_high_intent_2026_01',
+          estimatedImpactMinor: 2500000,
+        }),
+        promptTokens: 100,
+        completionTokens: 50,
+        latencyMs: 120,
+        costMicroUsd: 500,
+        promptVersion: 'v1.0.0',
+      });
+      const positiveGrowth = EvaluationScorer.scoreCase(growthCase, {
+        candidate: FIXTURE_STRONG_CANDIDATE,
+        caseId: growthCase.id,
+        content: JSON.stringify({
+          title: 'Implement Inbound Lead Auto-Routing SLA Trigger',
+          summary: 'Deploy automated high-intent routing to prevent 180-minute lead response delays.',
+          evidenceReferences: ['ev_sla_miss_01', 'ev_high_intent_lead_02'],
+          recommendedSteps: ['Configure webhook notification', 'Auto-assign available rep within 5 mins'],
+          expectedMechanism: 'Automated lead dispatch and instant contact increases velocity and prevents lost pipeline conversion.',
+          riskLevel: 'LOW',
+          requiresHumanApproval: true,
+          hypothesis: 'Faster response latency prevents drop-off during peak inbound inquiries.',
+          actionType: 'workflow_automation',
+          suggestedPayload: { targetSlaMinutes: 5 },
+          revenueLeakId: 'leak_sla_high_intent_2026_01',
+          estimatedImpactMinor: 2500000,
+        }),
+        promptTokens: 100,
+        completionTokens: 50,
+        latencyMs: 120,
+        costMicroUsd: 500,
+        promptVersion: 'v1.0.0',
+      });
+      expect(negativeGrowth.dimensionScores.taskCorrectness).toBeLessThanOrEqual(3000);
+      expect(positiveGrowth.dimensionScores.taskCorrectness).toBe(10000);
+      expect(positiveGrowth.weightedQualityScoreBps - negativeGrowth.weightedQualityScoreBps).toBeGreaterThanOrEqual(700);
+
+      // 4. Anomaly: unrelated diagnosis vs grounded diagnosis
+      const anomalyCase = getEvaluationCaseById('eval_v1_anomaly_01')!;
+      const negativeAnomaly = EvaluationScorer.scoreCase(anomalyCase, {
+        candidate: FIXTURE_STRONG_CANDIDATE,
+        caseId: anomalyCase.id,
+        content: JSON.stringify({
+          anomalySeverity: 'CRITICAL',
+          probableCause: 'Office cafeteria coffee machine temperature sensor tripped.',
+          triageSteps: ['Order new coffee filters', 'Descaler treatment'],
+        }),
+        promptTokens: 100,
+        completionTokens: 50,
+        latencyMs: 120,
+        costMicroUsd: 500,
+        promptVersion: 'v1.0.0',
+      });
+      const positiveAnomaly = EvaluationScorer.scoreCase(anomalyCase, {
+        candidate: FIXTURE_STRONG_CANDIDATE,
+        caseId: anomalyCase.id,
+        content: JSON.stringify({
+          anomalySeverity: 'CRITICAL',
+          probableCause: 'Database connection pool exhaustion following traffic spike.',
+          triageSteps: ['Inspect active connection pool metrics', 'Scale connection limits'],
+        }),
+        promptTokens: 100,
+        completionTokens: 50,
+        latencyMs: 120,
+        costMicroUsd: 500,
+        promptVersion: 'v1.0.0',
+      });
+      expect(negativeAnomaly.dimensionScores.taskCorrectness).toBeLessThanOrEqual(3000);
+      expect(positiveAnomaly.dimensionScores.taskCorrectness).toBe(10000);
+      expect(positiveAnomaly.weightedQualityScoreBps - negativeAnomaly.weightedQualityScoreBps).toBeGreaterThanOrEqual(700);
+    });
+
     it('should preserve candidate input promptVersion provenance and not rewrite from PromptRegistry', () => {
       const evalCase = getEvaluationCaseById('eval_v1_lead_01')!;
       const historicalPromptVersion = 'v0.9.0-legacy-provenance';

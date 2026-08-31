@@ -31,39 +31,39 @@ Prior sealed baselines remain intact:
 
 ## 2. Test Suite Execution & Invariant Verification
 
-**Result:** 29 / 29 Test Suites Passed (446 / 446 Tests Green)
+**Result:** 29 / 29 Test Suites Passed (447 / 447 Tests Green)
 
 | # | Test Suite File | Tests | Status | Scope |
 |---|---|---|---|---|
-| 1 | `tests/ai/shadowEvaluationHarness.test.ts` | 52 | PASS | Shadow Eval Harness, Dataset, Scorer, Security Gates & Regressions |
-| 2 | `tests/security/phaseA12B1AIRunProtocol.test.ts` | 48 | PASS | AIRun Protocol, Schema Validation & Invariants |
-| 3 | `tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts` | 13 | PASS | Evidence Completeness & Appointment Mutation Seal |
-| 4 | `tests/security/phaseA10BZeroTolerance.test.ts` | 10 | PASS | Zero-Tolerance Security & RBAC Enforcement |
-| 5 | `tests/security/phaseA9DataIntegrity.test.ts` | 9 | PASS | Data Integrity, Snapshot Verification & Vault Controls |
-| 6 | `tests/security/phaseA8ActionPolicyHardening.test.ts` | 8 | PASS | Action Policy Fail-Closed Enforcements |
-| 7 | `tests/security/phaseA7RBACMatrix.test.ts` | 7 | PASS | Canonical 5-Role RBAC Matrix Enforcement |
-| 8 | `tests/security/phaseA6TenantIsolation.test.ts` | 6 | PASS | Multi-Tenant Data Isolation Invariants |
-| 9 | `tests/security/phaseA5Regression.test.ts` | 12 | PASS | Phase A.5 Production Hardening & Invariant Seal |
-| 10 | `tests/security/phaseA4AuditLogging.test.ts` | 4 | PASS | Tamper-Resistant Audit Trail Logging |
-| 11 | `tests/security/phaseA3Hardening.test.ts` | 11 | PASS | Zero-Compromise Hardening & Tenant Boundary Verification |
-| 12 | `tests/security/phaseA2EvidenceValidation.test.ts` | 5 | PASS | Deterministic Evidence Validation Engine |
-| 13 | `tests/security/phaseA1SecuritySeal.test.ts` | 5 | PASS | Core Security Seal & Identity Safeguards |
-| 14 | `tests/security/tenantGuard.test.ts` | 8 | PASS | TenantGuard & Canonical 5-Role RBAC Matrix |
-| 15 | `tests/security/cryptoSecurity.test.ts` | 2 | PASS | Cryptographic Token & Hash Security |
-| 16 | `tests/security/noWorkerImportsInSrc.test.ts` | 1 | PASS | Architecture Boundary Isolation |
-| 17 | `tests/security/securitySnapshotIntegrity.test.ts` | 4 | PASS | Security Snapshot & Integrity Verification |
-| 18 | `tests/ai/outputValidator.test.ts` | 21 | PASS | Strict Output Validation & Task Schemas |
-| 19 | `tests/ai/aiRouterOrchestration.test.ts` | 4 | PASS | AI Router Orchestration & Telemetry Logging |
-| 20 | `tests/ai/budgetAndCost.test.ts` | 6 | PASS | Integer microUSD Budget & Cost Control |
-| 21 | `tests/ai/redactionAndPrivacy.test.ts` | 3 | PASS | Redaction Layer & Canary Token Scrubbing |
-| 22 | `tests/ai/dataClassification.test.ts` | 6 | PASS | 4-Tier Data Classification System |
-| 23 | `tests/migrations/migrationSchema.test.ts` | 5 | PASS | D1 SQLite Migration Schema Verification |
-| 24 | `tests/theme/themeColorRegression.test.ts` | 1 | PASS | Theme Color Contract Regression |
-| 25 | `tests/theme/themeSystem.test.ts` | 4 | PASS | Theme System Runtime Invariants |
+| 1 | `tests/ai/shadowEvaluationHarness.test.ts` | 53 | PASS | Shadow Eval Harness, Dataset, Scorer, Security Gates & Regressions |
+| 2 | `tests/security/phaseA12B1BEvidenceProvenance.test.ts` | 49 | PASS | AIRun Telemetry, Audit Provenance & Lineage |
+| 3 | `tests/security/phaseA12B1AIRunProtocol.test.ts` | 48 | PASS | AIRun Protocol, Schema Validation & Invariants |
+| 4 | `tests/security/phaseA12A5AppointmentSealEvidence.test.ts` | 41 | PASS | Appointment Seal & Evidence Validation |
+| 5 | `tests/worker/apiRoutes.test.ts` | 39 | PASS | Worker API Routes, Routing & Authorization |
+| 6 | `tests/security/phaseA11EvidenceAndAppointmentSeal.test.ts` | 29 | PASS | Evidence Completeness & Appointment Mutation Seal |
+| 7 | `tests/security/phaseA12A3AppointmentFinalSeal.test.ts` | 23 | PASS | Appointment Final Seal Invariants |
+| 8 | `tests/ai/outputValidator.test.ts` | 21 | PASS | Strict Output Validation & Task Schemas |
+| 9 | `tests/ai/actionPolicyEngine.test.ts` | 17 | PASS | Action Policy Engine & Business Scoping |
+| 10 | `tests/ai/repairGateRegression.test.ts` | 15 | PASS | AI Repair Gate Invariants & Regressions |
+| 11 | `tests/security/safeLoggerRegression.test.ts` | 13 | PASS | Safe Logger Sanitization & Incident Logging |
+| 12 | `tests/security/phaseA5Regression.test.ts` | 12 | PASS | Phase A.5 Production Hardening & Invariant Seal |
+| 13 | `tests/crypto/vaultCrypto.test.ts` | 12 | PASS | Cryptographic Vault Encryption & Security |
+| 14 | `tests/security/phaseA3Hardening.test.ts` | 11 | PASS | Zero-Compromise Hardening & Tenant Boundary Verification |
+| 15 | `tests/security/tenantGuard.test.ts` | 8 | PASS | TenantGuard & Canonical 5-Role RBAC Matrix |
+| 16 | `tests/security/phaseA8FinalIsolation.test.ts` | 8 | PASS | Phase A.8 Final Isolation Enforcements |
+| 17 | `tests/repositories/d1Scoping.test.ts` | 6 | PASS | D1 Scoping & Organization Isolation |
+| 18 | `tests/ai/budgetAndCost.test.ts` | 6 | PASS | Integer microUSD Budget & Cost Control |
+| 19 | `tests/ai/dataClassification.test.ts` | 6 | PASS | 4-Tier Data Classification System |
+| 20 | `tests/migrations/migrationSchema.test.ts` | 5 | PASS | D1 SQLite Migration Schema Verification |
+| 21 | `tests/security/securitySnapshotIntegrity.test.ts` | 4 | PASS | Security Snapshot & Integrity Verification |
+| 22 | `tests/theme/themeSystem.test.ts` | 4 | PASS | Theme System Runtime Invariants |
+| 23 | `tests/ai/aiRouterOrchestration.test.ts` | 4 | PASS | AI Router Orchestration & Telemetry Logging |
+| 24 | `tests/ai/redactionAndPrivacy.test.ts` | 3 | PASS | Redaction Layer & Canary Token Scrubbing |
+| 25 | `tests/ai/zeroFrontendSecrets.test.ts` | 3 | PASS | Zero Frontend Secrets Enforcement |
 | 26 | `tests/integrations/fulgorRay.test.ts` | 3 | PASS | Fulgor Ray Integration Invariants |
-| 27 | `tests/unit/leadScoring.test.ts` | 167 | PASS | Deterministic Lead Scoring Core Algorithms |
-| 28 | `tests/components/crmTable.test.ts` | 19 | PASS | CRM Table Sorting, Filtering & Actions |
-| 29 | `tests/components/actionPlanModal.test.ts` | 11 | PASS | Action Plan Modal Interaction & Approval |
+| 27 | `tests/security/cryptoSecurity.test.ts` | 2 | PASS | Cryptographic Token & Hash Security |
+| 28 | `tests/security/noWorkerImportsInSrc.test.ts` | 1 | PASS | Architecture Boundary Isolation |
+| 29 | `tests/theme/themeColorRegression.test.ts` | 1 | PASS | Theme Color Contract Regression |
 
 ---
 
