@@ -5,8 +5,11 @@
 
 import {
   A12B2B_PRICING_CATALOG_VERSION,
+  A12B2B_MAX_OUTPUT_TOKENS_BOUND,
+  A12B2B_WORST_CASE_INPUT_TOKENS_BOUND,
   DeepSeekPricingRate,
   GeminiPricingRate,
+  LiveCandidateConfig,
   PricingWindow,
   UsageSource,
 } from './evaluationLiveTypes';
@@ -182,5 +185,75 @@ export class EvaluationCostCalculator {
     if (baselineCost <= 0) return 0;
     if (actualCost >= baselineCost) return 0;
     return Math.round(((baselineCost - actualCost) / baselineCost) * 10000);
+  }
+
+  /**
+   * Calculates deterministic provider-specific worst-case upper bound invocation cost in integer microUSD.
+   * Assumes 100% cache-miss for DeepSeek (0 cache hit) and maximum bounded output generation.
+   */
+  public static calculateWorstCaseInvocationCostMicroUsd(
+    candidate: LiveCandidateConfig,
+    pricingWindow: PricingWindow,
+    estimatedInputTokens: number = A12B2B_WORST_CASE_INPUT_TOKENS_BOUND,
+    maxOutputTokens: number = A12B2B_MAX_OUTPUT_TOKENS_BOUND
+  ): number {
+    if (candidate.providerId === 'deepseek') {
+      const rates = DEEPSEEK_V4_FLASH_PRICING;
+      const missRate =
+        pricingWindow === 'PEAK'
+          ? rates.peakCacheMissMicroUsdPer1M
+          : rates.offPeakCacheMissMicroUsdPer1M;
+      const outputRate =
+        pricingWindow === 'PEAK'
+          ? rates.peakOutputMicroUsdPer1M
+          : rates.offPeakOutputMicroUsdPer1M;
+
+      const inputCost = Math.ceil((estimatedInputTokens * missRate) / 1000000);
+      const outputCost = Math.ceil((maxOutputTokens * outputRate) / 1000000);
+      return inputCost + outputCost;
+    } else if (candidate.providerId === 'gemini') {
+      const rates = GEMINI_35_FLASH_LITE_PRICING;
+      const inputRate =
+        candidate.serviceTier === 'flex'
+          ? rates.flexInputMicroUsdPer1M
+          : rates.standardInputMicroUsdPer1M;
+      const outputRate =
+        candidate.serviceTier === 'flex'
+          ? rates.flexOutputMicroUsdPer1M
+          : rates.standardOutputMicroUsdPer1M;
+
+      const inputCost = Math.ceil((estimatedInputTokens * inputRate) / 1000000);
+      const outputCost = Math.ceil((maxOutputTokens * outputRate) / 1000000);
+      return inputCost + outputCost;
+    }
+
+    throw new Error(`UNSUPPORTED_PROVIDER_FOR_COST: ${candidate.providerId}`);
+  }
+
+  /**
+   * Calculates conservative upper-bound spend for the entire remaining full protocol.
+   */
+  public static calculateWorstCaseProtocolRemainingSpendMicroUsd(params: {
+    candidates: LiveCandidateConfig[];
+    eligibleCasesCount: number;
+    replicatesCount: number;
+    pricingWindow: PricingWindow;
+    estimatedInputTokens?: number;
+    maxOutputTokens?: number;
+  }): number {
+    const { candidates, eligibleCasesCount, replicatesCount, pricingWindow } = params;
+    let totalWorstCaseSpend = 0;
+
+    for (const candidate of candidates) {
+      const perInvocationWorstCase = this.calculateWorstCaseInvocationCostMicroUsd(
+        candidate,
+        pricingWindow,
+        params.estimatedInputTokens,
+        params.maxOutputTokens
+      );
+      totalWorstCaseSpend += perInvocationWorstCase * eligibleCasesCount * replicatesCount;
+    }
+
+    return totalWorstCaseSpend;
   }
 }

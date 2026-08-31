@@ -8,6 +8,8 @@ import { EvaluationScoreDimensions, EvaluationHardFailReason, HallucinationCateg
 
 export const A12B2B_PRICING_CATALOG_VERSION = '2026-08-31-v1';
 export const A12B2B_BUDGET_CAP_MICRO_USD = 5000000; // $5.00 USD hard cap
+export const A12B2B_MAX_OUTPUT_TOKENS_BOUND = 2048; // Documented safe output bound for canonical VELNAR schemas
+export const A12B2B_WORST_CASE_INPUT_TOKENS_BOUND = 4000; // Conservative prompt input token upper bound
 
 export type LiveCandidateId =
   | 'deepseek-v4-flash-offpeak-low'
@@ -17,7 +19,7 @@ export type LiveServiceProfile =
   | 'OFF_PEAK_COST_OPTIMIZED'
   | 'FLEX_COST_OPTIMIZED';
 
-export type UsageSource = 'PROVIDER_REPORTED' | 'ESTIMATED';
+export type UsageSource = 'PROVIDER_REPORTED' | 'ESTIMATED' | 'UNAVAILABLE';
 
 export type PricingWindow = 'OFF_PEAK' | 'PEAK';
 
@@ -70,6 +72,8 @@ export interface LiveEvaluationResultRecord {
   latencyMs: number;
   attemptCount: number;
   usageSource: UsageSource;
+  returnedServiceTier?: string;
+  cacheStatus?: 'NOT_VERIFIED' | 'VERIFIED';
   promptTokens: number;
   cacheHitTokens: number;
   cacheMissTokens: number;

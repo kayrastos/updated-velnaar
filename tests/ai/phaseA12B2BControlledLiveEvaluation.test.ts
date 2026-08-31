@@ -440,4 +440,189 @@ describe('Phase A.12B.2B — Controlled Live Shadow Evaluation Specification & I
       }
     });
   });
+
+  // ==========================================================================
+  // 9. LIVE RUNNER STATE MACHINE & ORCHESTRATION INVARIANTS
+  // ==========================================================================
+  describe('9. Live Runner State Machine & Orchestration Invariants', () => {
+    it('should halt at PRECHECK with READY_FOR_OFF_PEAK_EXECUTION when in peak pricing window', async () => {
+      const mockEnv: WorkerEnv = {
+        GEMINI_API_KEY: 'test-gemini-key',
+        DEEPSEEK_API_KEY: 'test-ds-key',
+      } as any;
+
+      const peakDate = new Date('2026-08-31T02:00:00.000Z'); // Monday 02:00 UTC = PEAK
+      const res = await EvaluationLiveRunner.runControlledEvaluation({
+        env: mockEnv,
+        now: peakDate,
+      });
+
+      expect(res.state).toBe('PRECHECK');
+      expect(res.status).toBe('READY_FOR_OFF_PEAK_EXECUTION');
+      expect(res.currentPricingWindow).toBe('PEAK');
+      expect(res.cumulativeSpendMicroUsd).toBe(0);
+    });
+
+    it('should halt with SMOKE_FAILED on smoke provider failure and never execute FULL_RUN', async () => {
+      const originalFetch = global.fetch;
+      let totalCalls = 0;
+      global.fetch = (async (url: string) => {
+        totalCalls++;
+        return new Response('Simulated invalid token', { status: 401 });
+      }) as any;
+
+      try {
+        const mockEnv: WorkerEnv = {
+          GEMINI_API_KEY: 'test-gemini-key',
+          DEEPSEEK_API_KEY: 'test-ds-key',
+        } as any;
+
+        const offPeakDate = new Date('2026-08-31T12:00:00.000Z'); // Monday 12:00 UTC = OFF_PEAK
+        const res = await EvaluationLiveRunner.runControlledEvaluation({
+          env: mockEnv,
+          now: offPeakDate,
+        });
+
+        expect(res.state).toBe('LIVE_SMOKE');
+        expect(res.status).toBe('SMOKE_FAILED');
+        expect(res.smokeResults).toBeDefined();
+        expect(res.fullResults).toEqual([]);
+        expect(res.error).toContain('Smoke invocation failed');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('should execute end-to-end controlled run with clean smoke / fullResults separation', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = (async (url: string, init?: any) => {
+        const urlStr = String(url);
+        if (urlStr.includes('api.deepseek.com')) {
+          return new Response(
+            JSON.stringify({
+              model: 'deepseek-v4-flash',
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      primaryIntent: 'HIGH_INTENT',
+                      confidenceScoreBp: 9500,
+                      summary: 'Clean lead classification',
+                      reasoningExplanation: 'Explicit booking requested',
+                      suggestedNextStep: 'Schedule sales call immediately',
+                    }),
+                  },
+                },
+              ],
+              usage: {
+                prompt_tokens: 200,
+                prompt_cache_hit_tokens: 150,
+                prompt_cache_miss_tokens: 50,
+                completion_tokens: 50,
+                total_tokens: 250,
+              },
+            }),
+            { status: 200 }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({
+              model: 'gemini-3.5-flash-lite',
+              service_tier: 'flex',
+              steps: [
+                {
+                  type: 'output',
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify({
+                        primaryIntent: 'HIGH_INTENT',
+                        confidenceScoreBp: 9500,
+                        summary: 'Clean lead classification',
+                        reasoningExplanation: 'Explicit booking requested',
+                        suggestedNextStep: 'Schedule sales call immediately',
+                      }),
+                    },
+                  ],
+                },
+              ],
+              usage: {
+                total_input_tokens: 200,
+                total_output_tokens: 50,
+                total_tokens: 250,
+              },
+            }),
+            { status: 200 }
+          );
+        }
+      }) as any;
+
+      try {
+        const mockEnv: WorkerEnv = {
+          GEMINI_API_KEY: 'test-gemini-key',
+          DEEPSEEK_API_KEY: 'test-ds-key',
+        } as any;
+
+        const offPeakDate = new Date('2026-08-31T12:00:00.000Z');
+        const res = await EvaluationLiveRunner.runControlledEvaluation({
+          env: mockEnv,
+          now: offPeakDate,
+          maxCases: 2, // Limit to 2 cases for fast mock evaluation
+        });
+
+        expect(res.state).toBe('ARTIFACT_READY');
+        expect(res.status).toBe('ARTIFACT_READY');
+        expect(res.smokeResults).toBeDefined();
+        expect(res.fullResults).toBeDefined();
+        // Smoke results: 3 blocked + 3 smoke cases * 2 candidates = 9 records
+        expect(res.smokeResults!.length).toBeGreaterThan(0);
+        // Full results: 2 cases * 2 candidates * 2 replicates = 8 records
+        expect(res.fullResults!.length).toBe(8);
+
+        // Verify that primary candidate summary metrics use fullResults only (totalInvocations = 4 per candidate)
+        expect(res.summaries).toBeDefined();
+        const dsSummary = res.summaries!['deepseek-v4-flash-offpeak-low'];
+        const gemSummary = res.summaries!['gemini-3.5-flash-lite-flex-low'];
+        expect(dsSummary.totalInvocations).toBe(4);
+        expect(gemSummary.totalInvocations).toBe(4);
+
+        // Verify Cost Analysis
+        expect(res.costAnalysis).toBeDefined();
+        expect(res.costAnalysis!.deepseek.officialOffPeakWindowVerified).toBe(true);
+        expect(res.costAnalysis!.gemini.flexTierConfirmed).toBe(true);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('should reject incomplete replicate protocol in summarizeCandidateResults', () => {
+      const mockCandidate = CANDIDATE_A_DEEPSEEK;
+      const incompleteResults: any[] = [
+        {
+          candidateId: mockCandidate.candidateId,
+          caseId: 'eval_v1_lead_01_standard',
+          replicateIndex: 1,
+          securityDisposition: 'ELIGIBLE',
+          totalScoreBp: 8000,
+          passed: true,
+          hardFail: false,
+          promptTokens: 100,
+          cacheHitTokens: 80,
+          cacheMissTokens: 20,
+          completionTokens: 20,
+          thinkingTokens: 0,
+          totalTokens: 120,
+          actualCostMicroUsd: 10,
+          normalizedCostMicroUsd: 20,
+          taskType: 'LEAD_INTENT_CLASSIFICATION',
+          parsedOutput: {},
+          latencyMs: 100,
+        },
+      ];
+
+      expect(() =>
+        EvaluationLiveRunner.summarizeCandidateResults(mockCandidate, incompleteResults)
+      ).toThrow('A12B2B_INCOMPLETE_REPLICATE_PROTOCOL');
+    });
+  });
 });

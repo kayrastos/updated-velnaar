@@ -6,9 +6,35 @@
 import { WorkerEnv } from '../../env';
 import { PromptRegistry } from '../promptRegistry';
 import { TaskType, DataClassification, AIRequestEnvelope } from '../types';
-import { LiveCandidateConfig, UsageSource } from '../evaluation/evaluationLiveTypes';
+import {
+  LiveCandidateConfig,
+  UsageSource,
+  A12B2B_MAX_OUTPUT_TOKENS_BOUND,
+} from '../evaluation/evaluationLiveTypes';
 import { EvaluationCostCalculator } from '../evaluation/evaluationCostCalculator';
 import * as crypto from 'crypto';
+
+export class LiveProviderInvocationError extends Error {
+  public readonly providerId: 'gemini' | 'deepseek';
+  public readonly attemptCount: number;
+  public readonly latencyMs: number;
+  public readonly errorCategory: string;
+
+  constructor(params: {
+    providerId: 'gemini' | 'deepseek';
+    attemptCount: number;
+    latencyMs: number;
+    errorCategory: string;
+    message: string;
+  }) {
+    super(params.message);
+    this.name = 'LiveProviderInvocationError';
+    this.providerId = params.providerId;
+    this.attemptCount = params.attemptCount;
+    this.latencyMs = params.latencyMs;
+    this.errorCategory = params.errorCategory;
+  }
+}
 
 export interface LiveProviderInvocationResult {
   candidateId: string;
@@ -103,6 +129,7 @@ export class EvaluationLiveClient {
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user },
       ],
+      max_tokens: A12B2B_MAX_OUTPUT_TOKENS_BOUND,
       response_format: { type: 'json_object' },
       thinking: {
         type: 'enabled',
@@ -136,15 +163,27 @@ export class EvaluationLiveClient {
             await new Promise((r) => setTimeout(r, backoffMs[attemptCount - 1] || 2000));
             continue;
           }
-          throw new Error(`DEEPSEEK_HTTP_ERROR_${res.status}`);
+          throw new LiveProviderInvocationError({
+            providerId: 'deepseek',
+            attemptCount,
+            latencyMs,
+            errorCategory: `DEEPSEEK_HTTP_ERROR_${res.status}`,
+            message: `DEEPSEEK_HTTP_ERROR_${res.status}`,
+          });
         }
 
         const json: any = await res.json();
 
-        // Model identity check
+        // Model identity check - strictly deepseek-v4-flash only
         const returnedModel = json.model;
-        if (!returnedModel || (!returnedModel.includes('deepseek-v4-flash') && !returnedModel.includes('deepseek-chat'))) {
-          throw new Error(`A12B2B_MODEL_SUBSTITUTION_DETECTED: Returned model ${returnedModel || 'UNKNOWN'} does not match requested ${config.requestedModelIdentifier}`);
+        if (!returnedModel || !returnedModel.toLowerCase().includes('deepseek-v4-flash')) {
+          throw new LiveProviderInvocationError({
+            providerId: 'deepseek',
+            attemptCount,
+            latencyMs,
+            errorCategory: 'A12B2B_MODEL_SUBSTITUTION_DETECTED',
+            message: `A12B2B_MODEL_SUBSTITUTION_DETECTED: Returned model ${returnedModel || 'UNKNOWN'} does not match requested ${config.requestedModelIdentifier}`,
+          });
         }
 
         const choice = json.choices?.[0];
@@ -163,7 +202,13 @@ export class EvaluationLiveClient {
           typeof usage.completion_tokens !== 'number' ||
           typeof usage.total_tokens !== 'number'
         ) {
-          throw new Error('TELEMETRY_INCOMPLETE: Missing required DeepSeek provider-reported usage telemetry');
+          throw new LiveProviderInvocationError({
+            providerId: 'deepseek',
+            attemptCount,
+            latencyMs,
+            errorCategory: 'TELEMETRY_INCOMPLETE',
+            message: 'TELEMETRY_INCOMPLETE: Missing required DeepSeek provider-reported usage telemetry',
+          });
         }
 
         const promptTokens = usage.prompt_tokens;
@@ -171,7 +216,13 @@ export class EvaluationLiveClient {
         const cacheMissTokens = usage.prompt_cache_miss_tokens;
 
         if (!EvaluationCostCalculator.validateDeepSeekTokenIntegrity(promptTokens, cacheHitTokens, cacheMissTokens)) {
-          throw new Error('TELEMETRY_INTEGRITY_FAILURE: DeepSeek prompt tokens != cacheHit + cacheMiss');
+          throw new LiveProviderInvocationError({
+            providerId: 'deepseek',
+            attemptCount,
+            latencyMs,
+            errorCategory: 'TELEMETRY_INTEGRITY_FAILURE',
+            message: 'TELEMETRY_INTEGRITY_FAILURE: DeepSeek prompt tokens != cacheHit + cacheMiss',
+          });
         }
 
         const completionTokens = usage.completion_tokens;
@@ -196,18 +247,53 @@ export class EvaluationLiveClient {
           usageSource: 'PROVIDER_REPORTED',
         };
       } catch (err: any) {
-        if (err.message.includes('A12B2B_MODEL_SUBSTITUTION_DETECTED') || err.message.includes('TELEMETRY_')) {
+        if (err instanceof LiveProviderInvocationError) {
+          if (
+            attemptCount < maxAttempts &&
+            (err.errorCategory.includes('429') ||
+              err.errorCategory.includes('500') ||
+              err.errorCategory.includes('502') ||
+              err.errorCategory.includes('503') ||
+              err.errorCategory.includes('504'))
+          ) {
+            await new Promise((r) => setTimeout(r, backoffMs[attemptCount - 1] || 2000));
+            continue;
+          }
           throw err;
         }
-        if (attemptCount < maxAttempts && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('429'))) {
+
+        const latencyMs = Date.now() - startTime;
+        if (
+          attemptCount < maxAttempts &&
+          (err.message.includes('fetch') ||
+            err.message.includes('network') ||
+            err.message.includes('429') ||
+            err.message.includes('500') ||
+            err.message.includes('502') ||
+            err.message.includes('503') ||
+            err.message.includes('504'))
+        ) {
           await new Promise((r) => setTimeout(r, backoffMs[attemptCount - 1] || 2000));
           continue;
         }
-        throw err;
+
+        throw new LiveProviderInvocationError({
+          providerId: 'deepseek',
+          attemptCount,
+          latencyMs,
+          errorCategory: err.message?.split(':')[0] || 'DEEPSEEK_NETWORK_ERROR',
+          message: err.message || 'DEEPSEEK_NETWORK_ERROR',
+        });
       }
     }
 
-    throw new Error('DEEPSEEK_MAX_RETRIES_EXCEEDED');
+    throw new LiveProviderInvocationError({
+      providerId: 'deepseek',
+      attemptCount,
+      latencyMs: 0,
+      errorCategory: 'DEEPSEEK_MAX_RETRIES_EXCEEDED',
+      message: 'DEEPSEEK_MAX_RETRIES_EXCEEDED',
+    });
   }
 
   /**
@@ -232,6 +318,7 @@ export class EvaluationLiveClient {
       input: prompt.user,
       generation_config: {
         thinking_level: 'low',
+        max_output_tokens: A12B2B_MAX_OUTPUT_TOKENS_BOUND,
       },
       response_format: {
         type: 'text',
@@ -265,7 +352,13 @@ export class EvaluationLiveClient {
             await new Promise((r) => setTimeout(r, backoffMs[attemptCount - 1] || 2000));
             continue;
           }
-          throw new Error(`GEMINI_HTTP_ERROR_${res.status}`);
+          throw new LiveProviderInvocationError({
+            providerId: 'gemini',
+            attemptCount,
+            latencyMs,
+            errorCategory: `GEMINI_HTTP_ERROR_${res.status}`,
+            message: `GEMINI_HTTP_ERROR_${res.status}`,
+          });
         }
 
         const json: any = await res.json();
@@ -273,13 +366,25 @@ export class EvaluationLiveClient {
         // 1. Service tier confirmation
         const returnedTier = json.service_tier;
         if (config.serviceTier === 'flex' && returnedTier !== 'flex') {
-          throw new Error(`A12B2B_GEMINI_TIER_MISMATCH: Expected service_tier "flex" but provider returned "${returnedTier || 'standard'}"`);
+          throw new LiveProviderInvocationError({
+            providerId: 'gemini',
+            attemptCount,
+            latencyMs,
+            errorCategory: 'A12B2B_GEMINI_TIER_MISMATCH',
+            message: `A12B2B_GEMINI_TIER_MISMATCH: Expected service_tier "flex" but provider returned "${returnedTier || 'standard'}"`,
+          });
         }
 
         // 2. Model identity check
         const returnedModel = json.model || json.modelVersion;
-        if (!returnedModel || !returnedModel.includes('gemini-3.5-flash-lite')) {
-          throw new Error(`A12B2B_MODEL_SUBSTITUTION_DETECTED: Returned model ${returnedModel || 'UNKNOWN'} does not match requested ${config.requestedModelIdentifier}`);
+        if (!returnedModel || !returnedModel.toLowerCase().includes('gemini-3.5-flash-lite')) {
+          throw new LiveProviderInvocationError({
+            providerId: 'gemini',
+            attemptCount,
+            latencyMs,
+            errorCategory: 'A12B2B_MODEL_SUBSTITUTION_DETECTED',
+            message: `A12B2B_MODEL_SUBSTITUTION_DETECTED: Returned model ${returnedModel || 'UNKNOWN'} does not match requested ${config.requestedModelIdentifier}`,
+          });
         }
 
         // 3. Extract text from Interactions steps
@@ -320,7 +425,13 @@ export class EvaluationLiveClient {
           typeof usage.total_output_tokens !== 'number' ||
           typeof usage.total_tokens !== 'number'
         ) {
-          throw new Error('TELEMETRY_INCOMPLETE: Missing Gemini Interactions provider-reported usage telemetry');
+          throw new LiveProviderInvocationError({
+            providerId: 'gemini',
+            attemptCount,
+            latencyMs,
+            errorCategory: 'TELEMETRY_INCOMPLETE',
+            message: 'TELEMETRY_INCOMPLETE: Missing Gemini Interactions provider-reported usage telemetry',
+          });
         }
 
         const promptTokens = usage.total_input_tokens;
@@ -353,17 +464,52 @@ export class EvaluationLiveClient {
           usageSource: 'PROVIDER_REPORTED',
         };
       } catch (err: any) {
-        if (err.message.includes('A12B2B_') || err.message.includes('TELEMETRY_')) {
+        if (err instanceof LiveProviderInvocationError) {
+          if (
+            attemptCount < maxAttempts &&
+            (err.errorCategory.includes('429') ||
+              err.errorCategory.includes('500') ||
+              err.errorCategory.includes('502') ||
+              err.errorCategory.includes('503') ||
+              err.errorCategory.includes('504'))
+          ) {
+            await new Promise((r) => setTimeout(r, backoffMs[attemptCount - 1] || 2000));
+            continue;
+          }
           throw err;
         }
-        if (attemptCount < maxAttempts && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('429'))) {
+
+        const latencyMs = Date.now() - startTime;
+        if (
+          attemptCount < maxAttempts &&
+          (err.message.includes('fetch') ||
+            err.message.includes('network') ||
+            err.message.includes('429') ||
+            err.message.includes('500') ||
+            err.message.includes('502') ||
+            err.message.includes('503') ||
+            err.message.includes('504'))
+        ) {
           await new Promise((r) => setTimeout(r, backoffMs[attemptCount - 1] || 2000));
           continue;
         }
-        throw err;
+
+        throw new LiveProviderInvocationError({
+          providerId: 'gemini',
+          attemptCount,
+          latencyMs,
+          errorCategory: err.message?.split(':')[0] || 'GEMINI_NETWORK_ERROR',
+          message: err.message || 'GEMINI_NETWORK_ERROR',
+        });
       }
     }
 
-    throw new Error('GEMINI_MAX_RETRIES_EXCEEDED');
+    throw new LiveProviderInvocationError({
+      providerId: 'gemini',
+      attemptCount,
+      latencyMs: 0,
+      errorCategory: 'GEMINI_MAX_RETRIES_EXCEEDED',
+      message: 'GEMINI_MAX_RETRIES_EXCEEDED',
+    });
   }
 }

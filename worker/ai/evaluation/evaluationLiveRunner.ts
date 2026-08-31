@@ -22,7 +22,11 @@ import {
   PricingWindow,
 } from './evaluationLiveTypes';
 import { EvaluationCostCalculator, DEEPSEEK_V4_FLASH_PRICING, GEMINI_35_FLASH_LITE_PRICING } from './evaluationCostCalculator';
-import { EvaluationLiveClient, LiveProviderInvocationResult } from '../providers/liveEvaluationClient';
+import {
+  EvaluationLiveClient,
+  LiveProviderInvocationResult,
+  LiveProviderInvocationError,
+} from '../providers/liveEvaluationClient';
 import { PromptRegistry } from '../promptRegistry';
 import { PreparedEvaluationCase } from './types';
 
@@ -85,7 +89,9 @@ export interface ControlledEvaluationOutput {
   cumulativeSpendMicroUsd: number;
   budgetCapMicroUsd: number;
   smokeResults?: LiveEvaluationResultRecord[];
+  fullResults?: LiveEvaluationResultRecord[];
   allResults?: LiveEvaluationResultRecord[];
+  allPaidInvocations?: LiveEvaluationResultRecord[];
   summaries?: Record<LiveCandidateId, CandidateLiveSummary>;
   costAnalysis?: CostOptimizationAnalysis;
   error?: string;
@@ -193,7 +199,8 @@ export class EvaluationLiveRunner {
     }
 
     let cumulativeSpendMicroUsd = 0;
-    const allResults: LiveEvaluationResultRecord[] = [];
+    const smokeResults: LiveEvaluationResultRecord[] = [];
+    const fullResults: LiveEvaluationResultRecord[] = [];
     let ordinal = 0;
 
     // ========================================================================
@@ -208,8 +215,6 @@ export class EvaluationLiveRunner {
     if (injectionCase) smokeCases.push(injectionCase);
     if (insufficientCase) smokeCases.push(insufficientCase);
 
-    const smokeResults: LiveEvaluationResultRecord[] = [];
-
     // Verify blocked cases produce ZERO network calls
     for (const blocked of blockedCases) {
       smokeResults.push(this.createBlockedCaseRecord(blocked, ++ordinal));
@@ -220,14 +225,22 @@ export class EvaluationLiveRunner {
       const orderedCandidates = this.getCandidateOrder(this.CANDIDATES, cIdx, 1);
 
       for (const candidate of orderedCandidates) {
-        // Conservative upper bound check before invocation (50,000 microUSD)
-        if (cumulativeSpendMicroUsd + 50000 > A12B2B_BUDGET_CAP_MICRO_USD) {
+        // Deterministic provider-specific worst-case upper bound check before invocation
+        const nextWorstCase = EvaluationCostCalculator.calculateWorstCaseInvocationCostMicroUsd(
+          candidate,
+          currentPricingWindow
+        );
+
+        if (cumulativeSpendMicroUsd + nextWorstCase > A12B2B_BUDGET_CAP_MICRO_USD) {
           return {
             ...baseOutput,
             status: 'BUDGET_EXCEEDED',
             state: 'LIVE_SMOKE',
             cumulativeSpendMicroUsd,
             smokeResults,
+            fullResults: [],
+            allResults: smokeResults,
+            allPaidInvocations: smokeResults.filter((r) => r.securityDisposition === 'ELIGIBLE'),
             error: 'A12B2B_BUDGET_CAP_REACHED: Budget cap exceeded during smoke stage',
           } as ControlledEvaluationOutput;
         }
@@ -252,6 +265,9 @@ export class EvaluationLiveRunner {
               state: 'LIVE_SMOKE',
               cumulativeSpendMicroUsd,
               smokeResults,
+              fullResults: [],
+              allResults: smokeResults,
+              allPaidInvocations: smokeResults.filter((r) => r.securityDisposition === 'ELIGIBLE'),
               error: `Smoke invocation failed for ${candidate.candidateId}: ${result.providerErrorCategory || 'Provider error'}`,
             } as ControlledEvaluationOutput;
           }
@@ -262,18 +278,41 @@ export class EvaluationLiveRunner {
             state: 'LIVE_SMOKE',
             cumulativeSpendMicroUsd,
             smokeResults,
+            fullResults: [],
+            allResults: smokeResults,
+            allPaidInvocations: smokeResults.filter((r) => r.securityDisposition === 'ELIGIBLE'),
             error: `Smoke stage fatal error: ${err.message}`,
           } as ControlledEvaluationOutput;
         }
       }
     }
 
-    allResults.push(...smokeResults);
-
     // ========================================================================
     // STATE 3: FULL_RUN
     // ========================================================================
     const casesToRun = options.maxCases ? eligibleCases.slice(0, options.maxCases) : eligibleCases;
+
+    // Full-protocol budget preflight: calculate conservative upper-bound spend for entire remaining full run
+    const remainingWorstCaseSpend = EvaluationCostCalculator.calculateWorstCaseProtocolRemainingSpendMicroUsd({
+      candidates: this.CANDIDATES,
+      eligibleCasesCount: casesToRun.length,
+      replicatesCount: 2,
+      pricingWindow: currentPricingWindow,
+    });
+
+    if (cumulativeSpendMicroUsd + remainingWorstCaseSpend > A12B2B_BUDGET_CAP_MICRO_USD) {
+      return {
+        ...baseOutput,
+        status: 'BUDGET_EXCEEDED',
+        state: 'FULL_RUN',
+        cumulativeSpendMicroUsd,
+        smokeResults,
+        fullResults: [],
+        allResults: smokeResults,
+        allPaidInvocations: smokeResults.filter((r) => r.securityDisposition === 'ELIGIBLE'),
+        error: `A12B2B_BUDGET_INSUFFICIENT_FOR_PROTOCOL: Cumulative smoke spend (${cumulativeSpendMicroUsd} microUSD) + full protocol upper bound (${remainingWorstCaseSpend} microUSD) exceeds budget cap (${A12B2B_BUDGET_CAP_MICRO_USD} microUSD)`,
+      } as ControlledEvaluationOutput;
+    }
 
     for (const replicateIndex of [1, 2] as const) {
       for (let caseIndex = 0; caseIndex < casesToRun.length; caseIndex++) {
@@ -281,14 +320,25 @@ export class EvaluationLiveRunner {
         const orderedCandidates = this.getCandidateOrder(this.CANDIDATES, caseIndex, replicateIndex);
 
         for (const candidate of orderedCandidates) {
-          // Budget cap gate
-          if (cumulativeSpendMicroUsd + 50000 > A12B2B_BUDGET_CAP_MICRO_USD) {
+          // Per-invocation deterministic worst-case upper bound check
+          const nextInvocationWorstCase = EvaluationCostCalculator.calculateWorstCaseInvocationCostMicroUsd(
+            candidate,
+            currentPricingWindow
+          );
+
+          if (cumulativeSpendMicroUsd + nextInvocationWorstCase > A12B2B_BUDGET_CAP_MICRO_USD) {
             return {
               ...baseOutput,
               status: 'BUDGET_EXCEEDED',
               state: 'FULL_RUN',
               cumulativeSpendMicroUsd,
-              allResults,
+              smokeResults,
+              fullResults,
+              allResults: [...smokeResults, ...fullResults],
+              allPaidInvocations: [
+                ...smokeResults.filter((r) => r.securityDisposition === 'ELIGIBLE'),
+                ...fullResults,
+              ],
               error: 'A12B2B_BUDGET_CAP_REACHED: Budget cap exceeded during full benchmark run',
             } as ControlledEvaluationOutput;
           }
@@ -303,7 +353,7 @@ export class EvaluationLiveRunner {
           });
 
           cumulativeSpendMicroUsd += result.actualCostMicroUsd;
-          allResults.push(result);
+          fullResults.push(result);
         }
       }
     }
@@ -311,12 +361,55 @@ export class EvaluationLiveRunner {
     // ========================================================================
     // STATE 4: AGGREGATION
     // ========================================================================
-    const summaries: Record<LiveCandidateId, CandidateLiveSummary> = {
-      'deepseek-v4-flash-offpeak-low': this.summarizeCandidateResults(CANDIDATE_A_DEEPSEEK, allResults),
-      'gemini-3.5-flash-lite-flex-low': this.summarizeCandidateResults(CANDIDATE_B_GEMINI, allResults),
-    };
 
-    const costAnalysis = this.analyzeCostOptimization(summaries, allResults);
+    // Validate Unique Replicate Invariant: candidateId + caseId + replicateIndex
+    const replicateKeySet = new Set<string>();
+    for (const r of fullResults) {
+      const key = `${r.candidateId}::${r.caseId}::${r.replicateIndex}`;
+      if (replicateKeySet.has(key)) {
+        return {
+          ...baseOutput,
+          status: 'ERROR',
+          state: 'FAILED_STOP',
+          cumulativeSpendMicroUsd,
+          smokeResults,
+          fullResults,
+          allResults: [...smokeResults, ...fullResults],
+          error: `A12B2B_DUPLICATE_REPLICATE_RESULT: Duplicate candidate/case/replicate result for ${key}`,
+        } as ControlledEvaluationOutput;
+      }
+      replicateKeySet.add(key);
+    }
+
+    // Primary candidate quality/reliability/variance aggregates MUST use ONLY fullResults
+    let summaries: Record<LiveCandidateId, CandidateLiveSummary>;
+    try {
+      summaries = {
+        'deepseek-v4-flash-offpeak-low': this.summarizeCandidateResults(
+          CANDIDATE_A_DEEPSEEK,
+          fullResults,
+          casesToRun
+        ),
+        'gemini-3.5-flash-lite-flex-low': this.summarizeCandidateResults(
+          CANDIDATE_B_GEMINI,
+          fullResults,
+          casesToRun
+        ),
+      };
+    } catch (err: any) {
+      return {
+        ...baseOutput,
+        status: 'ERROR',
+        state: 'FAILED_STOP',
+        cumulativeSpendMicroUsd,
+        smokeResults,
+        fullResults,
+        allResults: [...smokeResults, ...fullResults],
+        error: err.message,
+      } as ControlledEvaluationOutput;
+    }
+
+    const costAnalysis = this.analyzeCostOptimization(summaries, fullResults);
 
     // ========================================================================
     // STATE 5: ARTIFACT_READY
@@ -326,7 +419,13 @@ export class EvaluationLiveRunner {
       status: 'ARTIFACT_READY',
       state: 'ARTIFACT_READY',
       cumulativeSpendMicroUsd,
-      allResults,
+      smokeResults,
+      fullResults,
+      allResults: [...smokeResults, ...fullResults],
+      allPaidInvocations: [
+        ...smokeResults.filter((r) => r.securityDisposition === 'ELIGIBLE'),
+        ...fullResults,
+      ],
       summaries,
       costAnalysis,
     } as ControlledEvaluationOutput;
@@ -352,6 +451,8 @@ export class EvaluationLiveRunner {
 
     let invocationResult: LiveProviderInvocationResult | null = null;
     let providerErrorCategory: string | undefined;
+    let failureAttemptCount = 1;
+    let failureLatencyMs = 0;
 
     try {
       invocationResult = await EvaluationLiveClient.invokeCandidate(
@@ -360,7 +461,15 @@ export class EvaluationLiveRunner {
         env
       );
     } catch (err: any) {
-      providerErrorCategory = err.message || 'PROVIDER_UNKNOWN_ERROR';
+      if (err instanceof LiveProviderInvocationError) {
+        providerErrorCategory = err.errorCategory || err.message;
+        failureAttemptCount = err.attemptCount || 1;
+        failureLatencyMs = err.latencyMs || 0;
+      } else {
+        providerErrorCategory = err.message || 'PROVIDER_UNKNOWN_ERROR';
+        failureAttemptCount = 1;
+        failureLatencyMs = 0;
+      }
     }
 
     if (invocationResult && !providerErrorCategory) {
@@ -429,6 +538,8 @@ export class EvaluationLiveRunner {
         latencyMs: invocationResult.latencyMs,
         attemptCount: invocationResult.attemptCount,
         usageSource: invocationResult.usageSource,
+        returnedServiceTier: invocationResult.serviceTier,
+        cacheStatus: invocationResult.cacheStatus,
         promptTokens: invocationResult.promptTokens,
         cacheHitTokens: invocationResult.cacheHitTokens,
         cacheMissTokens: invocationResult.cacheMissTokens,
@@ -447,7 +558,7 @@ export class EvaluationLiveRunner {
         rawTextHash: invocationResult.rawTextHash,
       };
     } else {
-      // Provider failure record
+      // Provider failure record - explicit UNAVAILABLE telemetry and real attempt count
       return {
         runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
         datasetVersion: preparedCase.datasetVersion,
@@ -469,9 +580,9 @@ export class EvaluationLiveRunner {
         securityDisposition: preparedCase.disposition,
         requestStartedAt,
         pricingWindow,
-        latencyMs: 0,
-        attemptCount: 1,
-        usageSource: 'PROVIDER_REPORTED',
+        latencyMs: failureLatencyMs,
+        attemptCount: failureAttemptCount,
+        usageSource: 'UNAVAILABLE',
         promptTokens: 0,
         cacheHitTokens: 0,
         cacheMissTokens: 0,
@@ -529,7 +640,7 @@ export class EvaluationLiveRunner {
       pricingWindow: 'OFF_PEAK',
       latencyMs: 0,
       attemptCount: 0,
-      usageSource: 'PROVIDER_REPORTED',
+      usageSource: 'UNAVAILABLE',
       promptTokens: 0,
       cacheHitTokens: 0,
       cacheMissTokens: 0,
@@ -557,12 +668,16 @@ export class EvaluationLiveRunner {
 
   /**
    * Calculates summary metrics for a candidate across its live evaluation results.
+   * Enforces complete replicate invariant (exactly 2 replicates for every eligible case).
    */
   public static summarizeCandidateResults(
     candidate: LiveCandidateConfig,
-    results: LiveEvaluationResultRecord[]
+    results: LiveEvaluationResultRecord[],
+    expectedEligibleCases?: PreparedEvaluationCase[]
   ): CandidateLiveSummary {
-    const candidateResults = results.filter((r) => r.candidateId === candidate.candidateId && r.securityDisposition === 'ELIGIBLE');
+    const candidateResults = results.filter(
+      (r) => r.candidateId === candidate.candidateId && r.securityDisposition === 'ELIGIBLE'
+    );
     const totalInvocations = candidateResults.length;
     const successfulInvocations = candidateResults.filter((r) => !r.providerErrorCategory).length;
     const providerErrors = totalInvocations - successfulInvocations;
@@ -637,6 +752,26 @@ export class EvaluationLiveRunner {
       if (!r.providerErrorCategory) t.latencies.push(r.latencyMs);
       t.actualCost += r.actualCostMicroUsd;
       t.normCost += r.normalizedCostMicroUsd;
+    }
+
+    // Verify exactly 2 replicates for every eligible case
+    if (expectedEligibleCases && expectedEligibleCases.length > 0) {
+      for (const ec of expectedEligibleCases) {
+        const reps = caseMap.get(ec.id) || [];
+        if (reps.length !== 2) {
+          throw new Error(
+            `A12B2B_INCOMPLETE_REPLICATE_PROTOCOL: Case ${ec.id} for candidate ${candidate.candidateId} has ${reps.length} replicates (expected exactly 2)`
+          );
+        }
+      }
+    } else {
+      for (const [caseId, reps] of caseMap) {
+        if (reps.length !== 2) {
+          throw new Error(
+            `A12B2B_INCOMPLETE_REPLICATE_PROTOCOL: Case ${caseId} for candidate ${candidate.candidateId} has ${reps.length} replicates (expected exactly 2)`
+          );
+        }
+      }
     }
 
     let unstableCaseCount = 0;
@@ -722,7 +857,7 @@ export class EvaluationLiveRunner {
   }
 
   /**
-   * Computes detailed cost optimization analysis without hardcoded flags.
+   * Computes detailed cost optimization analysis using persisted live results evidence.
    */
   public static analyzeCostOptimization(
     summaries: Record<LiveCandidateId, CandidateLiveSummary>,
@@ -751,11 +886,16 @@ export class EvaluationLiveRunner {
     const dsRealizedOffPeakSavingBps = EvaluationCostCalculator.calculateDiscountBps(dsColdPeak, dsColdOffPeak);
     const dsCombinedRealizedSavingBps = EvaluationCostCalculator.calculateDiscountBps(dsColdPeak, dsActualCost);
 
-    // Gemini Verification
+    // Gemini Verification using persisted returnedServiceTier and cacheStatus
     const gemResults = results.filter((r) => r.candidateId === 'gemini-3.5-flash-lite-flex-low' && r.securityDisposition === 'ELIGIBLE');
     const flexTierConfirmed =
       gemResults.length > 0 &&
-      gemResults.every((r) => !r.providerErrorCategory && (!r.providerErrorCategory?.includes('TIER_MISMATCH')));
+      gemResults.every((r) => r.returnedServiceTier === 'flex' && !r.providerErrorCategory);
+
+    const geminiCacheVerified =
+      gemResults.length > 0 &&
+      gemResults.every((r) => r.cacheStatus === 'VERIFIED' && !r.providerErrorCategory);
+    const geminiCacheStatus: 'VERIFIED' | 'NOT_VERIFIED' = geminiCacheVerified ? 'VERIFIED' : 'NOT_VERIFIED';
 
     // Gemini Arithmetic
     const gemActualFlex = gemSummary?.actualTotalCostMicroUsd || 0;
@@ -791,7 +931,7 @@ export class EvaluationLiveRunner {
         actualFlexCostMicroUsd: gemActualFlex,
         normalizedStandardCostMicroUsd: gemNormStandard,
         realizedFlexSavingBps: gemRealizedFlexSavingBps,
-        cacheStatus: 'NOT_VERIFIED',
+        cacheStatus: geminiCacheStatus,
       },
     };
   }
