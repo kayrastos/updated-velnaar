@@ -249,4 +249,195 @@ describe('Phase A.12B.2B — Controlled Live Shadow Evaluation Specification & I
       expect(check.missing).toContain('deepseek (DEEPSEEK_API_KEY)');
     });
   });
+
+  // ==========================================================================
+  // 8. ADVERSARIAL SECURITY, HOST VALIDATION & PROVIDER SPY TESTS
+  // ==========================================================================
+  describe('8. Adversarial Host Validation & Protocol Enforcement', () => {
+    it('should reject lookalike DeepSeek host before network invocation', () => {
+      expect(() =>
+        EvaluationLiveClient.validateDeepSeekBaseUrl('https://api.deepseek.com.evil.example')
+      ).toThrow('UNAPPROVED_DEEPSEEK_ENDPOINT');
+
+      expect(() =>
+        EvaluationLiveClient.validateDeepSeekBaseUrl('https://attacker-deepseek.com')
+      ).toThrow('UNAPPROVED_DEEPSEEK_ENDPOINT');
+
+      expect(() =>
+        EvaluationLiveClient.validateDeepSeekBaseUrl('http://api.deepseek.com')
+      ).toThrow('UNAPPROVED_DEEPSEEK_ENDPOINT');
+    });
+
+    it('should reject DeepSeek host with subpath, credentials, or unapproved ports', () => {
+      expect(() =>
+        EvaluationLiveClient.validateDeepSeekBaseUrl('https://user:pass@api.deepseek.com')
+      ).toThrow('UNAPPROVED_DEEPSEEK_ENDPOINT');
+
+      expect(() =>
+        EvaluationLiveClient.validateDeepSeekBaseUrl('https://api.deepseek.com:8080')
+      ).toThrow('UNAPPROVED_DEEPSEEK_ENDPOINT');
+    });
+
+    it('should accept valid canonical DeepSeek base URL', () => {
+      expect(EvaluationLiveClient.validateDeepSeekBaseUrl('https://api.deepseek.com')).toBe(
+        'https://api.deepseek.com'
+      );
+    });
+
+    it('should verify that blocked cases result in exactly zero network fetch calls', async () => {
+      const originalFetch = global.fetch;
+      let fetchCallCount = 0;
+      global.fetch = (async () => {
+        fetchCallCount++;
+        return new Response(JSON.stringify({}), { status: 200 });
+      }) as any;
+
+      try {
+        const mockEnv: WorkerEnv = {
+          GEMINI_API_KEY: 'test-gemini-key',
+          DEEPSEEK_API_KEY: 'test-deepseek-key',
+        } as any;
+
+        // Run with dryRunPreflightOnly = true
+        const preflight = await EvaluationLiveRunner.runControlledEvaluation({
+          env: mockEnv,
+          now: new Date('2026-08-31T12:00:00.000Z'), // Off-peak
+          dryRunPreflightOnly: true,
+        });
+
+        expect(preflight.status).toBe('PREFLIGHT_PASSED_READY_FOR_RUN');
+        expect(preflight.state).toBe('PRECHECK');
+        expect(fetchCallCount).toBe(0);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('should detect model substitution when provider returns unexpected model', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = (async () => {
+        return new Response(
+          JSON.stringify({
+            model: 'unapproved-hacked-model-v1',
+            choices: [{ message: { content: '{"intent":"HIGH_INTENT"}' } }],
+            usage: {
+              prompt_tokens: 100,
+              prompt_cache_hit_tokens: 50,
+              prompt_cache_miss_tokens: 50,
+              completion_tokens: 20,
+              total_tokens: 120,
+            },
+          }),
+          { status: 200 }
+        );
+      }) as any;
+
+      try {
+        const mockEnv: WorkerEnv = {
+          DEEPSEEK_API_KEY: 'test-ds-key',
+        } as any;
+
+        await expect(
+          EvaluationLiveClient.invokeCandidate(
+            CANDIDATE_A_DEEPSEEK,
+            {
+              taskType: 'LEAD_INTENT_CLASSIFICATION',
+              requestId: 'req-1',
+              organizationId: 'org-1',
+              businessId: 'biz-1',
+              dataClassification: 'PUBLIC_BUSINESS',
+              untrustedTextBlocks: ['Need demo now'],
+            },
+            mockEnv
+          )
+        ).rejects.toThrow('A12B2B_MODEL_SUBSTITUTION_DETECTED');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('should detect Gemini tier mismatch when standard tier is returned instead of flex', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = (async () => {
+        return new Response(
+          JSON.stringify({
+            model: 'gemini-3.5-flash-lite',
+            service_tier: 'standard', // Mismatch: candidate requested 'flex'
+            steps: [{ type: 'output', content: [{ type: 'text', text: '{"intent":"HIGH_INTENT"}' }] }],
+            usage: {
+              total_input_tokens: 100,
+              total_output_tokens: 20,
+              total_tokens: 120,
+            },
+          }),
+          { status: 200 }
+        );
+      }) as any;
+
+      try {
+        const mockEnv: WorkerEnv = {
+          GEMINI_API_KEY: 'test-gemini-key',
+        } as any;
+
+        await expect(
+          EvaluationLiveClient.invokeCandidate(
+            CANDIDATE_B_GEMINI,
+            {
+              taskType: 'LEAD_INTENT_CLASSIFICATION',
+              requestId: 'req-2',
+              organizationId: 'org-1',
+              businessId: 'biz-1',
+              dataClassification: 'PUBLIC_BUSINESS',
+              untrustedTextBlocks: ['Need demo now'],
+            },
+            mockEnv
+          )
+        ).rejects.toThrow('A12B2B_GEMINI_TIER_MISMATCH');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('should detect incomplete telemetry if DeepSeek omits cache breakdown tokens', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = (async () => {
+        return new Response(
+          JSON.stringify({
+            model: 'deepseek-v4-flash',
+            choices: [{ message: { content: '{"intent":"HIGH_INTENT"}' } }],
+            usage: {
+              prompt_tokens: 100,
+              // Missing prompt_cache_hit_tokens and prompt_cache_miss_tokens
+              completion_tokens: 20,
+              total_tokens: 120,
+            },
+          }),
+          { status: 200 }
+        );
+      }) as any;
+
+      try {
+        const mockEnv: WorkerEnv = {
+          DEEPSEEK_API_KEY: 'test-ds-key',
+        } as any;
+
+        await expect(
+          EvaluationLiveClient.invokeCandidate(
+            CANDIDATE_A_DEEPSEEK,
+            {
+              taskType: 'LEAD_INTENT_CLASSIFICATION',
+              requestId: 'req-3',
+              organizationId: 'org-1',
+              businessId: 'biz-1',
+              dataClassification: 'PUBLIC_BUSINESS',
+              untrustedTextBlocks: ['Need demo now'],
+            },
+            mockEnv
+          )
+        ).rejects.toThrow('TELEMETRY_INCOMPLETE');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
 });

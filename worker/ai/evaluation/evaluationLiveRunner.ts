@@ -4,7 +4,7 @@
  */
 
 import { WorkerEnv } from '../../env';
-import { TaskType, DataClassification } from '../types';
+import { TaskType, DataClassification, AIRequestEnvelope } from '../types';
 import {
   VELNAR_SHADOW_EVAL_V1,
   VELNAR_SHADOW_EVAL_V1_VERSION,
@@ -19,9 +19,12 @@ import {
   CostOptimizationAnalysis,
   A12B2B_PRICING_CATALOG_VERSION,
   A12B2B_BUDGET_CAP_MICRO_USD,
+  PricingWindow,
 } from './evaluationLiveTypes';
 import { EvaluationCostCalculator, DEEPSEEK_V4_FLASH_PRICING, GEMINI_35_FLASH_LITE_PRICING } from './evaluationCostCalculator';
-import { EvaluationLiveClient } from '../providers/liveEvaluationClient';
+import { EvaluationLiveClient, LiveProviderInvocationResult } from '../providers/liveEvaluationClient';
+import { PromptRegistry } from '../promptRegistry';
+import { PreparedEvaluationCase } from './types';
 
 export const CANDIDATE_A_DEEPSEEK: LiveCandidateConfig = {
   candidateId: 'deepseek-v4-flash-offpeak-low',
@@ -40,7 +43,60 @@ export const CANDIDATE_B_GEMINI: LiveCandidateConfig = {
   serviceTier: 'flex',
 };
 
+export type LiveRunnerState =
+  | 'PRECHECK'
+  | 'LIVE_SMOKE'
+  | 'FULL_RUN'
+  | 'AGGREGATION'
+  | 'ARTIFACT_READY'
+  | 'FAILED_STOP';
+
+export interface ControlledEvaluationOptions {
+  env: WorkerEnv;
+  organizationId?: string;
+  userEmail?: string;
+  userRole?: string;
+  businessId?: string;
+  now?: Date;
+  maxCases?: number;
+  dryRunPreflightOnly?: boolean;
+}
+
+export interface ControlledEvaluationOutput {
+  status:
+    | 'READY_FOR_LIVE_EXECUTION'
+    | 'READY_FOR_OFF_PEAK_EXECUTION'
+    | 'PREFLIGHT_PASSED_READY_FOR_RUN'
+    | 'SMOKE_FAILED'
+    | 'BUDGET_EXCEEDED'
+    | 'ARTIFACT_READY'
+    | 'ERROR';
+  state: LiveRunnerState;
+  datasetVersion: string;
+  pricingCatalogVersion: string;
+  scoringPolicyVersion: string;
+  currentPricingWindow: PricingWindow;
+  missingCredentials?: string[];
+  geminiAvailable: boolean;
+  deepseekAvailable: boolean;
+  totalDatasetCases: number;
+  eligibleCasesCount: number;
+  blockedCasesCount: number;
+  cumulativeSpendMicroUsd: number;
+  budgetCapMicroUsd: number;
+  smokeResults?: LiveEvaluationResultRecord[];
+  allResults?: LiveEvaluationResultRecord[];
+  summaries?: Record<LiveCandidateId, CandidateLiveSummary>;
+  costAnalysis?: CostOptimizationAnalysis;
+  error?: string;
+}
+
 export class EvaluationLiveRunner {
+  public static readonly CANDIDATES: LiveCandidateConfig[] = [
+    CANDIDATE_A_DEEPSEEK,
+    CANDIDATE_B_GEMINI,
+  ];
+
   /**
    * Verifies API credentials availability without printing secrets.
    */
@@ -64,9 +120,6 @@ export class EvaluationLiveRunner {
 
   /**
    * Deterministic round-robin rotation for candidate invocation order by case index & replicate index.
-   * e.g. for candidates [A, B]:
-   * (caseIndex + replicateIndex) % 2 === 0 -> [A, B]
-   * (caseIndex + replicateIndex) % 2 === 1 -> [B, A]
    */
   public static getCandidateOrder(
     candidates: LiveCandidateConfig[],
@@ -78,13 +131,438 @@ export class EvaluationLiveRunner {
   }
 
   /**
+   * Orchestrates the controlled live shadow evaluation pipeline.
+   * State Machine: PRECHECK -> LIVE_SMOKE -> FULL_RUN -> AGGREGATION -> ARTIFACT_READY
+   */
+  public static async runControlledEvaluation(
+    options: ControlledEvaluationOptions
+  ): Promise<ControlledEvaluationOutput> {
+    const now = options.now || new Date();
+    const currentPricingWindow = EvaluationCostCalculator.getDeepSeekPricingWindow(now);
+    const creds = this.checkCredentialAvailability(options.env);
+
+    // ========================================================================
+    // STATE 1: PRECHECK
+    // ========================================================================
+    const preparedCases = EvaluationSecurityGate.prepareEvaluationBatch(
+      VELNAR_SHADOW_EVAL_V1
+    );
+
+    const eligibleCases = preparedCases.filter((c) => c.disposition === 'ELIGIBLE');
+    const blockedCases = preparedCases.filter((c) => c.disposition === 'BLOCKED_BY_SECURITY');
+
+    const baseOutput: Partial<ControlledEvaluationOutput> = {
+      datasetVersion: VELNAR_SHADOW_EVAL_V1_VERSION,
+      pricingCatalogVersion: A12B2B_PRICING_CATALOG_VERSION,
+      scoringPolicyVersion: SCORING_POLICY_VERSION,
+      currentPricingWindow,
+      geminiAvailable: creds.geminiAvailable,
+      deepseekAvailable: creds.deepseekAvailable,
+      missingCredentials: creds.missing,
+      totalDatasetCases: preparedCases.length,
+      eligibleCasesCount: eligibleCases.length,
+      blockedCasesCount: blockedCases.length,
+      cumulativeSpendMicroUsd: 0,
+      budgetCapMicroUsd: A12B2B_BUDGET_CAP_MICRO_USD,
+    };
+
+    // Fail closed if credentials are missing
+    if (!creds.geminiAvailable || !creds.deepseekAvailable) {
+      return {
+        ...baseOutput,
+        status: 'READY_FOR_LIVE_EXECUTION',
+        state: 'PRECHECK',
+      } as ControlledEvaluationOutput;
+    }
+
+    // Fail closed if DeepSeek is in Peak window
+    if (currentPricingWindow === 'PEAK') {
+      return {
+        ...baseOutput,
+        status: 'READY_FOR_OFF_PEAK_EXECUTION',
+        state: 'PRECHECK',
+      } as ControlledEvaluationOutput;
+    }
+
+    if (options.dryRunPreflightOnly) {
+      return {
+        ...baseOutput,
+        status: 'PREFLIGHT_PASSED_READY_FOR_RUN',
+        state: 'PRECHECK',
+      } as ControlledEvaluationOutput;
+    }
+
+    let cumulativeSpendMicroUsd = 0;
+    const allResults: LiveEvaluationResultRecord[] = [];
+    let ordinal = 0;
+
+    // ========================================================================
+    // STATE 2: LIVE_SMOKE
+    // ========================================================================
+    const smokeCases: PreparedEvaluationCase[] = [];
+    const standardCase = eligibleCases.find((c) => c.id === 'eval_v1_lead_01_standard') || eligibleCases[0];
+    const injectionCase = eligibleCases.find((c) => c.id === 'eval_v1_lead_03_injection_bypass');
+    const insufficientCase = eligibleCases.find((c) => c.id === 'eval_v1_lead_02_insufficient_evidence');
+
+    if (standardCase) smokeCases.push(standardCase);
+    if (injectionCase) smokeCases.push(injectionCase);
+    if (insufficientCase) smokeCases.push(insufficientCase);
+
+    const smokeResults: LiveEvaluationResultRecord[] = [];
+
+    // Verify blocked cases produce ZERO network calls
+    for (const blocked of blockedCases) {
+      smokeResults.push(this.createBlockedCaseRecord(blocked, ++ordinal));
+    }
+
+    for (let cIdx = 0; cIdx < smokeCases.length; cIdx++) {
+      const pCase = smokeCases[cIdx];
+      const orderedCandidates = this.getCandidateOrder(this.CANDIDATES, cIdx, 1);
+
+      for (const candidate of orderedCandidates) {
+        // Conservative upper bound check before invocation (50,000 microUSD)
+        if (cumulativeSpendMicroUsd + 50000 > A12B2B_BUDGET_CAP_MICRO_USD) {
+          return {
+            ...baseOutput,
+            status: 'BUDGET_EXCEEDED',
+            state: 'LIVE_SMOKE',
+            cumulativeSpendMicroUsd,
+            smokeResults,
+            error: 'A12B2B_BUDGET_CAP_REACHED: Budget cap exceeded during smoke stage',
+          } as ControlledEvaluationOutput;
+        }
+
+        try {
+          const result = await this.executeCandidateInvocation({
+            candidate,
+            preparedCase: pCase,
+            replicateIndex: 1,
+            invocationOrdinal: ++ordinal,
+            pricingWindow: currentPricingWindow,
+            env: options.env,
+          });
+
+          cumulativeSpendMicroUsd += result.actualCostMicroUsd;
+          smokeResults.push(result);
+
+          if (result.providerErrorCategory || result.hardFailReasons.includes('PROVIDER_ERROR' as any)) {
+            return {
+              ...baseOutput,
+              status: 'SMOKE_FAILED',
+              state: 'LIVE_SMOKE',
+              cumulativeSpendMicroUsd,
+              smokeResults,
+              error: `Smoke invocation failed for ${candidate.candidateId}: ${result.providerErrorCategory || 'Provider error'}`,
+            } as ControlledEvaluationOutput;
+          }
+        } catch (err: any) {
+          return {
+            ...baseOutput,
+            status: 'SMOKE_FAILED',
+            state: 'LIVE_SMOKE',
+            cumulativeSpendMicroUsd,
+            smokeResults,
+            error: `Smoke stage fatal error: ${err.message}`,
+          } as ControlledEvaluationOutput;
+        }
+      }
+    }
+
+    allResults.push(...smokeResults);
+
+    // ========================================================================
+    // STATE 3: FULL_RUN
+    // ========================================================================
+    const casesToRun = options.maxCases ? eligibleCases.slice(0, options.maxCases) : eligibleCases;
+
+    for (const replicateIndex of [1, 2] as const) {
+      for (let caseIndex = 0; caseIndex < casesToRun.length; caseIndex++) {
+        const pCase = casesToRun[caseIndex];
+        const orderedCandidates = this.getCandidateOrder(this.CANDIDATES, caseIndex, replicateIndex);
+
+        for (const candidate of orderedCandidates) {
+          // Budget cap gate
+          if (cumulativeSpendMicroUsd + 50000 > A12B2B_BUDGET_CAP_MICRO_USD) {
+            return {
+              ...baseOutput,
+              status: 'BUDGET_EXCEEDED',
+              state: 'FULL_RUN',
+              cumulativeSpendMicroUsd,
+              allResults,
+              error: 'A12B2B_BUDGET_CAP_REACHED: Budget cap exceeded during full benchmark run',
+            } as ControlledEvaluationOutput;
+          }
+
+          const result = await this.executeCandidateInvocation({
+            candidate,
+            preparedCase: pCase,
+            replicateIndex,
+            invocationOrdinal: ++ordinal,
+            pricingWindow: currentPricingWindow,
+            env: options.env,
+          });
+
+          cumulativeSpendMicroUsd += result.actualCostMicroUsd;
+          allResults.push(result);
+        }
+      }
+    }
+
+    // ========================================================================
+    // STATE 4: AGGREGATION
+    // ========================================================================
+    const summaries: Record<LiveCandidateId, CandidateLiveSummary> = {
+      'deepseek-v4-flash-offpeak-low': this.summarizeCandidateResults(CANDIDATE_A_DEEPSEEK, allResults),
+      'gemini-3.5-flash-lite-flex-low': this.summarizeCandidateResults(CANDIDATE_B_GEMINI, allResults),
+    };
+
+    const costAnalysis = this.analyzeCostOptimization(summaries, allResults);
+
+    // ========================================================================
+    // STATE 5: ARTIFACT_READY
+    // ========================================================================
+    return {
+      ...baseOutput,
+      status: 'ARTIFACT_READY',
+      state: 'ARTIFACT_READY',
+      cumulativeSpendMicroUsd,
+      allResults,
+      summaries,
+      costAnalysis,
+    } as ControlledEvaluationOutput;
+  }
+
+  /**
+   * Executes a single candidate invocation, records prompt snapshot, and scores response.
+   */
+  private static async executeCandidateInvocation(params: {
+    candidate: LiveCandidateConfig;
+    preparedCase: PreparedEvaluationCase;
+    replicateIndex: 1 | 2;
+    invocationOrdinal: number;
+    pricingWindow: PricingWindow;
+    env: WorkerEnv;
+  }): Promise<LiveEvaluationResultRecord> {
+    const { candidate, preparedCase, replicateIndex, invocationOrdinal, pricingWindow, env } = params;
+    const requestStartedAt = new Date().toISOString();
+
+    // Snapshot prompt version BEFORE invocation
+    const promptDef = PromptRegistry.getPrompt(preparedCase.taskType);
+    const promptVersion = promptDef.version;
+
+    let invocationResult: LiveProviderInvocationResult | null = null;
+    let providerErrorCategory: string | undefined;
+
+    try {
+      invocationResult = await EvaluationLiveClient.invokeCandidate(
+        candidate,
+        preparedCase.requestEnvelope,
+        env
+      );
+    } catch (err: any) {
+      providerErrorCategory = err.message || 'PROVIDER_UNKNOWN_ERROR';
+    }
+
+    if (invocationResult && !providerErrorCategory) {
+      // Score real response through sealed EvaluationScorer
+      const scoreRes = EvaluationScorer.scoreCase(preparedCase, {
+        candidate: {
+          candidateId: candidate.candidateId,
+          providerId: candidate.providerId,
+          modelIdentifier: candidate.requestedModelIdentifier,
+        },
+        caseId: preparedCase.id,
+        content: invocationResult.content,
+        promptTokens: invocationResult.promptTokens,
+        completionTokens: invocationResult.completionTokens,
+        latencyMs: invocationResult.latencyMs,
+        promptVersion,
+      });
+
+      // Compute costs
+      let actualCostMicroUsd = 0;
+      let normalizedCostMicroUsd = 0;
+
+      if (candidate.providerId === 'deepseek') {
+        const cost = EvaluationCostCalculator.calculateDeepSeekCost({
+          cacheHitTokens: invocationResult.cacheHitTokens,
+          cacheMissTokens: invocationResult.cacheMissTokens,
+          completionTokens: invocationResult.completionTokens,
+          pricingWindow,
+          usageSource: invocationResult.usageSource,
+        });
+        actualCostMicroUsd = cost.actualCostMicroUsd;
+        normalizedCostMicroUsd = cost.normalizedColdOffPeakCostMicroUsd;
+      } else if (candidate.providerId === 'gemini') {
+        const cost = EvaluationCostCalculator.calculateGeminiCost({
+          promptTokens: invocationResult.promptTokens,
+          completionTokens: invocationResult.completionTokens,
+          thinkingTokens: invocationResult.thinkingTokens,
+          serviceTier: candidate.serviceTier || 'flex',
+          usageSource: invocationResult.usageSource,
+        });
+        actualCostMicroUsd = cost.actualCostMicroUsd;
+        normalizedCostMicroUsd = cost.normalizedStandardCostMicroUsd;
+      }
+
+      return {
+        runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
+        datasetVersion: preparedCase.datasetVersion,
+        scoringPolicyVersion: SCORING_POLICY_VERSION,
+        pricingCatalogVersion: A12B2B_PRICING_CATALOG_VERSION,
+        caseId: preparedCase.id,
+        taskType: preparedCase.taskType,
+        replicateIndex,
+        invocationOrdinal,
+        candidateId: candidate.candidateId,
+        providerId: candidate.providerId,
+        requestedModelIdentifier: candidate.requestedModelIdentifier,
+        returnedModelIdentifier: invocationResult.returnedModelIdentifier,
+        serviceProfile: candidate.serviceProfile,
+        thinkingEffort: candidate.thinkingEffort,
+        promptVersion,
+        originalDataClassification: preparedCase.dataClassification,
+        effectiveDataClassification: preparedCase.effectiveDataClassification || preparedCase.dataClassification,
+        securityDisposition: preparedCase.disposition,
+        requestStartedAt,
+        pricingWindow,
+        latencyMs: invocationResult.latencyMs,
+        attemptCount: invocationResult.attemptCount,
+        usageSource: invocationResult.usageSource,
+        promptTokens: invocationResult.promptTokens,
+        cacheHitTokens: invocationResult.cacheHitTokens,
+        cacheMissTokens: invocationResult.cacheMissTokens,
+        completionTokens: invocationResult.completionTokens,
+        thinkingTokens: invocationResult.thinkingTokens,
+        totalTokens: invocationResult.totalTokens,
+        actualCostMicroUsd,
+        normalizedCostMicroUsd,
+        dimensionScores: scoreRes.dimensionScores,
+        totalScoreBp: scoreRes.weightedQualityScoreBps,
+        passed: scoreRes.passed,
+        hardFail: scoreRes.hardFail,
+        hardFailReasons: scoreRes.hardFailReasons,
+        hallucinationsDetected: scoreRes.hallucinationsDetected,
+        parsedOutput: scoreRes.parsedOutput,
+        rawTextHash: invocationResult.rawTextHash,
+      };
+    } else {
+      // Provider failure record
+      return {
+        runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
+        datasetVersion: preparedCase.datasetVersion,
+        scoringPolicyVersion: SCORING_POLICY_VERSION,
+        pricingCatalogVersion: A12B2B_PRICING_CATALOG_VERSION,
+        caseId: preparedCase.id,
+        taskType: preparedCase.taskType,
+        replicateIndex,
+        invocationOrdinal,
+        candidateId: candidate.candidateId,
+        providerId: candidate.providerId,
+        requestedModelIdentifier: candidate.requestedModelIdentifier,
+        returnedModelIdentifier: 'UNKNOWN',
+        serviceProfile: candidate.serviceProfile,
+        thinkingEffort: candidate.thinkingEffort,
+        promptVersion,
+        originalDataClassification: preparedCase.dataClassification,
+        effectiveDataClassification: preparedCase.effectiveDataClassification || preparedCase.dataClassification,
+        securityDisposition: preparedCase.disposition,
+        requestStartedAt,
+        pricingWindow,
+        latencyMs: 0,
+        attemptCount: 1,
+        usageSource: 'PROVIDER_REPORTED',
+        promptTokens: 0,
+        cacheHitTokens: 0,
+        cacheMissTokens: 0,
+        completionTokens: 0,
+        thinkingTokens: 0,
+        totalTokens: 0,
+        actualCostMicroUsd: 0,
+        normalizedCostMicroUsd: 0,
+        dimensionScores: {
+          schemaCompliance: 0,
+          evidenceGrounding: 0,
+          hallucinationSafety: 0,
+          privacySafety: 10000,
+          taskCorrectness: 0,
+          actionPolicyCompliance: 0,
+          instructionFollowing: 0,
+        },
+        totalScoreBp: 0,
+        passed: false,
+        hardFail: true,
+        hardFailReasons: ['PROVIDER_ERROR' as any],
+        hallucinationsDetected: [],
+        providerErrorCategory,
+      };
+    }
+  }
+
+  /**
+   * Creates a zero-cost, non-invoked result record for security-blocked cases.
+   */
+  private static createBlockedCaseRecord(
+    blockedCase: PreparedEvaluationCase,
+    invocationOrdinal: number
+  ): LiveEvaluationResultRecord {
+    return {
+      runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
+      datasetVersion: blockedCase.datasetVersion,
+      scoringPolicyVersion: SCORING_POLICY_VERSION,
+      pricingCatalogVersion: A12B2B_PRICING_CATALOG_VERSION,
+      caseId: blockedCase.id,
+      taskType: blockedCase.taskType,
+      replicateIndex: 1,
+      invocationOrdinal,
+      candidateId: 'deepseek-v4-flash-offpeak-low',
+      providerId: 'deepseek',
+      requestedModelIdentifier: 'deepseek-v4-flash',
+      returnedModelIdentifier: 'BLOCKED',
+      serviceProfile: 'OFF_PEAK_COST_OPTIMIZED',
+      thinkingEffort: 'low',
+      promptVersion: blockedCase.promptVersion,
+      originalDataClassification: blockedCase.dataClassification,
+      effectiveDataClassification: blockedCase.effectiveDataClassification || blockedCase.dataClassification,
+      securityDisposition: 'BLOCKED_BY_SECURITY',
+      requestStartedAt: new Date().toISOString(),
+      pricingWindow: 'OFF_PEAK',
+      latencyMs: 0,
+      attemptCount: 0,
+      usageSource: 'PROVIDER_REPORTED',
+      promptTokens: 0,
+      cacheHitTokens: 0,
+      cacheMissTokens: 0,
+      completionTokens: 0,
+      thinkingTokens: 0,
+      totalTokens: 0,
+      actualCostMicroUsd: 0,
+      normalizedCostMicroUsd: 0,
+      dimensionScores: {
+        schemaCompliance: 0,
+        evidenceGrounding: 0,
+        hallucinationSafety: 0,
+        privacySafety: 10000,
+        taskCorrectness: 0,
+        actionPolicyCompliance: 0,
+        instructionFollowing: 0,
+      },
+      totalScoreBp: 0,
+      passed: false,
+      hardFail: true,
+      hardFailReasons: ['PRIVACY_LEAKAGE'],
+      hallucinationsDetected: ['PRIVACY_UNSAFE_OUTPUT'],
+    };
+  }
+
+  /**
    * Calculates summary metrics for a candidate across its live evaluation results.
    */
   public static summarizeCandidateResults(
     candidate: LiveCandidateConfig,
     results: LiveEvaluationResultRecord[]
   ): CandidateLiveSummary {
-    const candidateResults = results.filter((r) => r.candidateId === candidate.candidateId);
+    const candidateResults = results.filter((r) => r.candidateId === candidate.candidateId && r.securityDisposition === 'ELIGIBLE');
     const totalInvocations = candidateResults.length;
     const successfulInvocations = candidateResults.filter((r) => !r.providerErrorCategory).length;
     const providerErrors = totalInvocations - successfulInvocations;
@@ -127,7 +605,6 @@ export class EvaluationLiveRunner {
       ANOMALY_TRIAGE: { casesTotal: 0, casesPassed: 0, hardFails: 0, scoreSum: 0, scores: [], latencies: [], actualCost: 0, normCost: 0 },
     };
 
-    // Track replicates for instability detection
     const caseMap = new Map<string, LiveEvaluationResultRecord[]>();
 
     for (const r of candidateResults) {
@@ -162,7 +639,6 @@ export class EvaluationLiveRunner {
       t.normCost += r.normalizedCostMicroUsd;
     }
 
-    // Instability / Variance Calculation across 2 replicates
     let unstableCaseCount = 0;
     for (const [, reps] of caseMap) {
       if (reps.length === 2) {
@@ -246,13 +722,20 @@ export class EvaluationLiveRunner {
   }
 
   /**
-   * Computes detailed cost optimization analysis for DeepSeek off-peak and Gemini flex.
+   * Computes detailed cost optimization analysis without hardcoded flags.
    */
   public static analyzeCostOptimization(
-    summaries: Record<LiveCandidateId, CandidateLiveSummary>
+    summaries: Record<LiveCandidateId, CandidateLiveSummary>,
+    results: LiveEvaluationResultRecord[] = []
   ): CostOptimizationAnalysis {
     const dsSummary = summaries['deepseek-v4-flash-offpeak-low'];
     const gemSummary = summaries['gemini-3.5-flash-lite-flex-low'];
+
+    // DeepSeek Verification
+    const dsResults = results.filter((r) => r.candidateId === 'deepseek-v4-flash-offpeak-low' && r.securityDisposition === 'ELIGIBLE');
+    const officialOffPeakWindowVerified =
+      dsResults.length > 0 &&
+      dsResults.every((r) => r.pricingWindow === 'OFF_PEAK' && !r.providerErrorCategory);
 
     // DeepSeek Arithmetic
     const dsActualCost = dsSummary?.actualTotalCostMicroUsd || 0;
@@ -268,6 +751,12 @@ export class EvaluationLiveRunner {
     const dsRealizedOffPeakSavingBps = EvaluationCostCalculator.calculateDiscountBps(dsColdPeak, dsColdOffPeak);
     const dsCombinedRealizedSavingBps = EvaluationCostCalculator.calculateDiscountBps(dsColdPeak, dsActualCost);
 
+    // Gemini Verification
+    const gemResults = results.filter((r) => r.candidateId === 'gemini-3.5-flash-lite-flex-low' && r.securityDisposition === 'ELIGIBLE');
+    const flexTierConfirmed =
+      gemResults.length > 0 &&
+      gemResults.every((r) => !r.providerErrorCategory && (!r.providerErrorCategory?.includes('TIER_MISMATCH')));
+
     // Gemini Arithmetic
     const gemActualFlex = gemSummary?.actualTotalCostMicroUsd || 0;
     const gemNormStandard = gemSummary?.normalizedTotalCostMicroUsd || 0;
@@ -275,7 +764,7 @@ export class EvaluationLiveRunner {
 
     return {
       deepseek: {
-        officialOffPeakWindowVerified: true,
+        officialOffPeakWindowVerified,
         pricingCatalogVersion: A12B2B_PRICING_CATALOG_VERSION,
         offPeakCacheHitRateMicroUsdPer1M: DEEPSEEK_V4_FLASH_PRICING.offPeakCacheHitMicroUsdPer1M,
         offPeakCacheMissRateMicroUsdPer1M: DEEPSEEK_V4_FLASH_PRICING.offPeakCacheMissMicroUsdPer1M,
@@ -293,7 +782,7 @@ export class EvaluationLiveRunner {
           'DeepSeek ~98% discount rate applies strictly to off-peak cache-hit input ($0.007/1M) vs peak cache-miss input ($0.44/1M).',
       },
       gemini: {
-        flexTierConfirmed: true,
+        flexTierConfirmed,
         pricingCatalogVersion: A12B2B_PRICING_CATALOG_VERSION,
         flexInputRateMicroUsdPer1M: GEMINI_35_FLASH_LITE_PRICING.flexInputMicroUsdPer1M,
         flexOutputRateMicroUsdPer1M: GEMINI_35_FLASH_LITE_PRICING.flexOutputMicroUsdPer1M,
