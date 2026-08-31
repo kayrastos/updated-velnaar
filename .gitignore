@@ -4,5 +4,8 @@ dist/
 coverage/
 .DS_Store
 *.log
+!execution/a12b2a_typecheck.log
+!execution/a12b2a_test.log
+!execution/a12b2a_build.log
 .env*
 !.env.example
