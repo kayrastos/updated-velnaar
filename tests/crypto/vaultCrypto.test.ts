@@ -71,4 +71,44 @@ describe('VaultCryptoService (Standard Web Crypto AES-GCM-256 Envelope)', () => 
     const decrypted = await VaultCryptoService.decrypt(encrypted, orgAlpha, 'production', prodSecret);
     expect(decrypted).toBe(rawPii);
   });
+
+  describe('isVaultConfigured canonical policy', () => {
+    const validSecret = 'velnar_super_secret_kms_32_bytes_ok!';
+    const shortSecret = 'short';
+
+    it('development: always configured (uses dev fallback if secret is absent)', () => {
+      expect(VaultCryptoService.isVaultConfigured('development', undefined)).toBe(true);
+      expect(VaultCryptoService.isVaultConfigured('development', validSecret)).toBe(true);
+    });
+
+    it('test: always configured (uses test fallback if secret is absent)', () => {
+      expect(VaultCryptoService.isVaultConfigured('test', undefined)).toBe(true);
+      expect(VaultCryptoService.isVaultConfigured('test', validSecret)).toBe(true);
+    });
+
+    it('preview: configured ONLY when a valid master secret is supplied', () => {
+      expect(VaultCryptoService.isVaultConfigured('preview', undefined)).toBe(false);
+      expect(VaultCryptoService.isVaultConfigured('preview', '')).toBe(false);
+      expect(VaultCryptoService.isVaultConfigured('preview', shortSecret)).toBe(false);
+      expect(VaultCryptoService.isVaultConfigured('preview', validSecret)).toBe(true);
+    });
+
+    it('production: configured ONLY when a valid master secret is supplied', () => {
+      expect(VaultCryptoService.isVaultConfigured('production', undefined)).toBe(false);
+      expect(VaultCryptoService.isVaultConfigured('production', '')).toBe(false);
+      expect(VaultCryptoService.isVaultConfigured('production', shortSecret)).toBe(false);
+      expect(VaultCryptoService.isVaultConfigured('production', validSecret)).toBe(true);
+    });
+
+    it('unknown environment: fails closed and requires valid master secret', () => {
+      expect(VaultCryptoService.isVaultConfigured('staging_unknown', undefined)).toBe(false);
+      expect(VaultCryptoService.isVaultConfigured('staging_unknown', validSecret)).toBe(true);
+    });
+
+    it('preview throws CONFIGURATION_ERROR when secret is missing', async () => {
+      await expect(
+        VaultCryptoService.encrypt('Secret Plaintext', orgAlpha, 'preview', undefined)
+      ).rejects.toThrow(/CONFIGURATION_ERROR/);
+    });
+  });
 });

@@ -6,10 +6,19 @@
  * ARCHITECTURAL MANDATES:
  * 1. Strict tenant boundary: WHERE organization_id = ?
  * 2. Multi-role human approval tracking (approved_by_user_id, approved_at).
+ * 3. Strict guardrail_status ('PASSED' | 'FAILED' | 'NOT_EVALUATED').
+ * 4. Never default guardrail_status to 'PASSED'.
  * ============================================================================
  */
 
-import { GrowthActionRow, ActionResultRow } from '../../src/types/database';
+import { GrowthActionRow, ActionResultRow, AuditLogRow, UserRole } from '../../src/types/database';
+import { AuditRepository } from './auditRepository';
+import { SafeLogger } from '../security/safeLogger';
+
+export interface ActionTransitionResult {
+  action: GrowthActionRow;
+  auditLog: AuditLogRow;
+}
 
 export class GrowthActionRepository {
   private static assertDbOrDev(db: D1Database | undefined, environment: string = 'production'): void {
@@ -21,26 +30,58 @@ export class GrowthActionRepository {
     }
   }
 
-  private static memActions: GrowthActionRow[] = [
-    {
-      id: 'act_001',
-      leak_id: 'leak_001',
-      business_id: 'biz_beauty_salon',
-      organization_id: 'org_apex_holding',
-      market: 'GLOBAL',
-      title: 'High-Intent Inbound SLA Router (< 5m)',
-      hypothesis: 'Routing high intent leads within 5 minutes will recover $38,500/mo.',
-      action_type: 'high_intent_sla_dispatch',
-      execution_payload_json: JSON.stringify({
-        slaTargetMinutes: 5,
-        intentThreshold: 80,
-      }),
-      requires_approval: 1,
-      approval_status: 'pending_approval',
-      guardrails_passed: 1,
-      created_at: '2026-08-24T03:00:00Z',
-    }
-  ];
+  private static getInitialMemActions(): GrowthActionRow[] {
+    return [
+      {
+        id: 'act_001',
+        leak_id: 'leak_001',
+        business_id: 'biz_beauty_salon',
+        organization_id: 'org_apex_holding',
+        market: 'GLOBAL',
+        title: 'High-Intent Inbound SLA Router (< 5m)',
+        hypothesis: 'Routing high intent leads within 5 minutes will recover $38,500/mo.',
+        action_type: 'high_intent_sla_dispatch',
+        execution_payload_json: JSON.stringify({
+          slaTargetMinutes: 5,
+          intentThreshold: 80,
+          requiresHumanApproval: true,
+          discountPercent: 10,
+        }),
+        requires_approval: 1,
+        approval_status: 'pending_approval',
+        guardrails_passed: 0,
+        guardrail_status: 'NOT_EVALUATED',
+        created_at: '2026-08-24T03:00:00Z',
+      },
+      {
+        id: 'act_global_01',
+        leak_id: 'leak_global_01',
+        business_id: 'biz_beauty_salon',
+        organization_id: 'org_apex_holding',
+        market: 'GLOBAL',
+        title: '15-Minute Followup Dispatch',
+        hypothesis: 'Prompt followup recovers $15,000.',
+        action_type: 'high_intent_sla_dispatch',
+        execution_payload_json: JSON.stringify({
+          slaTargetMinutes: 15,
+          intentThreshold: 75,
+          requiresHumanApproval: true,
+          discountPercent: 5,
+        }),
+        requires_approval: 1,
+        approval_status: 'pending_approval',
+        guardrails_passed: 0,
+        guardrail_status: 'NOT_EVALUATED',
+        created_at: '2026-08-24T03:00:00Z',
+      }
+    ];
+  }
+
+  private static memActions: GrowthActionRow[] = GrowthActionRepository.getInitialMemActions();
+
+  public static resetMemoryStore(): void {
+    GrowthActionRepository.memActions = GrowthActionRepository.getInitialMemActions();
+  }
 
   private static memResults: ActionResultRow[] = [
     {
@@ -60,6 +101,30 @@ export class GrowthActionRepository {
     }
   ];
 
+  public static async getActionById(
+    db: D1Database | undefined,
+    actionId: string,
+    orgId: string,
+    environment: string = 'production'
+  ): Promise<GrowthActionRow | null> {
+    GrowthActionRepository.assertDbOrDev(db, environment);
+    if (db) {
+      const row = await db.prepare(`
+        SELECT id, leak_id, business_id, organization_id, market, title, hypothesis,
+               action_type, execution_payload_json, requires_approval, approval_status,
+               approved_by_user_id, approved_at, guardrails_passed, guardrail_status, created_at
+        FROM growth_actions
+        WHERE id = ? AND organization_id = ?
+      `).bind(actionId, orgId).first<GrowthActionRow>();
+      return row || null;
+    }
+
+    const action = GrowthActionRepository.memActions.find(
+      a => a.id === actionId && a.organization_id === orgId
+    );
+    return action || null;
+  }
+
   public static async listActionsByOrg(
     db: D1Database | undefined,
     orgId: string,
@@ -71,7 +136,7 @@ export class GrowthActionRepository {
       let query = `
         SELECT id, leak_id, business_id, organization_id, market, title, hypothesis,
                action_type, execution_payload_json, requires_approval, approval_status,
-               approved_by_user_id, approved_at, guardrails_passed, created_at
+               approved_by_user_id, approved_at, guardrails_passed, guardrail_status, created_at
         FROM growth_actions
         WHERE organization_id = ?
       `;
@@ -144,36 +209,173 @@ export class GrowthActionRepository {
     });
   }
 
-  public static async updateActionApproval(
+  /**
+   * Atomically transitions a growth action status and persists an immutable audit log.
+   * In production D1, executes UPDATE and INSERT in a single atomic batch.
+   * If either fails, neither is committed.
+   */
+  public static async transitionWithAudit(
     db: D1Database | undefined,
     actionId: string,
     status: GrowthActionRow['approval_status'],
     userId: string,
+    userRole: UserRole,
     orgId: string,
+    guardrailStatus: 'PASSED' | 'FAILED' | 'NOT_EVALUATED' = 'NOT_EVALUATED',
+    ipHash: string = 'UNKNOWN',
     environment: string = 'production'
-  ): Promise<GrowthActionRow | null> {
+  ): Promise<ActionTransitionResult> {
     GrowthActionRepository.assertDbOrDev(db, environment);
-    const now = new Date().toISOString();
 
-    if (db) {
-      const updated = await db.prepare(`
-        UPDATE growth_actions
-        SET approval_status = ?, approved_by_user_id = ?, approved_at = ?
-        WHERE id = ? AND organization_id = ?
-        RETURNING *
-      `).bind(status, userId, now, actionId, orgId).first<GrowthActionRow>();
-
-      return updated || null;
+    if (status === 'approved' && guardrailStatus !== 'PASSED') {
+      const err = new Error('GUARDRAIL_NOT_PASSED: Cannot approve growth action unless guardrail status is PASSED.');
+      (err as any).statusCode = 422;
+      (err as any).errorCode = 'GUARDRAIL_NOT_PASSED';
+      throw err;
     }
 
-    const action = GrowthActionRepository.memActions.find(
+    // Step 1: Read existing action to verify ownership and read canonical business_id
+    const existingAction = await GrowthActionRepository.getActionById(db, actionId, orgId, environment);
+    if (!existingAction) {
+      const err = new Error('ACTION_NOT_FOUND: Action not found or does not belong to your organization.');
+      (err as any).statusCode = 404;
+      (err as any).errorCode = 'ACTION_NOT_FOUND';
+      throw err;
+    }
+
+    // Step 2: Enforce state machine transitions
+    const currentStatus = existingAction.approval_status;
+    const isAllowedTransition =
+      (currentStatus === 'pending_approval' && (status === 'approved' || status === 'rejected' || status === 'deferred')) ||
+      (currentStatus === 'deferred' && (status === 'approved' || status === 'rejected'));
+
+    if (!isAllowedTransition) {
+      const err = new Error(`INVALID_ACTION_STATE_TRANSITION: Cannot transition action from state [${currentStatus}] to [${status}]. Terminal states cannot be re-transitioned.`);
+      (err as any).statusCode = 400;
+      (err as any).errorCode = 'INVALID_ACTION_STATE_TRANSITION';
+      throw err;
+    }
+
+    if (status === 'approved' && existingAction.requires_approval !== 1) {
+      const err = new Error('ACTION_NOT_HUMAN_REVIEWABLE: Action cannot be approved because human review is not enabled.');
+      (err as any).statusCode = 400;
+      (err as any).errorCode = 'ACTION_NOT_HUMAN_REVIEWABLE';
+      throw err;
+    }
+
+    const isApproved = status === 'approved';
+    const now = isApproved ? new Date().toISOString() : null;
+    const approverUserId = isApproved ? userId : null;
+    const finalGuardrailStatus = isApproved ? 'PASSED' : guardrailStatus;
+
+    const auditId = `aud_${crypto.randomUUID()}`;
+    const auditNow = new Date().toISOString();
+    const auditPayload = JSON.stringify({
+      status: { old: existingAction.approval_status, new: status },
+      guardrail_status: finalGuardrailStatus,
+    });
+
+    if (db) {
+      try {
+        const updateStmt = db.prepare(`
+          UPDATE growth_actions
+          SET approval_status = ?, approved_by_user_id = ?, approved_at = ?, guardrail_status = ?
+          WHERE id = ? AND organization_id = ?
+        `).bind(status, approverUserId, now, finalGuardrailStatus, actionId, orgId);
+
+        const auditStmt = db.prepare(`
+          INSERT INTO audit_logs (
+            id, organization_id, business_id, actor_id, actor_role, action,
+            target_entity_type, target_entity_id, payload_diff_json, ip_hash, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          auditId,
+          orgId,
+          existingAction.business_id || null,
+          userId,
+          userRole,
+          `GROWTH_ACTION_${status.toUpperCase()}`,
+          'growth_actions',
+          actionId,
+          auditPayload,
+          ipHash || 'UNKNOWN',
+          auditNow
+        );
+
+        // Execute atomically in a single D1 batch
+        await db.batch([updateStmt, auditStmt]);
+
+        // Re-read updated action
+        const updatedRow = await GrowthActionRepository.getActionById(db, actionId, orgId, environment);
+        if (!updatedRow) {
+          throw new Error('Failed to retrieve updated action record after atomic batch.');
+        }
+
+        const auditLog: AuditLogRow = {
+          id: auditId,
+          organization_id: orgId,
+          business_id: existingAction.business_id,
+          actor_id: userId,
+          actor_role: userRole,
+          action: `GROWTH_ACTION_${status.toUpperCase()}`,
+          target_entity_type: 'growth_actions',
+          target_entity_id: actionId,
+          payload_diff_json: auditPayload,
+          ip_hash: ipHash || 'UNKNOWN',
+          created_at: auditNow,
+        };
+
+        return { action: updatedRow, auditLog };
+      } catch (err: any) {
+        SafeLogger.error('[ACTION_TRANSITION_ATOMICITY_FAILED]', {
+          actionId,
+          orgId,
+          status,
+          errorCode: 'ACTION_TRANSITION_FAILED',
+        });
+        const atomicErr = new Error('ACTION_TRANSITION_FAILED: Atomic transition and audit write failed.');
+        (atomicErr as any).statusCode = 500;
+        (atomicErr as any).errorCode = 'ACTION_TRANSITION_FAILED';
+        throw atomicErr;
+      }
+    }
+
+    // In-memory atomic emulation (Dev / Test)
+    const actionIndex = GrowthActionRepository.memActions.findIndex(
       a => a.id === actionId && a.organization_id === orgId
     );
-    if (!action) return null;
+    if (actionIndex === -1) {
+      const err = new Error('ACTION_NOT_FOUND: Action not found.');
+      (err as any).statusCode = 404;
+      throw err;
+    }
 
-    action.approval_status = status;
-    action.approved_by_user_id = userId;
-    action.approved_at = now;
-    return action;
+    const updatedMemAction: GrowthActionRow = {
+      ...GrowthActionRepository.memActions[actionIndex],
+      approval_status: status,
+      approved_by_user_id: approverUserId || undefined,
+      approved_at: now || undefined,
+      guardrail_status: finalGuardrailStatus,
+    };
+
+    const memAuditLog: AuditLogRow = {
+      id: auditId,
+      organization_id: orgId,
+      business_id: existingAction.business_id,
+      actor_id: userId,
+      actor_role: userRole,
+      action: `GROWTH_ACTION_${status.toUpperCase()}`,
+      target_entity_type: 'growth_actions',
+      target_entity_id: actionId,
+      payload_diff_json: auditPayload,
+      ip_hash: ipHash || 'UNKNOWN',
+      created_at: auditNow,
+    };
+
+    // Commit both simultaneously
+    GrowthActionRepository.memActions[actionIndex] = updatedMemAction;
+    await AuditRepository.append(undefined, memAuditLog, orgId, environment);
+
+    return { action: updatedMemAction, auditLog: memAuditLog };
   }
 }

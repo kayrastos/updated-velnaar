@@ -9,6 +9,7 @@ import {
   Layers, 
   Database, 
   Lock, 
+  Clock,
   X,
   FileCheck,
   Building,
@@ -75,14 +76,21 @@ export const BusinessTwinView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          id="btn-add-twin-fact"
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center space-x-2 bg-theme-accent hover:bg-theme-accent/90 text-black px-4 py-2 rounded-lg font-semibold text-xs font-mono transition-all cursor-pointer shadow-xs"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{t.businessTwin.addNewFact}</span>
-        </button>
+        {import.meta.env.DEV ? (
+          <button
+            id="btn-add-twin-fact"
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center space-x-2 bg-theme-accent hover:bg-theme-accent/90 text-black px-4 py-2 rounded-lg font-semibold text-xs font-mono transition-all cursor-pointer shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{t.businessTwin.addNewFact}</span>
+          </button>
+        ) : (
+          <div className="flex items-center space-x-1.5 text-xs font-mono text-theme-muted bg-theme-surface-elevated px-3 py-1.5 rounded-lg border border-theme-border">
+            <Lock className="w-3.5 h-3.5 text-theme-accent" />
+            <span>Canonical Ledger</span>
+          </div>
+        )}
       </div>
 
       {/* Accuracy & Grounding Barometer */}
@@ -116,7 +124,7 @@ export const BusinessTwinView: React.FC = () => {
             Business Target
           </div>
           <div className="text-sm font-mono font-bold text-theme-primary truncate">
-            {currentBusiness.name}
+            {currentBusiness?.name || 'Unselected'}
           </div>
           <p className="text-[11px] text-theme-muted mt-2">
             Segmented by {currentMarket} market currency and regulatory regime.
@@ -177,7 +185,7 @@ export const BusinessTwinView: React.FC = () => {
                     <ShieldCheck className="w-3.5 h-3.5" />
                     {t.businessTwin.verifiedByHuman}
                   </span>
-                ) : (
+                ) : import.meta.env.DEV ? (
                   <button
                     id={`verify-fact-${fact.id}`}
                     onClick={() => verifyFact(fact.id)}
@@ -186,6 +194,11 @@ export const BusinessTwinView: React.FC = () => {
                     <Check className="w-3.5 h-3.5" />
                     {t.businessTwin.verifyBtn}
                   </button>
+                ) : (
+                  <span className="text-xs font-mono text-amber-500/90 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    Pending Audit
+                  </span>
                 )}
               </div>
 

@@ -154,7 +154,10 @@ export class TenantSecurityEngine {
   /**
    * Run server-side automated test suite via Worker API
    */
-  public static async runCrossTenantTestsAsync(orgId: string = 'org_apex_holding'): Promise<SecurityTestResult[]> {
+  public static async runCrossTenantTestsAsync(orgId: string): Promise<SecurityTestResult[]> {
+    if (!orgId || orgId.trim().length === 0) {
+      throw new Error('TENANT_ID_REQUIRED: Cannot execute security tests without an active organization ID.');
+    }
     return await ApiClient.runSecurityTests(orgId);
   }
 }

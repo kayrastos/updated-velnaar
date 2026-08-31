@@ -16,10 +16,18 @@ export type AppointmentSource =
   | 'velnar_manual' 
   | 'google_calendar' 
   | 'external_provider' 
-  | 'opentable'
+  | 'opentable' 
   | 'pos' 
-  | 'api'
+  | 'api' 
   | 'web_booking_widget';
+
+export type CancellationReasonCode = 
+  | 'CUSTOMER_CANCELLED' 
+  | 'NO_SHOW_CONFIRMED' 
+  | 'SCHEDULE_CONFLICT' 
+  | 'RESOURCE_UNAVAILABLE' 
+  | 'DUPLICATE_BOOKING' 
+  | 'OTHER_UNSPECIFIED';
 
 export type AppointmentEventType = 
   | 'appointment.created' 
@@ -33,23 +41,21 @@ export interface Appointment {
   id: string;
   organizationId: string;
   businessId: string;
-  customerName: string;
   customerPseudonymId: string;
-  customerContact?: string; // Vault token or phone reference
   serviceName: string;
   serviceCategory: string;
-  resourceStaffId: string;
+  resourceStaffId?: string;
   resourceStaffName: string;
-  scheduledStart: string; // ISO 8601
-  scheduledEnd: string; // ISO 8601
+  scheduledStart: string; // ISO 8601 / RFC 3339
+  scheduledEnd: string; // ISO 8601 / RFC 3339
   durationMinutes: number;
   expectedValueMinor: number; // in currency minor units / integers (e.g. 150000 = $1,500.00)
   currency: string;
   status: AppointmentStatus;
   source: AppointmentSource;
+  rowVersion: number;
   externalReferenceId?: string;
-  cancellationReason?: string;
-  notes?: string;
+  cancellationReasonCode?: CancellationReasonCode;
   createdAt: string;
   updatedAt: string;
 }
@@ -82,11 +88,4 @@ export interface AppointmentConnectorConfig {
   lastSyncAt?: string;
   eventsIngestedCount: number;
   syncIntervalMinutes: number;
-}
-
-export interface AppointmentRepository {
-  getById(id: string, orgId: string): Promise<Appointment | null>;
-  listByBusiness(businessId: string, orgId: string, filter?: { status?: AppointmentStatus; fromDate?: string; toDate?: string }): Promise<Appointment[]>;
-  create(appointment: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>, orgId: string): Promise<Appointment>;
-  updateStatus(id: string, status: AppointmentStatus, orgId: string, reason?: string): Promise<Appointment>;
 }

@@ -37,8 +37,8 @@ export const RevenueLeakRadarView: React.FC = () => {
   });
 
   const totalRevenueAtRisk = filteredLeaks.reduce((sum, l) => {
-    if (l.status !== 'active' || l.isDataInsufficient || l.confidenceLevel === 'INSUFFICIENT') return sum;
-    return sum + (l.estimatedImpactMinor / 100);
+    if (l.status !== 'active' || l.isDataInsufficient || l.confidenceLevel === 'INSUFFICIENT' || l.estimatedImpactMinor === null) return sum;
+    return sum + ((l.estimatedImpactMinor || 0) / 100);
   }, 0);
 
   const getSourceIcon = (source: string) => {
@@ -165,9 +165,9 @@ export const RevenueLeakRadarView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredLeaks.map((leak) => {
           const isInsufficient = leak.isDataInsufficient || leak.confidenceLevel === 'INSUFFICIENT';
-          const displayConfidence = leak.confidenceLevel || 'HIGH';
+          const displayConfidence = leak.confidenceLevel || 'INSUFFICIENT';
           const observedList = leak.observedFacts || [];
-          const sourceList = leak.dataSources || ['Pipeline Ledger'];
+          const sourceList = leak.dataSources?.filter(Boolean) ?? [];
 
           return (
             <div
@@ -193,7 +193,7 @@ export const RevenueLeakRadarView: React.FC = () => {
                   </div>
 
                   <div className="text-right">
-                    {isInsufficient ? (
+                    {isInsufficient || leak.estimatedImpactMinor === null ? (
                       <div className="text-xs font-mono font-bold text-amber-500">
                         INSUFFICIENT DATA
                       </div>
@@ -270,12 +270,18 @@ export const RevenueLeakRadarView: React.FC = () => {
                   <div className="pt-2 border-t border-theme-border flex items-center justify-between">
                     <span className="text-[10px] text-theme-muted uppercase">Source Systems:</span>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {sourceList.map((sys, idx) => (
-                        <span key={idx} className="flex items-center gap-1 text-[10px] text-theme-secondary bg-theme-surface px-1.5 py-0.5 rounded border border-theme-border">
-                          {getSourceIcon(sys)}
-                          <span>{sys}</span>
+                      {sourceList.length > 0 ? (
+                        sourceList.map((sys, idx) => (
+                          <span key={idx} className="flex items-center gap-1 text-[10px] text-theme-secondary bg-theme-surface px-1.5 py-0.5 rounded border border-theme-border">
+                            {getSourceIcon(sys)}
+                            <span>{sys}</span>
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[10px] text-theme-muted italic">
+                          Evidence source unavailable
                         </span>
-                      ))}
+                      )}
                     </div>
                   </div>
                 </div>
@@ -342,7 +348,7 @@ export const RevenueLeakRadarView: React.FC = () => {
                 <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
                   <span className="text-theme-muted block">Est. Annualized Leak</span>
                   <span className="text-base font-bold text-red-500">
-                    {activeForensicLeak.isDataInsufficient 
+                    {activeForensicLeak.isDataInsufficient || activeForensicLeak.estimatedImpactMinor === null
                       ? 'INSUFFICIENT DATA'
                       : `${formatCurrency((activeForensicLeak.estimatedImpactMinor / 100) * 12)} / year`}
                   </span>
@@ -350,7 +356,7 @@ export const RevenueLeakRadarView: React.FC = () => {
                 <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
                   <span className="text-theme-muted block">Confidence Level</span>
                   <span className="text-base font-bold text-theme-accent">
-                    {activeForensicLeak.confidenceLevel || 'HIGH'} (Deterministic Verification)
+                    {activeForensicLeak.confidenceLevel || 'INSUFFICIENT'}
                   </span>
                 </div>
               </div>

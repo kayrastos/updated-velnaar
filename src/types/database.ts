@@ -92,6 +92,9 @@ export interface LeadRow {
   status: 'open' | 'contacted' | 'recovered' | 'lost';
   response_latency_minutes: number;
   assigned_to_user_id?: string;
+  proposal_sent_at?: string;
+  last_follow_up_at?: string;
+  last_activity_at?: string;
   created_at: string;
 }
 
@@ -138,8 +141,25 @@ export interface GrowthActionRow {
   approval_status: ActionApprovalStatus;
   approved_by_user_id?: string;
   approved_at?: string;
-  guardrails_passed: number; // 1 = true
+  guardrails_passed: number; // 1 = true (legacy)
+  guardrail_status: 'PASSED' | 'FAILED' | 'NOT_EVALUATED';
   created_at: string;
+}
+
+export interface OrganizationActionPolicyRow {
+  id?: string;
+  organization_id: string;
+  business_id?: string | null;
+  maximum_discount_percent: number | null;
+  maximum_ad_budget_minor: number | null;
+  allowed_channels_json: string | null;
+  prohibited_actions_json: string | null;
+  requires_approval_for_outbound_messaging: number;
+  requires_approval_for_price_changes: number;
+  human_approval_required: number;
+  auto_execution_enabled: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ActionResultRow {
@@ -154,17 +174,44 @@ export interface ActionResultRow {
   proof_notes: string;
 }
 
+export type AIRunStatus = 'completed' | 'failed' | 'throttled' | 'blocked_by_policy' | 'budget_exceeded';
+
+export type AIRunTaskType = 
+  | 'LEAD_INTENT_CLASSIFICATION'
+  | 'LEAK_EXPLANATION'
+  | 'GROWTH_ACTION_DRAFT'
+  | 'BUSINESS_TWIN_SUMMARY'
+  | 'FUNNEL_DIAGNOSTIC_EXPLANATION'
+  | 'SEO_CONTENT_SUGGESTION'
+  | 'ANOMALY_TRIAGE';
+
+export type AIRunDataClassification = 
+  | 'PUBLIC_BUSINESS'
+  | 'PSEUDONYMOUS_OPERATIONAL'
+  | 'PERSONAL'
+  | 'SENSITIVE'
+  | 'SECRET';
+
 export interface AIRunRow {
   id: string;
+  organization_id: string;
   business_id: string;
+  task_type: AIRunTaskType;
   gateway_provider_id: string;
   model_identifier: string;
+  data_classification: AIRunDataClassification;
+  prompt_version: string;
   prompt_tokens: number;
   completion_tokens: number;
   latency_ms: number;
-  status: 'completed' | 'failed' | 'throttled';
+  estimated_cost_microusd: number;
+  redaction_count: number;
+  status: AIRunStatus;
+  error_code?: string | null;
+  input_fingerprint?: string | null;
   purpose: string;
   created_at: string;
+  isMock?: boolean;
 }
 
 export interface BusinessTwinFactRow {

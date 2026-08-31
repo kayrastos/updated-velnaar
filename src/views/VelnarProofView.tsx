@@ -112,7 +112,7 @@ export const VelnarProofView: React.FC = () => {
             {t.proof.attributionLedger} ({currentMarket})
           </h2>
           <span className="text-[10px] font-mono text-theme-muted">
-            Business: {currentBusiness.name}
+            Business: {currentBusiness?.name || 'Unselected'}
           </span>
         </div>
 

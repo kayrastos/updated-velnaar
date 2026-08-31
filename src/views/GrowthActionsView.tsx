@@ -139,7 +139,7 @@ export const GrowthActionsView: React.FC = () => {
         </div>
 
         <div className="text-[11px] font-mono text-theme-muted">
-          Active RBAC Signer: <span className="text-theme-accent font-semibold uppercase">{currentRole}</span>
+          Active RBAC Signer: <span className="text-theme-accent font-semibold uppercase">{currentRole || 'UNAUTHENTICATED'}</span>
         </div>
       </div>
 
@@ -209,7 +209,7 @@ export const GrowthActionsView: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-mono pt-2 border-t border-theme-border">
                   <div className="flex items-center space-x-2 text-emerald-600 dark:text-emerald-400">
                     <ShieldCheck className="w-4 h-4" />
-                    <span>{t.actions.guardrailsPassed}</span>
+                    <span>Deterministic Policy Enforced (Human Approval Mandatory)</span>
                   </div>
 
                   <button

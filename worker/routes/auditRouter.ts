@@ -14,7 +14,13 @@ export async function handleAuditRoute(
   db?: D1Database,
   environment: string = 'production'
 ): Promise<Response> {
-  const orgId = url.searchParams.get('orgId') || 'org_apex_holding';
+  const orgId = url.searchParams.get('orgId')?.trim() || req.headers.get('X-Tenant-Id')?.trim();
+  if (!orgId) {
+    return Response.json({
+      error: 'TENANT_ID_REQUIRED',
+      message: 'Organization ID is required and must be explicitly specified.',
+    }, { status: 400 });
+  }
 
   if (req.method === 'GET') {
     const auth = TenantGuard.authorize(user, orgId, 'audit.export');

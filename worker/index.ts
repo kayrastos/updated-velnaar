@@ -13,7 +13,7 @@
  * ============================================================================
  */
 
-import { AuthContextService } from './auth/authContext';
+import { AuthContextService, isValidUserRole } from './auth/authContext';
 import { handleLeadsRoute } from './routes/leadsRouter';
 import { handleAppointmentsRoute } from './routes/appointmentsRouter';
 import { handleRevenueLeaksRoute } from './routes/revenueLeaksRouter';
@@ -22,7 +22,11 @@ import { handleAttributionRoute } from './routes/attributionRouter';
 import { handleVaultRoute } from './routes/vaultRouter';
 import { handleSecurityRoute } from './routes/securityRouter';
 import { handleAuditRoute } from './routes/auditRouter';
+import { handleAiRoute } from './routes/aiRouter';
+import { handleActionPolicyRoute } from './routes/actionPolicyRouter';
+import { handleBootstrapRoute } from './routes/bootstrapRouter';
 import { SafeLogger } from './security/safeLogger';
+import { isVaultConfigured } from './crypto/vaultCrypto';
 import { WorkerEnv } from './env';
 
 export type { WorkerEnv };
@@ -114,24 +118,35 @@ export default {
     try {
       // 2. Health & Public Discovery Endpoint (Unauthenticated)
       if (url.pathname === '/api/health') {
-        const isVaultConfigured = environment === 'production'
-          ? Boolean(env.VELNAR_MASTER_KMS_SECRET && env.VELNAR_MASTER_KMS_SECRET.trim().length > 0)
-          : true; // In dev/test/preview fallback test secret is available
+        const vaultConfigured = isVaultConfigured(environment, env?.VELNAR_MASTER_KMS_SECRET);
+        const databaseConfigured = Boolean(env?.DB);
 
         const healthResponse = Response.json({
-          status: 'ok',
-          version: '3.4.0-hardened',
+          status: 'HEALTHY',
+          version: '4.0.0-sprint4-intelligence',
           timestamp: new Date().toISOString(),
           environment,
-          d1Status: env.DB ? 'ATTACHED' : 'NOT_BOUND',
-          guard: 'Cloudflare Worker Zero-Trust Active',
-          crypto: 'AES-GCM-256 Web Crypto Enabled',
+          securityArchitecture: 'SERVER_SIDE_TENANT_GUARD',
+          cryptoCapability: 'AES-GCM-256',
           vaultCryptoCapability: 'AES-GCM-256',
-          vaultConfigured: isVaultConfigured,
+          vaultConfigured,
+          databaseConfigured,
+          d1Status: databaseConfigured ? 'ATTACHED' : 'NOT_BOUND',
+          productionAuthProvider: 'NOT_CONFIGURED',
+          productionExternalAi: 'DISABLED',
           roles: ['OWNER', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER'],
           fulgorRay: { status: 'DISABLED', mode: 'MOCK_OFFLINE_RECEIVER' }
         });
         return addCorsAndSecurityHeaders(healthResponse, validatedOrigin);
+      }
+
+      // Dev demo endpoints are strictly disabled in production
+      if (url.pathname === '/api/vault/dev-demo' && environment === 'production') {
+        const devDisabledResp = Response.json({
+          error: 'DEV_ENDPOINT_DISABLED',
+          message: 'Dev demo endpoint is disabled in production.',
+        }, { status: 404 });
+        return addCorsAndSecurityHeaders(devDisabledResp, validatedOrigin);
       }
 
       // 3. Resolve Authenticated Identity (Fail-Closed)
@@ -167,11 +182,11 @@ export default {
       if (url.pathname.startsWith('/api/leads')) {
         response = await handleLeadsRoute(request, user, url, env.DB, environment);
       } else if (url.pathname.startsWith('/api/appointments')) {
-        response = await handleAppointmentsRoute(request, user, url, env.DB, environment);
+        response = await handleAppointmentsRoute(request, user, url, env.DB, environment, env.AUDIT_IP_HASH_SECRET);
       } else if (url.pathname.startsWith('/api/leaks')) {
         response = await handleRevenueLeaksRoute(request, user, url, env.DB, environment);
       } else if (url.pathname.startsWith('/api/actions') || url.pathname.startsWith('/api/proof')) {
-        response = await handleGrowthActionsRoute(request, user, url, env.DB, environment);
+        response = await handleGrowthActionsRoute(request, user, url, env.DB, environment, env.AUDIT_IP_HASH_SECRET);
       } else if (url.pathname.startsWith('/api/attribution')) {
         response = await handleAttributionRoute(request, user, url, env.DB, environment);
       } else if (url.pathname.startsWith('/api/vault')) {
@@ -180,19 +195,86 @@ export default {
         response = await handleSecurityRoute(request, user, url, env.DB, env.VELNAR_MASTER_KMS_SECRET, environment);
       } else if (url.pathname.startsWith('/api/audit')) {
         response = await handleAuditRoute(request, user, url, env.DB, environment);
-      } else if (url.pathname === '/api/auth/me') {
-        response = Response.json({ data: user });
+      } else if (url.pathname.startsWith('/api/action-policy')) {
+        response = await handleActionPolicyRoute(request, user, url, env.DB, environment, env.AUDIT_IP_HASH_SECRET);
+      } else if (url.pathname.startsWith('/api/ai')) {
+        response = await handleAiRoute(request, user, url, env);
+      } else if (url.pathname.startsWith('/api/bootstrap')) {
+        response = await handleBootstrapRoute(request, user, url, env.DB, environment);
+      } else if (url.pathname === '/api/auth/me' || url.pathname === '/api/session') {
+        const requestedOrgId = url.searchParams.get('orgId')?.trim() || request.headers.get('X-Tenant-Id')?.trim();
+        let effectiveOrgId: string | null = null;
+        let effectiveRole: string | null = null;
+
+        if (requestedOrgId) {
+          const matchingMembership = user.memberships?.find(m => m.organizationId === requestedOrgId);
+          if (matchingMembership) {
+            effectiveOrgId = requestedOrgId;
+            if (user.isSuperAdmin) {
+              effectiveRole = 'OWNER';
+            } else if (matchingMembership.role && isValidUserRole(matchingMembership.role)) {
+              effectiveRole = matchingMembership.role;
+            } else {
+              const forbiddenResp = Response.json({
+                error: 'AUTHORIZATION_CONTEXT_INVALID',
+                message: `User [${user.userId}] has invalid or missing role in organization [${requestedOrgId}].`,
+              }, { status: 403 });
+              return addCorsAndSecurityHeaders(forbiddenResp, validatedOrigin);
+            }
+          } else if (user.isSuperAdmin) {
+            effectiveOrgId = requestedOrgId;
+            effectiveRole = 'OWNER';
+          } else {
+            const forbiddenResp = Response.json({
+              error: 'CROSS_TENANT_ACCESS_DENIED',
+              message: `User [${user.userId}] does not hold membership in organization [${requestedOrgId}].`,
+            }, { status: 403 });
+            return addCorsAndSecurityHeaders(forbiddenResp, validatedOrigin);
+          }
+        } else {
+          // Without explicit requested/established tenant: activeOrganizationId = null, role = null
+          effectiveOrgId = null;
+          effectiveRole = null;
+        }
+
+        response = Response.json({
+          data: {
+            user,
+            userId: user.userId,
+            email: user.email,
+            fullName: user.fullName,
+            memberships: user.memberships,
+            activeOrganizationId: effectiveOrgId,
+            role: effectiveRole,
+            isSuperAdmin: Boolean(user.isSuperAdmin),
+          }
+        });
       } else {
         response = Response.json({ error: 'NOT_FOUND', message: `Route not found: ${url.pathname}` }, { status: 404 });
       }
 
       return addCorsAndSecurityHeaders(response, validatedOrigin);
     } catch (err: any) {
-      // Detailed redacted errors go strictly to SafeLogger
-      SafeLogger.error(`[WORKER_FATAL_ERROR] ${err?.message || 'Unknown error'}`, { stack: err?.stack });
-      
       const isDev = environment === 'development' || environment === 'test';
-      
+
+      if (isDev) {
+        SafeLogger.error('[WORKER_FATAL_ERROR]', {
+          route: url.pathname,
+          method: request.method,
+          errorType: err?.name || 'Error',
+          message: err?.message,
+          stack: err?.stack,
+        });
+      } else {
+        // In production/preview: NEVER log raw err.message or stack trace which could contain sensitive user input / SQL
+        SafeLogger.error('[WORKER_FATAL_ERROR]', {
+          route: url.pathname,
+          method: request.method,
+          errorType: err?.name || 'InternalError',
+          safeErrorCode: 'ERR_WORKER_INTERNAL',
+        });
+      }
+
       // In production: MUST NOT contain err.message, err.stack, SQL details, crypto details
       const errorResp = isDev
         ? Response.json({ error: 'INTERNAL_ERROR', message: err?.message }, { status: 500 })

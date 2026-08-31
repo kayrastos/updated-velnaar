@@ -18,6 +18,10 @@ import { AuthenticatedUser } from '../auth/authContext';
 import { SafeLogger } from './safeLogger';
 import { SecurityPipeline } from './securityPipeline';
 import { LeadRepository } from '../repositories/leadRepository';
+import { BusinessTenantGuard } from '../middleware/businessTenantGuard';
+import { ActionPolicyEngine } from '../ai/actions/actionPolicyEngine';
+import { RevenueLeakEvidence } from '../repositories/revenueLeakEvidence';
+import { RevenueLeakRepository } from '../repositories/revenueLeakRepository';
 
 export class SecurityTestSuite {
   /**
@@ -241,10 +245,11 @@ export class SecurityTestSuite {
           ? `PASSED: SQL queries strictly isolated by organization_id (Alpha: ${alphaLeads.length}, Beta: ${betaLeads.length}).`
           : 'FAILED: Cross-tenant data leak found in repository list.';
       } else {
-        t9Passed = true;
-        t9Details = 'PASSED: D1 Tenant boundary verified by repository query templates (WHERE organization_id = ?).';
+        t9Passed = false;
+        t9Details = 'UNAVAILABLE / NOT_EXECUTED: Live Cloudflare D1 database binding not present in runtime environment. Static repository analysis guarantees WHERE organization_id = ? scoping.';
       }
     } catch (e: any) {
+      t9Passed = false;
       t9Details = `ERROR: ${e.message}`;
     }
     results.push({
@@ -268,6 +273,142 @@ export class SecurityTestSuite {
       details: t10Passed 
         ? `PASSED: Fulgor Ray adapter is marked DISABLED (Zero access control or authentication authority).` 
         : 'FAILED: Fulgor Ray adapter was improperly active in security path.',
+      category: 'cross_tenant_isolation',
+      executedAt: timestamp,
+    });
+
+    // ------------------------------------------------------------------------
+    // TEST 11: Cross-Tenant Business Association Verification
+    // ------------------------------------------------------------------------
+    let t11Passed = false;
+    let t11Details = '';
+    try {
+      const bizCheck = await BusinessTenantGuard.verifyBusinessBelongsToOrganization(
+        db,
+        orgBeta,
+        'biz_apex_holding', // belongs to orgAlpha
+        environment
+      );
+      t11Passed = !bizCheck.valid && bizCheck.statusCode === 403;
+      t11Details = t11Passed
+        ? 'PASSED: BusinessTenantGuard blocked mismatched business-to-organization access.'
+        : 'FAILED: Cross-tenant business association was not blocked.';
+    } catch (e: any) {
+      t11Details = `ERROR: ${e.message}`;
+    }
+    results.push({
+      testId: 'SEC_TEST_11_BUSINESS_CROSS_TENANT_ISOLATION',
+      name: 'Business-to-Organization Cross-Tenant Verification Boundary',
+      passed: t11Passed,
+      details: t11Details,
+      category: 'cross_tenant_isolation',
+      executedAt: timestamp,
+    });
+
+    // ------------------------------------------------------------------------
+    // TEST 12: Action Policy Engine Canonical Guardrail Validation
+    // ------------------------------------------------------------------------
+    const sampleActionDraft: any = {
+      title: 'Discount Offering',
+      actionType: 'pricing_adjustment',
+      suggestedPayload: { discountPercent: 35, adBudgetMinor: 50000 },
+      revenueLeakId: 'leak_01',
+      evidenceReferences: ['REVENUE_LEAK:leak_01'],
+      requiresHumanApproval: true,
+    };
+    const samplePolicy: any = {
+      maximumDiscountPercent: 20,
+      maximumAdBudgetMinor: 20000,
+      prohibitedActions: [],
+      allowedChannels: ['email'],
+      requiresHumanApproval: true,
+    };
+    const policyResult = ActionPolicyEngine.validate(sampleActionDraft, samplePolicy);
+    const t12Passed = !policyResult.passed && policyResult.guardrailStatus === 'FAILED' && policyResult.violations.length >= 2;
+    results.push({
+      testId: 'SEC_TEST_12_ACTION_POLICY_DETERMINISTIC_GUARDRAIL',
+      name: 'Action Policy Deterministic Guardrail Enforcement',
+      passed: t12Passed,
+      details: t12Passed
+        ? `PASSED: Policy engine correctly identified 2 violations (${policyResult.violations.join('; ')}).`
+        : 'FAILED: Action exceeding discount and ad budget limits was not rejected.',
+      category: 'rbac_enforcement',
+      executedAt: timestamp,
+    });
+
+    // ------------------------------------------------------------------------
+    // TEST 13: Revenue Leak Canonical Evidence Generator Format
+    // ------------------------------------------------------------------------
+    const sampleLeak: any = {
+      id: 'leak_checkout_drop_01',
+      business_id: 'biz_01',
+      organization_id: 'org_01',
+      title: 'Checkout Drop-off',
+      severity: 'critical',
+      estimated_monthly_loss_minor: 120000,
+    };
+    const evidenceRefs = RevenueLeakEvidence.getCanonicalEvidenceReferences(sampleLeak);
+    const t13Passed = evidenceRefs.length === 1 && evidenceRefs[0] === 'REVENUE_LEAK:leak_checkout_drop_01';
+    results.push({
+      testId: 'SEC_TEST_13_REVENUE_LEAK_EVIDENCE_FORMAT',
+      name: 'Deterministic Revenue Leak Evidence Reference Formatting',
+      passed: t13Passed,
+      details: t13Passed
+        ? `PASSED: Generated canonical evidence citation "${evidenceRefs[0]}".`
+        : 'FAILED: Evidence citation was malformed or missing.',
+      category: 'cross_tenant_isolation',
+      executedAt: timestamp,
+    });
+
+    // ------------------------------------------------------------------------
+    // TEST 14: RevenueLeakRepository getById Mandatory Business Id Guard
+    // ------------------------------------------------------------------------
+    let t14Passed = false;
+    let t14Details = '';
+    try {
+      await RevenueLeakRepository.getById(db, 'leak_001', orgAlpha, '', environment);
+      t14Details = 'FAILED: getById allowed query without businessId.';
+    } catch (e: any) {
+      t14Passed = e.message.includes('BUSINESS_ID_REQUIRED');
+      t14Details = t14Passed
+        ? 'PASSED: RevenueLeakRepository.getById threw BUSINESS_ID_REQUIRED when businessId was missing.'
+        : `FAILED: Unexpected error: ${e.message}`;
+    }
+    results.push({
+      testId: 'SEC_TEST_14_REVENUE_LEAK_REPOSITORY_BUSINESS_REQUIRED',
+      name: 'Revenue Leak Repository Strict BusinessId Enforcement',
+      passed: t14Passed,
+      details: t14Details,
+      category: 'cross_tenant_isolation',
+      executedAt: timestamp,
+    });
+
+    // ------------------------------------------------------------------------
+    // TEST 15: Cross-Business Operational Leak Query Isolation
+    // ------------------------------------------------------------------------
+    let t15Passed = false;
+    let t15Details = '';
+    try {
+      // Query with mismatched businessId under the same org
+      const mismatched = await RevenueLeakRepository.getById(
+        db,
+        'leak_001', // belongs to biz_beauty_salon
+        orgAlpha,
+        'biz_mismatched_other',
+        environment
+      );
+      t15Passed = mismatched === null;
+      t15Details = t15Passed
+        ? 'PASSED: Cross-business leak lookup returned null (zero cross-business leakage).'
+        : 'FAILED: Cross-business leak was leaked across business boundaries.';
+    } catch (e: any) {
+      t15Details = `ERROR: ${e.message}`;
+    }
+    results.push({
+      testId: 'SEC_TEST_15_CROSS_BUSINESS_LEAK_ISOLATION',
+      name: 'Cross-Business Operational Data Isolation Boundary',
+      passed: t15Passed,
+      details: t15Details,
       category: 'cross_tenant_isolation',
       executedAt: timestamp,
     });

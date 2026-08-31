@@ -41,14 +41,14 @@ export const DashboardView: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2.5">
             <h1 className="text-xl font-editorial font-bold text-theme-primary tracking-wide">
-              {currentBusiness.name}
+              {currentBusiness?.name || 'Velnar Revenue Operations'}
             </h1>
             <span className="text-xs font-mono px-2 py-0.5 rounded bg-theme-surface-elevated text-theme-accent border border-theme-border">
               {currentMarket === 'TR' ? 'TR Market 🇹🇷' : 'Global Market 🌐'}
             </span>
           </div>
           <p className="text-xs text-theme-secondary font-mono mt-0.5">
-            ARR Run-Rate: {formatCurrency(currentBusiness.annual_revenue_run_rate)} | Baseline Margin: {currentBusiness.baseline_margin_pct}%
+            ARR Run-Rate: {currentBusiness ? formatCurrency(currentBusiness.annual_revenue_run_rate) : 'N/A'} | Baseline Margin: {currentBusiness?.baseline_margin_pct ?? 0}%
           </p>
         </div>
 

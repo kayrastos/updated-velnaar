@@ -9,6 +9,8 @@
  * - CONSULTING / B2B: available partner meeting hours
  */
 
+import { MetricProvenance } from './leakEngine';
+
 export type ResourceType = 
   | 'staff_member' 
   | 'treatment_room' 
@@ -65,4 +67,6 @@ export interface CapacityUtilization {
   lowestWindow: CapacitySnapshot;
   snapshotsByWindow: CapacitySnapshot[];
   recommendedOffPeakIncentive: string;
+  provenance?: MetricProvenance;
+  source?: string;
 }

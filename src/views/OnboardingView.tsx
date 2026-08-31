@@ -166,11 +166,11 @@ export const OnboardingView: React.FC = () => {
               <div className="text-theme-accent font-bold uppercase mb-2">Active Baseline Facts Loaded:</div>
               <div className="flex items-center justify-between text-theme-secondary py-1 border-b border-theme-border">
                 <span>ARR Run-Rate</span>
-                <span className="text-theme-primary font-bold">{currentBusiness.currency} {currentBusiness.annual_revenue_run_rate.toLocaleString()}</span>
+                <span className="text-theme-primary font-bold">{currentBusiness ? `${currentBusiness.currency} ${currentBusiness.annual_revenue_run_rate.toLocaleString()}` : 'N/A'}</span>
               </div>
               <div className="flex items-center justify-between text-theme-secondary py-1 border-b border-theme-border">
                 <span>Baseline Gross Margin</span>
-                <span className="text-theme-primary font-bold">{currentBusiness.baseline_margin_pct}%</span>
+                <span className="text-theme-primary font-bold">{currentBusiness ? `${currentBusiness.baseline_margin_pct}%` : 'N/A'}</span>
               </div>
               <div className="flex items-center justify-between text-theme-secondary py-1">
                 <span>Maximum Allowed Discount</span>

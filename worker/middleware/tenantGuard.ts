@@ -11,7 +11,7 @@
  * ============================================================================
  */
 
-import { AuthenticatedUser, ResourceAction, AuthContextService } from '../auth/authContext';
+import { AuthenticatedUser, ResourceAction, AuthContextService, isValidUserRole } from '../auth/authContext';
 import { SecurityPipeline } from '../security/securityPipeline';
 import { UserRole } from '../../src/types/database';
 
@@ -31,7 +31,7 @@ export class TenantGuard {
     user: AuthenticatedUser | null | undefined,
     targetOrgId: string,
     action: ResourceAction,
-    sourceIpHash: string = '127.0.0.1_local'
+    sourceIpHash: string = 'UNKNOWN'
   ): AuthorizationResult {
     // 1. Authentication Check
     if (!user) {
@@ -76,7 +76,33 @@ export class TenantGuard {
       };
     }
 
-    const effectiveRole: UserRole = user.isSuperAdmin ? 'OWNER' : (membership?.role || 'VIEWER');
+    let effectiveRole: UserRole;
+    if (user.isSuperAdmin) {
+      effectiveRole = 'OWNER';
+    } else {
+      if (!membership || !membership.role || !isValidUserRole(membership.role)) {
+        SecurityPipeline.recordEvent({
+          organizationId: targetOrgId,
+          eventType: 'authorization.denied',
+          severity: 'HIGH',
+          sourceIpHash,
+          actorUserId: user.userId,
+          details: {
+            attemptedAction: action,
+            rawRole: membership?.role,
+            reason: 'INVALID_OR_MISSING_MEMBERSHIP_ROLE'
+          },
+          enforcementAction: 'BLOCKED_IMMEDIATELY',
+        });
+
+        return {
+          authorized: false,
+          statusCode: 403,
+          errorMessage: `AUTHORIZATION_CONTEXT_INVALID: User [${user.userId}] has invalid or missing role in organization [${targetOrgId}].`
+        };
+      }
+      effectiveRole = membership.role;
+    }
 
     // 3. Validate RBAC Action Permission
     const hasPerm = AuthContextService.hasPermission(effectiveRole, action);
@@ -109,3 +135,6 @@ export class TenantGuard {
     };
   }
 }
+
+export { BusinessTenantGuard } from './businessTenantGuard';
+export type { BusinessVerificationResult } from './businessTenantGuard';

@@ -147,14 +147,20 @@ export const LeadInboxView: React.FC = () => {
 
                     <td className="px-4 py-3.5 text-right">
                       {lead.status === 'open' ? (
-                        <button
-                          id={`lead-dispatch-fast-action-${lead.id}`}
-                          onClick={() => triggerFastLeadResponse(lead.id)}
-                          className="px-3 py-1.5 rounded bg-theme-accent hover:bg-theme-accent/90 text-black font-semibold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
-                        >
-                          <Zap className="w-3.5 h-3.5" />
-                          <span>{t.leads.triggerFastResponse}</span>
-                        </button>
+                        import.meta.env.DEV ? (
+                          <button
+                            id={`lead-dispatch-fast-action-${lead.id}`}
+                            onClick={() => triggerFastLeadResponse(lead.id)}
+                            className="px-3 py-1.5 rounded bg-theme-accent hover:bg-theme-accent/90 text-black font-semibold text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Zap className="w-3.5 h-3.5" />
+                            <span>{t.leads.triggerFastResponse}</span>
+                          </button>
+                        ) : (
+                          <span className="text-amber-500 text-[11px] inline-flex items-center gap-1 font-mono">
+                            <Clock className="w-3.5 h-3.5" /> Ingested / Awaiting SLA
+                          </span>
+                        )
                       ) : (
                         <span className="text-emerald-600 dark:text-emerald-400 text-[11px] inline-flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Fast Response Engaged

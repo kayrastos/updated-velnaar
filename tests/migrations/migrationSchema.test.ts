@@ -21,6 +21,11 @@ describe('Cloudflare D1 Migration Schema & Source of Truth Verification', () => 
     expect(files.length).toBeGreaterThanOrEqual(2);
     expect(files).toContain('0001_initial_schema.sql');
     expect(files).toContain('0002_indexes_and_performance.sql');
+    expect(files).toContain('0003_ai_intelligence_layer.sql');
+    expect(files).toContain('0004_growth_action_policy_hardening.sql');
+    expect(files).toContain('0005_appointment_concurrency_hardening.sql');
+    expect(files).toContain('0006_appointment_identity_resource_hardening.sql');
+    expect(files).toContain('0007_ai_run_protocol_hardening.sql');
   });
 
   it('Legacy src/db/migrations directory must not exist or be referenced for deployment', () => {

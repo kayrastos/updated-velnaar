@@ -46,9 +46,9 @@ export interface MarketMetrics {
 export interface PlatformState {
   currentRoute: AppRoute;
   currentMarket: MarketType;
-  currentOrg: OrganizationRow;
-  currentBusiness: BusinessRow;
-  currentRole: UserRole;
+  currentOrg: OrganizationRow | null;
+  currentBusiness: BusinessRow | null;
+  currentRole: UserRole | null;
   language: Language;
   leaks: RevenueLeakRow[];
   actions: GrowthActionRow[];

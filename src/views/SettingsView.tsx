@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePlatform } from '../context/PlatformContext';
 import { useTheme, Theme } from '../context/ThemeContext';
 import { UserRole } from '../types/database';
+import { AIClient, AIStatusData } from '../services/aiClient';
 import { 
   Settings, 
   ShieldCheck, 
@@ -14,7 +15,10 @@ import {
   Palette,
   Moon,
   Sun,
-  Laptop
+  Laptop,
+  Sparkles,
+  Lock,
+  DollarSign
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
@@ -31,218 +35,33 @@ export const SettingsView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'tenant' | 'theme' | 'd1' | 'aiGateway' | 'audit'>('tenant');
   const [copiedSql, setCopiedSql] = useState(false);
+  const [aiStatus, setAiStatus] = useState<AIStatusData | null>(null);
 
-  const d1SqlSchema = `-- Cloudflare D1 Multi-Tenant B2B Production Schema
-PRAGMA foreign_keys = ON;
+  useEffect(() => {
+    let isMounted = true;
+    if (currentOrg?.id) {
+      AIClient.getStatus(currentOrg.id)
+        .then(status => {
+          if (isMounted) setAiStatus(status);
+        })
+        .catch(err => {
+          console.warn('AI status fetch warning:', err);
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [currentOrg?.id]);
 
-CREATE TABLE IF NOT EXISTS organizations (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  tier TEXT NOT NULL CHECK (tier IN ('starter', 'scale', 'enterprise')) DEFAULT 'scale',
-  default_market TEXT NOT NULL CHECK (default_market IN ('TR', 'GLOBAL')) DEFAULT 'GLOBAL',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+  const migrationsMetadata = [
+    { id: '0001', name: '0001_initial_schema.sql', description: 'Canonical multi-tenant tables, integer minor currency fields, identity vault, and integrity constraints.', tables: 23, status: 'Applied' },
+    { id: '0002', name: '0002_indexes_and_performance.sql', description: 'Performance indices for tenant isolation, funnel stages, and audit trails.', tables: 0, status: 'Applied' },
+    { id: '0003', name: '0003_ai_intelligence_layer.sql', description: 'AI run telemetry, spend tracking, and audit logging tables.', tables: 2, status: 'Applied' },
+    { id: '0004', name: '0004_growth_action_policy_hardening.sql', description: 'Tenant action policy configuration, guardrail status column, and unconfigured policy safety.', tables: 1, status: 'Applied' },
+  ];
 
-CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  full_name TEXT NOT NULL,
-  role_global TEXT NOT NULL DEFAULT 'user',
-  avatar_url TEXT,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS organization_members (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('OWNER', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER')),
-  status TEXT NOT NULL CHECK (status IN ('active', 'invited', 'suspended')) DEFAULT 'active',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  UNIQUE(organization_id, user_id)
-);
-
-CREATE TABLE IF NOT EXISTS businesses (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  name TEXT NOT NULL,
-  market TEXT NOT NULL CHECK (market IN ('TR', 'GLOBAL')),
-  industry TEXT NOT NULL,
-  currency TEXT NOT NULL CHECK (currency IN ('TRY', 'USD', 'EUR')),
-  annual_revenue_run_rate_minor INTEGER NOT NULL DEFAULT 0,
-  baseline_margin_pct REAL NOT NULL DEFAULT 0.0,
-  status TEXT NOT NULL CHECK (status IN ('active', 'archived')) DEFAULT 'active',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS identity_vault (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  pseudonym_id TEXT UNIQUE NOT NULL,
-  encrypted_name_payload TEXT NOT NULL,
-  encrypted_email_payload TEXT NOT NULL,
-  encrypted_phone_payload TEXT NOT NULL,
-  key_version INTEGER NOT NULL DEFAULT 1,
-  algorithm TEXT NOT NULL DEFAULT 'AES-GCM-256',
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS leads (
-  id TEXT PRIMARY KEY,
-  business_id TEXT NOT NULL,
-  organization_id TEXT NOT NULL,
-  market TEXT NOT NULL CHECK (market IN ('TR', 'GLOBAL')),
-  pseudonymous_customer_id TEXT NOT NULL,
-  company_name TEXT NOT NULL,
-  intent_score INTEGER NOT NULL CHECK (intent_score BETWEEN 0 AND 100) DEFAULT 50,
-  estimated_deal_value_minor INTEGER NOT NULL DEFAULT 0,
-  funnel_stage TEXT NOT NULL CHECK (funnel_stage IN ('captured', 'qualifying', 'proposal_sent', 'negotiation', 'stalled')),
-  leak_risk_factor TEXT NOT NULL CHECK (leak_risk_factor IN ('high_decay', 'unassigned', 'underpriced', 'normal')) DEFAULT 'normal',
-  status TEXT NOT NULL CHECK (status IN ('open', 'contacted', 'recovered', 'lost')) DEFAULT 'open',
-  response_latency_minutes INTEGER NOT NULL DEFAULT 0,
-  assigned_to_user_id TEXT,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS appointments (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  business_id TEXT NOT NULL,
-  pseudonymous_customer_id TEXT NOT NULL,
-  service_name TEXT NOT NULL,
-  service_category TEXT NOT NULL,
-  resource_staff_id TEXT,
-  resource_staff_name TEXT NOT NULL,
-  scheduled_start DATETIME NOT NULL,
-  scheduled_end DATETIME NOT NULL,
-  duration_minutes INTEGER NOT NULL DEFAULT 30,
-  expected_value_minor INTEGER NOT NULL DEFAULT 0,
-  currency TEXT NOT NULL CHECK (currency IN ('TRY', 'USD', 'EUR')),
-  status TEXT NOT NULL CHECK (status IN ('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show', 'rescheduled')) DEFAULT 'scheduled',
-  source TEXT NOT NULL CHECK (source IN ('velnar_manual', 'google_calendar', 'external_provider', 'opentable', 'pos', 'api', 'web_booking_widget')) DEFAULT 'velnar_manual',
-  external_reference_id TEXT,
-  cancellation_reason TEXT,
-  notes TEXT,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
-  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS events (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  business_id TEXT NOT NULL,
-  event_type TEXT NOT NULL,
-  pseudonymous_customer_id TEXT,
-  payload_json TEXT NOT NULL,
-  actor_type TEXT NOT NULL CHECK (actor_type IN ('system', 'user', 'ai_gateway', 'connector')),
-  actor_id TEXT,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
-  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS revenue_leaks (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  business_id TEXT NOT NULL,
-  market TEXT NOT NULL CHECK (market IN ('TR', 'GLOBAL')),
-  title TEXT NOT NULL,
-  category TEXT NOT NULL CHECK (category IN ('lead_decay', 'pricing_friction', 'follow_up_bottleneck', 'call_decay', 'no_show_decay', 'unused_capacity', 'funnel_friction', 'aging_inventory', 'checkout_abandonment')),
-  severity TEXT NOT NULL CHECK (severity IN ('critical', 'high', 'medium', 'low')),
-  root_cause TEXT NOT NULL,
-  estimated_monthly_loss_minor INTEGER NOT NULL DEFAULT 0,
-  affected_funnel_stage TEXT NOT NULL,
-  confidence_score REAL NOT NULL CHECK (confidence_score BETWEEN 0.0 AND 1.0) DEFAULT 0.85,
-  status TEXT NOT NULL CHECK (status IN ('active', 'mitigated', 'ignored', 'investigating')) DEFAULT 'active',
-  detected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
-  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS growth_actions (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  leak_id TEXT NOT NULL,
-  business_id TEXT NOT NULL,
-  market TEXT NOT NULL CHECK (market IN ('TR', 'GLOBAL')),
-  title TEXT NOT NULL,
-  hypothesis TEXT NOT NULL,
-  action_type TEXT NOT NULL CHECK (action_type IN ('workflow_automation', 'pricing_adjustment', 'high_intent_sla_dispatch', 're_engagement_sequence', 'churn_prevention_trigger')),
-  execution_payload_json TEXT NOT NULL,
-  requires_approval INTEGER NOT NULL DEFAULT 1 CHECK (requires_approval IN (0, 1)),
-  approval_status TEXT NOT NULL CHECK (approval_status IN ('pending_approval', 'approved', 'rejected', 'deferred')) DEFAULT 'pending_approval',
-  approved_by_user_id TEXT,
-  approved_at DATETIME,
-  guardrails_passed INTEGER NOT NULL DEFAULT 1 CHECK (guardrails_passed IN (0, 1)),
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
-  FOREIGN KEY (leak_id) REFERENCES revenue_leaks(id) ON DELETE CASCADE,
-  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS action_results (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  growth_action_id TEXT NOT NULL,
-  business_id TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('success', 'in_progress', 'failed')) DEFAULT 'in_progress',
-  revenue_recovered_amount_minor INTEGER NOT NULL DEFAULT 0,
-  metric_delta_json TEXT NOT NULL,
-  verified_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  proof_notes TEXT NOT NULL,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
-  FOREIGN KEY (growth_action_id) REFERENCES growth_actions(id) ON DELETE CASCADE,
-  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS attribution_results (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  business_id TEXT NOT NULL,
-  journey_id TEXT NOT NULL,
-  revenue_type TEXT NOT NULL CHECK (revenue_type IN ('ATTRIBUTED_REVENUE', 'INFLUENCED_REVENUE', 'UNATTRIBUTED')),
-  confidence TEXT NOT NULL CHECK (confidence IN ('HIGH', 'MEDIUM', 'LOW', 'INSUFFICIENT')),
-  attribution_method TEXT NOT NULL,
-  gross_amount_minor INTEGER NOT NULL DEFAULT 0,
-  currency TEXT NOT NULL CHECK (currency IN ('TRY', 'USD', 'EUR')),
-  evidence_summary TEXT NOT NULL,
-  data_sources_json TEXT NOT NULL,
-  time_window_description TEXT NOT NULL,
-  touchpoints_breakdown_json TEXT NOT NULL,
-  calculated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
-  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id TEXT PRIMARY KEY,
-  organization_id TEXT NOT NULL,
-  business_id TEXT NOT NULL,
-  actor_id TEXT NOT NULL,
-  actor_role TEXT NOT NULL CHECK (actor_role IN ('OWNER', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER')),
-  action TEXT NOT NULL,
-  target_entity_type TEXT NOT NULL,
-  target_entity_id TEXT NOT NULL,
-  payload_diff_json TEXT NOT NULL,
-  ip_hash TEXT NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
-  FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE
-);`;
-
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(d1SqlSchema);
+  const handleCopyMigrationsPath = () => {
+    navigator.clipboard.writeText('wrangler d1 migrations apply velnar-db --remote');
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 3000);
   };
@@ -342,11 +161,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
               <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
                 <span className="text-theme-muted block">Organization ID</span>
-                <span className="text-theme-primary font-bold">{currentOrg.id}</span>
+                <span className="text-theme-primary font-bold">{currentOrg?.id || 'NO_SESSION'}</span>
               </div>
               <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
                 <span className="text-theme-muted block">Tier Level</span>
-                <span className="text-theme-accent font-bold uppercase">{currentOrg.tier}</span>
+                <span className="text-theme-accent font-bold uppercase">{currentOrg?.tier || 'UNSPECIFIED'}</span>
               </div>
               <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
                 <span className="text-theme-muted block">Tenant Isolation Mode</span>
@@ -495,74 +314,227 @@ CREATE TABLE IF NOT EXISTS audit_logs (
       {/* Tab 3: Cloudflare D1 Schema & Migrations */}
       {activeTab === 'd1' && (
         <div className="space-y-4">
-          <div className="bg-theme-surface border border-theme-border rounded-xl p-5 space-y-3">
+          <div className="bg-theme-surface border border-theme-border rounded-xl p-5 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-mono uppercase tracking-wider font-semibold text-theme-primary">
-                  {t.settings.d1.title}
+                  Cloudflare D1 Schema & Canonical Migrations
                 </h3>
                 <p className="text-xs text-theme-muted mt-0.5">
-                  {t.settings.d1.description}
+                  The single source of truth for D1 database schemas is the <code className="text-theme-accent">/migrations</code> directory.
                 </p>
               </div>
 
               <button
                 id="btn-copy-d1-sql"
-                onClick={handleCopySql}
+                onClick={handleCopyMigrationsPath}
                 className="flex items-center space-x-2 bg-theme-surface-elevated hover:bg-theme-surface-muted text-theme-primary px-3.5 py-1.5 rounded-lg border border-theme-border text-xs font-mono transition-all cursor-pointer shrink-0"
               >
                 {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-theme-accent" />}
-                <span>{copiedSql ? t.settings.d1.copied : t.settings.d1.copySql}</span>
+                <span>{copiedSql ? 'Command Copied' : 'Copy Apply Command'}</span>
               </button>
             </div>
 
-            <div className="bg-theme-surface-elevated p-4 rounded-xl border border-theme-border font-mono text-xs text-theme-secondary max-h-[500px] overflow-y-auto">
-              <pre className="text-[11px] leading-relaxed">{d1SqlSchema}</pre>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+              <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
+                <span className="text-theme-muted block">Migration Directory</span>
+                <span className="text-theme-primary font-bold">/migrations</span>
+              </div>
+              <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
+                <span className="text-theme-muted block">Canonical Database Binding</span>
+                <span className="text-theme-accent font-bold">DB (velnar-db)</span>
+              </div>
+              <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border">
+                <span className="text-theme-muted block">Active Sequence</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">0001 → 0004</span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-theme-border rounded-xl">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-theme-surface-elevated text-theme-muted uppercase text-[10px] border-b border-theme-border">
+                  <tr>
+                    <th className="px-4 py-3">Sequence</th>
+                    <th className="px-4 py-3">Migration File</th>
+                    <th className="px-4 py-3">Description</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-theme-border bg-theme-surface">
+                  {migrationsMetadata.map((mig) => (
+                    <tr key={mig.id} className="hover:bg-theme-surface-elevated">
+                      <td className="px-4 py-3 font-bold text-theme-accent">{mig.id}</td>
+                      <td className="px-4 py-3 text-theme-primary font-semibold">{mig.name}</td>
+                      <td className="px-4 py-3 text-theme-secondary font-sans text-xs">{mig.description}</td>
+                      <td className="px-4 py-3">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                          {mig.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 4: Provider-Neutral AI Gateway */}
+      {/* Tab 4: VELNAR AI Intelligence Layer */}
       {activeTab === 'aiGateway' && (
         <div className="space-y-6">
           <div className="bg-theme-surface border border-theme-border rounded-xl p-5 space-y-4">
-            <div>
-              <h3 className="text-sm font-mono uppercase tracking-wider font-semibold text-theme-primary">
-                {t.settings.aiGateway.title}
-              </h3>
-              <p className="text-xs text-theme-muted mt-1">
-                {t.settings.aiGateway.description}
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-theme-accent" />
+                  <h3 className="text-sm font-mono uppercase tracking-wider font-semibold text-theme-primary">
+                    VELNAR AI Intelligence Layer
+                  </h3>
+                  <span className="text-[10px] bg-theme-accent/20 text-theme-accent border border-theme-accent/30 font-mono font-bold px-2 py-0.5 rounded">
+                    SERVER-SIDE GATEWAY
+                  </span>
+                </div>
+                <p className="text-xs text-theme-muted mt-1">
+                  Deterministic Systems Find Facts · AI Interprets and Prepares Actions · Humans Approve · Code Enforces
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2 bg-theme-surface-elevated px-3 py-1.5 rounded-lg border border-theme-border text-xs font-mono">
+                <Lock className="w-3.5 h-3.5 text-theme-accent" />
+                <span className="text-theme-secondary">
+                  Privacy Gateway: <strong className={
+                    aiStatus?.privacyGateway === 'CONFIGURED'
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : aiStatus?.privacyGateway === 'NOT_CONFIGURED'
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-zinc-500'
+                  }>
+                    {aiStatus?.privacyGateway || 'UNKNOWN'}
+                  </strong>
+                </span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
-              <div className="bg-theme-surface-elevated p-4 rounded-xl border border-theme-border space-y-1">
-                <span className="text-theme-muted">Reasoning Core Adapter</span>
-                <div className="text-sm font-bold text-theme-primary">gateway-engine-alpha</div>
-                <span className="text-[10px] text-emerald-600 dark:text-emerald-400">Latency: 380ms · Health: 100%</span>
+            {/* VELNAR AI Intelligence Tiers (Provider-Neutral Customer Architecture) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
+              <div className="bg-theme-surface-elevated p-4 rounded-xl border border-theme-border space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-theme-muted font-bold">Deterministic Hard Rules</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                    {aiStatus?.tiers?.DETERMINISTIC_ONLY?.status || 'CONFIGURED'}
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-theme-primary">Evidence & Fact Finding</div>
+                <p className="text-[10px] text-theme-muted font-sans leading-tight">
+                  Mathematical proof, revenue loss arithmetic, and deterministic constraint validation. Zero AI hallucination risk.
+                </p>
               </div>
 
-              <div className="bg-theme-surface-elevated p-4 rounded-xl border border-theme-border space-y-1">
-                <span className="text-theme-muted">Fast Heuristic Engine</span>
-                <div className="text-sm font-bold text-theme-primary">gateway-engine-beta</div>
-                <span className="text-[10px] text-emerald-600 dark:text-emerald-400">Latency: 135ms · Health: 100%</span>
+              <div className="bg-theme-surface-elevated p-4 rounded-xl border border-theme-border space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-theme-muted font-bold">Fast Telemetry Tier</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    aiStatus?.tiers?.FAST_LOW_COST?.status === 'CONFIGURED'
+                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                      : aiStatus?.tiers?.FAST_LOW_COST?.status === 'DISABLED'
+                      ? 'bg-zinc-500/20 text-zinc-500'
+                      : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                  }`}>
+                    {aiStatus?.tiers?.FAST_LOW_COST?.status || 'NOT_CONFIGURED'}
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-theme-primary">Speed-to-Lead & Intent</div>
+                <p className="text-[10px] text-theme-muted font-sans leading-tight">
+                  Real-time funnel classification & SLA response latency evaluation. Pseudonymous telemetry only.
+                </p>
               </div>
 
-              <div className="bg-theme-surface-elevated p-4 rounded-xl border border-theme-border space-y-1">
-                <span className="text-theme-muted">Deterministic Guard Sentinel</span>
-                <div className="text-sm font-bold text-theme-primary">gateway-guard-sentinel</div>
-                <span className="text-[10px] text-theme-accent">Enforcing 100% Approval Policy</span>
+              <div className="bg-theme-surface-elevated p-4 rounded-xl border border-theme-border space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-theme-muted font-bold">Calibrated Action Synthesis</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    aiStatus?.tiers?.REASONING?.status === 'CONFIGURED'
+                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                      : aiStatus?.tiers?.REASONING?.status === 'DISABLED'
+                      ? 'bg-zinc-500/20 text-zinc-500'
+                      : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                  }`}>
+                    {aiStatus?.tiers?.REASONING?.status || 'NOT_CONFIGURED'}
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-theme-primary">Growth Action Preparation</div>
+                <p className="text-[10px] text-theme-muted font-sans leading-tight">
+                  Multi-step hypothesis synthesis grounded in verified Revenue Leak evidence references.
+                </p>
+              </div>
+
+              <div className="bg-theme-surface-elevated p-4 rounded-xl border border-theme-border space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-theme-muted font-bold">Long-Context Synthesis</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                    aiStatus?.tiers?.LONG_CONTEXT?.status === 'CONFIGURED'
+                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                      : aiStatus?.tiers?.LONG_CONTEXT?.status === 'DISABLED'
+                      ? 'bg-zinc-500/20 text-zinc-500'
+                      : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                  }`}>
+                    {aiStatus?.tiers?.LONG_CONTEXT?.status || 'NOT_CONFIGURED'}
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-theme-primary">Business Twin Memory</div>
+                <p className="text-[10px] text-theme-muted font-sans leading-tight">
+                  Deep context ingestion across operational history, verified facts, and historical performance trends.
+                </p>
+              </div>
+            </div>
+
+            {/* AI Governance Policy Banner */}
+            <div className="bg-theme-surface-elevated/70 p-3.5 rounded-xl border border-theme-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-mono">
+              <div className="space-y-0.5">
+                <div className="text-theme-primary font-bold flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-theme-accent" />
+                  Deterministic Action Policy Enforcement
+                </div>
+                <p className="text-[11px] text-theme-muted font-sans">
+                  Mandatory human approval enabled. Autonomous external actions strictly prohibited in Sprint 4.
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-3 shrink-0 text-[11px]">
+                <span className="text-theme-muted">
+                  Monthly Cap:{' '}
+                  <strong className="text-theme-primary">
+                    {aiStatus?.policy?.maxMonthlyCostMicroUsd != null
+                      ? `$${(aiStatus.policy.maxMonthlyCostMicroUsd / 1_000_000).toFixed(2)} USD`
+                      : 'UNKNOWN'}
+                  </strong>
+                </span>
+                <span className={
+                  aiStatus?.policy?.humanApprovalRequired === true
+                    ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+                    : aiStatus?.policy?.humanApprovalRequired === false
+                    ? 'text-rose-600 dark:text-rose-400 font-bold'
+                    : 'text-zinc-500 font-bold'
+                }>
+                  Human Gate:{' '}
+                  {aiStatus?.policy?.humanApprovalRequired === true
+                    ? 'REQUIRED'
+                    : aiStatus?.policy?.humanApprovalRequired === false
+                    ? 'DISABLED'
+                    : 'UNKNOWN'}
+                </span>
               </div>
             </div>
           </div>
 
           {/* AI Inference Telemetry Table */}
           <div className="bg-theme-surface border border-theme-border rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-theme-border">
+            <div className="p-4 border-b border-theme-border flex items-center justify-between">
               <h3 className="text-xs font-mono uppercase tracking-wider font-semibold text-theme-primary">
-                {t.settings.aiGateway.tokenTelemetry}
+                AI Inference & Cost Telemetry (D1 / MicroUSD Ledger)
               </h3>
+              <span className="text-[10px] font-mono text-theme-muted">Integer microUSD Currency Model</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono">
@@ -570,8 +542,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
                   <tr>
                     <th className="px-4 py-3">Run ID</th>
                     <th className="px-4 py-3">Purpose</th>
-                    <th className="px-4 py-3">Tokens (In / Out)</th>
+                    <th className="px-4 py-3">Tier</th>
+                    <th className="px-4 py-3">Tokens (In/Out)</th>
                     <th className="px-4 py-3">Latency</th>
+                    <th className="px-4 py-3">Cost (μUSD)</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Timestamp</th>
                   </tr>
@@ -581,10 +555,14 @@ CREATE TABLE IF NOT EXISTS audit_logs (
                     <tr key={run.id} className="hover:bg-theme-surface-elevated">
                       <td className="px-4 py-3 font-bold text-theme-primary">{run.id}</td>
                       <td className="px-4 py-3 text-theme-secondary font-sans">{run.purpose}</td>
+                      <td className="px-4 py-3 text-theme-muted text-[11px]">
+                        <span className="text-theme-accent">VELNAR AI</span> {run.isMock ? '(Mock Sentinel)' : ''}
+                      </td>
                       <td className="px-4 py-3 text-theme-accent font-bold">
                         {run.prompt_tokens} / {run.completion_tokens}
                       </td>
                       <td className="px-4 py-3 text-theme-secondary">{run.latency_ms} ms</td>
+                      <td className="px-4 py-3 text-theme-primary font-mono">{run.estimated_cost_microusd?.toLocaleString() || 0}</td>
                       <td className="px-4 py-3 text-emerald-600 dark:text-emerald-400 uppercase font-bold text-[10px]">{run.status}</td>
                       <td className="px-4 py-3 text-theme-muted">{new Date(run.created_at).toLocaleTimeString()}</td>
                     </tr>
@@ -622,6 +600,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
                   <th className="px-4 py-3">Actor Role</th>
                   <th className="px-4 py-3">Target Entity</th>
                   <th className="px-4 py-3">Payload Diff</th>
+                  <th className="px-4 py-3">IP Hash</th>
                   <th className="px-4 py-3">Timestamp</th>
                 </tr>
               </thead>
@@ -634,6 +613,14 @@ CREATE TABLE IF NOT EXISTS audit_logs (
                     <td className="px-4 py-3 text-theme-secondary">{log.target_entity_type} ({log.target_entity_id})</td>
                     <td className="px-4 py-3 text-theme-muted font-mono text-[10px] max-w-xs truncate">
                       {log.payload_diff_json}
+                    </td>
+                    <td className="px-4 py-3 text-theme-muted font-mono text-[10px]">
+                      <span 
+                        className="px-2 py-0.5 rounded bg-theme-surface-elevated border border-theme-border text-[10px] font-mono text-theme-secondary inline-block"
+                        title="Cryptographically anonymized HMAC-SHA-256 hash for tenant audit privacy"
+                      >
+                        {log.ip_hash && log.ip_hash !== 'UNKNOWN' ? `${log.ip_hash.slice(0, 12)}…` : 'UNKNOWN'}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-theme-muted">{new Date(log.created_at).toLocaleString()}</td>
                   </tr>

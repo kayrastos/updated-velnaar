@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { LeadRepository } from '../../worker/repositories/leadRepository';
 import { AppointmentRepository } from '../../worker/repositories/appointmentRepository';
+import { AppointmentResourceRepository } from '../../worker/repositories/appointmentResourceRepository';
 import { GrowthActionRepository } from '../../worker/repositories/growthActionRepository';
 import { RevenueLeakRepository } from '../../worker/repositories/revenueLeakRepository';
 import { IdentityVaultRepository } from '../../worker/repositories/identityVaultRepository';
@@ -60,34 +61,78 @@ describe('Tenant Scoping in Repositories (Cloudflare D1 Prepared SQL / In-Memory
   });
 
   it('AppointmentRepository should enforce tenant boundary during status updates', async () => {
-    const newApt = await AppointmentRepository.create(undefined, {
+    IdentityVaultRepository.registerTestPseudonym('cus_ps_test_01', orgAlpha);
+    AppointmentResourceRepository.registerTestResource({
+      id: 'stf_01',
+      organizationId: orgAlpha,
       businessId: 'biz_beauty_salon',
-      customerName: 'Test Customer',
-      customerPseudonymId: 'cus_ps_test_01',
-      serviceName: 'Aesthetic Treatment',
-      serviceCategory: 'Facial',
-      resourceStaffId: 'stf_01',
-      resourceStaffName: 'Elena',
-      scheduledStart: '2026-08-24T10:00:00Z',
-      scheduledEnd: '2026-08-24T10:45:00Z',
-      durationMinutes: 45,
-      expectedValueMinor: 35000,
-      currency: 'USD',
-      status: 'confirmed',
-      source: 'velnar_manual',
-    }, orgAlpha, 'test');
+      name: 'Elena',
+      resourceType: 'staff',
+      capacityUnits: 1,
+      status: 'active',
+      createdAt: '2026-08-20T00:00:00Z',
+    });
 
+    const created = await AppointmentRepository.createWithAudit(
+      undefined,
+      {
+        customerPseudonymId: 'cus_ps_test_01',
+        serviceName: 'Aesthetic Treatment',
+        serviceCategory: 'Facial',
+        resourceStaffId: 'stf_01',
+        scheduledStart: '2026-08-24T10:00:00Z',
+        scheduledEnd: '2026-08-24T10:45:00Z',
+        durationMinutes: 45,
+        expectedValueMinor: 35000,
+      },
+      {
+        organizationId: orgAlpha,
+        businessId: 'biz_beauty_salon',
+        currency: 'USD',
+        actorId: 'usr_owner_alpha',
+        actorRole: 'OWNER',
+        ipHash: 'ip_hash_alpha_test',
+      },
+      'test'
+    );
+
+    const newApt = created.appointment;
     expect(newApt.organizationId).toBe(orgAlpha);
+    expect(newApt.businessId).toBe('biz_beauty_salon');
     expect(newApt.expectedValueMinor).toBe(35000);
 
     // Cross-tenant update attempt should fail (return null)
-    const crossUpdate = await AppointmentRepository.updateStatus(undefined, newApt.id, 'cancelled', orgBeta, 'Malicious cancel', 'test');
+    const crossUpdate = await AppointmentRepository.updateStatusWithAudit(
+      undefined,
+      newApt.id,
+      'scheduled',
+      'cancelled',
+      orgBeta,
+      'biz_beauty_salon',
+      'usr_owner_beta',
+      'OWNER',
+      'ip_hash_beta_test',
+      'CUSTOMER_CANCELLED',
+      'test'
+    );
     expect(crossUpdate).toBeNull();
 
     // Valid same-tenant update should succeed
-    const validUpdate = await AppointmentRepository.updateStatus(undefined, newApt.id, 'cancelled', orgAlpha, 'Customer requested', 'test');
+    const validUpdate = await AppointmentRepository.updateStatusWithAudit(
+      undefined,
+      newApt.id,
+      'scheduled',
+      'cancelled',
+      orgAlpha,
+      'biz_beauty_salon',
+      'usr_owner_alpha',
+      'OWNER',
+      'ip_hash_alpha_test',
+      'CUSTOMER_CANCELLED',
+      'test'
+    );
     expect(validUpdate).not.toBeNull();
-    expect(validUpdate?.status).toBe('cancelled');
+    expect(validUpdate?.appointment.status).toBe('cancelled');
   });
 
   it('GrowthActionRepository should track human approval with user ID and timestamp', async () => {
@@ -95,19 +140,22 @@ describe('Tenant Scoping in Repositories (Cloudflare D1 Prepared SQL / In-Memory
     expect(actions.length).toBeGreaterThan(0);
 
     const actionId = actions[0].id;
-    const updated = await GrowthActionRepository.updateActionApproval(
+    const updatedResult = await GrowthActionRepository.transitionWithAudit(
       undefined,
       actionId,
       'approved',
       'usr_owner_01',
+      'OWNER',
       orgAlpha,
+      'PASSED',
+      'UNKNOWN',
       'test'
     );
 
-    expect(updated).not.toBeNull();
-    expect(updated?.approval_status).toBe('approved');
-    expect(updated?.approved_by_user_id).toBe('usr_owner_01');
-    expect(updated?.approved_at).toBeDefined();
+    expect(updatedResult).not.toBeNull();
+    expect(updatedResult.action.approval_status).toBe('approved');
+    expect(updatedResult.action.approved_by_user_id).toBe('usr_owner_01');
+    expect(updatedResult.action.approved_at).toBeDefined();
   });
 
   it('IdentityVaultRepository should encrypt PII into ciphertext before storage and decrypt on demand', async () => {
@@ -155,7 +203,7 @@ describe('Tenant Scoping in Repositories (Cloudflare D1 Prepared SQL / In-Memory
     await expect(leadRepo.listByOrg(orgAlpha)).rejects.toThrow(/DATABASE_NOT_CONFIGURED/);
 
     await expect(
-      AppointmentRepository.listByOrg(undefined, orgAlpha, undefined, 'production')
+      AppointmentRepository.listByBusiness(undefined, orgAlpha, 'biz_beauty_salon', 'production')
     ).rejects.toThrow(/DATABASE_NOT_CONFIGURED/);
 
     await expect(

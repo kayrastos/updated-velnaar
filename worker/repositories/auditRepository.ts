@@ -92,14 +92,14 @@ export class AuditRepository {
       `).bind(
         id,
         orgId,
-        entry.business_id || 'biz_global',
+        entry.business_id || null,
         entry.actor_id,
         entry.actor_role,
         entry.action,
         entry.target_entity_type,
         entry.target_entity_id,
         JSON.stringify(safePayload),
-        entry.ip_hash || '127.0.0.1_hash',
+        entry.ip_hash || 'UNKNOWN',
         now
       ).run();
     } else {

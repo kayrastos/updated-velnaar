@@ -23,6 +23,40 @@ export interface EncryptedVaultPayload {
   tagLength: number; // 128 bits
 }
 
+/**
+ * Check if a supplied secret string meets the minimum master secret length requirements (>= 16 chars).
+ */
+export function isValidMasterSecret(secret?: string): boolean {
+  return Boolean(secret && typeof secret === 'string' && secret.trim().length >= 16);
+}
+
+/**
+ * Canonical vault configuration check.
+ * Evaluates whether a vault operation can obtain the required master secret in the current environment.
+ * 
+ * Rules:
+ * - development: true (uses dev fallback if secret is absent)
+ * - test: true (uses test fallback if secret is absent)
+ * - preview: true ONLY if VELNAR_MASTER_KMS_SECRET is present and valid (>= 16 chars)
+ * - production: true ONLY if VELNAR_MASTER_KMS_SECRET is present and valid (>= 16 chars)
+ * - unknown environment: fail closed; true ONLY if valid secret is present
+ */
+export function isVaultConfigured(environment?: string, envSecret?: string): boolean {
+  const normEnv = (environment || 'production').toLowerCase().trim();
+  const hasValidSecret = isValidMasterSecret(envSecret);
+
+  if (normEnv === 'development' || normEnv === 'test') {
+    return true;
+  }
+
+  if (normEnv === 'production' || normEnv === 'preview') {
+    return hasValidSecret;
+  }
+
+  // Unknown environment: fail closed
+  return hasValidSecret;
+}
+
 export class VaultCryptoService {
   private static readonly DEV_DEFAULT_MASTER_SECRET = 'DEV_MASTER_SECRET_DO_NOT_USE_IN_PROD_32BYTES_TEST!';
   private static readonly CURRENT_KEY_VERSION = 1;
@@ -38,25 +72,39 @@ export class VaultCryptoService {
   }
 
   /**
+   * Check whether the vault is configured for the given environment.
+   */
+  public static isVaultConfigured(environment?: string, envSecret?: string): boolean {
+    return isVaultConfigured(environment, envSecret);
+  }
+
+  /**
+   * Check whether a secret string is valid.
+   */
+  public static isValidMasterSecret(secret?: string): boolean {
+    return isValidMasterSecret(secret);
+  }
+
+  /**
    * Resolve Master Secret from Worker Environment bindings or fail closed.
    * 
    * Rules:
    * - If envSecret is provided and valid (>= 16 chars), use it.
    * - If environment is development/test, fallback to explicit dev secret.
-   * - If environment is production and envSecret is missing/invalid, THROW CONFIGURATION_ERROR.
+   * - If environment is production/preview/unknown and envSecret is missing/invalid, THROW CONFIGURATION_ERROR.
    */
   public static getMasterSecret(environment: string, envSecret?: string): string {
-    if (envSecret && envSecret.trim().length >= 16) {
-      return envSecret.trim();
+    if (isValidMasterSecret(envSecret)) {
+      return envSecret!.trim();
     }
 
     if (VaultCryptoService.isDevelopmentOrTest(environment)) {
       return VaultCryptoService.DEV_DEFAULT_MASTER_SECRET;
     }
 
-    // Production fail-closed: Never fall back to dev secret
+    // Production / Preview fail-closed: Never fall back to dev secret
     throw new Error(
-      'CONFIGURATION_ERROR: VELNAR_MASTER_KMS_SECRET is required in production and must be at least 16 characters.'
+      `CONFIGURATION_ERROR: VELNAR_MASTER_KMS_SECRET is required in ${environment} and must be at least 16 characters.`
     );
   }
 

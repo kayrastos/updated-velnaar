@@ -41,6 +41,55 @@ export class SafeLogger {
   ]);
 
   /**
+   * Sanitize raw string messages to prevent accidental leakage of sensitive tokens, PII, and secrets.
+   */
+  public static sanitizeMessage(msg: string): string {
+    if (!msg || typeof msg !== 'string') return '';
+
+    let sanitized = msg;
+
+    // 1. Redact Bearer tokens
+    sanitized = sanitized.replace(/Bearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [REDACTED_TOKEN]');
+
+    // 2. Redact JWT-like tokens (3 base64 url-encoded parts separated by dots)
+    sanitized = sanitized.replace(/\bey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[REDACTED_JWT]');
+
+    // 3. Redact Basic auth tokens
+    sanitized = sanitized.replace(/Basic\s+[A-Za-z0-9+/=]{10,}/gi, 'Basic [REDACTED_AUTH]');
+
+    // 4. Redact Key-Value secret patterns like "apiKey: secret123" or "password=xyz"
+    sanitized = sanitized.replace(
+      /(api_?key|secret|password|auth(?:orization)?|token)\s*[:=]\s*["']?[A-Za-z0-9_\-.~+]{8,}["']?/gi,
+      '$1: [REDACTED_SECRET]'
+    );
+
+    // 5. Mask email addresses in raw message string
+    sanitized = sanitized.replace(
+      /\b([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/g,
+      (match, local, domain) => {
+        if (local.length <= 2) {
+          return `${local[0]}***@${domain}`;
+        }
+        return `${local[0]}***${local[local.length - 1]}@${domain}`;
+      }
+    );
+
+    // 6. Mask international phone number patterns
+    sanitized = sanitized.replace(
+      /(\+?[0-9]{1,4}[\s-]?)?(\(?[0-9]{2,4}\)?[\s-]?)?[0-9]{3,4}[\s-]?[0-9]{3,4}/g,
+      (match) => {
+        const digitsOnly = match.replace(/\D/g, '');
+        if (digitsOnly.length >= 7) {
+          return SafeLogger.maskPhone(match);
+        }
+        return match;
+      }
+    );
+
+    return sanitized;
+  }
+
+  /**
    * Mask email address: "john.smith@acme.com" -> "j***h@acme.com"
    */
   public static maskEmail(email: string): string {
@@ -69,11 +118,7 @@ export class SafeLogger {
   public static redactData<T>(obj: T): T {
     if (obj === null || obj === undefined) return obj;
     if (typeof obj === 'string') {
-      // Check for JWT-like strings or email/phone patterns in raw strings
-      if (obj.startsWith('Bearer ') || obj.split('.').length === 3 && obj.length > 50) {
-        return '[REDACTED_AUTH_TOKEN]' as unknown as T;
-      }
-      return obj;
+      return SafeLogger.sanitizeMessage(obj) as unknown as T;
     }
     if (typeof obj !== 'object') return obj;
 
@@ -92,6 +137,8 @@ export class SafeLogger {
         cleaned[key] = SafeLogger.maskPhone(value);
       } else if (typeof value === 'object' && value !== null) {
         cleaned[key] = SafeLogger.redactData(value);
+      } else if (typeof value === 'string') {
+        cleaned[key] = SafeLogger.sanitizeMessage(value);
       } else {
         cleaned[key] = value;
       }
@@ -101,17 +148,20 @@ export class SafeLogger {
   }
 
   public static info(message: string, context?: Record<string, unknown>): void {
+    const safeMsg = SafeLogger.sanitizeMessage(message);
     const safeContext = context ? SafeLogger.redactData(context) : undefined;
-    console.log(`[VELNAR:INFO] [${new Date().toISOString()}] ${message}`, safeContext ? JSON.stringify(safeContext) : '');
+    console.log(`[VELNAR:INFO] [${new Date().toISOString()}] ${safeMsg}`, safeContext ? JSON.stringify(safeContext) : '');
   }
 
   public static warn(message: string, context?: Record<string, unknown>): void {
+    const safeMsg = SafeLogger.sanitizeMessage(message);
     const safeContext = context ? SafeLogger.redactData(context) : undefined;
-    console.warn(`[VELNAR:WARN] [${new Date().toISOString()}] ${message}`, safeContext ? JSON.stringify(safeContext) : '');
+    console.warn(`[VELNAR:WARN] [${new Date().toISOString()}] ${safeMsg}`, safeContext ? JSON.stringify(safeContext) : '');
   }
 
   public static error(message: string, context?: Record<string, unknown>): void {
+    const safeMsg = SafeLogger.sanitizeMessage(message);
     const safeContext = context ? SafeLogger.redactData(context) : undefined;
-    console.error(`[VELNAR:ERROR] [${new Date().toISOString()}] ${message}`, safeContext ? JSON.stringify(safeContext) : '');
+    console.error(`[VELNAR:ERROR] [${new Date().toISOString()}] ${safeMsg}`, safeContext ? JSON.stringify(safeContext) : '');
   }
 }

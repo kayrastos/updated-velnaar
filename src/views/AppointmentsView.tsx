@@ -34,17 +34,16 @@ export const AppointmentsView: React.FC = () => {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   // Fast Creation Form State
-  const [customerName, setCustomerName] = useState('');
+  const [customerPseudonymId, setCustomerPseudonymId] = useState('');
   const [serviceName, setServiceName] = useState(
-    activeTemplate.industryName.includes('Salon') ? 'Signature Laser Treatment' :
-    activeTemplate.industryName.includes('Dining') ? 'Terrace Dining Reservation' : 'VIP Vehicle Test Drive'
+    activeTemplate?.industryName?.includes('Salon') ? 'Signature Laser Treatment' :
+    activeTemplate?.industryName?.includes('Dining') ? 'Terrace Dining Reservation' : 'VIP Consultation'
   );
   const [serviceCategory, setServiceCategory] = useState('Standard Service');
-  const [staffName, setStaffName] = useState(activeTemplate.resources[0]?.name || 'Senior Specialist');
+  const [staffName, setStaffName] = useState(activeTemplate?.resources?.[0]?.name || 'Senior Specialist');
   const [scheduledStart, setScheduledStart] = useState('2026-08-24T14:30');
   const [durationMinutes, setDurationMinutes] = useState<number>(60);
-  const [expectedValue, setExpectedValue] = useState<number>(activeTemplate.currency === 'TRY' ? 4500 : 850);
-  const [notes, setNotes] = useState('');
+  const [expectedValue, setExpectedValue] = useState<number>(activeTemplate?.currency === 'TRY' ? 4500 : 850);
 
   // Filtered Appointments
   const filteredAppointments = appointments.filter(apt => {
@@ -62,10 +61,9 @@ export const AppointmentsView: React.FC = () => {
 
   const handleQuickCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim()) return;
 
     createManualAppointment({
-      customerName,
+      customerPseudonymId: customerPseudonymId.trim() || `c_ps_${Math.random().toString(36).substring(2, 8)}`,
       serviceName,
       serviceCategory,
       resourceStaffName: staffName,
@@ -73,11 +71,9 @@ export const AppointmentsView: React.FC = () => {
       durationMinutes: Number(durationMinutes),
       expectedValueMinor: Math.round(Number(expectedValue) * 100),
       currency: activeTemplate.currency,
-      notes,
     });
 
-    setCustomerName('');
-    setNotes('');
+    setCustomerPseudonymId('');
     setIsCreateModalOpen(false);
   };
 
@@ -132,13 +128,20 @@ export const AppointmentsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center space-x-2 px-4 py-2.5 rounded-lg bg-theme-accent text-black font-medium text-xs hover:bg-theme-accent/90 transition-colors cursor-pointer shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t.appointments.newAppointment}</span>
-          </button>
+          {import.meta.env.DEV ? (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center space-x-2 px-4 py-2.5 rounded-lg bg-theme-accent text-black font-medium text-xs hover:bg-theme-accent/90 transition-colors cursor-pointer shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{t.appointments.newAppointment}</span>
+            </button>
+          ) : (
+            <div className="flex items-center space-x-1.5 text-xs font-mono text-theme-muted bg-theme-surface-elevated px-3 py-2 rounded-lg border border-theme-border">
+              <ShieldCheck className="w-3.5 h-3.5 text-theme-accent" />
+              <span>Integration Stream Active</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -148,17 +151,23 @@ export const AppointmentsView: React.FC = () => {
         <div className="bg-theme-surface p-4 rounded-xl border border-theme-border">
           <div className="flex items-center justify-between text-xs text-theme-secondary font-mono mb-2">
             <span>Current Capacity Utilization</span>
-            <span className="text-theme-accent font-bold">{activeTemplate.capacityUtilization.overallUtilizationPct}%</span>
+            <span className="text-theme-accent font-bold">
+              {activeTemplate ? `${activeTemplate.capacityUtilization.overallUtilizationPct}%` : 'Telemetry Synchronized'}
+            </span>
           </div>
           <div className="w-full bg-theme-surface-elevated h-2 rounded-full overflow-hidden mb-2">
             <div 
               className="bg-theme-accent h-full rounded-full transition-all duration-500"
-              style={{ width: `${activeTemplate.capacityUtilization.overallUtilizationPct}%` }}
+              style={{ width: `${activeTemplate?.capacityUtilization.overallUtilizationPct || 0}%` }}
             ></div>
           </div>
           <div className="text-[11px] text-theme-muted flex items-center justify-between">
-            <span>Peak: {activeTemplate.capacityUtilization.peakWindow.windowLabel} ({activeTemplate.capacityUtilization.peakWindow.utilizationPct}%)</span>
-            <span className="text-amber-500">Lowest: {activeTemplate.capacityUtilization.lowestWindow.utilizationPct}%</span>
+            <span>
+              Peak: {activeTemplate ? `${activeTemplate.capacityUtilization.peakWindow.windowLabel} (${activeTemplate.capacityUtilization.peakWindow.utilizationPct}%)` : 'Live Telemetry Active'}
+            </span>
+            <span className="text-amber-500">
+              {activeTemplate ? `Lowest: ${activeTemplate.capacityUtilization.lowestWindow.utilizationPct}%` : 'Deterministic'}
+            </span>
           </div>
         </div>
 
@@ -169,10 +178,14 @@ export const AppointmentsView: React.FC = () => {
             <span>Off-Peak Capacity Warning</span>
           </div>
           <p className="text-xs text-theme-primary leading-relaxed">
-            {activeTemplate.capacityUtilization.lowestWindow.windowLabel} shows {activeTemplate.capacityUtilization.lowestWindow.utilizationPct}% utilization.
+            {activeTemplate 
+              ? `${activeTemplate.capacityUtilization.lowestWindow.windowLabel} shows ${activeTemplate.capacityUtilization.lowestWindow.utilizationPct}% utilization.`
+              : 'Capacity telemetry monitored across operational booking slots.'}
           </p>
           <div className="text-[11px] text-theme-secondary mt-1">
-            Est. Monthly Gap: <strong className="text-amber-600 dark:text-amber-300">{formatCurrency(activeTemplate.capacityUtilization.lowestWindow.potentialRevenueLossMinor / 100)}</strong>
+            Est. Monthly Gap: <strong className="text-amber-600 dark:text-amber-300">
+              {activeTemplate ? formatCurrency(activeTemplate.capacityUtilization.lowestWindow.potentialRevenueLossMinor / 100) : '—'}
+            </strong>
           </div>
         </div>
 
@@ -181,15 +194,24 @@ export const AppointmentsView: React.FC = () => {
           <div>
             <div className="flex items-center justify-between text-xs font-mono text-theme-secondary mb-2">
               <span className="flex items-center gap-1.5"><RefreshCw className="w-3 h-3 text-emerald-500" /> Connected Ingestion Channels</span>
-              <span className="text-emerald-600 dark:text-emerald-400 text-[10px]">3 Active</span>
+              <span className="text-emerald-600 dark:text-emerald-400 text-[10px]">
+                {import.meta.env.DEV ? '3 Active' : 'Ingestion Active'}
+              </span>
             </div>
             <div className="space-y-1.5">
-              {mockConnectorsList.slice(0, 2).map(c => (
-                <div key={c.id} className="flex items-center justify-between text-[11px] text-theme-secondary bg-theme-surface-elevated px-2.5 py-1 rounded border border-theme-border">
-                  <span className="truncate">{c.name}</span>
+              {import.meta.env.DEV ? (
+                mockConnectorsList.slice(0, 2).map(c => (
+                  <div key={c.id} className="flex items-center justify-between text-[11px] text-theme-secondary bg-theme-surface-elevated px-2.5 py-1 rounded border border-theme-border">
+                    <span className="truncate">{c.name}</span>
+                    <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">Synced</span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-between text-[11px] text-theme-secondary bg-theme-surface-elevated px-2.5 py-1.5 rounded border border-theme-border">
+                  <span className="truncate">Calendar & Booking Gateway</span>
                   <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400">Synced</span>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -269,11 +291,10 @@ export const AppointmentsView: React.FC = () => {
                     <td className="py-3.5 px-4 font-medium text-theme-primary">
                       <div className="flex items-center space-x-2">
                         <div className="w-6 h-6 rounded-full bg-theme-surface-elevated flex items-center justify-center text-[10px] font-mono text-theme-accent border border-theme-border">
-                          {apt.customerName.charAt(0)}
+                          {apt.customerPseudonymId.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <div>{apt.customerName}</div>
-                          <div className="text-[10px] font-mono text-theme-muted">{apt.customerPseudonymId}</div>
+                          <div className="font-mono text-sm">{apt.customerPseudonymId}</div>
                         </div>
                       </div>
                     </td>
@@ -301,34 +322,39 @@ export const AppointmentsView: React.FC = () => {
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end space-x-1.5">
-                        {apt.status === 'confirmed' && (
+                        {import.meta.env.DEV ? (
                           <>
-                            <button
-                              onClick={() => updateAppointmentStatus(apt.id, 'completed')}
-                              title="Mark Completed"
-                              className="px-2 py-1 rounded bg-theme-surface-elevated hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-theme-border hover:border-emerald-500/40 text-[10px] font-mono transition-colors"
-                            >
-                              Complete
-                            </button>
-                            <button
-                              onClick={() => updateAppointmentStatus(apt.id, 'no_show', 'Customer did not show up')}
-                              title="Mark No-Show"
-                              className="px-2 py-1 rounded bg-theme-surface-elevated hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-theme-border hover:border-red-500/40 text-[10px] font-mono transition-colors"
-                            >
-                              No-Show
-                            </button>
+                            {apt.status === 'confirmed' && (
+                              <>
+                                <button
+                                  onClick={() => updateAppointmentStatus(apt.id, 'completed')}
+                                  title="Mark Completed"
+                                  className="px-2 py-1 rounded bg-theme-surface-elevated hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-theme-border hover:border-emerald-500/40 text-[10px] font-mono transition-colors"
+                                >
+                                  Complete
+                                </button>
+                                <button
+                                  onClick={() => updateAppointmentStatus(apt.id, 'no_show', 'NO_SHOW_CONFIRMED')}
+                                  title="Mark No-Show"
+                                  className="px-2 py-1 rounded bg-theme-surface-elevated hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-theme-border hover:border-red-500/40 text-[10px] font-mono transition-colors"
+                                >
+                                  No-Show
+                                </button>
+                              </>
+                            )}
+                            {apt.status === 'no_show' && (
+                              <button
+                                onClick={() => updateAppointmentStatus(apt.id, 'scheduled')}
+                                className="px-2.5 py-1 rounded bg-theme-accent/10 hover:bg-theme-accent/20 text-theme-accent border border-theme-border text-[10px] font-mono flex items-center gap-1"
+                              >
+                                <Sparkles className="w-2.5 h-2.5" /> Re-engage
+                              </button>
+                            )}
                           </>
-                        )}
-                        {apt.status === 'no_show' && (
-                          <button
-                            onClick={() => {
-                              // Trigger Rebooking sequence
-                              alert('Triggered automated 1-click re-engagement sequence via WhatsApp/SMS.');
-                            }}
-                            className="px-2.5 py-1 rounded bg-theme-accent/10 hover:bg-theme-accent/20 text-theme-accent border border-theme-border text-[10px] font-mono flex items-center gap-1"
-                          >
-                            <Sparkles className="w-2.5 h-2.5" /> Re-engage
-                          </button>
+                        ) : (
+                          <span className="text-[10px] font-mono text-theme-muted">
+                            Canonical
+                          </span>
                         )}
                       </div>
                     </td>
@@ -364,15 +390,14 @@ export const AppointmentsView: React.FC = () => {
             <form onSubmit={handleQuickCreate} className="space-y-3.5 text-xs">
               <div>
                 <label className="block text-[11px] font-mono text-theme-secondary mb-1">
-                  Customer Full Name *
+                  Customer Pseudonym ID (e.g. c_ps_1234)
                 </label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. Zeynep Yılmaz"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full bg-theme-surface-elevated border border-theme-border rounded-lg px-3 py-2 text-theme-primary focus:outline-none focus:border-theme-accent"
+                  placeholder="Leave blank to auto-generate pseudonym..."
+                  value={customerPseudonymId}
+                  onChange={(e) => setCustomerPseudonymId(e.target.value)}
+                  className="w-full bg-theme-surface-elevated border border-theme-border rounded-lg px-3 py-2 text-theme-primary font-mono focus:outline-none focus:border-theme-accent"
                 />
               </div>
 
@@ -431,7 +456,7 @@ export const AppointmentsView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-[11px] font-mono text-theme-secondary mb-1">
-                    Value ({activeTemplate.currencySymbol})
+                    Value ({activeTemplate?.currencySymbol || '$'})
                   </label>
                   <input
                     type="number"
@@ -440,19 +465,6 @@ export const AppointmentsView: React.FC = () => {
                     className="w-full bg-theme-surface-elevated border border-theme-border rounded-lg px-3 py-2 text-theme-primary font-mono focus:outline-none focus:border-theme-accent"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-mono text-theme-secondary mb-1">
-                  Operational Notes (Optional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Special requests, treatment details, or table preferences..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full bg-theme-surface-elevated border border-theme-border rounded-lg px-3 py-2 text-theme-primary focus:outline-none focus:border-theme-accent"
-                />
               </div>
 
               <div className="pt-3 flex items-center justify-end space-x-2 border-t border-theme-border">

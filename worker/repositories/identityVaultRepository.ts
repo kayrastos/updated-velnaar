@@ -43,8 +43,25 @@ export class IdentityVaultRepository {
     if (!db) {
       const isDevOrTest = environment === 'development' || environment === 'test';
       if (!isDevOrTest) {
-        throw new Error('DATABASE_NOT_CONFIGURED: In-memory fallback in IdentityVaultRepository is prohibited in production.');
+        throw new Error('DATABASE_NOT_CONFIGURED');
       }
+    }
+  }
+
+  public static registerTestPseudonym(pseudonymId: string, organizationId: string): void {
+    const found = this.memRecords.find(r => r.pseudonymId === pseudonymId && r.organizationId === organizationId);
+    if (!found) {
+      this.memRecords.push({
+        id: `vrec_reg_${Date.now()}_${crypto.randomUUID()}`,
+        organizationId,
+        pseudonymId,
+        encryptedNamePayload: { ciphertext: 'dummy', iv: 'dummy', authTag: 'dummy' } as any,
+        encryptedEmailPayload: { ciphertext: 'dummy', iv: 'dummy', authTag: 'dummy' } as any,
+        encryptedPhonePayload: { ciphertext: 'dummy', iv: 'dummy', authTag: 'dummy' } as any,
+        keyVersion: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     }
   }
 
@@ -58,20 +75,80 @@ export class IdentityVaultRepository {
       const emailEnc = await VaultCryptoService.encrypt('clara@vanceaesthetics.com', orgA, environment, masterSecret);
       const phoneEnc = await VaultCryptoService.encrypt('+1 (415) 890-1122', orgA, environment, masterSecret);
 
-      this.memRecords.push({
-        id: 'vrec_001',
-        organizationId: orgA,
-        pseudonymId: 'cus_89a12e',
-        encryptedNamePayload: nameEnc,
-        encryptedEmailPayload: emailEnc,
-        encryptedPhonePayload: phoneEnc,
-        keyVersion: 1,
-        createdAt: '2026-08-24T00:00:00Z',
-        updatedAt: '2026-08-24T00:00:00Z',
-      });
+      const testPseudonyms = [
+        { org: 'org_apex_holding', pid: 'cus_89a12e' },
+        { org: 'org_apex_holding', pid: 'cus_123' },
+        { org: 'org_apex_holding', pid: 'cus_seal_test_a12' },
+        { org: 'org_apex_holding', pid: 'cus_noshow_01' },
+        { org: 'org_apex_holding', pid: 'cus_race_01' },
+        { org: 'org_apex_holding', pid: 'cus_direct_01' },
+        { org: 'org_apex_holding', pid: 'cus_client_01' },
+        { org: 'org_apex_holding', pid: 'cus_client_02' },
+        { org: 'org_alpha_holdings', pid: 'cus_ps_test_01' },
+        { org: 'org_demo', pid: 'c_ps_9821_a' },
+        { org: 'org_demo', pid: 'c_ps_4412_b' },
+        { org: 'org_demo', pid: 'c_ps_3301_c' },
+        { org: 'org_demo', pid: 'c_ps_1109_d' },
+        { org: 'org_demo', pid: 'c_ps_9912_p' },
+        { org: 'org_demo', pid: 'c_ps_3120_k' },
+        { org: 'org_demo', pid: 'c_ps_8820_v' },
+        { org: 'org_demo', pid: 'c_ps_7712_j' },
+      ];
+
+      for (let i = 0; i < testPseudonyms.length; i++) {
+        const item = testPseudonyms[i];
+        this.memRecords.push({
+          id: `vrec_seed_${i + 1}`,
+          organizationId: item.org,
+          pseudonymId: item.pid,
+          encryptedNamePayload: nameEnc,
+          encryptedEmailPayload: emailEnc,
+          encryptedPhonePayload: phoneEnc,
+          keyVersion: 1,
+          createdAt: '2026-08-24T00:00:00Z',
+          updatedAt: '2026-08-24T00:00:00Z',
+        });
+      }
     } catch {
       // Ignore if master secret is not set in non-dev env
     }
+  }
+
+  /**
+   * Non-decrypting check for pseudonym existence under tenant scope.
+   * Returns true if pseudonym exists in the specified organization, false otherwise.
+   */
+  public static async existsPseudonym(
+    db: D1Database | undefined,
+    pseudonymId: string,
+    orgId: string,
+    environment: string = 'production'
+  ): Promise<boolean> {
+    IdentityVaultRepository.assertDbOrDev(db, environment);
+
+    if (!pseudonymId || !orgId) {
+      return false;
+    }
+
+    if (db) {
+      try {
+        const row = await db.prepare(`
+          SELECT 1 as found
+          FROM identity_vault
+          WHERE pseudonym_id = ? AND organization_id = ?
+          LIMIT 1
+        `).bind(pseudonymId, orgId).first<{ found: number }>();
+
+        return Boolean(row && row.found === 1);
+      } catch {
+        throw new Error('IDENTITY_VAULT_LOOKUP_FAILED');
+      }
+    }
+
+    await this.initSeedMem(environment);
+    return IdentityVaultRepository.memRecords.some(
+      r => r.pseudonymId === pseudonymId && r.organizationId === orgId
+    );
   }
 
   /**

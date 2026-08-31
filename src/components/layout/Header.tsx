@@ -53,25 +53,30 @@ export const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Demo Business Archetype Switcher */}
-          <div className="hidden md:flex items-center space-x-1.5 bg-theme-surface-elevated rounded-lg px-2.5 py-1 border border-theme-border text-xs font-mono">
-            <Building2 className="w-3.5 h-3.5 text-theme-accent" />
-            <select
-              value={activeTemplateId}
-              onChange={(e) => setActiveTemplateId(e.target.value)}
-              className="bg-transparent text-theme-primary font-medium focus:outline-none cursor-pointer text-xs"
-            >
-              <option value="template_beauty_salon" className="bg-theme-surface text-theme-primary">
-                {t.demoSwitch.beauty}
-              </option>
-              <option value="template_restaurant" className="bg-theme-surface text-theme-primary">
-                {t.demoSwitch.restaurant}
-              </option>
-              <option value="template_auto_dealership" className="bg-theme-surface text-theme-primary">
-                {t.demoSwitch.dealership}
-              </option>
-            </select>
-          </div>
+          {/* Demo Business Archetype Switcher (DEV ONLY) */}
+          {import.meta.env?.DEV && (
+            <div className="hidden md:flex items-center space-x-1.5 bg-theme-surface-elevated rounded-lg px-2.5 py-1 border border-amber-500/30 text-xs font-mono">
+              <span className="px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-500 text-[10px] font-bold">
+                DEMO
+              </span>
+              <Building2 className="w-3.5 h-3.5 text-theme-accent" />
+              <select
+                value={activeTemplateId}
+                onChange={(e) => setActiveTemplateId(e.target.value)}
+                className="bg-transparent text-theme-primary font-medium focus:outline-none cursor-pointer text-xs"
+              >
+                <option value="template_beauty_salon" className="bg-theme-surface text-theme-primary">
+                  {t.demoSwitch.beauty}
+                </option>
+                <option value="template_restaurant" className="bg-theme-surface text-theme-primary">
+                  {t.demoSwitch.restaurant}
+                </option>
+                <option value="template_auto_dealership" className="bg-theme-surface text-theme-primary">
+                  {t.demoSwitch.dealership}
+                </option>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Center/Right Controls: Market Switcher, RBAC Role, Theme, Language, Scan */}
@@ -108,22 +113,28 @@ export const Header: React.FC = () => {
             </button>
           </div>
 
-          {/* RBAC Role Simulator Dropdown (5 Enterprise Roles) */}
+          {/* RBAC Role: Selector in DEV, Read-Only Badge in PROD */}
           <div className="hidden lg:flex items-center space-x-1 bg-theme-surface-elevated rounded-lg px-2.5 py-1 border border-theme-border text-xs font-mono">
             <ShieldCheck className="w-3.5 h-3.5 text-theme-accent" />
             <span className="text-theme-muted text-[11px]">Role:</span>
-            <select
-              id="rbac-role-selector"
-              value={currentRole}
-              onChange={(e) => setCurrentRole(e.target.value as UserRole)}
-              className="bg-transparent text-theme-primary font-medium focus:outline-none cursor-pointer text-xs"
-            >
-              <option value="owner" className="bg-theme-surface text-theme-primary">OWNER (Exec)</option>
-              <option value="admin" className="bg-theme-surface text-theme-primary">ADMIN (Ops)</option>
-              <option value="manager" className="bg-theme-surface text-theme-primary">MANAGER</option>
-              <option value="staff" className="bg-theme-surface text-theme-primary">STAFF</option>
-              <option value="viewer" className="bg-theme-surface text-theme-primary">VIEWER (RO)</option>
-            </select>
+            {import.meta.env?.DEV ? (
+              <select
+                id="rbac-role-selector"
+                value={currentRole || 'OWNER'}
+                onChange={(e) => setCurrentRole(e.target.value as UserRole)}
+                className="bg-transparent text-theme-primary font-medium focus:outline-none cursor-pointer text-xs uppercase"
+              >
+                <option value="OWNER" className="bg-theme-surface text-theme-primary">OWNER (Exec)</option>
+                <option value="ADMIN" className="bg-theme-surface text-theme-primary">ADMIN (Ops)</option>
+                <option value="MANAGER" className="bg-theme-surface text-theme-primary">MANAGER</option>
+                <option value="STAFF" className="bg-theme-surface text-theme-primary">STAFF</option>
+                <option value="VIEWER" className="bg-theme-surface text-theme-primary">VIEWER (RO)</option>
+              </select>
+            ) : (
+              <span id="rbac-role-badge" className="text-theme-primary font-medium text-xs uppercase">
+                {currentRole || 'UNAUTHENTICATED'}
+              </span>
+            )}
           </div>
 
           {/* Theme Switcher Toggle (Dark / Light / System) */}

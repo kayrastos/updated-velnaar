@@ -14,6 +14,12 @@
 
 import { UserRole } from '../../src/types/database';
 
+export const VALID_USER_ROLES: readonly UserRole[] = ['OWNER', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER'] as const;
+
+export function isValidUserRole(role: any): role is UserRole {
+  return typeof role === 'string' && VALID_USER_ROLES.includes(role as UserRole);
+}
+
 export type ResourceAction = 
   | 'leads.read'
   | 'leads.create'
@@ -161,12 +167,24 @@ export class AuthContextService {
       }
 
       const parts = token.split(':');
-      const userId = parts[1] || 'usr_test';
-      const orgId = parts[2] || 'org_apex_holding';
-      const rawRole = (parts[3] || 'OWNER').toUpperCase() as UserRole;
-      
+      if (parts.length !== 4) {
+        return null;
+      }
+
+      const userId = parts[1]?.trim();
+      const orgId = parts[2]?.trim();
+      const rawRole = parts[3]?.trim();
+
+      if (!userId || !orgId || !rawRole) {
+        return null;
+      }
+
       const validRoles: UserRole[] = ['OWNER', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER'];
-      const effectiveRole = validRoles.includes(rawRole) ? rawRole : 'VIEWER';
+      if (!validRoles.includes(rawRole as UserRole)) {
+        return null;
+      }
+
+      const effectiveRole = rawRole as UserRole;
 
       return {
         userId,

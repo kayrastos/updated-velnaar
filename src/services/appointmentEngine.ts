@@ -88,18 +88,18 @@ export class AppointmentEngine {
   public static createManualAppointment(params: {
     organizationId: string;
     businessId: string;
-    customerName: string;
+    customerPseudonymId?: string;
     serviceName: string;
     serviceCategory: string;
+    resourceStaffId?: string;
     resourceStaffName: string;
     scheduledStart: string;
     durationMinutes: number;
     expectedValueMinor: number;
     currency: string;
-    notes?: string;
   }): { appointment: Appointment; event: AppointmentEvent } {
     const aptId = `apt_man_${crypto.randomUUID()}`;
-    const pseudonym = `c_ps_${crypto.randomUUID()}`;
+    const pseudonym = params.customerPseudonymId || `c_ps_${crypto.randomUUID()}`;
     const startTime = new Date(params.scheduledStart);
     const endTime = new Date(startTime.getTime() + params.durationMinutes * 60000);
 
@@ -107,11 +107,10 @@ export class AppointmentEngine {
       id: aptId,
       organizationId: params.organizationId,
       businessId: params.businessId,
-      customerName: params.customerName,
       customerPseudonymId: pseudonym,
       serviceName: params.serviceName,
       serviceCategory: params.serviceCategory,
-      resourceStaffId: `res_${crypto.randomUUID()}`,
+      resourceStaffId: params.resourceStaffId || `res_${crypto.randomUUID()}`,
       resourceStaffName: params.resourceStaffName,
       scheduledStart: startTime.toISOString(),
       scheduledEnd: endTime.toISOString(),
@@ -120,7 +119,7 @@ export class AppointmentEngine {
       currency: params.currency,
       status: 'confirmed',
       source: 'velnar_manual',
-      notes: params.notes,
+      rowVersion: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
