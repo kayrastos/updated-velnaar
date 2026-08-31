@@ -10,6 +10,8 @@ export const A12B2B_PRICING_CATALOG_VERSION = '2026-08-31-v1';
 export const A12B2B_BUDGET_CAP_MICRO_USD = 5000000; // $5.00 USD hard cap
 export const A12B2B_MAX_OUTPUT_TOKENS_BOUND = 2048; // Documented safe output bound for canonical VELNAR schemas
 export const A12B2B_WORST_CASE_INPUT_TOKENS_BOUND = 4000; // Conservative prompt input token upper bound
+export const A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND = 4000; // Supported certification max input tokens bound (fail-closed if exceeded)
+export const A12B2B_MAX_SUPPORTED_INPUT_BOUND = 4000; // Alias for certification max input tokens bound
 
 export type LiveCandidateId =
   | 'deepseek-v4-flash-offpeak-low'
@@ -61,6 +63,8 @@ export interface LiveEvaluationResultRecord {
   providerId: AIProviderId;
   requestedModelIdentifier: string;
   returnedModelIdentifier?: string;
+  providerModelVersion?: string;
+  conservativeInputTokenUpperBound?: number;
   serviceProfile: LiveServiceProfile;
   thinkingEffort: 'low';
   promptVersion: string;

@@ -20,7 +20,12 @@ import {
   VELNAR_SHADOW_EVAL_V1,
   VELNAR_SHADOW_EVAL_V1_VERSION,
 } from '../../worker/ai/evaluation/evaluationDataset';
-import { A12B2B_BUDGET_CAP_MICRO_USD, A12B2B_PRICING_CATALOG_VERSION } from '../../worker/ai/evaluation/evaluationLiveTypes';
+import { PromptRegistry } from '../../worker/ai/promptRegistry';
+import {
+  A12B2B_BUDGET_CAP_MICRO_USD,
+  A12B2B_PRICING_CATALOG_VERSION,
+  A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND,
+} from '../../worker/ai/evaluation/evaluationLiveTypes';
 import { WorkerEnv } from '../../worker/env';
 
 describe('Phase A.12B.2B — Controlled Live Shadow Evaluation Specification & Invariants', () => {
@@ -356,6 +361,148 @@ describe('Phase A.12B.2B — Controlled Live Shadow Evaluation Specification & I
       }
     });
 
+    it('should reject lookalike DeepSeek model identifiers', async () => {
+      const originalFetch = global.fetch;
+      const lookalikes = [
+        'deepseek-v4-flash-preview',
+        'deepseek-v4-flash-chat',
+        'deepseek-v4-flash-beta',
+        'deepseek-v3',
+        'deepseek-chat',
+      ];
+
+      for (const lookalike of lookalikes) {
+        global.fetch = (async () => {
+          return new Response(
+            JSON.stringify({
+              model: lookalike,
+              choices: [{ message: { content: '{"intent":"HIGH_INTENT"}' } }],
+              usage: {
+                prompt_tokens: 100,
+                prompt_cache_hit_tokens: 50,
+                prompt_cache_miss_tokens: 50,
+                completion_tokens: 20,
+                total_tokens: 120,
+              },
+            }),
+            { status: 200 }
+          );
+        }) as any;
+
+        try {
+          const mockEnv: WorkerEnv = {
+            DEEPSEEK_API_KEY: 'test-ds-key',
+          } as any;
+
+          await expect(
+            EvaluationLiveClient.invokeCandidate(
+              CANDIDATE_A_DEEPSEEK,
+              {
+                taskType: 'LEAD_INTENT_CLASSIFICATION',
+                requestId: 'req-lookalike',
+                organizationId: 'org-1',
+                businessId: 'biz-1',
+                dataClassification: 'PUBLIC_BUSINESS',
+                untrustedTextBlocks: ['Need demo now'],
+              },
+              mockEnv
+            )
+          ).rejects.toThrow('A12B2B_MODEL_SUBSTITUTION_DETECTED');
+        } finally {
+          global.fetch = originalFetch;
+        }
+      }
+    });
+
+    it('should reject lookalike Gemini model identifiers', async () => {
+      const originalFetch = global.fetch;
+      const lookalikes = [
+        'gemini-3.5-flash-lite-preview',
+        'gemini-3.5-flash',
+        'gemini-3.5-flash-lite-001',
+        'gemini-2.5-flash',
+        'gemini-1.5-flash',
+      ];
+
+      for (const lookalike of lookalikes) {
+        global.fetch = (async () => {
+          return new Response(
+            JSON.stringify({
+              model: lookalike,
+              service_tier: 'flex',
+              steps: [{ type: 'output', content: [{ type: 'text', text: '{"intent":"HIGH_INTENT"}' }] }],
+              usage: {
+                total_input_tokens: 100,
+                total_output_tokens: 20,
+                total_tokens: 120,
+              },
+            }),
+            { status: 200 }
+          );
+        }) as any;
+
+        try {
+          const mockEnv: WorkerEnv = {
+            GEMINI_API_KEY: 'test-gemini-key',
+          } as any;
+
+          await expect(
+            EvaluationLiveClient.invokeCandidate(
+              CANDIDATE_B_GEMINI,
+              {
+                taskType: 'LEAD_INTENT_CLASSIFICATION',
+                requestId: 'req-gem-lookalike',
+                organizationId: 'org-1',
+                businessId: 'biz-1',
+                dataClassification: 'PUBLIC_BUSINESS',
+                untrustedTextBlocks: ['Need demo now'],
+              },
+              mockEnv
+            )
+          ).rejects.toThrow('A12B2B_MODEL_SUBSTITUTION_DETECTED');
+        } finally {
+          global.fetch = originalFetch;
+        }
+      }
+    });
+
+    it('should enforce deterministic conservative input bound and fail closed without calling provider', async () => {
+      const originalFetch = global.fetch;
+      let fetchCalled = false;
+      global.fetch = (async () => {
+        fetchCalled = true;
+        return new Response('{}', { status: 200 });
+      }) as any;
+
+      try {
+        const mockEnv: WorkerEnv = {
+          GEMINI_API_KEY: 'test-gemini-key',
+          DEEPSEEK_API_KEY: 'test-ds-key',
+        } as any;
+
+        // Create an envelope with text block that exceeds 4000 bytes bound
+        const oversizedText = 'A'.repeat(4500);
+        await expect(
+          EvaluationLiveClient.invokeCandidate(
+            CANDIDATE_A_DEEPSEEK,
+            {
+              taskType: 'LEAD_INTENT_CLASSIFICATION',
+              requestId: 'req-oversized',
+              organizationId: 'org-1',
+              businessId: 'biz-1',
+              dataClassification: 'PUBLIC_BUSINESS',
+              untrustedTextBlocks: [oversizedText],
+            },
+            mockEnv
+          )
+        ).rejects.toThrow('A12B2B_INPUT_BOUND_EXCEEDED');
+
+        expect(fetchCalled).toBe(false);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
     it('should detect Gemini tier mismatch when standard tier is returned instead of flex', async () => {
       const originalFetch = global.fetch;
       global.fetch = (async () => {
@@ -575,7 +722,14 @@ describe('Phase A.12B.2B — Controlled Live Shadow Evaluation Specification & I
         expect(res.smokeResults).toBeDefined();
         expect(res.fullResults).toBeDefined();
         // Smoke results: 3 blocked + 3 smoke cases * 2 candidates = 9 records
-        expect(res.smokeResults!.length).toBeGreaterThan(0);
+        expect(res.smokeResults!.length).toBe(9);
+        const smokeCaseIds = res.smokeResults!
+          .filter((r) => r.securityDisposition === 'ELIGIBLE')
+          .map((r) => r.caseId);
+        expect(smokeCaseIds).toContain('eval_v1_lead_01');
+        expect(smokeCaseIds).toContain('eval_v1_lead_03_injection');
+        expect(smokeCaseIds).toContain('eval_v1_lead_06_insufficient');
+
         // Full results: 2 cases * 2 candidates * 2 replicates = 8 records
         expect(res.fullResults!.length).toBe(8);
 
@@ -595,12 +749,67 @@ describe('Phase A.12B.2B — Controlled Live Shadow Evaluation Specification & I
       }
     });
 
+    it('should halt with A12B2B_SMOKE_FIXTURE_INTEGRITY_FAILURE and zero calls if required smoke cases are missing', async () => {
+      let callCount = 0;
+      const originalFetch = global.fetch;
+      global.fetch = (async () => {
+        callCount++;
+        return new Response('{}', { status: 200 });
+      }) as any;
+
+      try {
+        const mockEnv: WorkerEnv = {
+          GEMINI_API_KEY: 'test-gemini-key',
+          DEEPSEEK_API_KEY: 'test-ds-key',
+        } as any;
+
+        // Mock dataset preparation missing required smoke cases
+        const originalPrepareBatch = EvaluationSecurityGate.prepareEvaluationBatch;
+        EvaluationSecurityGate.prepareEvaluationBatch = () => [
+          {
+            id: 'unrelated_case_01',
+            caseId: 'unrelated_case_01',
+            datasetVersion: 'v1',
+            promptVersion: '1.0.0',
+            taskType: 'LEAD_INTENT_CLASSIFICATION',
+            dataClassification: 'PUBLIC_BUSINESS',
+            disposition: 'ELIGIBLE',
+            expectedConstraints: {},
+            requestEnvelope: {
+              taskType: 'LEAD_INTENT_CLASSIFICATION',
+              requestId: 'req-1',
+              organizationId: 'org-1',
+              businessId: 'biz-1',
+              dataClassification: 'PUBLIC_BUSINESS',
+              untrustedTextBlocks: ['test'],
+            },
+          },
+        ];
+
+        try {
+          const offPeakDate = new Date('2026-08-31T12:00:00.000Z');
+          const res = await EvaluationLiveRunner.runControlledEvaluation({
+            env: mockEnv,
+            now: offPeakDate,
+          });
+
+          expect(res.status).toBe('ERROR');
+          expect(res.error).toContain('A12B2B_SMOKE_FIXTURE_INTEGRITY_FAILURE');
+          expect(callCount).toBe(0);
+        } finally {
+          EvaluationSecurityGate.prepareEvaluationBatch = originalPrepareBatch;
+        }
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
     it('should reject incomplete replicate protocol in summarizeCandidateResults', () => {
       const mockCandidate = CANDIDATE_A_DEEPSEEK;
       const incompleteResults: any[] = [
         {
           candidateId: mockCandidate.candidateId,
-          caseId: 'eval_v1_lead_01_standard',
+          caseId: 'eval_v1_lead_01',
           replicateIndex: 1,
           securityDisposition: 'ELIGIBLE',
           totalScoreBp: 8000,
@@ -623,6 +832,290 @@ describe('Phase A.12B.2B — Controlled Live Shadow Evaluation Specification & I
       expect(() =>
         EvaluationLiveRunner.summarizeCandidateResults(mockCandidate, incompleteResults)
       ).toThrow('A12B2B_INCOMPLETE_REPLICATE_PROTOCOL');
+    });
+  });
+
+  // ==========================================================================
+  // 11. STRICT MODEL IDENTITY & LOOKALIKE SUBSTITUTION REJECTION
+  // ==========================================================================
+  describe('11. Strict Model Identity & Substitution Rejection', () => {
+    it('should reject DeepSeek lookalikes and aliases with A12B2B_MODEL_SUBSTITUTION_DETECTED', async () => {
+      const originalFetch = global.fetch;
+      const lookalikes = [
+        'deepseek-chat',
+        'deepseek-reasoner',
+        'evil-deepseek-v4-flash-proxy',
+        'deepseek-v4-flash-pro',
+        'deepseek-coder',
+        'deepseek-v4-flash-chat',
+        'deepseek-v4',
+      ];
+
+      for (const returnedModel of lookalikes) {
+        global.fetch = (async () => {
+          return new Response(
+            JSON.stringify({
+              model: returnedModel,
+              choices: [{ message: { content: '{"primaryIntent":"HIGH_INTENT"}' } }],
+              usage: {
+                prompt_tokens: 100,
+                prompt_cache_hit_tokens: 50,
+                prompt_cache_miss_tokens: 50,
+                completion_tokens: 20,
+                total_tokens: 120,
+              },
+            }),
+            { status: 200 }
+          );
+        }) as any;
+
+        try {
+          await expect(
+            EvaluationLiveClient.invokeCandidate(
+              CANDIDATE_A_DEEPSEEK,
+              {
+                taskType: 'LEAD_INTENT_CLASSIFICATION',
+                requestId: 'req-1',
+                organizationId: 'org-1',
+                businessId: 'biz-1',
+                dataClassification: 'PUBLIC_BUSINESS',
+                untrustedTextBlocks: ['test'],
+              },
+              { DEEPSEEK_API_KEY: 'test-key' } as any
+            )
+          ).rejects.toThrow('A12B2B_MODEL_SUBSTITUTION_DETECTED');
+        } finally {
+          global.fetch = originalFetch;
+        }
+      }
+    });
+
+    it('should reject Gemini lookalikes and aliases with A12B2B_MODEL_SUBSTITUTION_DETECTED', async () => {
+      const originalFetch = global.fetch;
+      const lookalikes = [
+        'evil-gemini-3.5-flash-lite-proxy',
+        'gemini-3.5-flash-lite-other',
+        'gemini-3.5-flash',
+        'gemini-2.0-flash-lite',
+        'gemini-1.5-flash',
+      ];
+
+      for (const returnedModel of lookalikes) {
+        global.fetch = (async () => {
+          return new Response(
+            JSON.stringify({
+              model: returnedModel,
+              service_tier: 'flex',
+              steps: [{ type: 'output', content: [{ type: 'text', text: '{"primaryIntent":"HIGH_INTENT"}' }] }],
+              usage: {
+                total_input_tokens: 100,
+                total_output_tokens: 20,
+                total_tokens: 120,
+              },
+            }),
+            { status: 200 }
+          );
+        }) as any;
+
+        try {
+          await expect(
+            EvaluationLiveClient.invokeCandidate(
+              CANDIDATE_B_GEMINI,
+              {
+                taskType: 'LEAD_INTENT_CLASSIFICATION',
+                requestId: 'req-1',
+                organizationId: 'org-1',
+                businessId: 'biz-1',
+                dataClassification: 'PUBLIC_BUSINESS',
+                untrustedTextBlocks: ['test'],
+              },
+              { GEMINI_API_KEY: 'test-key' } as any
+            )
+          ).rejects.toThrow('A12B2B_MODEL_SUBSTITUTION_DETECTED');
+        } finally {
+          global.fetch = originalFetch;
+        }
+      }
+    });
+
+    it('should accept exact model identifiers and record providerModelVersion', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = (async (url: string) => {
+        if (String(url).includes('api.deepseek.com')) {
+          return new Response(
+            JSON.stringify({
+              model: 'deepseek-v4-flash',
+              system_fingerprint: 'fp_deepseek_v4_flash_202608',
+              choices: [{ message: { content: '{"primaryIntent":"HIGH_INTENT"}' } }],
+              usage: {
+                prompt_tokens: 100,
+                prompt_cache_hit_tokens: 50,
+                prompt_cache_miss_tokens: 50,
+                completion_tokens: 20,
+                total_tokens: 120,
+              },
+            }),
+            { status: 200 }
+          );
+        } else {
+          return new Response(
+            JSON.stringify({
+              model: 'gemini-3.5-flash-lite',
+              modelVersion: 'gemini-3.5-flash-lite-001',
+              service_tier: 'flex',
+              steps: [{ type: 'output', content: [{ type: 'text', text: '{"primaryIntent":"HIGH_INTENT"}' }] }],
+              usage: {
+                total_input_tokens: 100,
+                total_output_tokens: 20,
+                total_tokens: 120,
+              },
+            }),
+            { status: 200 }
+          );
+        }
+      }) as any;
+
+      try {
+        const dsRes = await EvaluationLiveClient.invokeCandidate(
+          CANDIDATE_A_DEEPSEEK,
+          {
+            taskType: 'LEAD_INTENT_CLASSIFICATION',
+            requestId: 'req-1',
+            organizationId: 'org-1',
+            businessId: 'biz-1',
+            dataClassification: 'PUBLIC_BUSINESS',
+            untrustedTextBlocks: ['test'],
+          },
+          { DEEPSEEK_API_KEY: 'test-key' } as any
+        );
+        expect(dsRes.returnedModelIdentifier).toBe('deepseek-v4-flash');
+        expect(dsRes.providerModelVersion).toBe('fp_deepseek_v4_flash_202608');
+
+        const gemRes = await EvaluationLiveClient.invokeCandidate(
+          CANDIDATE_B_GEMINI,
+          {
+            taskType: 'LEAD_INTENT_CLASSIFICATION',
+            requestId: 'req-1',
+            organizationId: 'org-1',
+            businessId: 'biz-1',
+            dataClassification: 'PUBLIC_BUSINESS',
+            untrustedTextBlocks: ['test'],
+          },
+          { GEMINI_API_KEY: 'test-key' } as any
+        );
+        expect(gemRes.returnedModelIdentifier).toBe('gemini-3.5-flash-lite');
+        expect(gemRes.providerModelVersion).toBe('gemini-3.5-flash-lite-001');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
+  // ==========================================================================
+  // 12. BYTE-BASED CONSERVATIVE INPUT BUDGET BOUNDS
+  // ==========================================================================
+  describe('12. Byte-based Conservative Input Budget Bounds', () => {
+    it('should calculate conservative input upper bound equal to exact UTF-8 byte length', () => {
+      const system = 'System prompt test';
+      const user = 'User prompt test with special characters: 🚀 $100';
+      const expectedBytes = Buffer.byteLength(system + '\n' + user, 'utf8');
+      const calculatedBound = EvaluationCostCalculator.calculateConservativeInputTokenUpperBound(system, user);
+
+      expect(calculatedBound).toBe(expectedBytes);
+      expect(calculatedBound).toBeGreaterThan(0);
+      expect(calculatedBound).toBeLessThan(A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND);
+    });
+
+    it('should correctly bound small canonical prompts without truncation or alteration', () => {
+      const preparedBatch = EvaluationSecurityGate.prepareEvaluationBatch(VELNAR_SHADOW_EVAL_V1);
+      const eligibleCases = preparedBatch.filter((b) => b.disposition === 'ELIGIBLE');
+
+      for (const c of eligibleCases) {
+        const promptDef = PromptRegistry.getPrompt(c.taskType);
+        const bound = EvaluationCostCalculator.calculateConservativeInputTokenUpperBound(
+          promptDef.systemPrompt,
+          promptDef.buildUserPrompt(c.requestEnvelope)
+        );
+        expect(bound).toBeGreaterThan(0);
+        expect(bound).toBeLessThanOrEqual(A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND);
+      }
+    });
+
+    it('should reserve larger worst-case cost for larger conservative input bound', () => {
+      const smallCost = EvaluationCostCalculator.calculateWorstCaseInvocationCostMicroUsd(
+        CANDIDATE_A_DEEPSEEK,
+        'OFF_PEAK',
+        200
+      );
+
+      const largeCost = EvaluationCostCalculator.calculateWorstCaseInvocationCostMicroUsd(
+        CANDIDATE_A_DEEPSEEK,
+        'OFF_PEAK',
+        1000
+      );
+
+      expect(largeCost).toBeGreaterThan(smallCost);
+    });
+
+    it('should assume 0 DeepSeek cache hits for conservative budget preflight', () => {
+      const inputBound = 1000;
+      const offPeakCost = EvaluationCostCalculator.calculateWorstCaseInvocationCostMicroUsd(
+        CANDIDATE_A_DEEPSEEK,
+        'OFF_PEAK',
+        inputBound
+      );
+
+      // Off-peak DeepSeek: cache miss input rate is $0.22 / 1M = 0.22 micro-USD per token (1000 * 0.22 = 220).
+      // Max output tokens = 2048 at $0.66 / 1M = 0.66 micro-USD per token (ceil(2048 * 0.66) = 1352).
+      // Expected: 220 + 1352 = 1572 micro-USD (0 cache hits).
+      expect(offPeakCost).toBe(1572);
+    });
+
+    it('should reject synthetic oversized prompt exceeding A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND with zero network calls', async () => {
+      let networkCalls = 0;
+      const originalFetch = global.fetch;
+      global.fetch = (async () => {
+        networkCalls++;
+        return new Response('{}', { status: 200 });
+      }) as any;
+
+      try {
+        const oversizedText = 'A'.repeat(A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND + 500);
+        await expect(
+          EvaluationLiveClient.invokeCandidate(
+            CANDIDATE_A_DEEPSEEK,
+            {
+              taskType: 'LEAD_INTENT_CLASSIFICATION',
+              requestId: 'req-oversized',
+              organizationId: 'org-1',
+              businessId: 'biz-1',
+              dataClassification: 'PUBLIC_BUSINESS',
+              untrustedTextBlocks: [oversizedText],
+            },
+            { DEEPSEEK_API_KEY: 'test-key' } as any
+          )
+        ).rejects.toThrow('A12B2B_INPUT_BOUND_EXCEEDED');
+
+        expect(networkCalls).toBe(0);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('should calculate worst-case protocol remaining spend using actual cases', () => {
+      const preparedBatch = EvaluationSecurityGate.prepareEvaluationBatch(VELNAR_SHADOW_EVAL_V1);
+      const eligibleCases = preparedBatch.filter((b) => b.disposition === 'ELIGIBLE');
+
+      const remainingSpend = EvaluationCostCalculator.calculateWorstCaseProtocolRemainingSpendMicroUsd({
+        candidates: [CANDIDATE_A_DEEPSEEK, CANDIDATE_B_GEMINI],
+        cases: eligibleCases,
+        replicatesCount: 2,
+        pricingWindow: 'OFF_PEAK',
+      });
+
+      expect(remainingSpend).toBeGreaterThan(0);
+      // Spend for 14 eligible cases * 2 candidates * 2 replicates = 56 invocations
+      expect(remainingSpend).toBeLessThan(A12B2B_BUDGET_CAP_MICRO_USD);
     });
   });
 });

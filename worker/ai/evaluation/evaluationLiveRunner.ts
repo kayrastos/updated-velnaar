@@ -19,6 +19,7 @@ import {
   CostOptimizationAnalysis,
   A12B2B_PRICING_CATALOG_VERSION,
   A12B2B_BUDGET_CAP_MICRO_USD,
+  A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND,
   PricingWindow,
 } from './evaluationLiveTypes';
 import { EvaluationCostCalculator, DEEPSEEK_V4_FLASH_PRICING, GEMINI_35_FLASH_LITE_PRICING } from './evaluationCostCalculator';
@@ -206,14 +207,25 @@ export class EvaluationLiveRunner {
     // ========================================================================
     // STATE 2: LIVE_SMOKE
     // ========================================================================
-    const smokeCases: PreparedEvaluationCase[] = [];
-    const standardCase = eligibleCases.find((c) => c.id === 'eval_v1_lead_01_standard') || eligibleCases[0];
-    const injectionCase = eligibleCases.find((c) => c.id === 'eval_v1_lead_03_injection_bypass');
-    const insufficientCase = eligibleCases.find((c) => c.id === 'eval_v1_lead_02_insufficient_evidence');
+    const normalCase = eligibleCases.find((c) => c.id === 'eval_v1_lead_01');
+    const injectionCase = eligibleCases.find((c) => c.id === 'eval_v1_lead_03_injection');
+    const insufficientCase = eligibleCases.find((c) => c.id === 'eval_v1_lead_06_insufficient');
 
-    if (standardCase) smokeCases.push(standardCase);
-    if (injectionCase) smokeCases.push(injectionCase);
-    if (insufficientCase) smokeCases.push(insufficientCase);
+    if (!normalCase || !injectionCase || !insufficientCase) {
+      return {
+        ...baseOutput,
+        status: 'ERROR',
+        state: 'PRECHECK',
+        cumulativeSpendMicroUsd: 0,
+        smokeResults: [],
+        fullResults: [],
+        allResults: [],
+        allPaidInvocations: [],
+        error: `A12B2B_SMOKE_FIXTURE_INTEGRITY_FAILURE: Required canonical smoke fixture cases missing (normal=${!!normalCase}, injection=${!!injectionCase}, insufficient=${!!insufficientCase})`,
+      } as ControlledEvaluationOutput;
+    }
+
+    const smokeCases: PreparedEvaluationCase[] = [normalCase, injectionCase, insufficientCase];
 
     // Verify blocked cases produce ZERO network calls
     for (const blocked of blockedCases) {
@@ -224,11 +236,33 @@ export class EvaluationLiveRunner {
       const pCase = smokeCases[cIdx];
       const orderedCandidates = this.getCandidateOrder(this.CANDIDATES, cIdx, 1);
 
+      // Pre-invocation exact input bound verification
+      const promptDef = PromptRegistry.getPrompt(pCase.taskType);
+      const inputUpperBound = EvaluationCostCalculator.calculateConservativeInputTokenUpperBound(
+        promptDef.systemPrompt,
+        promptDef.buildUserPrompt(pCase.requestEnvelope)
+      );
+
+      if (inputUpperBound > A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND) {
+        return {
+          ...baseOutput,
+          status: 'ERROR',
+          state: 'LIVE_SMOKE',
+          cumulativeSpendMicroUsd,
+          smokeResults,
+          fullResults: [],
+          allResults: smokeResults,
+          allPaidInvocations: smokeResults.filter((r) => r.securityDisposition === 'ELIGIBLE'),
+          error: `A12B2B_INPUT_BOUND_EXCEEDED: Smoke case ${pCase.id} input size (${inputUpperBound} bytes) exceeds supported limit (${A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND} bytes)`,
+        } as ControlledEvaluationOutput;
+      }
+
       for (const candidate of orderedCandidates) {
         // Deterministic provider-specific worst-case upper bound check before invocation
         const nextWorstCase = EvaluationCostCalculator.calculateWorstCaseInvocationCostMicroUsd(
           candidate,
-          currentPricingWindow
+          currentPricingWindow,
+          inputUpperBound
         );
 
         if (cumulativeSpendMicroUsd + nextWorstCase > A12B2B_BUDGET_CAP_MICRO_USD) {
@@ -292,13 +326,28 @@ export class EvaluationLiveRunner {
     // ========================================================================
     const casesToRun = options.maxCases ? eligibleCases.slice(0, options.maxCases) : eligibleCases;
 
-    // Full-protocol budget preflight: calculate conservative upper-bound spend for entire remaining full run
-    const remainingWorstCaseSpend = EvaluationCostCalculator.calculateWorstCaseProtocolRemainingSpendMicroUsd({
-      candidates: this.CANDIDATES,
-      eligibleCasesCount: casesToRun.length,
-      replicatesCount: 2,
-      pricingWindow: currentPricingWindow,
-    });
+    // Full-protocol budget preflight: calculate conservative upper-bound spend for entire remaining full run using actual per-case bounds
+    let remainingWorstCaseSpend = 0;
+    try {
+      remainingWorstCaseSpend = EvaluationCostCalculator.calculateWorstCaseProtocolRemainingSpendMicroUsd({
+        candidates: this.CANDIDATES,
+        cases: casesToRun,
+        replicatesCount: 2,
+        pricingWindow: currentPricingWindow,
+      });
+    } catch (err: any) {
+      return {
+        ...baseOutput,
+        status: 'ERROR',
+        state: 'FULL_RUN',
+        cumulativeSpendMicroUsd,
+        smokeResults,
+        fullResults: [],
+        allResults: smokeResults,
+        allPaidInvocations: smokeResults.filter((r) => r.securityDisposition === 'ELIGIBLE'),
+        error: err.message,
+      } as ControlledEvaluationOutput;
+    }
 
     if (cumulativeSpendMicroUsd + remainingWorstCaseSpend > A12B2B_BUDGET_CAP_MICRO_USD) {
       return {
@@ -319,11 +368,35 @@ export class EvaluationLiveRunner {
         const pCase = casesToRun[caseIndex];
         const orderedCandidates = this.getCandidateOrder(this.CANDIDATES, caseIndex, replicateIndex);
 
+        const promptDef = PromptRegistry.getPrompt(pCase.taskType);
+        const inputUpperBound = EvaluationCostCalculator.calculateConservativeInputTokenUpperBound(
+          promptDef.systemPrompt,
+          promptDef.buildUserPrompt(pCase.requestEnvelope)
+        );
+
+        if (inputUpperBound > A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND) {
+          return {
+            ...baseOutput,
+            status: 'ERROR',
+            state: 'FULL_RUN',
+            cumulativeSpendMicroUsd,
+            smokeResults,
+            fullResults,
+            allResults: [...smokeResults, ...fullResults],
+            allPaidInvocations: [
+              ...smokeResults.filter((r) => r.securityDisposition === 'ELIGIBLE'),
+              ...fullResults,
+            ],
+            error: `A12B2B_INPUT_BOUND_EXCEEDED: Case ${pCase.id} input size (${inputUpperBound} bytes) exceeds supported limit (${A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND} bytes)`,
+          } as ControlledEvaluationOutput;
+        }
+
         for (const candidate of orderedCandidates) {
-          // Per-invocation deterministic worst-case upper bound check
+          // Per-invocation deterministic worst-case upper bound check with actual input bound
           const nextInvocationWorstCase = EvaluationCostCalculator.calculateWorstCaseInvocationCostMicroUsd(
             candidate,
-            currentPricingWindow
+            currentPricingWindow,
+            inputUpperBound
           );
 
           if (cumulativeSpendMicroUsd + nextInvocationWorstCase > A12B2B_BUDGET_CAP_MICRO_USD) {
@@ -448,6 +521,10 @@ export class EvaluationLiveRunner {
     // Snapshot prompt version BEFORE invocation
     const promptDef = PromptRegistry.getPrompt(preparedCase.taskType);
     const promptVersion = promptDef.version;
+    const conservativeInputTokenUpperBound = EvaluationCostCalculator.calculateConservativeInputTokenUpperBound(
+      promptDef.systemPrompt,
+      promptDef.buildUserPrompt(preparedCase.requestEnvelope)
+    );
 
     let invocationResult: LiveProviderInvocationResult | null = null;
     let providerErrorCategory: string | undefined;
@@ -514,6 +591,11 @@ export class EvaluationLiveRunner {
         normalizedCostMicroUsd = cost.normalizedStandardCostMicroUsd;
       }
 
+      const conservativeInputTokenUpperBound = EvaluationCostCalculator.calculateConservativeInputTokenUpperBound(
+        promptDef.systemPrompt,
+        promptDef.buildUserPrompt(preparedCase.requestEnvelope)
+      );
+
       return {
         runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
         datasetVersion: preparedCase.datasetVersion,
@@ -527,6 +609,8 @@ export class EvaluationLiveRunner {
         providerId: candidate.providerId,
         requestedModelIdentifier: candidate.requestedModelIdentifier,
         returnedModelIdentifier: invocationResult.returnedModelIdentifier,
+        providerModelVersion: invocationResult.providerModelVersion,
+        conservativeInputTokenUpperBound,
         serviceProfile: candidate.serviceProfile,
         thinkingEffort: candidate.thinkingEffort,
         promptVersion,
@@ -572,6 +656,7 @@ export class EvaluationLiveRunner {
         providerId: candidate.providerId,
         requestedModelIdentifier: candidate.requestedModelIdentifier,
         returnedModelIdentifier: 'UNKNOWN',
+        conservativeInputTokenUpperBound,
         serviceProfile: candidate.serviceProfile,
         thinkingEffort: candidate.thinkingEffort,
         promptVersion,

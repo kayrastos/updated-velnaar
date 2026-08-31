@@ -7,12 +7,15 @@ import {
   A12B2B_PRICING_CATALOG_VERSION,
   A12B2B_MAX_OUTPUT_TOKENS_BOUND,
   A12B2B_WORST_CASE_INPUT_TOKENS_BOUND,
+  A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND,
   DeepSeekPricingRate,
   GeminiPricingRate,
   LiveCandidateConfig,
   PricingWindow,
   UsageSource,
 } from './evaluationLiveTypes';
+import { PromptRegistry } from '../promptRegistry';
+import { PreparedEvaluationCase } from './types';
 
 /**
  * Official verified rates (snapshot: 2026-08-31)
@@ -188,6 +191,20 @@ export class EvaluationCostCalculator {
   }
 
   /**
+   * Calculates a deterministic conservative upper bound on input tokens for a prompt.
+   * Uses exact UTF-8 byte length of (systemPrompt + '\n' + userPrompt).
+   * Since any valid tokenizer assigns >= 1 byte per token, UTF-8 byte length
+   * is mathematically guaranteed to be >= actual token count.
+   */
+  public static calculateConservativeInputTokenUpperBound(
+    systemPrompt: string,
+    userPrompt: string
+  ): number {
+    const combined = `${systemPrompt}\n${userPrompt}`;
+    return Buffer.byteLength(combined, 'utf8');
+  }
+
+  /**
    * Calculates deterministic provider-specific worst-case upper bound invocation cost in integer microUSD.
    * Assumes 100% cache-miss for DeepSeek (0 cache hit) and maximum bounded output generation.
    */
@@ -232,18 +249,50 @@ export class EvaluationCostCalculator {
 
   /**
    * Calculates conservative upper-bound spend for the entire remaining full protocol.
+   * When `cases` is provided, computes exact conservative per-request bounds for every case.
    */
   public static calculateWorstCaseProtocolRemainingSpendMicroUsd(params: {
     candidates: LiveCandidateConfig[];
-    eligibleCasesCount: number;
+    eligibleCasesCount?: number;
+    cases?: PreparedEvaluationCase[];
     replicatesCount: number;
     pricingWindow: PricingWindow;
     estimatedInputTokens?: number;
     maxOutputTokens?: number;
   }): number {
-    const { candidates, eligibleCasesCount, replicatesCount, pricingWindow } = params;
+    const { candidates, cases, replicatesCount, pricingWindow, maxOutputTokens } = params;
     let totalWorstCaseSpend = 0;
 
+    if (cases && cases.length > 0) {
+      for (const pCase of cases) {
+        const promptDef = PromptRegistry.getPrompt(pCase.taskType);
+        const systemPrompt = promptDef.systemPrompt;
+        const userPrompt = promptDef.buildUserPrompt(pCase.requestEnvelope);
+        const conservativeInputTokens = this.calculateConservativeInputTokenUpperBound(
+          systemPrompt,
+          userPrompt
+        );
+
+        if (conservativeInputTokens > A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND) {
+          throw new Error(
+            `A12B2B_INPUT_BOUND_EXCEEDED: Case ${pCase.id} input bound (${conservativeInputTokens} bytes) exceeds supported certification bound (${A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND} tokens)`
+          );
+        }
+
+        for (const candidate of candidates) {
+          const perInvocationWorstCase = this.calculateWorstCaseInvocationCostMicroUsd(
+            candidate,
+            pricingWindow,
+            conservativeInputTokens,
+            maxOutputTokens
+          );
+          totalWorstCaseSpend += perInvocationWorstCase * replicatesCount;
+        }
+      }
+      return totalWorstCaseSpend;
+    }
+
+    const count = params.eligibleCasesCount || 0;
     for (const candidate of candidates) {
       const perInvocationWorstCase = this.calculateWorstCaseInvocationCostMicroUsd(
         candidate,
@@ -251,7 +300,7 @@ export class EvaluationCostCalculator {
         params.estimatedInputTokens,
         params.maxOutputTokens
       );
-      totalWorstCaseSpend += perInvocationWorstCase * eligibleCasesCount * replicatesCount;
+      totalWorstCaseSpend += perInvocationWorstCase * count * replicatesCount;
     }
 
     return totalWorstCaseSpend;

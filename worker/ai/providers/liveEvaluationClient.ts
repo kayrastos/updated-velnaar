@@ -10,6 +10,7 @@ import {
   LiveCandidateConfig,
   UsageSource,
   A12B2B_MAX_OUTPUT_TOKENS_BOUND,
+  A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND,
 } from '../evaluation/evaluationLiveTypes';
 import { EvaluationCostCalculator } from '../evaluation/evaluationCostCalculator';
 import * as crypto from 'crypto';
@@ -41,6 +42,7 @@ export interface LiveProviderInvocationResult {
   providerId: 'gemini' | 'deepseek';
   requestedModelIdentifier: string;
   returnedModelIdentifier: string;
+  providerModelVersion?: string;
   content: string;
   rawTextHash: string;
   promptTokens: number;
@@ -97,6 +99,21 @@ export class EvaluationLiveClient {
     const promptDef = PromptRegistry.getPrompt(envelope.taskType);
     const systemPrompt = promptDef.systemPrompt;
     const userPrompt = promptDef.buildUserPrompt(envelope);
+
+    const conservativeInputTokens = EvaluationCostCalculator.calculateConservativeInputTokenUpperBound(
+      systemPrompt,
+      userPrompt
+    );
+
+    if (conservativeInputTokens > A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND) {
+      throw new LiveProviderInvocationError({
+        providerId: config.providerId as any,
+        attemptCount: 0,
+        latencyMs: 0,
+        errorCategory: 'A12B2B_INPUT_BOUND_EXCEEDED',
+        message: `A12B2B_INPUT_BOUND_EXCEEDED: Prompt size (${conservativeInputTokens} bytes) exceeds supported certification bound (${A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND} tokens)`,
+      });
+    }
 
     if (config.providerId === 'deepseek') {
       return this.invokeDeepSeekWithRetry(config, { system: systemPrompt, user: userPrompt }, env);
@@ -174,15 +191,16 @@ export class EvaluationLiveClient {
 
         const json: any = await res.json();
 
-        // Model identity check - strictly deepseek-v4-flash only
+        // Model identity check - strictly exact match to config.requestedModelIdentifier ("deepseek-v4-flash")
         const returnedModel = json.model;
-        if (!returnedModel || !returnedModel.toLowerCase().includes('deepseek-v4-flash')) {
+        const providerModelVersion = json.system_fingerprint || json.model_version || json.modelVersion;
+        if (returnedModel !== config.requestedModelIdentifier) {
           throw new LiveProviderInvocationError({
             providerId: 'deepseek',
             attemptCount,
             latencyMs,
             errorCategory: 'A12B2B_MODEL_SUBSTITUTION_DETECTED',
-            message: `A12B2B_MODEL_SUBSTITUTION_DETECTED: Returned model ${returnedModel || 'UNKNOWN'} does not match requested ${config.requestedModelIdentifier}`,
+            message: `A12B2B_MODEL_SUBSTITUTION_DETECTED: Returned model "${returnedModel || 'UNKNOWN'}" does not exactly match requested "${config.requestedModelIdentifier}"`,
           });
         }
 
@@ -234,6 +252,7 @@ export class EvaluationLiveClient {
           providerId: 'deepseek',
           requestedModelIdentifier: config.requestedModelIdentifier,
           returnedModelIdentifier: returnedModel,
+          providerModelVersion,
           content,
           rawTextHash,
           promptTokens,
@@ -375,15 +394,16 @@ export class EvaluationLiveClient {
           });
         }
 
-        // 2. Model identity check
-        const returnedModel = json.model || json.modelVersion;
-        if (!returnedModel || !returnedModel.toLowerCase().includes('gemini-3.5-flash-lite')) {
+        // 2. Model identity check - strictly exact match to config.requestedModelIdentifier ("gemini-3.5-flash-lite")
+        const returnedModel = json.model;
+        const providerModelVersion = json.modelVersion || json.system_fingerprint || json.model_version;
+        if (returnedModel !== config.requestedModelIdentifier) {
           throw new LiveProviderInvocationError({
             providerId: 'gemini',
             attemptCount,
             latencyMs,
             errorCategory: 'A12B2B_MODEL_SUBSTITUTION_DETECTED',
-            message: `A12B2B_MODEL_SUBSTITUTION_DETECTED: Returned model ${returnedModel || 'UNKNOWN'} does not match requested ${config.requestedModelIdentifier}`,
+            message: `A12B2B_MODEL_SUBSTITUTION_DETECTED: Returned model "${returnedModel || 'UNKNOWN'}" does not exactly match requested "${config.requestedModelIdentifier}"`,
           });
         }
 
@@ -449,6 +469,7 @@ export class EvaluationLiveClient {
           providerId: 'gemini',
           requestedModelIdentifier: config.requestedModelIdentifier,
           returnedModelIdentifier: returnedModel,
+          providerModelVersion,
           serviceTier: returnedTier,
           cacheStatus,
           content,
