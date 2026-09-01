@@ -768,17 +768,27 @@ describe('Phase A.12B.2C-2B: Certified Provider Parity & Contract Suite', () => 
       const offPeakDate = new Date('2026-09-01T00:30:00Z');
       expect(DeepSeekCertifiedProvider.getPricingCertificationStatus(offPeakDate)).toBe('OFF_PEAK_CERTIFIED');
 
-      // 02:00 UTC is peak (01:00-04:00 UTC)
+      // 02:00 UTC is peak on weekday (01:00-04:00 UTC)
       const peakDate1 = new Date('2026-09-01T02:00:00Z');
       expect(DeepSeekCertifiedProvider.getPricingCertificationStatus(peakDate1)).toBe('PEAK_NOT_CERTIFIED_FOR_ROUTING_DECISION');
 
-      // 07:00 UTC is peak (06:00-10:00 UTC)
+      // 07:00 UTC is peak on weekday (06:00-10:00 UTC)
       const peakDate2 = new Date('2026-09-01T07:00:00Z');
       expect(DeepSeekCertifiedProvider.getPricingCertificationStatus(peakDate2)).toBe('PEAK_NOT_CERTIFIED_FOR_ROUTING_DECISION');
 
       // 12:00 UTC is off-peak
       const offPeakDate2 = new Date('2026-09-01T12:00:00Z');
       expect(DeepSeekCertifiedProvider.getPricingCertificationStatus(offPeakDate2)).toBe('OFF_PEAK_CERTIFIED');
+    });
+
+    it('returns OFF_PEAK_CERTIFIED on weekends even during weekday peak clock windows (e.g. 2026-09-05T02:00:00Z)', () => {
+      // 2026-09-05 is a Saturday. 02:00 UTC would be peak on weekdays, but all weekend UTC hours are off-peak
+      const weekendSaturday = new Date('2026-09-05T02:00:00Z');
+      expect(DeepSeekCertifiedProvider.getPricingCertificationStatus(weekendSaturday)).toBe('OFF_PEAK_CERTIFIED');
+
+      // 2026-09-06 is a Sunday. 07:00 UTC would be peak on weekdays, but all weekend UTC hours are off-peak
+      const weekendSunday = new Date('2026-09-06T07:00:00Z');
+      expect(DeepSeekCertifiedProvider.getPricingCertificationStatus(weekendSunday)).toBe('OFF_PEAK_CERTIFIED');
     });
   });
 

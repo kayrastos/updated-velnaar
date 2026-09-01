@@ -89,14 +89,21 @@ Phase `A.12B.2C-2B` constructs the dormant, hardened certified provider adapters
 ## 4. Verification & Validation Metrics
 
 - **Parity Test Suite (`tests/ai/phaseA12B2CCertifiedProviderParity.test.ts`):**
-  - Total Tests: 24 / 24 passed (100%).
+  - Total Tests: 25 / 25 passed (100%).
+  - weekend DeepSeek pricing certification regression = PASS
   - Zero live network calls executed.
-- **Full Vitest System Suite:**
-  - Test Suites: 32 / 32 passed (100%).
-  - Total Tests: 572 / 572 passed (100%).
-  - Failed / Todo / Skipped: 0.
-- **TypeScript Typecheck (`npm run typecheck`):** Clean (0 errors).
-- **Production Build (`npm run build`):** Clean (0 errors).
+- **Full Vitest System Suite (`execution/a12b2c2b_vitest_summary.json`):**
+  - Total Test Suites: 186 / 186 passed (100%).
+  - Total Tests: 573 / 573 passed (100%).
+  - Failed Test Files: 0.
+  - Failed Tests: 0.
+  - Pending / Todo Tests: 0.
+- **Provider Calls:**
+  - Real Provider API Calls: 0 (Zero DeepSeek, Zero Gemini, Zero Kimi, Zero Fulgor).
+- **TypeScript Typecheck (`npm run typecheck`):**
+  - Exit Code: 0 (0 errors).
+- **Production Build (`npm run build`):**
+  - Exit Code: 0 (0 errors).
 
 ---
 
