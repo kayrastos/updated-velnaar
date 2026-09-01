@@ -1,0 +1,368 @@
+{
+  "summaries": {
+    "deepseek-v4-flash-offpeak-low": {
+      "candidateId": "deepseek-v4-flash-offpeak-low",
+      "providerId": "deepseek",
+      "requestedModelIdentifier": "deepseek-v4-flash",
+      "serviceProfile": "OFF_PEAK_COST_OPTIMIZED",
+      "totalInvocations": 66,
+      "successfulInvocations": 66,
+      "providerErrors": 0,
+      "validJsonRateBps": 9848,
+      "providerSuccessRateBps": 10000,
+      "passRateBps": 9091,
+      "hardFailRateBps": 909,
+      "meanScoreBps": 9402,
+      "medianScoreBps": 10000,
+      "p50LatencyMs": 286,
+      "p95LatencyMs": 319,
+      "minLatencyMs": 264,
+      "maxLatencyMs": 388,
+      "meanLatencyMs": 290,
+      "totalPromptTokens": 34816,
+      "totalCacheHitTokens": 29696,
+      "totalCacheMissTokens": 5120,
+      "totalCompletionTokens": 32746,
+      "totalThinkingTokens": 23026,
+      "totalTokens": 67562,
+      "cacheHitRatioBps": 8529,
+      "actualTotalCostMicroUsd": 22951,
+      "normalizedTotalCostMicroUsd": 29275,
+      "costPerPassingCaseMicroUsd": 383,
+      "unstableCaseCount": 3,
+      "instabilityRateBps": 909,
+      "perTaskBreakdown": {
+        "LEAD_INTENT_CLASSIFICATION": {
+          "casesTotal": 10,
+          "casesPassed": 10,
+          "hardFails": 0,
+          "passRateBps": 10000,
+          "meanScoreBps": 9230,
+          "medianScoreBps": 8950,
+          "p50LatencyMs": 283,
+          "p95LatencyMs": 343,
+          "actualCostMicroUsd": 2359,
+          "normalizedCostMicroUsd": 3179
+        },
+        "LEAK_EXPLANATION": {
+          "casesTotal": 10,
+          "casesPassed": 10,
+          "hardFails": 0,
+          "passRateBps": 10000,
+          "meanScoreBps": 9600,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 282,
+          "p95LatencyMs": 342,
+          "actualCostMicroUsd": 2936,
+          "normalizedCostMicroUsd": 4026
+        },
+        "GROWTH_ACTION_DRAFT": {
+          "casesTotal": 12,
+          "casesPassed": 12,
+          "hardFails": 0,
+          "passRateBps": 10000,
+          "meanScoreBps": 9767,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 283,
+          "p95LatencyMs": 293,
+          "actualCostMicroUsd": 7172,
+          "normalizedCostMicroUsd": 8808
+        },
+        "BUSINESS_TWIN_SUMMARY": {
+          "casesTotal": 8,
+          "casesPassed": 6,
+          "hardFails": 2,
+          "passRateBps": 7500,
+          "meanScoreBps": 9000,
+          "medianScoreBps": 9300,
+          "p50LatencyMs": 297,
+          "p95LatencyMs": 303,
+          "actualCostMicroUsd": 3610,
+          "normalizedCostMicroUsd": 4264
+        },
+        "FUNNEL_DIAGNOSTIC_EXPLANATION": {
+          "casesTotal": 10,
+          "casesPassed": 9,
+          "hardFails": 1,
+          "passRateBps": 9000,
+          "meanScoreBps": 9680,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 283,
+          "p95LatencyMs": 295,
+          "actualCostMicroUsd": 2937,
+          "normalizedCostMicroUsd": 3755
+        },
+        "SEO_CONTENT_SUGGESTION": {
+          "casesTotal": 8,
+          "casesPassed": 6,
+          "hardFails": 2,
+          "passRateBps": 7500,
+          "meanScoreBps": 8825,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 307,
+          "p95LatencyMs": 365,
+          "actualCostMicroUsd": 2414,
+          "normalizedCostMicroUsd": 3068
+        },
+        "ANOMALY_TRIAGE": {
+          "casesTotal": 8,
+          "casesPassed": 7,
+          "hardFails": 1,
+          "passRateBps": 8750,
+          "meanScoreBps": 9450,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 277,
+          "p95LatencyMs": 304,
+          "actualCostMicroUsd": 1523,
+          "normalizedCostMicroUsd": 2175
+        }
+      }
+    },
+    "gemini-3.5-flash-lite-flex-low": {
+      "candidateId": "gemini-3.5-flash-lite-flex-low",
+      "providerId": "gemini",
+      "requestedModelIdentifier": "gemini-3.5-flash-lite",
+      "serviceProfile": "FLEX_COST_OPTIMIZED",
+      "totalInvocations": 66,
+      "successfulInvocations": 66,
+      "providerErrors": 0,
+      "validJsonRateBps": 9394,
+      "providerSuccessRateBps": 10000,
+      "passRateBps": 8636,
+      "hardFailRateBps": 1364,
+      "meanScoreBps": 9361,
+      "medianScoreBps": 10000,
+      "p50LatencyMs": 2468,
+      "p95LatencyMs": 4523,
+      "minLatencyMs": 1956,
+      "maxLatencyMs": 9165,
+      "meanLatencyMs": 2882,
+      "totalPromptTokens": 32304,
+      "totalCacheHitTokens": 0,
+      "totalCacheMissTokens": 32304,
+      "totalCompletionTokens": 7878,
+      "totalThinkingTokens": 6265,
+      "totalTokens": 46447,
+      "cacheHitRatioBps": 0,
+      "actualTotalCostMicroUsd": 22540,
+      "normalizedTotalCostMicroUsd": 45068,
+      "costPerPassingCaseMicroUsd": 395,
+      "unstableCaseCount": 1,
+      "instabilityRateBps": 303,
+      "perTaskBreakdown": {
+        "LEAD_INTENT_CLASSIFICATION": {
+          "casesTotal": 10,
+          "casesPassed": 10,
+          "hardFails": 0,
+          "passRateBps": 10000,
+          "meanScoreBps": 9510,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 2255,
+          "p95LatencyMs": 3483,
+          "actualCostMicroUsd": 2181,
+          "normalizedCostMicroUsd": 4363
+        },
+        "LEAK_EXPLANATION": {
+          "casesTotal": 10,
+          "casesPassed": 10,
+          "hardFails": 0,
+          "passRateBps": 10000,
+          "meanScoreBps": 9800,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 2422,
+          "p95LatencyMs": 2516,
+          "actualCostMicroUsd": 2470,
+          "normalizedCostMicroUsd": 4940
+        },
+        "GROWTH_ACTION_DRAFT": {
+          "casesTotal": 12,
+          "casesPassed": 12,
+          "hardFails": 0,
+          "passRateBps": 10000,
+          "meanScoreBps": 9883,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 3114,
+          "p95LatencyMs": 7995,
+          "actualCostMicroUsd": 6842,
+          "normalizedCostMicroUsd": 13685
+        },
+        "BUSINESS_TWIN_SUMMARY": {
+          "casesTotal": 8,
+          "casesPassed": 6,
+          "hardFails": 2,
+          "passRateBps": 7500,
+          "meanScoreBps": 9038,
+          "medianScoreBps": 8850,
+          "p50LatencyMs": 3491,
+          "p95LatencyMs": 4040,
+          "actualCostMicroUsd": 5268,
+          "normalizedCostMicroUsd": 10533
+        },
+        "FUNNEL_DIAGNOSTIC_EXPLANATION": {
+          "casesTotal": 10,
+          "casesPassed": 6,
+          "hardFails": 4,
+          "passRateBps": 6000,
+          "meanScoreBps": 8900,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 2241,
+          "p95LatencyMs": 2620,
+          "actualCostMicroUsd": 1704,
+          "normalizedCostMicroUsd": 3403
+        },
+        "SEO_CONTENT_SUGGESTION": {
+          "casesTotal": 8,
+          "casesPassed": 6,
+          "hardFails": 2,
+          "passRateBps": 7500,
+          "meanScoreBps": 8650,
+          "medianScoreBps": 9300,
+          "p50LatencyMs": 2357,
+          "p95LatencyMs": 2683,
+          "actualCostMicroUsd": 1326,
+          "normalizedCostMicroUsd": 2648
+        },
+        "ANOMALY_TRIAGE": {
+          "casesTotal": 8,
+          "casesPassed": 7,
+          "hardFails": 1,
+          "passRateBps": 8750,
+          "meanScoreBps": 9450,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 2591,
+          "p95LatencyMs": 3510,
+          "actualCostMicroUsd": 2749,
+          "normalizedCostMicroUsd": 5496
+        }
+      }
+    }
+  },
+  "replicateAnalysis": {
+    "deepseek-v4-flash-offpeak-low": {
+      "candidateId": "deepseek-v4-flash-offpeak-low",
+      "totalCasesEvaluated": 33,
+      "completePairsCount": 33,
+      "passDisagreementCount": 2,
+      "passDisagreementRateBps": 606,
+      "hardFailDisagreementCount": 2,
+      "hardFailDisagreementRateBps": 606,
+      "medianScoreDeltaBps": 0,
+      "maxScoreDeltaBps": 4000,
+      "unstableCasesCount": 3,
+      "unstableCases": [
+        {
+          "caseId": "eval_v1_funnel_04_insufficient",
+          "rep1Score": 8000,
+          "rep2Score": 10000,
+          "scoreDelta": 2000,
+          "rep1Passed": false,
+          "rep2Passed": true,
+          "rep1HardFail": true,
+          "rep2HardFail": false,
+          "rep1HardFailReasons": [
+            "INSUFFICIENT_EVIDENCE_FABRICATION"
+          ],
+          "rep2HardFailReasons": []
+        },
+        {
+          "caseId": "eval_v1_seo_04_insufficient",
+          "rep1Score": 4000,
+          "rep2Score": 8000,
+          "scoreDelta": 4000,
+          "rep1Passed": false,
+          "rep2Passed": false,
+          "rep1HardFail": true,
+          "rep2HardFail": true,
+          "rep1HardFailReasons": [
+            "INVALID_OUTPUT_SCHEMA",
+            "INSUFFICIENT_EVIDENCE_FABRICATION"
+          ],
+          "rep2HardFailReasons": [
+            "INSUFFICIENT_EVIDENCE_FABRICATION"
+          ]
+        },
+        {
+          "caseId": "eval_v1_anomaly_04_insufficient",
+          "rep1Score": 10000,
+          "rep2Score": 8000,
+          "scoreDelta": 2000,
+          "rep1Passed": true,
+          "rep2Passed": false,
+          "rep1HardFail": false,
+          "rep2HardFail": true,
+          "rep1HardFailReasons": [],
+          "rep2HardFailReasons": [
+            "INSUFFICIENT_EVIDENCE_FABRICATION"
+          ]
+        }
+      ]
+    },
+    "gemini-3.5-flash-lite-flex-low": {
+      "candidateId": "gemini-3.5-flash-lite-flex-low",
+      "totalCasesEvaluated": 33,
+      "completePairsCount": 33,
+      "passDisagreementCount": 1,
+      "passDisagreementRateBps": 303,
+      "hardFailDisagreementCount": 1,
+      "hardFailDisagreementRateBps": 303,
+      "medianScoreDeltaBps": 0,
+      "maxScoreDeltaBps": 2000,
+      "unstableCasesCount": 1,
+      "unstableCases": [
+        {
+          "caseId": "eval_v1_anomaly_04_insufficient",
+          "rep1Score": 10000,
+          "rep2Score": 8000,
+          "scoreDelta": 2000,
+          "rep1Passed": true,
+          "rep2Passed": false,
+          "rep1HardFail": false,
+          "rep2HardFail": true,
+          "rep1HardFailReasons": [],
+          "rep2HardFailReasons": [
+            "INSUFFICIENT_EVIDENCE_FABRICATION"
+          ]
+        }
+      ]
+    }
+  },
+  "paretoAnalysis": {
+    "dimensions": {
+      "qualityMeanScoreBps": {
+        "deepseek": 9402,
+        "gemini": 9361,
+        "leader": "deepseek"
+      },
+      "passRateBps": {
+        "deepseek": 9091,
+        "gemini": 8636,
+        "leader": "deepseek"
+      },
+      "hardFailRateBps": {
+        "deepseek": 909,
+        "gemini": 1364,
+        "leader": "deepseek"
+      },
+      "p50LatencyMs": {
+        "deepseek": 286,
+        "gemini": 2468,
+        "leader": "deepseek"
+      },
+      "actualCostMicroUsd": {
+        "deepseek": 22951,
+        "gemini": 22540,
+        "leader": "gemini"
+      },
+      "replicateInstabilityRateBps": {
+        "deepseek": 909,
+        "gemini": 303,
+        "leader": "gemini"
+      }
+    },
+    "frontierClassification": {
+      "deepseek": "PARETO_FRONTIER",
+      "gemini": "PARETO_FRONTIER",
+      "note": "Both candidates inhabit distinct positions on the Pareto trade-off surface (DeepSeek excels on pass rate, latency, and cache efficiency; Gemini offers alternative token cost and architecture dynamics). Final production routing remains sealed pending independent audit."
+    }
+  }
+}
