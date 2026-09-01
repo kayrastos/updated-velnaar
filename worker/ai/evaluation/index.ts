@@ -12,3 +12,4 @@ export * from './evaluationFixtures';
 export * from './evaluationLiveTypes';
 export * from './evaluationCostCalculator';
 export * from './evaluationLiveRunner';
+export * from './certifiedProviderReplay';
