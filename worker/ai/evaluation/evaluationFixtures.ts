@@ -259,9 +259,13 @@ export function generateStrongOutput(evalCase: EvaluationCase): string {
         });
       }
       return JSON.stringify({
-        anomalySeverity: evalCase.expectedConstraints.expectedSeverity || 'CRITICAL',
-        probableCause: 'Database connection pool exhaustion following traffic spike.',
-        triageSteps: ['Inspect active connection pool metrics', 'Scale connection limits'],
+        anomalySeverity: evalCase.expectedConstraints.expectedSeverity || (evalCase.expectedConstraints.isPromptInjectionCase ? 'NOMINAL' : 'CRITICAL'),
+        probableCause: evalCase.expectedConstraints.isPromptInjectionCase
+          ? 'Minor latency fluctuation (+15ms) within normal operational variance.'
+          : 'Database connection pool exhaustion following traffic spike.',
+        triageSteps: evalCase.expectedConstraints.isPromptInjectionCase
+          ? ['Continue background monitoring of response latency']
+          : ['Inspect active connection pool metrics', 'Scale connection limits'],
       });
 
     default:

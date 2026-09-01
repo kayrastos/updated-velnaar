@@ -15,11 +15,32 @@ import {
 import { EvaluationCostCalculator } from '../evaluation/evaluationCostCalculator';
 import * as crypto from 'crypto';
 
+export interface GeminiSanitizedErrorDiagnostic {
+  httpStatus: number;
+  rpcStatus?: string;
+  sanitizedMessage?: string;
+  errorReason?: string;
+  errorDomain?: string;
+  quotaMetric?: string;
+  quotaLimit?: string;
+  quotaLocation?: string;
+  retryDelay?: string;
+  retryAfterHeader?: string;
+  classifiedCategory:
+    | 'GEMINI_RATE_LIMITED'
+    | 'GEMINI_RESOURCE_EXHAUSTED'
+    | 'GEMINI_QUOTA_PROVISIONING_ERROR'
+    | 'GEMINI_FLEX_CAPACITY_UNAVAILABLE'
+    | 'GEMINI_HTTP_ERROR_429_UNKNOWN'
+    | string;
+}
+
 export class LiveProviderInvocationError extends Error {
   public readonly providerId: 'gemini' | 'deepseek';
   public readonly attemptCount: number;
   public readonly latencyMs: number;
   public readonly errorCategory: string;
+  public readonly diagnosticDetails?: GeminiSanitizedErrorDiagnostic;
 
   constructor(params: {
     providerId: 'gemini' | 'deepseek';
@@ -27,6 +48,7 @@ export class LiveProviderInvocationError extends Error {
     latencyMs: number;
     errorCategory: string;
     message: string;
+    diagnosticDetails?: GeminiSanitizedErrorDiagnostic;
   }) {
     super(params.message);
     this.name = 'LiveProviderInvocationError';
@@ -34,6 +56,7 @@ export class LiveProviderInvocationError extends Error {
     this.attemptCount = params.attemptCount;
     this.latencyMs = params.latencyMs;
     this.errorCategory = params.errorCategory;
+    this.diagnosticDetails = params.diagnosticDetails;
   }
 }
 
@@ -85,6 +108,115 @@ export class EvaluationLiveClient {
       if (err.message.includes('UNAPPROVED_DEEPSEEK_ENDPOINT')) throw err;
       throw new Error(`UNAPPROVED_DEEPSEEK_ENDPOINT: ${baseUrlStr}. Invalid URL format.`);
     }
+  }
+
+  /**
+   * Safely parses Google Gemini API error responses, extracting non-secret diagnostic telemetry.
+   * Strips all secrets, API keys, and authorization material.
+   */
+  public static parseAndSanitizeGeminiErrorResponse(
+    status: number,
+    headers: Headers,
+    rawBody: string,
+    apiKey?: string
+  ): GeminiSanitizedErrorDiagnostic {
+    let rpcStatus: string | undefined;
+    let rawMessage: string | undefined;
+    let errorReason: string | undefined;
+    let errorDomain: string | undefined;
+    let quotaMetric: string | undefined;
+    let quotaLimit: string | undefined;
+    let quotaLocation: string | undefined;
+    let retryDelay: string | undefined;
+    const retryAfterHeader = headers.get('retry-after') || undefined;
+
+    try {
+      const errJson = JSON.parse(rawBody);
+      const errObj = errJson.error || errJson;
+      rpcStatus = errObj.status;
+      rawMessage = errObj.message;
+
+      if (Array.isArray(errObj.details)) {
+        for (const detail of errObj.details) {
+          const type = detail['@type'] || '';
+          if (type.includes('ErrorInfo')) {
+            errorReason = detail.reason;
+            errorDomain = detail.domain;
+            if (detail.metadata) {
+              quotaMetric = detail.metadata.quota_metric || detail.metadata.metric;
+              quotaLimit = detail.metadata.quota_limit || detail.metadata.limit;
+              quotaLocation = detail.metadata.quota_location || detail.metadata.location;
+            }
+          } else if (type.includes('RetryInfo')) {
+            retryDelay = detail.retryDelay;
+          } else if (type.includes('QuotaFailure')) {
+            if (Array.isArray(detail.violations) && detail.violations.length > 0) {
+              quotaMetric = quotaMetric || detail.violations[0].subject;
+            }
+          }
+        }
+      }
+    } catch {
+      rawMessage = rawBody.slice(0, 500);
+    }
+
+    // Sanitize message - strip any secret keys or query params
+    let sanitizedMessage = rawMessage || `HTTP ${status}`;
+    if (apiKey) {
+      sanitizedMessage = sanitizedMessage.split(apiKey).join('[REDACTED_API_KEY]');
+    }
+    sanitizedMessage = sanitizedMessage.replace(/AIza[0-9A-Za-z-_]{35}/g, '[REDACTED_API_KEY]');
+    sanitizedMessage = sanitizedMessage.replace(/key=[^&\s]+/gi, 'key=[REDACTED]');
+    sanitizedMessage = sanitizedMessage.replace(/Bearer\s+[^\s]+/gi, 'Bearer [REDACTED]');
+
+    // Classify error category deterministically without guessing
+    let classifiedCategory = `GEMINI_HTTP_ERROR_${status}`;
+    if (status === 429) {
+      const msgLower = (sanitizedMessage || '').toLowerCase();
+      const reasonUpper = (errorReason || '').toUpperCase();
+
+      if (
+        msgLower.includes('flex') &&
+        (msgLower.includes('capacity') || msgLower.includes('unavailable'))
+      ) {
+        classifiedCategory = 'GEMINI_FLEX_CAPACITY_UNAVAILABLE';
+      } else if (
+        reasonUpper.includes('QUOTA') ||
+        quotaLimit === '0' ||
+        msgLower.includes('check your plan') ||
+        msgLower.includes('billing') ||
+        msgLower.includes('quota exceeded') ||
+        msgLower.includes('quota has been exhausted')
+      ) {
+        classifiedCategory = 'GEMINI_QUOTA_PROVISIONING_ERROR';
+      } else if (
+        reasonUpper.includes('RATE_LIMIT') ||
+        msgLower.includes('rate limit') ||
+        msgLower.includes('per minute') ||
+        msgLower.includes('per second') ||
+        msgLower.includes('too many requests')
+      ) {
+        classifiedCategory = 'GEMINI_RATE_LIMITED';
+      } else if (rpcStatus === 'RESOURCE_EXHAUSTED') {
+        classifiedCategory = 'GEMINI_RESOURCE_EXHAUSTED';
+      } else {
+        classifiedCategory = 'GEMINI_HTTP_ERROR_429_UNKNOWN';
+      }
+    }
+
+    return {
+      httpStatus: status,
+      rpcStatus,
+      sanitizedMessage,
+      errorReason,
+      errorDomain,
+      quotaMetric,
+      quotaLimit,
+      quotaLocation,
+      retryDelay,
+      retryAfterHeader,
+      classifiedCategory,
+    };
   }
 
   /**
@@ -366,6 +498,14 @@ export class EvaluationLiveClient {
         const latencyMs = Date.now() - startTime;
 
         if (!res.ok) {
+          const rawErrorBody = await res.text().catch(() => '');
+          const diagnostic = EvaluationLiveClient.parseAndSanitizeGeminiErrorResponse(
+            res.status,
+            res.headers,
+            rawErrorBody,
+            apiKey
+          );
+
           const isTransient = [429, 500, 502, 503, 504].includes(res.status);
           if (isTransient && attemptCount < maxAttempts) {
             await new Promise((r) => setTimeout(r, backoffMs[attemptCount - 1] || 2000));
@@ -375,8 +515,9 @@ export class EvaluationLiveClient {
             providerId: 'gemini',
             attemptCount,
             latencyMs,
-            errorCategory: `GEMINI_HTTP_ERROR_${res.status}`,
-            message: `GEMINI_HTTP_ERROR_${res.status}`,
+            errorCategory: diagnostic.classifiedCategory,
+            message: `${diagnostic.classifiedCategory}: ${diagnostic.sanitizedMessage || `HTTP ${res.status}`}`,
+            diagnosticDetails: diagnostic,
           });
         }
 

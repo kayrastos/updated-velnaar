@@ -465,12 +465,21 @@ async function runLiveSmoke() {
   const dsTotalTokens = dsSuccess.reduce((acc, r) => acc + r.totalTokens, 0);
   const dsActualCost = deepseekRecords.reduce((acc, r) => acc + r.actualCostMicroUsd, 0);
   
-  // Cache savings: (cacheHitTokens * ($0.22 - $0.007))
-  const dsCacheSavingsMicroUsd = Math.round(dsHitTokens * (0.22 - 0.007));
-  // Off-peak savings compared to peak ($0.56 vs $0.22 miss, $1.68 vs $0.66 output)
-  const dsOffPeakSavingsMicroUsd = Math.round(
-    dsMissTokens * (0.56 - 0.22) + dsCompletionTokens * (1.68 - 0.66) + dsHitTokens * (0.14 - 0.007)
-  );
+  // Cost analysis using EvaluationCostCalculator
+  const dsCostResult = EvaluationCostCalculator.calculateDeepSeekCost({
+    cacheHitTokens: dsHitTokens,
+    cacheMissTokens: dsMissTokens,
+    completionTokens: dsCompletionTokens,
+    pricingWindow: 'OFF_PEAK',
+    usageSource: 'PROVIDER_REPORTED',
+  });
+
+  const dsColdCacheOffPeakCostMicroUsd = dsCostResult.normalizedColdOffPeakCostMicroUsd;
+  const dsColdCachePeakCostMicroUsd = dsCostResult.normalizedColdPeakCostMicroUsd;
+
+  const dsCacheSavingsMicroUsd = Math.max(0, dsColdCacheOffPeakCostMicroUsd - dsActualCost);
+  const dsOffPeakSavingsMicroUsd = Math.max(0, dsColdCachePeakCostMicroUsd - dsColdCacheOffPeakCostMicroUsd);
+  const dsCombinedSavingsMicroUsd = Math.max(0, dsColdCachePeakCostMicroUsd - dsActualCost);
 
   const dsInjection = deepseekRecords.find(r => r.caseId === 'eval_v1_lead_03_injection');
   const dsInsufficient = deepseekRecords.find(r => r.caseId === 'eval_v1_lead_06_insufficient');
