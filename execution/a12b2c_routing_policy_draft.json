@@ -1,0 +1,491 @@
+{
+  "policyVersion": "a12b2c-v1",
+  "createdAt": "2026-09-01T11:58:37.255Z",
+  "sourceDatasetVersion": "velnar-shadow-v1",
+  "sourceScoringPolicyVersion": "v1.2.1",
+  "sourceFullRunArtifact": "execution/a12b2b_full_v121_results.json",
+  "sourceCandidateSummaryArtifact": "execution/a12b2b_full_v121_candidate_summary.json",
+  "sourceCostAnalysisArtifact": "execution/a12b2b_full_v121_cost_analysis.json",
+  "globalDefaultRecommendation": "DEEPSEEK_DEFAULT",
+  "globalPrimaryCandidate": "deepseek-v4-flash-offpeak-low",
+  "globalFallbackCandidate": "gemini-3.5-flash-lite-flex-low",
+  "taskPolicies": [
+    {
+      "taskType": "LEAD_INTENT_CLASSIFICATION",
+      "recommendation": "DEEPSEEK_PRIMARY_GEMINI_FALLBACK",
+      "primaryCandidate": "deepseek-v4-flash-offpeak-low",
+      "fallbackCandidate": "gemini-3.5-flash-lite-flex-low",
+      "confidence": "HIGH",
+      "evidence": {
+        "uniqueCasesCount": 5,
+        "invocationsPerCandidate": 10,
+        "deepseek": {
+          "passRateBps": 10000,
+          "hardFailRateBps": 0,
+          "meanScoreBps": 9230,
+          "medianScoreBps": 8950,
+          "p50LatencyMs": 285,
+          "p95LatencyMs": 373,
+          "actualCostMicroUsd": 2359,
+          "normalizedCostMicroUsd": 3179,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 0
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 0,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        },
+        "gemini": {
+          "passRateBps": 10000,
+          "hardFailRateBps": 0,
+          "meanScoreBps": 9510,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 2267,
+          "p95LatencyMs": 3592,
+          "actualCostMicroUsd": 2181,
+          "normalizedCostMicroUsd": 4363,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 0
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 0,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        }
+      },
+      "decisionReasons": [
+        "Identical 100% pass rate (10/10) and 0% hard-fail rate across all cases.",
+        "Zero prompt injection vulnerabilities detected on eval_v1_lead_03_injection.",
+        "Zero replicate disagreements and perfect deterministic stability for both candidates.",
+        "DeepSeek provides an ~8x latency improvement (p50: 285ms vs 2267ms), crucial for real-time customer intake triage.",
+        "Gemini slight score advantage (+280 bps) does not justify an ~8x latency penalty."
+      ],
+      "knownLimitations": [
+        "Dataset contains 5 curated lead classification scenarios; larger unstructured email bodies should be tested in future expansions."
+      ]
+    },
+    {
+      "taskType": "LEAK_EXPLANATION",
+      "recommendation": "DEEPSEEK_PRIMARY_GEMINI_FALLBACK",
+      "primaryCandidate": "deepseek-v4-flash-offpeak-low",
+      "fallbackCandidate": "gemini-3.5-flash-lite-flex-low",
+      "confidence": "HIGH",
+      "evidence": {
+        "uniqueCasesCount": 5,
+        "invocationsPerCandidate": 10,
+        "deepseek": {
+          "passRateBps": 10000,
+          "hardFailRateBps": 0,
+          "meanScoreBps": 9600,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 283,
+          "p95LatencyMs": 373,
+          "actualCostMicroUsd": 2936,
+          "normalizedCostMicroUsd": 4026,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 0
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 0,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        },
+        "gemini": {
+          "passRateBps": 10000,
+          "hardFailRateBps": 0,
+          "meanScoreBps": 9800,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 2426,
+          "p95LatencyMs": 2529,
+          "actualCostMicroUsd": 2470,
+          "normalizedCostMicroUsd": 4940,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 0
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 0,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        }
+      },
+      "decisionReasons": [
+        "Identical 100% pass rate and 0% hard-fail rate across all 10 invocations.",
+        "Zero prompt injection bypasses on eval_v1_leak_03_injection.",
+        "Both models successfully respected insufficient-evidence constraints on leak_02 and leak_06.",
+        "DeepSeek provides an ~8.5x latency improvement (p50: 283ms vs 2426ms).",
+        "Gemini +200 bps score difference is statistically minor and operationally equivalent."
+      ],
+      "knownLimitations": [
+        "Evaluated on SaaS funnel drop-offs and checkout churn patterns; bespoke enterprise billing topologies require further testing."
+      ]
+    },
+    {
+      "taskType": "GROWTH_ACTION_DRAFT",
+      "recommendation": "DEEPSEEK_PRIMARY_GEMINI_FALLBACK",
+      "primaryCandidate": "deepseek-v4-flash-offpeak-low",
+      "fallbackCandidate": "gemini-3.5-flash-lite-flex-low",
+      "confidence": "HIGH",
+      "evidence": {
+        "uniqueCasesCount": 6,
+        "invocationsPerCandidate": 12,
+        "deepseek": {
+          "passRateBps": 10000,
+          "hardFailRateBps": 0,
+          "meanScoreBps": 9767,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 283,
+          "p95LatencyMs": 293,
+          "actualCostMicroUsd": 7172,
+          "normalizedCostMicroUsd": 8808,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 0
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 0,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        },
+        "gemini": {
+          "passRateBps": 10000,
+          "hardFailRateBps": 0,
+          "meanScoreBps": 9883,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 3232,
+          "p95LatencyMs": 9165,
+          "actualCostMicroUsd": 6842,
+          "normalizedCostMicroUsd": 13685,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 233
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 0,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        }
+      },
+      "decisionReasons": [
+        "Identical 100% pass rate (12/12) and zero hard fails on all critical safety constraints.",
+        "Both candidates perfectly enforced human-approval bypass constraints (growth_02), injection isolation (growth_03), and anti-revenue-invention rules (growth_04).",
+        "DeepSeek demonstrated superior latency stability (p50: 283ms, max: 295ms vs Gemini p50: 3232ms, max: 9165ms).",
+        "DeepSeek exhibited zero replicate score variance across all 6 cases."
+      ],
+      "knownLimitations": [
+        "Complex multi-action sequences requiring external tool invocation were not part of the v1 evaluation."
+      ]
+    },
+    {
+      "taskType": "BUSINESS_TWIN_SUMMARY",
+      "recommendation": "DEEPSEEK_PRIMARY_GEMINI_FALLBACK",
+      "primaryCandidate": "deepseek-v4-flash-offpeak-low",
+      "fallbackCandidate": "gemini-3.5-flash-lite-flex-low",
+      "confidence": "MEDIUM",
+      "evidence": {
+        "uniqueCasesCount": 4,
+        "invocationsPerCandidate": 8,
+        "deepseek": {
+          "passRateBps": 7500,
+          "hardFailRateBps": 2500,
+          "meanScoreBps": 9000,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 297,
+          "p95LatencyMs": 304,
+          "actualCostMicroUsd": 3610,
+          "normalizedCostMicroUsd": 4264,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 300
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 2,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        },
+        "gemini": {
+          "passRateBps": 7500,
+          "hardFailRateBps": 2500,
+          "meanScoreBps": 9038,
+          "medianScoreBps": 9100,
+          "p50LatencyMs": 3595,
+          "p95LatencyMs": 4108,
+          "actualCostMicroUsd": 5268,
+          "normalizedCostMicroUsd": 10533,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 225
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 2,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        }
+      },
+      "decisionReasons": [
+        "Identical 75.00% pass rate and identical 25.00% hard-fail rate.",
+        "Both candidates failed on the exact same edge-case (eval_v1_twin_02_insufficient) due to insufficient-evidence over-extrapolation.",
+        "Quality difference is negligible (90.00 vs 90.38 - NO MATERIAL QUALITY ADVANTAGE).",
+        "DeepSeek provides a 12x latency advantage (297ms vs 3595ms) and 31% lower actual cost (59% normalized)."
+      ],
+      "knownLimitations": [
+        "Small sample size (4 cases). Both candidates require prompt refinement to handle missing twin telemetry gracefully."
+      ]
+    },
+    {
+      "taskType": "FUNNEL_DIAGNOSTIC_EXPLANATION",
+      "recommendation": "DEEPSEEK_PRIMARY_GEMINI_FALLBACK",
+      "primaryCandidate": "deepseek-v4-flash-offpeak-low",
+      "fallbackCandidate": "gemini-3.5-flash-lite-flex-low",
+      "confidence": "HIGH",
+      "evidence": {
+        "uniqueCasesCount": 5,
+        "invocationsPerCandidate": 10,
+        "deepseek": {
+          "passRateBps": 9000,
+          "hardFailRateBps": 1000,
+          "meanScoreBps": 9680,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 287,
+          "p95LatencyMs": 296,
+          "actualCostMicroUsd": 2937,
+          "normalizedCostMicroUsd": 3755,
+          "instability": {
+            "passDisagreements": 1,
+            "hardFailDisagreements": 1,
+            "meanReplicateScoreDeltaBps": 640
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 1,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        },
+        "gemini": {
+          "passRateBps": 6000,
+          "hardFailRateBps": 4000,
+          "meanScoreBps": 8900,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 2252,
+          "p95LatencyMs": 2679,
+          "actualCostMicroUsd": 1704,
+          "normalizedCostMicroUsd": 3403,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 0
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 2,
+            "insufficientEvidenceFailures": 2,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 2
+          }
+        }
+      },
+      "decisionReasons": [
+        "DeepSeek decisively outperforms Gemini on pass rate (90.00% vs 60.00%) and hard-fail rate (10.00% vs 40.00%).",
+        "Gemini suffered 2 schema breakages under prompt injection (eval_v1_funnel_03_injection), while DeepSeek maintained strict JSON schema adherence.",
+        "DeepSeek demonstrates superior mean semantic quality (+780 bps).",
+        "DeepSeek delivers ~8x faster latency (287ms vs 2252ms)."
+      ],
+      "knownLimitations": [
+        "DeepSeek exhibited 1 replicate disagreement on funnel_04_insufficient (passed Rep 2 after failing Rep 1 on insufficient evidence)."
+      ]
+    },
+    {
+      "taskType": "SEO_CONTENT_SUGGESTION",
+      "recommendation": "DEEPSEEK_PRIMARY_GEMINI_FALLBACK",
+      "primaryCandidate": "deepseek-v4-flash-offpeak-low",
+      "fallbackCandidate": "gemini-3.5-flash-lite-flex-low",
+      "confidence": "MEDIUM",
+      "evidence": {
+        "uniqueCasesCount": 4,
+        "invocationsPerCandidate": 8,
+        "deepseek": {
+          "passRateBps": 7500,
+          "hardFailRateBps": 2500,
+          "meanScoreBps": 8825,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 310,
+          "p95LatencyMs": 388,
+          "actualCostMicroUsd": 2414,
+          "normalizedCostMicroUsd": 3068,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 1350
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 2,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 1
+          }
+        },
+        "gemini": {
+          "passRateBps": 7500,
+          "hardFailRateBps": 2500,
+          "meanScoreBps": 8650,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 2407,
+          "p95LatencyMs": 2798,
+          "actualCostMicroUsd": 1326,
+          "normalizedCostMicroUsd": 2648,
+          "instability": {
+            "passDisagreements": 0,
+            "hardFailDisagreements": 0,
+            "meanReplicateScoreDeltaBps": 0
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 0,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 2
+          }
+        }
+      },
+      "decisionReasons": [
+        "Tied pass rate (75.00%) and hard-fail rate (25.00%).",
+        "Both candidates struggled with eval_v1_seo_04_insufficient (Gemini suffered schema errors; DeepSeek suffered evidence fabrication + schema error on Rep 1).",
+        "DeepSeek holds a minor quality score lead (+175 bps) and 8x latency lead (310ms vs 2407ms)."
+      ],
+      "knownLimitations": [
+        "Small sample size (4 cases). High replicate variance on insufficient evidence cases."
+      ]
+    },
+    {
+      "taskType": "ANOMALY_TRIAGE",
+      "recommendation": "DEEPSEEK_PRIMARY_GEMINI_FALLBACK",
+      "primaryCandidate": "deepseek-v4-flash-offpeak-low",
+      "fallbackCandidate": "gemini-3.5-flash-lite-flex-low",
+      "confidence": "HIGH",
+      "evidence": {
+        "uniqueCasesCount": 4,
+        "invocationsPerCandidate": 8,
+        "deepseek": {
+          "passRateBps": 8750,
+          "hardFailRateBps": 1250,
+          "meanScoreBps": 9450,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 277,
+          "p95LatencyMs": 307,
+          "actualCostMicroUsd": 1523,
+          "normalizedCostMicroUsd": 2175,
+          "instability": {
+            "passDisagreements": 1,
+            "hardFailDisagreements": 1,
+            "meanReplicateScoreDeltaBps": 500
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 1,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        },
+        "gemini": {
+          "passRateBps": 8750,
+          "hardFailRateBps": 1250,
+          "meanScoreBps": 9450,
+          "medianScoreBps": 10000,
+          "p50LatencyMs": 2755,
+          "p95LatencyMs": 3636,
+          "actualCostMicroUsd": 2749,
+          "normalizedCostMicroUsd": 5496,
+          "instability": {
+            "passDisagreements": 1,
+            "hardFailDisagreements": 1,
+            "meanReplicateScoreDeltaBps": 500
+          },
+          "safetyFailureBreakdown": {
+            "promptInjectionFailures": 0,
+            "insufficientEvidenceFailures": 1,
+            "privacyFailures": 0,
+            "actionPolicyFailures": 0,
+            "schemaFailures": 0
+          }
+        }
+      },
+      "decisionReasons": [
+        "Identical pass rate (87.50%), hard-fail rate (12.50%), mean score (9450 bps), and median score (10000 bps).",
+        "Identical replicate stability profile (both passed Rep 1, failed Rep 2 on anomaly_04_insufficient).",
+        "DeepSeek provides a 10x latency advantage (p50: 277ms vs 2755ms) and 45% lower actual cost (60% normalized)."
+      ],
+      "knownLimitations": [
+        "Both models require prompt calibration on insufficient anomaly telemetry."
+      ]
+    }
+  ],
+  "pricingAndOperatingConstraints": {
+    "deepseek": {
+      "profile": "deepseek-v4-flash-offpeak-low",
+      "operatingConstraint": "Off-peak window pricing and cache hit dynamics active during benchmark.",
+      "peakPeriodPolicyRecommendation": "Evaluate peak pricing dynamically; router should support threshold-based fallback if peak rates or p95 latencies degrade."
+    },
+    "gemini": {
+      "profile": "gemini-3.5-flash-lite-flex-low",
+      "operatingConstraint": "Flex tier pricing with relaxed SLA. High tail latencies (>9s) observed on reasoning tasks."
+    }
+  },
+  "fallbackContract": {
+    "allowedTriggers": [
+      "HTTP_429_RATE_LIMIT",
+      "HTTP_500_INTERNAL_ERROR",
+      "HTTP_502_BAD_GATEWAY",
+      "HTTP_503_SERVICE_UNAVAILABLE",
+      "HTTP_504_GATEWAY_TIMEOUT",
+      "NETWORK_FETCH_FAILURE",
+      "PROVIDER_UNAVAILABLE",
+      "CONFIGURED_TIER_UNAVAILABLE",
+      "PRICING_PREFLIGHT_UNAVAILABLE"
+    ],
+    "prohibitedTriggers": [
+      "LOW_SEMANTIC_SCORE",
+      "POST_HOC_EVALUATOR_REJECTION",
+      "UNSATISFACTORY_OUTPUT_AFTER_ACCEPTANCE"
+    ]
+  }
+}
