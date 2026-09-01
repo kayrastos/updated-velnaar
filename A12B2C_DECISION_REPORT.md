@@ -17,8 +17,8 @@
 Based on the sealed A.12B.2B full canonical benchmark run (66 invocations per candidate across 7 production task types), the offline routing policy recommendation is:
 
 **Global Recommendation:** `DEEPSEEK_PRIMARY_GEMINI_FALLBACK`
-- **Primary Provider:** `deepseek-v4-flash-offpeak-low` (DeepSeek-V4 Flash / DeepSeek-Chat, low reasoning effort, off-peak pricing)
-- **Fallback Provider:** `gemini-3.5-flash-lite-flex-low` (Gemini 2.5/3.5 Flash Lite, Flex low tier)
+- **Primary Provider:** `deepseek-v4-flash-offpeak-low` (deepseek-v4-flash, low reasoning effort, off-peak pricing)
+- **Fallback Provider:** `gemini-3.5-flash-lite-flex-low` (gemini-3.5-flash-lite, flex-low pricing tier)
 
 ### Key Findings:
 1. **Pass Rate & Reliability:** DeepSeek achieved an aggregate pass rate of **90.91% (60/66)** (60/66 passed invocations, 6 unique hard fails) compared to Gemini's **86.36% (57/66)** (57/66 passed invocations, 9 unique hard fails).
@@ -248,7 +248,7 @@ Understanding failure types is vital for routing safety:
 | Pass Rate | 87.50% (8,750 bps) | 87.50% (8,750 bps) | Tied (87.50%) |
 | Mean Score | 9,450 bps | 9,450 bps | Tied (9,450 bps) |
 | Median Score | 10,000 bps | 10,000 bps | Tied (10,000 bps) |
-| p50 Latency | **286 ms** | **2,591 ms** | DeepSeek 9.4x faster |
+| p50 Latency | **277 ms** | **2,591 ms** | DeepSeek 9.4x faster |
 | p95 Latency | **304 ms** | **3,510 ms** | DeepSeek 11.5x faster |
 | Actual Cost | $0.001523 | $0.002749 | DeepSeek 44.6% lower |
 | Normalized Cost | $0.002175 | $0.005496 | DeepSeek 60.4% lower |
