@@ -1,0 +1,30 @@
+{
+  "manifestVersion": "A12B2B_MANIFEST_v1",
+  "generatedAt": "2026-09-01T11:15:06.187Z",
+  "resultsCount": 132,
+  "scoringPolicyVersion": "v1.2.1",
+  "datasetVersion": "velnar-shadow-v1",
+  "cumulativeSpendMicroUsd": 45491,
+  "artifacts": {
+    "execution/a12b2b_full_v121_results.json": {
+      "relativePath": "execution/a12b2b_full_v121_results.json",
+      "sizeBytes": 348718,
+      "sha256": "20632f1d5da77f977482aa5728ef4472aa43904dd18c84c8769888579db32313"
+    },
+    "execution/a12b2b_full_v121_candidate_summary.json": {
+      "relativePath": "execution/a12b2b_full_v121_candidate_summary.json",
+      "sizeBytes": 11254,
+      "sha256": "4b55d754eed19dc3b494a246e3b111f831037d10f5684e98564036a9909282a6"
+    },
+    "execution/a12b2b_full_v121_cost_analysis.json": {
+      "relativePath": "execution/a12b2b_full_v121_cost_analysis.json",
+      "sizeBytes": 1172,
+      "sha256": "88d8043e6389dcb36cb8b52a3a5c8513f5443aec776b2c2a96986d463f2c2ae7"
+    },
+    "execution/a12b2b_full_v121.log": {
+      "relativePath": "execution/a12b2b_full_v121.log",
+      "sizeBytes": 27672,
+      "sha256": "05f91fc5fc2485734b04cb59f8ee6a30dc58b614e107747f9c2ad90d6dc744ec"
+    }
+  }
+}
