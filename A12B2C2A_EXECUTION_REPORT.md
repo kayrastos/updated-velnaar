@@ -26,19 +26,21 @@ Phase `A.12B.2C-2A` establishes the non-interfering shadow routing policy scaffo
 - **Enforcement Flag:** `enforcementAllowed` is statically and dynamically fixed to `false`.
 
 ### 2.2 Sealed Certified Profiles
-- **Primary Certified Candidate Profile:**
+- **Primary Certified Candidate Profile (DeepSeek):**
   - `candidateId`: `deepseek-v4-flash-offpeak-low`
   - `provider`: `deepseek`
   - `certifiedModel`: `deepseek-v4-flash`
-  - `trafficPricingTier`: `offpeak-low`
-  - `executionMode`: `standard-offpeak`
+  - `reasoningEnabled`: `true`
+  - `reasoningEffort`: `low`
+  - `pricingWindow`: `offpeak`
   - `knownLimitations`: Requires profile parity update before live candidate invocation; peak-period routing policy is unresolved; requires tier capability parity for `REASONING` and `LONG_CONTEXT`.
-- **Fallback Certified Candidate Profile:**
+- **Fallback Certified Candidate Profile (Gemini):**
   - `candidateId`: `gemini-3.5-flash-lite-flex-low`
   - `provider`: `gemini`
   - `certifiedModel`: `gemini-3.5-flash-lite`
-  - `trafficPricingTier`: `flex-low`
-  - `executionMode`: `interactions-api-flex-low`
+  - `apiFamily`: `interactions`
+  - `serviceTier`: `flex`
+  - `thinkingLevel`: `low`
   - `knownLimitations`: Requires Flex Low profile parity configuration before live parity.
 - **Excluded Candidates:** `kimi` and `fulgor` are explicitly omitted from certified routing candidates.
 
@@ -50,13 +52,17 @@ The resolver `resolveRoutingPolicyDecision` operates as a pure, deterministic fu
 
 ```typescript
 export interface RoutingPolicyResolutionContext {
-  taskType: TaskType;
-  routingTier?: RoutingTier;
-  effectiveDataClassification?: DataClassification;
-  allowedProviders?: AIProviderId[];
-  configuredProviders?: AIProviderId[];
-  routingPolicyMode?: string;
-  metadata?: Record<string, unknown>;
+  readonly taskType: TaskType;
+  readonly routingTier?: RoutingTier;
+  readonly effectiveDataClassification?: DataClassification;
+  readonly allowedProviders?: readonly AIProviderId[];
+  readonly configuredProviders?: {
+    readonly gemini: boolean;
+    readonly deepseek: boolean;
+    readonly kimi?: boolean;
+  };
+  readonly routingPolicyMode?: RoutingPolicyMode;
+  readonly env?: WorkerEnv;
 }
 ```
 
@@ -77,20 +83,20 @@ Each candidate provider receives a comprehensive, context-aware set of `compatib
 The fallback contract is strictly documented within the decision metadata:
 
 - **Allowed Infrastructure Failover Triggers (9 triggers):**
-  1. `HTTP_500_INTERNAL_SERVER_ERROR`
-  2. `HTTP_502_BAD_GATEWAY`
-  3. `HTTP_503_SERVICE_UNAVAILABLE`
-  4. `HTTP_504_GATEWAY_TIMEOUT`
-  5. `HTTP_429_RATE_LIMITED`
-  6. `NETWORK_CONNECTION_REFUSED`
-  7. `NETWORK_CONNECTION_RESET`
-  8. `NETWORK_TIMEOUT`
-  9. `UPSTREAM_DNS_FAILURE`
+  1. `HTTP_429`
+  2. `HTTP_500`
+  3. `HTTP_502`
+  4. `HTTP_503`
+  5. `HTTP_504`
+  6. `NETWORK_TRANSPORT_FAILURE`
+  7. `PROVIDER_UNAVAILABLE`
+  8. `TIER_UNAVAILABLE`
+  9. `PRICING_PREFLIGHT_UNAVAILABLE`
 
 - **Prohibited Semantic Failover Triggers (3 prohibited triggers):**
-  1. `TASK_QUALITY_DISSATISFACTION`
-  2. `USER_PREFERENCE_OVERRIDE`
-  3. `OUTPUT_SCHEMA_PARSING_FAILURE`
+  1. `LOW_SEMANTIC_SCORE`
+  2. `POST_HOC_EVALUATOR_REJECTION`
+  3. `UNSATISFACTORY_ACCEPTED_OUTPUT`
 
 ---
 
