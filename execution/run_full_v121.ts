@@ -18,6 +18,7 @@ import {
   A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND,
   LiveEvaluationResultRecord,
   LiveCandidateConfig,
+  LiveEvaluationCheckpoint,
   PricingWindow,
 } from '../worker/ai/evaluation/evaluationLiveTypes';
 import {
@@ -37,11 +38,7 @@ import * as path from 'path';
 
 const logFilePath = path.join(process.cwd(), 'execution', 'a12b2b_full_v121.log');
 
-// Clear log file at start
-if (fs.existsSync(logFilePath)) {
-  fs.unlinkSync(logFilePath);
-}
-
+// Log appender (NEVER delete historical logs)
 function log(msg: string) {
   const line = `[${new Date().toISOString()}] ${msg}`;
   console.log(line);
@@ -49,8 +46,10 @@ function log(msg: string) {
 }
 
 async function runFullEvaluationV121() {
+  const runId = `a12b2b_run_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   log('================================================================');
-  log('VELNAR PHASE A.12B.2B — FULL CONTROLLED LIVE SHADOW EVALUATION (v1.2.1)');
+  log(`VELNAR PHASE A.12B.2B — FULL CONTROLLED LIVE SHADOW EVALUATION (v1.2.1)`);
+  log(`RUN ID: ${runId}`);
   log('================================================================');
 
   const env: WorkerEnv = {
@@ -150,6 +149,27 @@ async function runFullEvaluationV121() {
   const fullResults: LiveEvaluationResultRecord[] = [];
   let cumulativeSpendMicroUsd = 0;
   let ordinal = 0;
+
+  const executionStartTimestamp = new Date().toISOString();
+
+  const writeCheckpoint = (currentOrdinal: number) => {
+    const checkpoint: LiveEvaluationCheckpoint = {
+      runId,
+      executionStartTimestamp,
+      datasetVersion: VELNAR_SHADOW_EVAL_V1_VERSION,
+      scoringPolicyVersion: SCORING_POLICY_VERSION,
+      pricingWindow,
+      expectedInvocationCount: expectedTotalInvocations,
+      lastCompletedInvocationOrdinal: currentOrdinal,
+      completedResults: fullResults,
+      cumulativeSpendMicroUsd,
+      runCompleted: currentOrdinal === expectedTotalInvocations,
+    };
+    EvaluationLiveRunner.persistCheckpoint(checkpoint);
+  };
+
+  // Initial checkpoint at 0 invocations
+  writeCheckpoint(0);
 
   for (const replicateIndex of [1, 2] as const) {
     log(`\n============================================================`);
@@ -313,6 +333,7 @@ async function runFullEvaluationV121() {
           };
 
           fullResults.push(record);
+          writeCheckpoint(ordinal);
 
           log(`[${ordinal}/${expectedTotalInvocations}] Rep ${replicateIndex} | Case: ${pCase.id} | ${candidate.candidateId} | Latency: ${record.latencyMs}ms | Tokens: ${record.totalTokens} | Cost: ${actualCostMicroUsd}u$ | Score: ${record.totalScoreBp}bps | Passed: ${record.passed}${record.hardFail ? ' (HARD FAIL: ' + record.hardFailReasons.join(',') + ')' : ''}`);
         } else {
@@ -370,6 +391,8 @@ async function runFullEvaluationV121() {
           };
 
           fullResults.push(record);
+          writeCheckpoint(ordinal);
+
           log(`[${ordinal}/${expectedTotalInvocations}] Rep ${replicateIndex} | Case: ${pCase.id} | ${candidate.candidateId} | PROVIDER FAILURE: ${providerErrorCategory}`);
         }
       }
@@ -381,14 +404,15 @@ async function runFullEvaluationV121() {
   log(`Cumulative Spend: ${cumulativeSpendMicroUsd} microUSD ($${(cumulativeSpendMicroUsd / 1_000_000).toFixed(6)})`);
   log(`============================================================`);
 
-  // 7. Verify Unique Replicate Key Invariant
-  const replicateKeySet = new Set<string>();
-  for (const r of fullResults) {
-    const key = `${r.candidateId}::${r.caseId}::${r.replicateIndex}`;
-    if (replicateKeySet.has(key)) {
-      throw new Error(`A12B2B_DUPLICATE_REPLICATE_RESULT: Duplicate candidate/case/replicate result for ${key}`);
-    }
-    replicateKeySet.add(key);
+  // 7. Verify Protocol & Invariant Enforcement
+  EvaluationLiveRunner.validateReplicateProtocol(fullResults, eligibleCases, candidates);
+
+  if (cumulativeSpendMicroUsd > A12B2B_BUDGET_CAP_MICRO_USD) {
+    throw new Error(`A12B2B_BUDGET_EXCEEDED: Cumulative spend (${cumulativeSpendMicroUsd}) exceeded cap (${A12B2B_BUDGET_CAP_MICRO_USD})`);
+  }
+
+  if (blockedCases.length !== 3) {
+    throw new Error(`A12B2B_SECURITY_GATE_DEFECT: Expected 3 blocked cases, found ${blockedCases.length}`);
   }
 
   // 8. Generate Candidate Summaries
@@ -479,49 +503,8 @@ async function runFullEvaluationV121() {
     };
   }
 
-  // 11. Pareto Descriptive Analysis
-  const dsSum = summaries['deepseek-v4-flash-offpeak-low'];
-  const gemSum = summaries['gemini-3.5-flash-lite-flex-low'];
-
-  const paretoAnalysis = {
-    dimensions: {
-      qualityMeanScoreBps: {
-        deepseek: dsSum.meanScoreBps,
-        gemini: gemSum.meanScoreBps,
-        leader: dsSum.meanScoreBps > gemSum.meanScoreBps ? 'deepseek' : (gemSum.meanScoreBps > dsSum.meanScoreBps ? 'gemini' : 'TIE'),
-      },
-      passRateBps: {
-        deepseek: dsSum.passRateBps,
-        gemini: gemSum.passRateBps,
-        leader: dsSum.passRateBps > gemSum.passRateBps ? 'deepseek' : (gemSum.passRateBps > dsSum.passRateBps ? 'gemini' : 'TIE'),
-      },
-      hardFailRateBps: {
-        deepseek: dsSum.hardFailRateBps,
-        gemini: gemSum.hardFailRateBps,
-        leader: dsSum.hardFailRateBps < gemSum.hardFailRateBps ? 'deepseek' : (gemSum.hardFailRateBps < dsSum.hardFailRateBps ? 'gemini' : 'TIE'),
-      },
-      p50LatencyMs: {
-        deepseek: dsSum.p50LatencyMs,
-        gemini: gemSum.p50LatencyMs,
-        leader: dsSum.p50LatencyMs < gemSum.p50LatencyMs ? 'deepseek' : (gemSum.p50LatencyMs < dsSum.p50LatencyMs ? 'gemini' : 'TIE'),
-      },
-      actualCostMicroUsd: {
-        deepseek: dsSum.actualTotalCostMicroUsd,
-        gemini: gemSum.actualTotalCostMicroUsd,
-        leader: dsSum.actualTotalCostMicroUsd < gemSum.actualTotalCostMicroUsd ? 'deepseek' : (gemSum.actualTotalCostMicroUsd < dsSum.actualTotalCostMicroUsd ? 'gemini' : 'TIE'),
-      },
-      replicateInstabilityRateBps: {
-        deepseek: dsSum.instabilityRateBps,
-        gemini: gemSum.instabilityRateBps,
-        leader: dsSum.instabilityRateBps < gemSum.instabilityRateBps ? 'deepseek' : (gemSum.instabilityRateBps < dsSum.instabilityRateBps ? 'gemini' : 'TIE'),
-      },
-    },
-    frontierClassification: {
-      deepseek: 'PARETO_FRONTIER',
-      gemini: 'PARETO_FRONTIER',
-      note: 'Both candidates inhabit distinct positions on the Pareto trade-off surface (DeepSeek excels on pass rate, latency, and cache efficiency; Gemini offers alternative token cost and architecture dynamics). Final production routing remains sealed pending independent audit.',
-    },
-  };
+  // 11. Dynamic Mathematical Pareto Analysis
+  const paretoAnalysis = EvaluationLiveRunner.evaluateParetoFrontier(summaries);
 
   // 12. Primary Source of Truth Output Artifact
   const canonicalResultsPayload = {
@@ -559,7 +542,20 @@ async function runFullEvaluationV121() {
     results: fullResults,
   };
 
-  // 13. Write JSON Artifacts
+  const summaryPayload = { summaries, replicateAnalysis, paretoAnalysis };
+
+  // 13. Deterministic Cross-Artifact Consistency Validation
+  const consistencyResult = EvaluationLiveRunner.validateArtifactConsistency({
+    resultsPayload: canonicalResultsPayload,
+    candidateSummaryPayload: summaryPayload,
+    costAnalysisPayload: costAnalysis,
+  });
+
+  if (!consistencyResult.passed) {
+    throw new Error(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: ${consistencyResult.errors.join('; ')}`);
+  }
+
+  // 14. Write Final Canonical JSON Artifacts
   fs.writeFileSync(
     path.join(process.cwd(), 'execution', 'a12b2b_full_v121_results.json'),
     JSON.stringify(canonicalResultsPayload, null, 2),
@@ -568,7 +564,7 @@ async function runFullEvaluationV121() {
 
   fs.writeFileSync(
     path.join(process.cwd(), 'execution', 'a12b2b_full_v121_candidate_summary.json'),
-    JSON.stringify({ summaries, replicateAnalysis, paretoAnalysis }, null, 2),
+    JSON.stringify(summaryPayload, null, 2),
     'utf8'
   );
 
@@ -578,7 +574,12 @@ async function runFullEvaluationV121() {
     'utf8'
   );
 
-  log('Successfully generated all canonical full-run artifacts.');
+  // 15. Programmatically update/write markdown report section
+  const reportPath = path.join(process.cwd(), 'A12B2B_EXECUTION_REPORT.md');
+  const markdownSection = EvaluationLiveRunner.generateMarkdownReportSection(canonicalResultsPayload);
+  fs.writeFileSync(reportPath, markdownSection, 'utf8');
+
+  log('Successfully validated invariants, verified consistency, and generated all canonical full-run artifacts.');
   log(`Total Invocations: ${fullResults.length} / ${expectedTotalInvocations}`);
   log(`Cumulative Spend: ${cumulativeSpendMicroUsd} microUSD ($${(cumulativeSpendMicroUsd / 1_000_000).toFixed(6)})`);
 }

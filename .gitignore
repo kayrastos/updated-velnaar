@@ -12,5 +12,6 @@ coverage/
 !execution/a12b2b_build.log
 !execution/a12b2b_smoke_execution.log
 !execution/a12b2b_full_benchmark.log
+!execution/a12b2b_full_v121.log
 .env*
 !.env.example

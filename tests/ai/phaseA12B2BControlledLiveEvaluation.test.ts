@@ -3,7 +3,7 @@
  * @description Comprehensive Invariant & Specification Test Suite for Phase A.12B.2B Controlled Live Shadow Evaluation
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   CANDIDATE_A_DEEPSEEK,
   CANDIDATE_B_GEMINI,
@@ -30,8 +30,13 @@ import {
   A12B2B_BUDGET_CAP_MICRO_USD,
   A12B2B_PRICING_CATALOG_VERSION,
   A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND,
+  LiveEvaluationResultRecord,
+  LiveEvaluationCheckpoint,
+  CandidateLiveSummary,
 } from '../../worker/ai/evaluation/evaluationLiveTypes';
 import { WorkerEnv } from '../../worker/env';
+import * as fs from 'fs';
+import * as path from 'path';
 
 describe('Phase A.12B.2B — Controlled Live Shadow Evaluation Specification & Invariants', () => {
 
@@ -1440,4 +1445,543 @@ describe('Phase A.12B.2B — Controlled Live Shadow Evaluation Specification & I
       expect(diagnostic.sanitizedMessage).toContain('[REDACTED');
     });
   });
+
+  // ==========================================================================
+  // 15. RUNNER HARDENING, CHECKPOINTING, REPLICATE PROTOCOL & PARETO INVARIANTS
+  // ==========================================================================
+  describe('15. Runner Hardening, Checkpointing, Replicate Invariants & Pareto Classification', () => {
+    const tmpTestDir = path.join(process.cwd(), 'execution', 'test_tmp');
+
+    beforeAll(() => {
+      if (!fs.existsSync(tmpTestDir)) {
+        fs.mkdirSync(tmpTestDir, { recursive: true });
+      }
+    });
+
+    afterAll(() => {
+      if (fs.existsSync(tmpTestDir)) {
+        fs.rmSync(tmpTestDir, { recursive: true, force: true });
+      }
+    });
+
+    // 15.1 Checkpointing: Atomic write + crash survival
+    it('should atomically persist checkpoints without corrupting state', () => {
+      const customCheckpointPath = path.join(tmpTestDir, 'test_checkpoint.json');
+      const checkpoint: LiveEvaluationCheckpoint = {
+        runId: 'test_run_123',
+        executionStartTimestamp: new Date().toISOString(),
+        datasetVersion: 'v1.0.0',
+        scoringPolicyVersion: 'v1.2.1',
+        pricingWindow: 'OFF_PEAK',
+        expectedInvocationCount: 132,
+        lastCompletedInvocationOrdinal: 1,
+        cumulativeSpendMicroUsd: 500,
+        runCompleted: false,
+        completedResults: [
+          {
+            runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
+            datasetVersion: 'v1.0.0',
+            scoringPolicyVersion: 'v1.2.1',
+            pricingCatalogVersion: '2026-02-28',
+            caseId: 'eval_v1_lead_01_high_intent',
+            taskType: 'LEAD_INTENT_CLASSIFICATION',
+            replicateIndex: 1,
+            invocationOrdinal: 1,
+            candidateId: 'deepseek-v4-flash-offpeak-low',
+            providerId: 'deepseek',
+            requestedModelIdentifier: 'deepseek-v4-flash',
+            returnedModelIdentifier: 'deepseek-v4-flash',
+            conservativeInputTokenUpperBound: 500,
+            serviceProfile: 'OFF_PEAK_COST_OPTIMIZED',
+            thinkingEffort: 'low',
+            promptVersion: 'v1.0.0',
+            originalDataClassification: 'PUBLIC_BUSINESS',
+            effectiveDataClassification: 'PUBLIC_BUSINESS',
+            securityDisposition: 'ELIGIBLE',
+            requestStartedAt: new Date().toISOString(),
+            pricingWindow: 'OFF_PEAK',
+            latencyMs: 350,
+            attemptCount: 1,
+            usageSource: 'PROVIDER_REPORTED',
+            promptTokens: 200,
+            cacheHitTokens: 150,
+            cacheMissTokens: 50,
+            completionTokens: 80,
+            thinkingTokens: 0,
+            totalTokens: 280,
+            actualCostMicroUsd: 180,
+            normalizedCostMicroUsd: 250,
+            dimensionScores: {
+              schemaCompliance: 10000,
+              evidenceGrounding: 10000,
+              hallucinationSafety: 10000,
+              privacySafety: 10000,
+              taskCorrectness: 10000,
+              instructionFollowing: 10000,
+              actionPolicyCompliance: 10000,
+            },
+            totalScoreBp: 10000,
+            passed: true,
+            hardFail: false,
+            hardFailReasons: [],
+            hallucinationsDetected: [],
+            rawTextHash: 'hash123',
+          },
+        ],
+      };
+
+      EvaluationLiveRunner.persistCheckpoint(checkpoint, customCheckpointPath);
+      expect(fs.existsSync(customCheckpointPath)).toBe(true);
+
+      const readBack = JSON.parse(fs.readFileSync(customCheckpointPath, 'utf8'));
+      expect(readBack.runId).toBe('test_run_123');
+      expect(readBack.lastCompletedInvocationOrdinal).toBe(1);
+      expect(readBack.completedResults).toHaveLength(1);
+      expect(readBack.completedResults[0].caseId).toBe('eval_v1_lead_01_high_intent');
+    });
+
+    // 15.2 Invariant: Rejection of Duplicate Replicates
+    it('should throw A12B2B_DUPLICATE_REPLICATE_RESULT on duplicate candidate/case/replicate', () => {
+      const eligibleCases = EvaluationSecurityGate.prepareEvaluationBatch(VELNAR_SHADOW_EVAL_V1).filter(
+        (c) => c.disposition === 'ELIGIBLE'
+      );
+
+      const fakeRecord: LiveEvaluationResultRecord = {
+        runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
+        datasetVersion: 'v1.0.0',
+        scoringPolicyVersion: 'v1.2.1',
+        pricingCatalogVersion: '2026-02-28',
+        caseId: eligibleCases[0].id,
+        taskType: eligibleCases[0].taskType,
+        replicateIndex: 1,
+        invocationOrdinal: 1,
+        candidateId: 'deepseek-v4-flash-offpeak-low',
+        providerId: 'deepseek',
+        requestedModelIdentifier: 'deepseek-v4-flash',
+        returnedModelIdentifier: 'deepseek-v4-flash',
+        conservativeInputTokenUpperBound: 500,
+        serviceProfile: 'OFF_PEAK_COST_OPTIMIZED',
+        thinkingEffort: 'low',
+        promptVersion: 'v1.0.0',
+        originalDataClassification: 'PUBLIC_BUSINESS',
+        effectiveDataClassification: 'PUBLIC_BUSINESS',
+        securityDisposition: 'ELIGIBLE',
+        requestStartedAt: new Date().toISOString(),
+        pricingWindow: 'OFF_PEAK',
+        latencyMs: 300,
+        attemptCount: 1,
+        usageSource: 'PROVIDER_REPORTED',
+        promptTokens: 100,
+        cacheHitTokens: 0,
+        cacheMissTokens: 100,
+        completionTokens: 50,
+        thinkingTokens: 0,
+        totalTokens: 150,
+        actualCostMicroUsd: 100,
+        normalizedCostMicroUsd: 100,
+        dimensionScores: {} as any,
+        totalScoreBp: 9000,
+        passed: true,
+        hardFail: false,
+        hardFailReasons: [],
+        hallucinationsDetected: [],
+        rawTextHash: 'hash',
+      };
+
+      const duplicates = [fakeRecord, { ...fakeRecord, invocationOrdinal: 2 }];
+      expect(() => {
+        EvaluationLiveRunner.validateReplicateProtocol(duplicates, eligibleCases, [CANDIDATE_A_DEEPSEEK]);
+      }).toThrow('A12B2B_DUPLICATE_REPLICATE_RESULT');
+    });
+
+    // 15.3 Invariant: Rejection of Missing Replicate
+    it('should throw A12B2B_INCOMPLETE_REPLICATE_PROTOCOL if replicate 1 or 2 is missing for any eligible case', () => {
+      const eligibleCases = EvaluationSecurityGate.prepareEvaluationBatch(VELNAR_SHADOW_EVAL_V1).filter(
+        (c) => c.disposition === 'ELIGIBLE'
+      );
+
+      // Only replicate 1 present for case 0
+      const onlyRep1: LiveEvaluationResultRecord = {
+        runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
+        datasetVersion: 'v1.0.0',
+        scoringPolicyVersion: 'v1.2.1',
+        pricingCatalogVersion: '2026-02-28',
+        caseId: eligibleCases[0].id,
+        taskType: eligibleCases[0].taskType,
+        replicateIndex: 1,
+        invocationOrdinal: 1,
+        candidateId: 'deepseek-v4-flash-offpeak-low',
+        providerId: 'deepseek',
+        requestedModelIdentifier: 'deepseek-v4-flash',
+        returnedModelIdentifier: 'deepseek-v4-flash',
+        conservativeInputTokenUpperBound: 500,
+        serviceProfile: 'OFF_PEAK_COST_OPTIMIZED',
+        thinkingEffort: 'low',
+        promptVersion: 'v1.0.0',
+        originalDataClassification: 'PUBLIC_BUSINESS',
+        effectiveDataClassification: 'PUBLIC_BUSINESS',
+        securityDisposition: 'ELIGIBLE',
+        requestStartedAt: new Date().toISOString(),
+        pricingWindow: 'OFF_PEAK',
+        latencyMs: 300,
+        attemptCount: 1,
+        usageSource: 'PROVIDER_REPORTED',
+        promptTokens: 100,
+        cacheHitTokens: 0,
+        cacheMissTokens: 100,
+        completionTokens: 50,
+        thinkingTokens: 0,
+        totalTokens: 150,
+        actualCostMicroUsd: 100,
+        normalizedCostMicroUsd: 100,
+        dimensionScores: {} as any,
+        totalScoreBp: 9000,
+        passed: true,
+        hardFail: false,
+        hardFailReasons: [],
+        hallucinationsDetected: [],
+        rawTextHash: 'hash',
+      };
+
+      expect(() => {
+        EvaluationLiveRunner.validateReplicateProtocol([onlyRep1], eligibleCases, [CANDIDATE_A_DEEPSEEK]);
+      }).toThrow('A12B2B_INCOMPLETE_REPLICATE_PROTOCOL');
+    });
+
+    // 15.4 Quality Metrics: Provider Failure Exclusion from Semantic Quality Mean
+    it('should exclude provider failures from semantic quality mean while tracking providerSuccessRate and allInvocationPassRate', () => {
+      const eligibleCases = EvaluationSecurityGate.prepareEvaluationBatch(VELNAR_SHADOW_EVAL_V1).filter(
+        (c) => c.disposition === 'ELIGIBLE'
+      ).slice(0, 1); // 1 case for test simplicity
+
+      const successfulRep1: LiveEvaluationResultRecord = {
+        runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
+        datasetVersion: 'v1.0.0',
+        scoringPolicyVersion: 'v1.2.1',
+        pricingCatalogVersion: '2026-02-28',
+        caseId: eligibleCases[0].id,
+        taskType: eligibleCases[0].taskType,
+        replicateIndex: 1,
+        invocationOrdinal: 1,
+        candidateId: 'deepseek-v4-flash-offpeak-low',
+        providerId: 'deepseek',
+        requestedModelIdentifier: 'deepseek-v4-flash',
+        returnedModelIdentifier: 'deepseek-v4-flash',
+        conservativeInputTokenUpperBound: 500,
+        serviceProfile: 'OFF_PEAK_COST_OPTIMIZED',
+        thinkingEffort: 'low',
+        promptVersion: 'v1.0.0',
+        originalDataClassification: 'PUBLIC_BUSINESS',
+        effectiveDataClassification: 'PUBLIC_BUSINESS',
+        securityDisposition: 'ELIGIBLE',
+        requestStartedAt: new Date().toISOString(),
+        pricingWindow: 'OFF_PEAK',
+        latencyMs: 400,
+        attemptCount: 1,
+        usageSource: 'PROVIDER_REPORTED',
+        promptTokens: 100,
+        cacheHitTokens: 0,
+        cacheMissTokens: 100,
+        completionTokens: 50,
+        thinkingTokens: 0,
+        totalTokens: 150,
+        actualCostMicroUsd: 100,
+        normalizedCostMicroUsd: 100,
+        dimensionScores: {} as any,
+        totalScoreBp: 9200, // 92.00%
+        passed: true,
+        hardFail: false,
+        hardFailReasons: [],
+        hallucinationsDetected: [],
+        rawTextHash: 'hash1',
+        parsedOutput: { intent: 'HIGH' },
+      };
+
+      const providerFailedRep2: LiveEvaluationResultRecord = {
+        runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
+        datasetVersion: 'v1.0.0',
+        scoringPolicyVersion: 'v1.2.1',
+        pricingCatalogVersion: '2026-02-28',
+        caseId: eligibleCases[0].id,
+        taskType: eligibleCases[0].taskType,
+        replicateIndex: 2,
+        invocationOrdinal: 2,
+        candidateId: 'deepseek-v4-flash-offpeak-low',
+        providerId: 'deepseek',
+        requestedModelIdentifier: 'deepseek-v4-flash',
+        returnedModelIdentifier: 'UNKNOWN',
+        conservativeInputTokenUpperBound: 500,
+        serviceProfile: 'OFF_PEAK_COST_OPTIMIZED',
+        thinkingEffort: 'low',
+        promptVersion: 'v1.0.0',
+        originalDataClassification: 'PUBLIC_BUSINESS',
+        effectiveDataClassification: 'PUBLIC_BUSINESS',
+        securityDisposition: 'ELIGIBLE',
+        requestStartedAt: new Date().toISOString(),
+        pricingWindow: 'OFF_PEAK',
+        latencyMs: 0,
+        attemptCount: 1,
+        usageSource: 'UNAVAILABLE',
+        promptTokens: 0,
+        cacheHitTokens: 0,
+        cacheMissTokens: 0,
+        completionTokens: 0,
+        thinkingTokens: 0,
+        totalTokens: 0,
+        actualCostMicroUsd: 0,
+        normalizedCostMicroUsd: 0,
+        dimensionScores: {} as any,
+        totalScoreBp: 0,
+        passed: false,
+        hardFail: true,
+        hardFailReasons: ['PROVIDER_ERROR' as any],
+        hallucinationsDetected: [],
+        rawTextHash: 'NONE',
+        providerErrorCategory: 'PROVIDER_HTTP_503',
+      };
+
+      const summary = EvaluationLiveRunner.summarizeCandidateResults(
+        CANDIDATE_A_DEEPSEEK,
+        [successfulRep1, providerFailedRep2],
+        eligibleCases
+      );
+
+      // Semantic quality score MUST be 9200 (from the 1 scorable output), NOT (9200 + 0)/2 = 4600!
+      expect(summary.meanScoreSuccessfulScorableOutputs).toBe(9200);
+      expect(summary.meanScoreBps).toBe(9200);
+
+      // Reliability & pass rates MUST reflect the provider failure (1/2 = 50%)
+      expect(summary.totalInvocations).toBe(2);
+      expect(summary.successfulInvocations).toBe(1);
+      expect(summary.providerErrors).toBe(1);
+      expect(summary.providerSuccessRateBps).toBe(5000); // 50.00%
+      expect(summary.passRateBps).toBe(5000); // 50.00%
+      expect(summary.allInvocationPassRateBps).toBe(5000); // 50.00%
+      expect(summary.hardFailRateBps).toBe(5000); // 50.00%
+    });
+
+    // 15.5 Dynamic Mathematical Pareto Frontier Evaluation
+    it('should compute mathematical Pareto dominance without hardcoded strings', () => {
+      const mockDeepSeekSummary: CandidateLiveSummary = {
+        candidateId: 'deepseek-v4-flash-offpeak-low',
+        providerId: 'deepseek',
+        requestedModelIdentifier: 'deepseek-v4-flash',
+        serviceProfile: 'OFF_PEAK_COST_OPTIMIZED',
+        totalInvocations: 66,
+        successfulInvocations: 66,
+        providerErrors: 0,
+        validJsonRateBps: 10000,
+        providerSuccessRateBps: 10000,
+        passRateBps: 9091,
+        allInvocationPassRateBps: 9091,
+        hardFailRateBps: 909,
+        meanScoreBps: 9387,
+        meanScoreSuccessfulScorableOutputs: 9387,
+        medianScoreBps: 9940,
+        p50LatencyMs: 2500,
+        p95LatencyMs: 4000,
+        minLatencyMs: 1200,
+        maxLatencyMs: 5000,
+        meanLatencyMs: 2600,
+        totalPromptTokens: 30000,
+        totalCacheHitTokens: 25000,
+        totalCacheMissTokens: 5000,
+        totalCompletionTokens: 10000,
+        totalThinkingTokens: 0,
+        totalTokens: 40000,
+        cacheHitRatioBps: 8333,
+        actualTotalCostMicroUsd: 6500,
+        normalizedTotalCostMicroUsd: 12000,
+        costPerPassingCaseMicroUsd: 108,
+        costPerPassingInvocationMicroUsd: 108,
+        costPerSuccessfulInvocationMicroUsd: 98,
+        unstableCaseCount: 3,
+        instabilityRateBps: 909,
+        perTaskBreakdown: {} as any,
+      };
+
+      const mockGeminiSummaryDominated: CandidateLiveSummary = {
+        ...mockDeepSeekSummary,
+        candidateId: 'gemini-3.5-flash-lite-flex-low',
+        providerId: 'gemini',
+        requestedModelIdentifier: 'gemini-3.5-flash-lite',
+        serviceProfile: 'FLEX_COST_OPTIMIZED',
+        meanScoreSuccessfulScorableOutputs: 9000, // strictly worse
+        allInvocationPassRateBps: 8500, // strictly worse
+        hardFailRateBps: 1500, // strictly worse
+        p50LatencyMs: 3500, // strictly worse
+        actualTotalCostMicroUsd: 9000, // strictly worse
+        instabilityRateBps: 1500, // strictly worse
+      };
+
+      const paretoResult = EvaluationLiveRunner.evaluateParetoFrontier({
+        'deepseek-v4-flash-offpeak-low': mockDeepSeekSummary,
+        'gemini-3.5-flash-lite-flex-low': mockGeminiSummaryDominated,
+      });
+
+      expect(paretoResult.frontierClassification.deepseek).toBe('PARETO_FRONTIER');
+      expect(paretoResult.frontierClassification.gemini).toBe('PARETO_DOMINATED');
+      expect(paretoResult.frontierClassification.mathematicalProof.geminiDominatedByDeepSeek).toBe(true);
+      expect(paretoResult.frontierClassification.mathematicalProof.deepseekDominatedByGemini).toBe(false);
+    });
+
+    // 15.6 Cross-Artifact Deterministic Consistency Validation
+    it('should validate cross-artifact consistency and catch any mismatches', () => {
+      const canonicalPayload = {
+        summaryCounts: {
+          actualInvocationsCount: 2,
+          cumulativeSpendMicroUsd: 200,
+        },
+        candidateSummaries: {
+          'deepseek-v4-flash-offpeak-low': {
+            totalInvocations: 1,
+            actualTotalCostMicroUsd: 100,
+            passRateBps: 10000,
+            meanScoreSuccessfulScorableOutputs: 9500,
+            totalTokens: 150,
+          },
+          'gemini-3.5-flash-lite-flex-low': {
+            totalInvocations: 1,
+            actualTotalCostMicroUsd: 100,
+            passRateBps: 10000,
+            meanScoreSuccessfulScorableOutputs: 9500,
+            totalTokens: 150,
+          },
+        },
+        costOptimizationAnalysis: { deepseek: { actualOffPeakCostMicroUsd: 100 } },
+        paretoAnalysis: { frontierClassification: { deepseek: 'PARETO_FRONTIER', gemini: 'PARETO_FRONTIER' } },
+        results: [
+          { actualCostMicroUsd: 100 },
+          { actualCostMicroUsd: 100 },
+        ],
+      };
+
+      const summaryPayload = {
+        summaries: canonicalPayload.candidateSummaries,
+        paretoAnalysis: canonicalPayload.paretoAnalysis,
+      };
+
+      const costPayload = canonicalPayload.costOptimizationAnalysis;
+
+      const validResult = EvaluationLiveRunner.validateArtifactConsistency({
+        resultsPayload: canonicalPayload,
+        candidateSummaryPayload: summaryPayload,
+        costAnalysisPayload: costPayload,
+      });
+
+      expect(validResult.passed).toBe(true);
+      expect(validResult.errors).toHaveLength(0);
+
+      // Inconsistency test: Mismatch in spend
+      const invalidSummaryPayload = {
+        ...summaryPayload,
+        summaries: {
+          ...summaryPayload.summaries,
+          'deepseek-v4-flash-offpeak-low': {
+            ...summaryPayload.summaries['deepseek-v4-flash-offpeak-low'],
+            actualTotalCostMicroUsd: 99999, // mismatch!
+          },
+        },
+      };
+
+      const invalidResult = EvaluationLiveRunner.validateArtifactConsistency({
+        resultsPayload: canonicalPayload,
+        candidateSummaryPayload: invalidSummaryPayload,
+        costAnalysisPayload: costPayload,
+      });
+
+      expect(invalidResult.passed).toBe(false);
+      expect(invalidResult.errors.some((e) => e.includes('Actual cost mismatch'))).toBe(true);
+    });
+
+    // 15.7 Complete 7 TaskTypes Breakdown Coverage
+    it('should generate complete per-task metrics for all 7 TaskTypes in CandidateLiveSummary', () => {
+      const eligibleCases = EvaluationSecurityGate.prepareEvaluationBatch(VELNAR_SHADOW_EVAL_V1).filter(
+        (c) => c.disposition === 'ELIGIBLE'
+      );
+
+      // Generate 2 dummy replicates for all eligible cases
+      const results: LiveEvaluationResultRecord[] = [];
+      for (const ec of eligibleCases) {
+        for (const rep of [1, 2] as const) {
+          results.push({
+            runProtocolVersion: 'A12B2B_LIVE_SHADOW_v1',
+            datasetVersion: 'v1.0.0',
+            scoringPolicyVersion: 'v1.2.1',
+            pricingCatalogVersion: '2026-02-28',
+            caseId: ec.id,
+            taskType: ec.taskType,
+            replicateIndex: rep,
+            invocationOrdinal: results.length + 1,
+            candidateId: 'deepseek-v4-flash-offpeak-low',
+            providerId: 'deepseek',
+            requestedModelIdentifier: 'deepseek-v4-flash',
+            returnedModelIdentifier: 'deepseek-v4-flash',
+            conservativeInputTokenUpperBound: 500,
+            serviceProfile: 'OFF_PEAK_COST_OPTIMIZED',
+            thinkingEffort: 'low',
+            promptVersion: 'v1.0.0',
+            originalDataClassification: 'PUBLIC_BUSINESS',
+            effectiveDataClassification: 'PUBLIC_BUSINESS',
+            securityDisposition: 'ELIGIBLE',
+            requestStartedAt: new Date().toISOString(),
+            pricingWindow: 'OFF_PEAK',
+            latencyMs: 500,
+            attemptCount: 1,
+            usageSource: 'PROVIDER_REPORTED',
+            promptTokens: 100,
+            cacheHitTokens: 50,
+            cacheMissTokens: 50,
+            completionTokens: 50,
+            thinkingTokens: 0,
+            totalTokens: 150,
+            actualCostMicroUsd: 25,
+            normalizedCostMicroUsd: 30,
+            dimensionScores: {} as any,
+            totalScoreBp: 9500,
+            passed: true,
+            hardFail: false,
+            hardFailReasons: [],
+            hallucinationsDetected: [],
+            rawTextHash: 'hash',
+            parsedOutput: { ok: true },
+          });
+        }
+      }
+
+      const summary = EvaluationLiveRunner.summarizeCandidateResults(
+        CANDIDATE_A_DEEPSEEK,
+        results,
+        eligibleCases
+      );
+
+      const expectedTasks = [
+        'LEAD_INTENT_CLASSIFICATION',
+        'LEAK_EXPLANATION',
+        'GROWTH_ACTION_DRAFT',
+        'BUSINESS_TWIN_SUMMARY',
+        'FUNNEL_DIAGNOSTIC_EXPLANATION',
+        'SEO_CONTENT_SUGGESTION',
+        'ANOMALY_TRIAGE',
+      ];
+
+      for (const task of expectedTasks) {
+        const t = summary.perTaskBreakdown[task as any];
+        expect(t).toBeDefined();
+        expect(t.uniqueCaseCount).toBeGreaterThan(0);
+        expect(t.invocationCount).toBe(t.uniqueCaseCount * 2);
+        expect(t.casesTotal).toBe(t.invocationCount);
+        expect(t.providerSuccess).toBe(t.invocationCount);
+        expect(t.validJsonCount).toBe(t.invocationCount);
+        expect(t.passCount).toBe(t.invocationCount);
+        expect(t.hardFailCount).toBe(0);
+        expect(t.meanScoreSuccessfulScorableOutputs).toBe(9500);
+        expect(t.medianScoreBps).toBe(9500);
+        expect(t.p50LatencyMs).toBe(500);
+        expect(t.p95LatencyMs).toBe(500);
+        expect(t.replicateInstabilityRateBps).toBe(0);
+      }
+    });
+  });
 });
+

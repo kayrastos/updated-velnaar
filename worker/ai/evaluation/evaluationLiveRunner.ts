@@ -17,6 +17,10 @@ import {
   LiveEvaluationResultRecord,
   CandidateLiveSummary,
   CostOptimizationAnalysis,
+  ParetoAnalysisResult,
+  ParetoClassification,
+  LiveEvaluationCheckpoint,
+  TaskTypeEvaluationSummary,
   A12B2B_PRICING_CATALOG_VERSION,
   A12B2B_BUDGET_CAP_MICRO_USD,
   A12B2B_CERTIFICATION_MAX_INPUT_TOKENS_BOUND,
@@ -30,6 +34,8 @@ import {
 } from '../providers/liveEvaluationClient';
 import { PromptRegistry } from '../promptRegistry';
 import { PreparedEvaluationCase } from './types';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export const CANDIDATE_A_DEEPSEEK: LiveCandidateConfig = {
   candidateId: 'deepseek-v4-flash-offpeak-low',
@@ -752,8 +758,69 @@ export class EvaluationLiveRunner {
   }
 
   /**
+   * Validates exact replicate protocol invariants.
+   * Duplicate key -> throws A12B2B_DUPLICATE_REPLICATE_RESULT
+   * Missing replicate 1 or 2 -> throws A12B2B_INCOMPLETE_REPLICATE_PROTOCOL
+   */
+  public static validateReplicateProtocol(
+    results: LiveEvaluationResultRecord[],
+    expectedEligibleCases: PreparedEvaluationCase[],
+    candidates: LiveCandidateConfig[] = EvaluationLiveRunner.CANDIDATES
+  ): void {
+    const replicateKeySet = new Set<string>();
+    for (const r of results) {
+      if (r.securityDisposition !== 'ELIGIBLE') continue;
+      const key = `${r.candidateId}::${r.caseId}::${r.replicateIndex}`;
+      if (replicateKeySet.has(key)) {
+        throw new Error(
+          `A12B2B_DUPLICATE_REPLICATE_RESULT: Duplicate candidate/case/replicate result for ${key}`
+        );
+      }
+      replicateKeySet.add(key);
+    }
+
+    if (expectedEligibleCases && expectedEligibleCases.length > 0) {
+      for (const candidate of candidates) {
+        for (const ec of expectedEligibleCases) {
+          const rep1Key = `${candidate.candidateId}::${ec.id}::1`;
+          const rep2Key = `${candidate.candidateId}::${ec.id}::2`;
+          if (!replicateKeySet.has(rep1Key)) {
+            throw new Error(
+              `A12B2B_INCOMPLETE_REPLICATE_PROTOCOL: Case ${ec.id} for candidate ${candidate.candidateId} is missing replicate 1`
+            );
+          }
+          if (!replicateKeySet.has(rep2Key)) {
+            throw new Error(
+              `A12B2B_INCOMPLETE_REPLICATE_PROTOCOL: Case ${ec.id} for candidate ${candidate.candidateId} is missing replicate 2`
+            );
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Atomically persists a durable run checkpoint to disk using a temporary file and atomic rename.
+   */
+  public static persistCheckpoint(
+    checkpoint: LiveEvaluationCheckpoint,
+    customPath?: string
+  ): void {
+    const checkpointPath =
+      customPath || path.join(process.cwd(), 'execution', 'a12b2b_full_v121_checkpoint.json');
+    const dir = path.dirname(checkpointPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const tmpPath = `${checkpointPath}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 7)}`;
+    fs.writeFileSync(tmpPath, JSON.stringify(checkpoint, null, 2), 'utf8');
+    fs.renameSync(tmpPath, checkpointPath);
+  }
+
+  /**
    * Calculates summary metrics for a candidate across its live evaluation results.
    * Enforces complete replicate invariant (exactly 2 replicates for every eligible case).
+   * Excludes provider failures from model semantic quality score calculations.
    */
   public static summarizeCandidateResults(
     candidate: LiveCandidateConfig,
@@ -770,8 +837,7 @@ export class EvaluationLiveRunner {
     let validJsonCount = 0;
     let passedCount = 0;
     let hardFailCount = 0;
-    let scoreSum = 0;
-    const scores: number[] = [];
+    const scorableScores: number[] = [];
     const latencies: number[] = [];
 
     let totalPromptTokens = 0;
@@ -786,38 +852,51 @@ export class EvaluationLiveRunner {
     const taskMap: Record<
       TaskType,
       {
-        casesTotal: number;
-        casesPassed: number;
-        hardFails: number;
-        scoreSum: number;
-        scores: number[];
+        casesMap: Map<string, LiveEvaluationResultRecord[]>;
+        invocationCount: number;
+        providerSuccess: number;
+        validJsonCount: number;
+        passCount: number;
+        hardFailCount: number;
+        scorableScores: number[];
         latencies: number[];
         actualCost: number;
         normCost: number;
       }
     > = {
-      LEAD_INTENT_CLASSIFICATION: { casesTotal: 0, casesPassed: 0, hardFails: 0, scoreSum: 0, scores: [], latencies: [], actualCost: 0, normCost: 0 },
-      LEAK_EXPLANATION: { casesTotal: 0, casesPassed: 0, hardFails: 0, scoreSum: 0, scores: [], latencies: [], actualCost: 0, normCost: 0 },
-      GROWTH_ACTION_DRAFT: { casesTotal: 0, casesPassed: 0, hardFails: 0, scoreSum: 0, scores: [], latencies: [], actualCost: 0, normCost: 0 },
-      BUSINESS_TWIN_SUMMARY: { casesTotal: 0, casesPassed: 0, hardFails: 0, scoreSum: 0, scores: [], latencies: [], actualCost: 0, normCost: 0 },
-      FUNNEL_DIAGNOSTIC_EXPLANATION: { casesTotal: 0, casesPassed: 0, hardFails: 0, scoreSum: 0, scores: [], latencies: [], actualCost: 0, normCost: 0 },
-      SEO_CONTENT_SUGGESTION: { casesTotal: 0, casesPassed: 0, hardFails: 0, scoreSum: 0, scores: [], latencies: [], actualCost: 0, normCost: 0 },
-      ANOMALY_TRIAGE: { casesTotal: 0, casesPassed: 0, hardFails: 0, scoreSum: 0, scores: [], latencies: [], actualCost: 0, normCost: 0 },
+      LEAD_INTENT_CLASSIFICATION: { casesMap: new Map(), invocationCount: 0, providerSuccess: 0, validJsonCount: 0, passCount: 0, hardFailCount: 0, scorableScores: [], latencies: [], actualCost: 0, normCost: 0 },
+      LEAK_EXPLANATION: { casesMap: new Map(), invocationCount: 0, providerSuccess: 0, validJsonCount: 0, passCount: 0, hardFailCount: 0, scorableScores: [], latencies: [], actualCost: 0, normCost: 0 },
+      GROWTH_ACTION_DRAFT: { casesMap: new Map(), invocationCount: 0, providerSuccess: 0, validJsonCount: 0, passCount: 0, hardFailCount: 0, scorableScores: [], latencies: [], actualCost: 0, normCost: 0 },
+      BUSINESS_TWIN_SUMMARY: { casesMap: new Map(), invocationCount: 0, providerSuccess: 0, validJsonCount: 0, passCount: 0, hardFailCount: 0, scorableScores: [], latencies: [], actualCost: 0, normCost: 0 },
+      FUNNEL_DIAGNOSTIC_EXPLANATION: { casesMap: new Map(), invocationCount: 0, providerSuccess: 0, validJsonCount: 0, passCount: 0, hardFailCount: 0, scorableScores: [], latencies: [], actualCost: 0, normCost: 0 },
+      SEO_CONTENT_SUGGESTION: { casesMap: new Map(), invocationCount: 0, providerSuccess: 0, validJsonCount: 0, passCount: 0, hardFailCount: 0, scorableScores: [], latencies: [], actualCost: 0, normCost: 0 },
+      ANOMALY_TRIAGE: { casesMap: new Map(), invocationCount: 0, providerSuccess: 0, validJsonCount: 0, passCount: 0, hardFailCount: 0, scorableScores: [], latencies: [], actualCost: 0, normCost: 0 },
     };
 
     const caseMap = new Map<string, LiveEvaluationResultRecord[]>();
+    const replicateKeySet = new Set<string>();
 
     for (const r of candidateResults) {
+      const repKey = `${r.candidateId}::${r.caseId}::${r.replicateIndex}`;
+      if (replicateKeySet.has(repKey)) {
+        throw new Error(
+          `A12B2B_DUPLICATE_REPLICATE_RESULT: Duplicate candidate/case/replicate result for ${repKey}`
+        );
+      }
+      replicateKeySet.add(repKey);
+
       if (!caseMap.has(r.caseId)) caseMap.set(r.caseId, []);
       caseMap.get(r.caseId)!.push(r);
 
-      if (r.parsedOutput && typeof r.parsedOutput === 'object') validJsonCount++;
+      const isProviderError = Boolean(r.providerErrorCategory);
+      if (!isProviderError && r.parsedOutput && typeof r.parsedOutput === 'object') validJsonCount++;
       if (r.passed) passedCount++;
       if (r.hardFail) hardFailCount++;
 
-      scoreSum += r.totalScoreBp;
-      scores.push(r.totalScoreBp);
-      if (!r.providerErrorCategory) latencies.push(r.latencyMs);
+      if (!isProviderError) {
+        scorableScores.push(r.totalScoreBp);
+        latencies.push(r.latencyMs);
+      }
 
       totalPromptTokens += r.promptTokens;
       totalCacheHitTokens += r.cacheHitTokens;
@@ -829,12 +908,17 @@ export class EvaluationLiveRunner {
       normalizedTotalCostMicroUsd += r.normalizedCostMicroUsd;
 
       const t = taskMap[r.taskType];
-      t.casesTotal++;
-      if (r.passed) t.casesPassed++;
-      if (r.hardFail) t.hardFails++;
-      t.scoreSum += r.totalScoreBp;
-      t.scores.push(r.totalScoreBp);
-      if (!r.providerErrorCategory) t.latencies.push(r.latencyMs);
+      if (!t.casesMap.has(r.caseId)) t.casesMap.set(r.caseId, []);
+      t.casesMap.get(r.caseId)!.push(r);
+      t.invocationCount++;
+      if (!isProviderError) {
+        t.providerSuccess++;
+        if (r.parsedOutput && typeof r.parsedOutput === 'object') t.validJsonCount++;
+        t.scorableScores.push(r.totalScoreBp);
+        t.latencies.push(r.latencyMs);
+      }
+      if (r.passed) t.passCount++;
+      if (r.hardFail) t.hardFailCount++;
       t.actualCost += r.actualCostMicroUsd;
       t.normCost += r.normalizedCostMicroUsd;
     }
@@ -874,9 +958,16 @@ export class EvaluationLiveRunner {
     const validJsonRateBps = totalInvocations > 0 ? Math.round((validJsonCount / totalInvocations) * 10000) : 0;
     const providerSuccessRateBps = totalInvocations > 0 ? Math.round((successfulInvocations / totalInvocations) * 10000) : 0;
     const passRateBps = totalInvocations > 0 ? Math.round((passedCount / totalInvocations) * 10000) : 0;
+    const allInvocationPassRateBps = passRateBps;
     const hardFailRateBps = totalInvocations > 0 ? Math.round((hardFailCount / totalInvocations) * 10000) : 0;
-    const meanScoreBps = totalInvocations > 0 ? Math.round(scoreSum / totalInvocations) : 0;
-    const medianScoreBps = this.computePercentile(scores, 50);
+    
+    // Model semantic quality mean EXCLUDES provider failures
+    const meanScoreSuccessfulScorableOutputs =
+      scorableScores.length > 0
+        ? Math.round(scorableScores.reduce((a, b) => a + b, 0) / scorableScores.length)
+        : 0;
+    const meanScoreBps = meanScoreSuccessfulScorableOutputs;
+    const medianScoreBps = this.computePercentile(scorableScores, 50);
 
     const minLatencyMs = latencies.length > 0 ? Math.min(...latencies) : 0;
     const maxLatencyMs = latencies.length > 0 ? Math.max(...latencies) : 0;
@@ -885,24 +976,54 @@ export class EvaluationLiveRunner {
     const p95LatencyMs = this.computePercentile(latencies, 95);
 
     const cacheHitRatioBps = totalPromptTokens > 0 ? Math.round((totalCacheHitTokens / totalPromptTokens) * 10000) : 0;
-    const costPerPassingCaseMicroUsd = passedCount > 0 ? Math.round(actualTotalCostMicroUsd / passedCount) : 0;
+    const costPerPassingInvocationMicroUsd = passedCount > 0 ? Math.round(actualTotalCostMicroUsd / passedCount) : 0;
+    const costPerPassingCaseMicroUsd = costPerPassingInvocationMicroUsd;
+    const costPerSuccessfulInvocationMicroUsd = successfulInvocations > 0 ? Math.round(actualTotalCostMicroUsd / successfulInvocations) : 0;
+    
     const totalCases = caseMap.size;
     const instabilityRateBps = totalCases > 0 ? Math.round((unstableCaseCount / totalCases) * 10000) : 0;
 
-    const perTaskBreakdown: any = {};
+    const perTaskBreakdown: Record<TaskType, TaskTypeEvaluationSummary> = {} as any;
     for (const [taskKey, t] of Object.entries(taskMap)) {
       const task = taskKey as TaskType;
+      const uniqueCaseCount = t.casesMap.size;
+      let taskUnstableCount = 0;
+      for (const [, reps] of t.casesMap) {
+        if (reps.length === 2) {
+          const delta = Math.abs(reps[0].totalScoreBp - reps[1].totalScoreBp);
+          if (reps[0].passed !== reps[1].passed || reps[0].hardFail !== reps[1].hardFail || delta > 2000) {
+            taskUnstableCount++;
+          }
+        }
+      }
+      const taskInstabilityBps = uniqueCaseCount > 0 ? Math.round((taskUnstableCount / uniqueCaseCount) * 10000) : 0;
+      const taskMeanScore =
+        t.scorableScores.length > 0
+          ? Math.round(t.scorableScores.reduce((a, b) => a + b, 0) / t.scorableScores.length)
+          : 0;
+
       perTaskBreakdown[task] = {
-        casesTotal: t.casesTotal,
-        casesPassed: t.casesPassed,
-        hardFails: t.hardFails,
-        passRateBps: t.casesTotal > 0 ? Math.round((t.casesPassed / t.casesTotal) * 10000) : 0,
-        meanScoreBps: t.casesTotal > 0 ? Math.round(t.scoreSum / t.casesTotal) : 0,
-        medianScoreBps: this.computePercentile(t.scores, 50),
+        uniqueCaseCount,
+        invocationCount: t.invocationCount,
+        casesTotal: t.invocationCount,
+        casesPassed: t.passCount,
+        passCount: t.passCount,
+        hardFails: t.hardFailCount,
+        hardFailCount: t.hardFailCount,
+        providerSuccess: t.providerSuccess,
+        providerSuccessRateBps: t.invocationCount > 0 ? Math.round((t.providerSuccess / t.invocationCount) * 10000) : 0,
+        validJsonCount: t.validJsonCount,
+        validJsonRateBps: t.invocationCount > 0 ? Math.round((t.validJsonCount / t.invocationCount) * 10000) : 0,
+        passRateBps: t.invocationCount > 0 ? Math.round((t.passCount / t.invocationCount) * 10000) : 0,
+        hardFailRateBps: t.invocationCount > 0 ? Math.round((t.hardFailCount / t.invocationCount) * 10000) : 0,
+        meanScoreBps: taskMeanScore,
+        meanScoreSuccessfulScorableOutputs: taskMeanScore,
+        medianScoreBps: this.computePercentile(t.scorableScores, 50),
         p50LatencyMs: this.computePercentile(t.latencies, 50),
         p95LatencyMs: this.computePercentile(t.latencies, 95),
         actualCostMicroUsd: t.actualCost,
         normalizedCostMicroUsd: t.normCost,
+        replicateInstabilityRateBps: taskInstabilityBps,
       };
     }
 
@@ -917,8 +1038,10 @@ export class EvaluationLiveRunner {
       validJsonRateBps,
       providerSuccessRateBps,
       passRateBps,
+      allInvocationPassRateBps,
       hardFailRateBps,
       meanScoreBps,
+      meanScoreSuccessfulScorableOutputs,
       medianScoreBps,
       p50LatencyMs,
       p95LatencyMs,
@@ -935,10 +1058,276 @@ export class EvaluationLiveRunner {
       actualTotalCostMicroUsd,
       normalizedTotalCostMicroUsd,
       costPerPassingCaseMicroUsd,
+      costPerPassingInvocationMicroUsd,
+      costPerSuccessfulInvocationMicroUsd,
       unstableCaseCount,
       instabilityRateBps,
       perTaskBreakdown,
     };
+  }
+
+  /**
+   * Evaluates Pareto frontier classification mathematically based strictly on completed metrics.
+   * Candidate A is PARETO_DOMINATED iff Candidate B is no worse on every dimension and strictly better on at least one.
+   * Otherwise Candidate A is PARETO_FRONTIER.
+   */
+  public static evaluateParetoFrontier(
+    summaries: Record<LiveCandidateId, CandidateLiveSummary>
+  ): ParetoAnalysisResult {
+    const ds = summaries['deepseek-v4-flash-offpeak-low'];
+    const gem = summaries['gemini-3.5-flash-lite-flex-low'];
+
+    if (!ds || !gem) {
+      throw new Error('A12B2B_INVALID_SUMMARIES: Both DeepSeek and Gemini candidate summaries are required for Pareto classification');
+    }
+
+    const dimensions = {
+      qualityMeanScoreBps: {
+        deepseek: ds.meanScoreSuccessfulScorableOutputs,
+        gemini: gem.meanScoreSuccessfulScorableOutputs,
+        leader: (ds.meanScoreSuccessfulScorableOutputs > gem.meanScoreSuccessfulScorableOutputs
+          ? 'deepseek'
+          : gem.meanScoreSuccessfulScorableOutputs > ds.meanScoreSuccessfulScorableOutputs
+          ? 'gemini'
+          : 'TIE') as 'deepseek' | 'gemini' | 'TIE',
+      },
+      passRateBps: {
+        deepseek: ds.allInvocationPassRateBps,
+        gemini: gem.allInvocationPassRateBps,
+        leader: (ds.allInvocationPassRateBps > gem.allInvocationPassRateBps
+          ? 'deepseek'
+          : gem.allInvocationPassRateBps > ds.allInvocationPassRateBps
+          ? 'gemini'
+          : 'TIE') as 'deepseek' | 'gemini' | 'TIE',
+      },
+      hardFailRateBps: {
+        deepseek: ds.hardFailRateBps,
+        gemini: gem.hardFailRateBps,
+        leader: (ds.hardFailRateBps < gem.hardFailRateBps
+          ? 'deepseek'
+          : gem.hardFailRateBps < ds.hardFailRateBps
+          ? 'gemini'
+          : 'TIE') as 'deepseek' | 'gemini' | 'TIE',
+      },
+      p50LatencyMs: {
+        deepseek: ds.p50LatencyMs,
+        gemini: gem.p50LatencyMs,
+        leader: (ds.p50LatencyMs < gem.p50LatencyMs
+          ? 'deepseek'
+          : gem.p50LatencyMs < ds.p50LatencyMs
+          ? 'gemini'
+          : 'TIE') as 'deepseek' | 'gemini' | 'TIE',
+      },
+      actualCostMicroUsd: {
+        deepseek: ds.actualTotalCostMicroUsd,
+        gemini: gem.actualTotalCostMicroUsd,
+        leader: (ds.actualTotalCostMicroUsd < gem.actualTotalCostMicroUsd
+          ? 'deepseek'
+          : gem.actualTotalCostMicroUsd < ds.actualTotalCostMicroUsd
+          ? 'gemini'
+          : 'TIE') as 'deepseek' | 'gemini' | 'TIE',
+      },
+      replicateInstabilityRateBps: {
+        deepseek: ds.instabilityRateBps,
+        gemini: gem.instabilityRateBps,
+        leader: (ds.instabilityRateBps < gem.instabilityRateBps
+          ? 'deepseek'
+          : gem.instabilityRateBps < ds.instabilityRateBps
+          ? 'gemini'
+          : 'TIE') as 'deepseek' | 'gemini' | 'TIE',
+      },
+    };
+
+    // DeepSeek dominated by Gemini?
+    const geminiNoWorseThanDeepSeek =
+      gem.meanScoreSuccessfulScorableOutputs >= ds.meanScoreSuccessfulScorableOutputs &&
+      gem.hardFailRateBps <= ds.hardFailRateBps &&
+      gem.providerSuccessRateBps >= ds.providerSuccessRateBps &&
+      gem.p50LatencyMs <= ds.p50LatencyMs &&
+      gem.actualTotalCostMicroUsd <= ds.actualTotalCostMicroUsd &&
+      gem.instabilityRateBps <= ds.instabilityRateBps;
+
+    const geminiStrictlyBetterThanDeepSeek =
+      gem.meanScoreSuccessfulScorableOutputs > ds.meanScoreSuccessfulScorableOutputs ||
+      gem.hardFailRateBps < ds.hardFailRateBps ||
+      gem.providerSuccessRateBps > ds.providerSuccessRateBps ||
+      gem.p50LatencyMs < ds.p50LatencyMs ||
+      gem.actualTotalCostMicroUsd < ds.actualTotalCostMicroUsd ||
+      gem.instabilityRateBps < ds.instabilityRateBps;
+
+    const deepseekDominatedByGemini = geminiNoWorseThanDeepSeek && geminiStrictlyBetterThanDeepSeek;
+
+    // Gemini dominated by DeepSeek?
+    const deepseekNoWorseThanGemini =
+      ds.meanScoreSuccessfulScorableOutputs >= gem.meanScoreSuccessfulScorableOutputs &&
+      ds.hardFailRateBps <= gem.hardFailRateBps &&
+      ds.providerSuccessRateBps >= gem.providerSuccessRateBps &&
+      ds.p50LatencyMs <= gem.p50LatencyMs &&
+      ds.actualTotalCostMicroUsd <= gem.actualTotalCostMicroUsd &&
+      ds.instabilityRateBps <= gem.instabilityRateBps;
+
+    const deepseekStrictlyBetterThanGemini =
+      ds.meanScoreSuccessfulScorableOutputs > gem.meanScoreSuccessfulScorableOutputs ||
+      ds.hardFailRateBps < gem.hardFailRateBps ||
+      ds.providerSuccessRateBps > gem.providerSuccessRateBps ||
+      ds.p50LatencyMs < gem.p50LatencyMs ||
+      ds.actualTotalCostMicroUsd < gem.actualTotalCostMicroUsd ||
+      ds.instabilityRateBps < gem.instabilityRateBps;
+
+    const geminiDominatedByDeepSeek = deepseekNoWorseThanGemini && deepseekStrictlyBetterThanGemini;
+
+    const dsClassification: ParetoClassification = deepseekDominatedByGemini ? 'PARETO_DOMINATED' : 'PARETO_FRONTIER';
+    const gemClassification: ParetoClassification = geminiDominatedByDeepSeek ? 'PARETO_DOMINATED' : 'PARETO_FRONTIER';
+
+    return {
+      dimensions,
+      frontierClassification: {
+        deepseek: dsClassification,
+        gemini: gemClassification,
+        mathematicalProof: {
+          deepseekDominatedByGemini,
+          geminiDominatedByDeepSeek,
+        },
+      },
+    };
+  }
+
+  /**
+   * Deterministic cross-artifact validator.
+   * Validates consistency across canonical results, candidate summary, and cost analysis artifacts.
+   */
+  public static validateArtifactConsistency(params: {
+    resultsPayload: any;
+    candidateSummaryPayload: any;
+    costAnalysisPayload: any;
+    markdownContent?: string;
+  }): { passed: boolean; errors: string[] } {
+    const { resultsPayload, candidateSummaryPayload, costAnalysisPayload } = params;
+    const errors: string[] = [];
+
+    if (!resultsPayload || !candidateSummaryPayload || !costAnalysisPayload) {
+      errors.push('A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Missing required artifact payload(s)');
+      return { passed: false, errors };
+    }
+
+    // 1. Validate Candidate IDs and Invocations Count
+    const resSummaries = resultsPayload.candidateSummaries;
+    const canSummaries = candidateSummaryPayload.summaries;
+
+    if (!resSummaries || !canSummaries) {
+      errors.push('A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Missing candidate summaries in results or summary payload');
+      return { passed: false, errors };
+    }
+
+    for (const candId of ['deepseek-v4-flash-offpeak-low', 'gemini-3.5-flash-lite-flex-low']) {
+      const rSum = resSummaries[candId];
+      const cSum = canSummaries[candId];
+      if (!rSum || !cSum) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Candidate ${candId} missing from summary records`);
+        continue;
+      }
+
+      if (rSum.totalInvocations !== cSum.totalInvocations) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Invocations count mismatch for ${candId} (${rSum.totalInvocations} vs ${cSum.totalInvocations})`);
+      }
+      if (rSum.actualTotalCostMicroUsd !== cSum.actualTotalCostMicroUsd) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Actual cost mismatch for ${candId} (${rSum.actualTotalCostMicroUsd} vs ${cSum.actualTotalCostMicroUsd})`);
+      }
+      if (rSum.passRateBps !== cSum.passRateBps) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Pass rate mismatch for ${candId} (${rSum.passRateBps} vs ${cSum.passRateBps})`);
+      }
+      if (rSum.meanScoreSuccessfulScorableOutputs !== cSum.meanScoreSuccessfulScorableOutputs) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Semantic quality score mismatch for ${candId}`);
+      }
+      if (rSum.totalTokens !== cSum.totalTokens) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Total tokens mismatch for ${candId}`);
+      }
+    }
+
+    // 2. Validate Cumulative Spend & Results Array Count
+    const actualResults = resultsPayload.results || [];
+    const expectedCount = resultsPayload.summaryCounts?.actualInvocationsCount;
+    if (actualResults.length !== expectedCount) {
+      errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Results array length (${actualResults.length}) does not match actualInvocationsCount (${expectedCount})`);
+    }
+
+    const calculatedSpend = actualResults.reduce((acc: number, r: any) => acc + (r.actualCostMicroUsd || 0), 0);
+    if (calculatedSpend !== resultsPayload.summaryCounts?.cumulativeSpendMicroUsd) {
+      errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Cumulative spend mismatch in results payload (${calculatedSpend} vs ${resultsPayload.summaryCounts?.cumulativeSpendMicroUsd})`);
+    }
+
+    // 3. Validate Cost Analysis Artifact
+    const resCost = resultsPayload.costOptimizationAnalysis;
+    if (JSON.stringify(resCost) !== JSON.stringify(costAnalysisPayload)) {
+      errors.push('A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Cost analysis artifact does not match results costOptimizationAnalysis');
+    }
+
+    // 4. Validate Pareto Analysis Consistency
+    const resPareto = resultsPayload.paretoAnalysis;
+    const canPareto = candidateSummaryPayload.paretoAnalysis;
+    if (JSON.stringify(resPareto) !== JSON.stringify(canPareto)) {
+      errors.push('A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Pareto analysis mismatch between results and summary artifacts');
+    }
+
+    return {
+      passed: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Programmatically generates the Phase A.12B.2B Controlled Live Shadow Benchmark Report section from final JSON.
+   */
+  public static generateMarkdownReportSection(canonicalResults: any): string {
+    const counts = canonicalResults.summaryCounts;
+    const ds = canonicalResults.candidateSummaries['deepseek-v4-flash-offpeak-low'];
+    const gem = canonicalResults.candidateSummaries['gemini-3.5-flash-lite-flex-low'];
+    const pareto = canonicalResults.paretoAnalysis;
+    const cost = canonicalResults.costOptimizationAnalysis;
+
+    const formatUsd = (microUsd: number) => `$${(microUsd / 1_000_000).toFixed(6)}`;
+    const formatBps = (bps: number) => `${(bps / 100).toFixed(2)}%`;
+
+    return `## Phase A.12B.2B: Full Controlled Live Shadow Evaluation
+
+### 1. Protocol & Execution Metadata
+- **Execution Timestamp**: ${canonicalResults.executionTimestamp}
+- **Protocol Version**: ${canonicalResults.protocol} (v${canonicalResults.version})
+- **Dataset Version**: ${canonicalResults.datasetVersion} (36 total cases: 33 eligible, 3 security canaries)
+- **Scoring Policy**: ${canonicalResults.scoringPolicyVersion} (v1.2.1)
+- **Pricing Catalog Version**: ${canonicalResults.pricingCatalogVersion}
+- **Total Invocations**: ${counts.actualInvocationsCount} / ${counts.expectedInvocationsCount}
+- **Security Zero-Call Gate**: ${canonicalResults.securityZeroCallProof.passed ? 'PASSED (0 network calls for 3 blocked cases)' : 'FAILED'}
+- **Cumulative Spend**: ${counts.cumulativeSpendMicroUsd} microUSD (${formatUsd(counts.cumulativeSpendMicroUsd)}) / Budget Cap: ${formatUsd(counts.budgetCapMicroUsd)}
+
+### 2. Candidate Comparative Performance Matrix
+
+| Metric | DeepSeek V4 Flash (Off-Peak) | Gemini 3.5 Flash-Lite (Flex) | Dimension Leader |
+| :--- | :--- | :--- | :--- |
+| **Provider & Requested Model** | \`deepseek-v4-flash\` | \`gemini-3.5-flash-lite\` | — |
+| **Service Profile / Tier** | \`OFF_PEAK_COST_OPTIMIZED\` | \`FLEX_COST_OPTIMIZED\` (flex) | — |
+| **Total Invocations** | ${ds.totalInvocations} | ${gem.totalInvocations} | — |
+| **Provider Success Rate** | ${formatBps(ds.providerSuccessRateBps)} (${ds.successfulInvocations}/${ds.totalInvocations}) | ${formatBps(gem.providerSuccessRateBps)} (${gem.successfulInvocations}/${gem.totalInvocations}) | ${pareto.dimensions.passRateBps ? (ds.providerSuccessRateBps >= gem.providerSuccessRateBps ? 'DeepSeek' : 'Gemini') : 'TIE'} |
+| **Valid JSON Schema Rate** | ${formatBps(ds.validJsonRateBps)} | ${formatBps(gem.validJsonRateBps)} | ${ds.validJsonRateBps >= gem.validJsonRateBps ? 'DeepSeek' : 'Gemini'} |
+| **Overall Pass Rate** | **${formatBps(ds.passRateBps)}** | **${formatBps(gem.passRateBps)}** | **${pareto.dimensions.passRateBps.leader.toUpperCase()}** |
+| **Hard-Fail Rate** | **${formatBps(ds.hardFailRateBps)}** | **${formatBps(gem.hardFailRateBps)}** | **${pareto.dimensions.hardFailRateBps.leader.toUpperCase()}** |
+| **Mean Quality Score (Scorable Outputs)** | **${(ds.meanScoreSuccessfulScorableOutputs / 100).toFixed(2)} / 100.00** | **${(gem.meanScoreSuccessfulScorableOutputs / 100).toFixed(2)} / 100.00** | **${pareto.dimensions.qualityMeanScoreBps.leader.toUpperCase()}** |
+| **Median Quality Score** | ${(ds.medianScoreBps / 100).toFixed(2)} / 100.00 | ${(gem.medianScoreBps / 100).toFixed(2)} / 100.00 | — |
+| **p50 Latency** | **${ds.p50LatencyMs}ms** | **${gem.p50LatencyMs}ms** | **${pareto.dimensions.p50LatencyMs.leader.toUpperCase()}** |
+| **p95 Latency** | ${ds.p95LatencyMs}ms | ${gem.p95LatencyMs}ms | — |
+| **Total Prompt / Completion Tokens** | ${ds.totalPromptTokens} / ${ds.totalCompletionTokens} | ${ds.totalPromptTokens} / ${gem.totalCompletionTokens} | — |
+| **Cache Hit Tokens / Ratio** | ${ds.totalCacheHitTokens} (${formatBps(ds.cacheHitRatioBps)}) | N/A (Standard Flex) | DeepSeek |
+| **Actual Benchmark Cost** | **${formatUsd(ds.actualTotalCostMicroUsd)}** | **${formatUsd(gem.actualTotalCostMicroUsd)}** | **${pareto.dimensions.actualCostMicroUsd.leader.toUpperCase()}** |
+| **Cost Per Passing Invocation** | ${formatUsd(ds.costPerPassingInvocationMicroUsd)} | ${formatUsd(gem.costPerPassingInvocationMicroUsd)} | ${ds.costPerPassingInvocationMicroUsd <= gem.costPerPassingInvocationMicroUsd ? 'DeepSeek' : 'Gemini'} |
+| **Replicate Instability Rate** | **${formatBps(ds.instabilityRateBps)}** (${ds.unstableCaseCount}/${ds.totalInvocations / 2} cases) | **${formatBps(gem.instabilityRateBps)}** (${gem.unstableCaseCount}/${gem.totalInvocations / 2} cases) | **${pareto.dimensions.replicateInstabilityRateBps.leader.toUpperCase()}** |
+
+### 3. Pareto Frontier Classification
+- **DeepSeek Classification**: \`${pareto.frontierClassification.deepseek}\`
+- **Gemini Classification**: \`${pareto.frontierClassification.gemini}\`
+- **Mathematical Dominance Check**:
+  - DeepSeek Dominated by Gemini: \`${pareto.frontierClassification.mathematicalProof.deepseekDominatedByGemini}\`
+  - Gemini Dominated by DeepSeek: \`${pareto.frontierClassification.mathematicalProof.geminiDominatedByDeepSeek}\`
+`;
   }
 
   /**

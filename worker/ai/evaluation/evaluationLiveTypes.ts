@@ -97,6 +97,32 @@ export interface LiveEvaluationResultRecord {
   rawTextHash?: string; // SHA-256 of raw response text
 }
 
+export type ParetoClassification = 'PARETO_FRONTIER' | 'PARETO_DOMINATED';
+
+export interface TaskTypeEvaluationSummary {
+  uniqueCaseCount: number;
+  invocationCount: number;
+  casesTotal: number; // alias for invocationCount for backwards compatibility
+  casesPassed: number;
+  passCount: number; // explicit alias for passing invocations
+  hardFails: number;
+  hardFailCount: number;
+  providerSuccess: number;
+  providerSuccessRateBps: number;
+  validJsonCount: number;
+  validJsonRateBps: number;
+  passRateBps: number;
+  hardFailRateBps: number;
+  meanScoreBps: number;
+  meanScoreSuccessfulScorableOutputs: number;
+  medianScoreBps: number;
+  p50LatencyMs: number;
+  p95LatencyMs: number;
+  actualCostMicroUsd: number;
+  normalizedCostMicroUsd: number;
+  replicateInstabilityRateBps: number;
+}
+
 export interface CandidateLiveSummary {
   candidateId: LiveCandidateId;
   providerId: AIProviderId;
@@ -108,8 +134,10 @@ export interface CandidateLiveSummary {
   validJsonRateBps: number;
   providerSuccessRateBps: number;
   passRateBps: number;
+  allInvocationPassRateBps: number;
   hardFailRateBps: number;
   meanScoreBps: number;
+  meanScoreSuccessfulScorableOutputs: number;
   medianScoreBps: number;
   p50LatencyMs: number;
   p95LatencyMs: number;
@@ -126,20 +154,67 @@ export interface CandidateLiveSummary {
   actualTotalCostMicroUsd: number;
   normalizedTotalCostMicroUsd: number;
   costPerPassingCaseMicroUsd: number;
+  costPerPassingInvocationMicroUsd: number;
+  costPerSuccessfulInvocationMicroUsd: number;
   unstableCaseCount: number;
   instabilityRateBps: number;
-  perTaskBreakdown: Record<TaskType, {
-    casesTotal: number;
-    casesPassed: number;
-    hardFails: number;
-    passRateBps: number;
-    meanScoreBps: number;
-    medianScoreBps: number;
-    p50LatencyMs: number;
-    p95LatencyMs: number;
-    actualCostMicroUsd: number;
-    normalizedCostMicroUsd: number;
-  }>;
+  perTaskBreakdown: Record<TaskType, TaskTypeEvaluationSummary>;
+}
+
+export interface ParetoAnalysisResult {
+  dimensions: {
+    qualityMeanScoreBps: {
+      deepseek: number;
+      gemini: number;
+      leader: 'deepseek' | 'gemini' | 'TIE';
+    };
+    passRateBps: {
+      deepseek: number;
+      gemini: number;
+      leader: 'deepseek' | 'gemini' | 'TIE';
+    };
+    hardFailRateBps: {
+      deepseek: number;
+      gemini: number;
+      leader: 'deepseek' | 'gemini' | 'TIE';
+    };
+    p50LatencyMs: {
+      deepseek: number;
+      gemini: number;
+      leader: 'deepseek' | 'gemini' | 'TIE';
+    };
+    actualCostMicroUsd: {
+      deepseek: number;
+      gemini: number;
+      leader: 'deepseek' | 'gemini' | 'TIE';
+    };
+    replicateInstabilityRateBps: {
+      deepseek: number;
+      gemini: number;
+      leader: 'deepseek' | 'gemini' | 'TIE';
+    };
+  };
+  frontierClassification: {
+    deepseek: ParetoClassification;
+    gemini: ParetoClassification;
+    mathematicalProof: {
+      deepseekDominatedByGemini: boolean;
+      geminiDominatedByDeepSeek: boolean;
+    };
+  };
+}
+
+export interface LiveEvaluationCheckpoint {
+  runId: string;
+  executionStartTimestamp: string;
+  datasetVersion: string;
+  scoringPolicyVersion: string;
+  pricingWindow: PricingWindow;
+  expectedInvocationCount: number;
+  lastCompletedInvocationOrdinal: number;
+  completedResults: LiveEvaluationResultRecord[];
+  cumulativeSpendMicroUsd: number;
+  runCompleted: boolean;
 }
 
 export interface CostOptimizationAnalysis {
