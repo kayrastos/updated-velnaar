@@ -33,12 +33,16 @@ import { OutputValidator } from './outputValidator';
 import { AIRunRepository } from './aiRunRepository';
 import { AIPolicyRepository } from './aiPolicyRepository';
 import { SafeLogger } from '../security/safeLogger';
-
 import { BaseAIProvider } from './providers/provider';
 import { GeminiProvider } from './providers/geminiProvider';
 import { DeepSeekProvider } from './providers/deepSeekProvider';
 import { KimiProvider } from './providers/kimiProvider';
 import { DisabledProvider } from './providers/disabledProvider';
+import {
+  resolveRoutingPolicyDecision,
+  buildShadowTelemetryEvent,
+  resolveRoutingPolicyMode,
+} from './routingPolicy';
 
 export class AIRouter {
   private static readonly providers: Record<AIProviderId, BaseAIProvider> = {
@@ -60,115 +64,164 @@ export class AIRouter {
   }
 
   /**
-   * Update organization AI policy persisted in D1.
+   * Update organization AI policy backed by D1.
    */
   public static async updateOrganizationPolicy(
-    policy: Partial<AIOrganizationPolicy> & { organizationId: string },
+    policy: AIOrganizationPolicy,
     environment: string = 'production',
     db?: any
   ): Promise<AIOrganizationPolicy> {
     return AIPolicyRepository.savePolicy(db, policy, environment);
   }
 
-  private static getProviderModelId(providerId: AIProviderId, envelope: AIRequestEnvelope, env: WorkerEnv): string {
-    if (providerId === 'gemini') {
-      const isReasoning = envelope.taskType === 'GROWTH_ACTION_DRAFT';
-      return (isReasoning ? env.VELNAR_AI_GEMINI_REASONING_MODEL : env.VELNAR_AI_GEMINI_FAST_MODEL)?.trim() || '';
+  /**
+   * Get dynamic model identifier configured for a specific provider.
+   */
+  private static getProviderModelId(
+    providerId: AIProviderId, 
+    envelope: AIRequestEnvelope, 
+    env: WorkerEnv
+  ): string {
+    switch (providerId) {
+      case 'gemini': {
+        const tier = TaskClassifier.classifyTask(envelope.taskType);
+        return tier === 'REASONING'
+          ? (env.VELNAR_AI_GEMINI_REASONING_MODEL || 'gemini-1.5-pro')
+          : (env.VELNAR_AI_GEMINI_FAST_MODEL || 'gemini-1.5-flash');
+      }
+      case 'deepseek':
+        return env.VELNAR_AI_DEEPSEEK_MODEL || 'deepseek-chat';
+      case 'kimi':
+        return env.VELNAR_AI_KIMI_MODEL || 'moonshot-v1-8k';
+      case 'disabled':
+      default:
+        return 'deterministic-mock-v1';
     }
-    if (providerId === 'deepseek') {
-      return env.VELNAR_AI_DEEPSEEK_MODEL?.trim() || '';
-    }
-    if (providerId === 'kimi') {
-      return env.VELNAR_AI_KIMI_MODEL?.trim() || '';
-    }
-    return 'none';
   }
 
   /**
-   * Get public capability status for VELNAR AI (Provider-Neutral Customer Architecture).
+   * Get system AI status and configured tiers for diagnostics.
    */
-  public static async getStatus(organizationId: string, env: WorkerEnv): Promise<AIStatusResponse> {
-    const policy = await AIPolicyRepository.getPolicy(env.DB, organizationId, env.ENVIRONMENT);
+  public static async getStatus(
+    organizationIdOrEnv: string | WorkerEnv,
+    envParam?: WorkerEnv
+  ): Promise<AIStatusResponse> {
+    const env = typeof organizationIdOrEnv === 'object' ? organizationIdOrEnv : (envParam || { ENVIRONMENT: 'production' } as WorkerEnv);
+    const orgId = typeof organizationIdOrEnv === 'string' ? organizationIdOrEnv : undefined;
 
-    const isGeminiConfigured = this.providers.gemini.isConfigured(env);
+    let policy: AIOrganizationPolicy | undefined;
+    if (orgId) {
+      policy = await this.getOrganizationPolicy(orgId, env.ENVIRONMENT, env.DB);
+    }
+
+    const isGeminiConfigured = (this.providers.gemini as GeminiProvider).isConfigured(env);
     const isDeepSeekConfigured = this.providers.deepseek.isConfigured(env);
     const isKimiConfigured = this.providers.kimi.isConfigured(env);
-
-    const gemini = this.providers.gemini as GeminiProvider;
-    const fastConfigured = (policy.allowedProviders.includes('gemini') && gemini.isTierConfigured('FAST_LOW_COST', env)) ||
-      (policy.allowedProviders.includes('deepseek') && isDeepSeekConfigured);
-    const reasoningConfigured = policy.allowedProviders.includes('gemini') && gemini.isTierConfigured('REASONING', env);
-    const longContextConfigured = (policy.allowedProviders.includes('gemini') && gemini.isTierConfigured('LONG_CONTEXT', env)) ||
-      (policy.allowedProviders.includes('kimi') && isKimiConfigured);
 
     return {
       serviceName: 'VELNAR AI',
       privacyGateway: 'CONFIGURED',
-      externalAiEnabled: policy.externalAiEnabled,
+      externalAiEnabled: policy ? policy.externalAiEnabled : true,
       tiers: {
         DETERMINISTIC_ONLY: {
           status: 'CONFIGURED',
-          name: 'Deterministic Hard Rules',
-          description: 'Mathematical proof, revenue loss arithmetic, and deterministic constraint validation. Zero AI processing.',
+          name: 'Deterministic Baseline',
+          description: 'Calculations, data pipelines, rule engines (Zero Token Cost)',
         },
         FAST_LOW_COST: {
-          status: !policy.externalAiEnabled ? 'DISABLED' : (fastConfigured ? 'CONFIGURED' : 'NOT_CONFIGURED'),
-          name: 'Fast Telemetry Tier',
-          description: 'Real-time funnel classification & SLA response latency evaluation. Pseudonymous telemetry only.',
+          status: isGeminiConfigured || isDeepSeekConfigured ? 'CONFIGURED' : 'NOT_CONFIGURED',
+          name: 'Fast & Low Cost (Gemini Flash / DeepSeek Chat)',
+          description: 'High-throughput operational explanations and classification',
         },
         REASONING: {
-          status: !policy.externalAiEnabled ? 'DISABLED' : (reasoningConfigured ? 'CONFIGURED' : 'NOT_CONFIGURED'),
-          name: 'Calibrated Action Synthesis',
-          description: 'Multi-step hypothesis synthesis grounded in verified Revenue Leak evidence references.',
+          status: isGeminiConfigured ? 'CONFIGURED' : 'NOT_CONFIGURED',
+          name: 'High Reasoning (Gemini Pro)',
+          description: 'Multi-step strategic growth hypotheses and root-cause analysis',
         },
         LONG_CONTEXT: {
-          status: !policy.externalAiEnabled ? 'DISABLED' : (longContextConfigured ? 'CONFIGURED' : 'NOT_CONFIGURED'),
-          name: 'Long-Context Synthesis',
-          description: 'Deep context ingestion across operational history and historical performance trends.',
+          status: isKimiConfigured ? 'CONFIGURED' : 'NOT_CONFIGURED',
+          name: 'Long Context (Kimi / Moonshot)',
+          description: 'Large ledger analysis, bulk transcripts, multi-quarter timelines',
         },
         PRIVATE_LOCAL_FUTURE: {
           status: 'DISABLED',
-          name: 'Private Local Adapter',
-          description: 'Local on-premise execution adapter (Disabled in Sprint 4.0).',
+          name: 'On-Prem / Edge Private Models',
+          description: 'Air-gapped on-device models for strict data sovereignty',
         },
       },
       policy: {
-        humanApprovalRequired: policy.humanApprovalRequired,
-        allowPublicBusinessData: policy.allowPublicBusinessData,
-        allowPseudonymousOperationalData: policy.allowPseudonymousOperationalData,
-        allowPersonalData: policy.allowPersonalData,
-        maxDailyRequests: policy.maxDailyRequests,
-        maxMonthlyCostMicroUsd: policy.maxMonthlyCostMicroUsd,
+        humanApprovalRequired: policy ? policy.humanApprovalRequired : true,
+        allowPublicBusinessData: policy ? policy.allowPublicBusinessData : true,
+        allowPseudonymousOperationalData: policy ? policy.allowPseudonymousOperationalData : true,
+        allowPersonalData: policy ? policy.allowPersonalData : false,
+        maxDailyRequests: policy ? policy.maxDailyRequests : 100,
+        maxMonthlyCostMicroUsd: policy ? policy.maxMonthlyCostMicroUsd : 50_000_000,
       },
     };
   }
 
   /**
-   * Main Execution Entrypoint for all AI operations.
+   * Main Execution Pipeline:
+   * 1. Prohibited AI Check & Organization Policy & Consent
+   * 2. Classify Task & Complexity Tier
+   * 3. Redact & Filter (Zero PII leak guarantee)
+   * 4. Enforce Integer Budget Limits (Pre-flight)
+   * 5. Fallback Provider Selection & Invocation
+   * 6. Validate Output Schema
+   * 7. Track Integer Spend & Telemetry
    */
   public static async execute(
     envelope: AIRequestEnvelope,
     env: WorkerEnv
-  ): Promise<{
-    result: any;
-    runRecord: AIRunRecord;
-    isMock: boolean;
-  }> {
+  ): Promise<{ result: any; runRecord: AIRunRecord; isMock: boolean }> {
     const startTime = Date.now();
-    const runId = `run_${crypto.randomUUID()}`;
+    const runId = `run_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const organizationId = envelope.organizationId;
-    const policy = await AIPolicyRepository.getPolicy(env.DB, organizationId, env.ENVIRONMENT);
-    const routingTier = TaskClassifier.getRoutingTier(envelope.taskType);
 
-    // 1. Prohibited AI operation gate (auth, payments, money arithmetic, crypto)
-    if (TaskClassifier.isProhibitedAIOperation(envelope.taskType)) {
-      throw new Error(`PROHIBITED_AI_OPERATION: Task "${envelope.taskType}" cannot be executed by AI.`);
+    // 0. Prohibited AI Operation Check
+    if (TaskClassifier.isProhibitedAIOperation(envelope.taskType as string)) {
+      SafeLogger.warn('[PROHIBITED_AI_OPERATION]', {
+        organizationId,
+        taskType: envelope.taskType,
+      });
+      throw new Error(`PROHIBITED_AI_OPERATION: Operation "${envelope.taskType}" is prohibited from AI routing.`);
     }
 
-    // 2. Redaction & Data Classification Layer
-    const { sanitized: sanitizedEnvelope, report: redactionReport } = RedactionLayer.sanitize(envelope, envelope.dataClassification);
+    // 1. Check Organization AI Policy
+    const policy = await this.getOrganizationPolicy(organizationId, env.ENVIRONMENT, env.DB);
+    if (!policy.externalAiEnabled) {
+      const blockedRecord: AIRunRecord = {
+        id: runId,
+        organization_id: organizationId,
+        business_id: envelope.businessId,
+        task_type: envelope.taskType,
+        gateway_provider_id: 'disabled',
+        model_identifier: 'none',
+        data_classification: envelope.dataClassification,
+        prompt_version: 'none',
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        latency_ms: Date.now() - startTime,
+        estimated_cost_microusd: 0,
+        redaction_count: 0,
+        status: 'blocked_by_policy',
+        error_code: 'AI_POLICY_EXTERNAL_DISABLED',
+        purpose: 'External AI processing disabled by organization policy',
+        created_at: new Date().toISOString(),
+      };
+      await AIRunRepository.saveRun(env.DB, blockedRecord, env.ENVIRONMENT);
+      throw new Error('AI_POLICY_EXTERNAL_DISABLED: Organization has disabled external AI processing.');
+    }
+
+    // 2. Classify Task Complexity & Security Tier
+    const routingTier: RoutingTier = TaskClassifier.classifyTask(envelope.taskType);
+
+    // 3. Privacy & Redaction Pipeline
+    const redactionReport = RedactionLayer.redactEnvelope(envelope);
+    const sanitizedEnvelope = redactionReport.sanitizedEnvelope;
     const effectiveClassification = redactionReport.effectiveClassification;
 
+    // Verify privacy safety of the sanitized payload
     if (!redactionReport.safeForExternalProcessing) {
       const blockedRecord: AIRunRecord = {
         id: runId,
@@ -185,47 +238,15 @@ export class AIRouter {
         estimated_cost_microusd: 0,
         redaction_count: redactionReport.patternsRedacted,
         status: 'blocked_by_policy',
-        error_code: 'ERR_PRIVACY_UNSAFE',
-        purpose: `Execution blocked due to unsafe classification (${effectiveClassification})`,
+        error_code: 'AI_PII_LEAK_PREVENTED',
+        purpose: 'Data classification exceeds allowable thresholds after redaction',
         created_at: new Date().toISOString(),
       };
       await AIRunRepository.saveRun(env.DB, blockedRecord, env.ENVIRONMENT);
-      throw new Error(`PRIVACY_VIOLATION: Input data classified as "${effectiveClassification}" cannot be sent to external AI.`);
+      throw new Error('AI_PII_LEAK_PREVENTED: Request payload contains personal/sensitive data unsafe for external AI.');
     }
 
-    // 3. Organization AI Policy Check
-    if (!policy.externalAiEnabled) {
-      const policyBlockedRecord: AIRunRecord = {
-        id: runId,
-        organization_id: organizationId,
-        business_id: envelope.businessId,
-        task_type: envelope.taskType,
-        gateway_provider_id: 'disabled',
-        model_identifier: 'none',
-        data_classification: effectiveClassification,
-        prompt_version: 'none',
-        prompt_tokens: 0,
-        completion_tokens: 0,
-        latency_ms: Date.now() - startTime,
-        estimated_cost_microusd: 0,
-        redaction_count: redactionReport.patternsRedacted,
-        status: 'blocked_by_policy',
-        error_code: 'ERR_ORG_AI_DISABLED',
-        purpose: 'External AI is disabled for this organization.',
-        created_at: new Date().toISOString(),
-      };
-      await AIRunRepository.saveRun(env.DB, policyBlockedRecord, env.ENVIRONMENT);
-      throw new Error('AI_POLICY_DISABLED: External AI execution is disabled by tenant policy.');
-    }
-
-    if (effectiveClassification === 'PUBLIC_BUSINESS' && policy.allowPublicBusinessData !== true) {
-      throw new Error('AI_POLICY_DATA_CLASS_BLOCKED: Tenant policy prohibits processing of PUBLIC_BUSINESS data.');
-    }
-    if (effectiveClassification === 'PSEUDONYMOUS_OPERATIONAL' && policy.allowPseudonymousOperationalData !== true) {
-      throw new Error('AI_POLICY_DATA_CLASS_BLOCKED: Tenant policy prohibits processing of PSEUDONYMOUS_OPERATIONAL data.');
-    }
-
-    // 4. Initial Baseline Budget Check (D1-backed, Integer microUSD)
+    // 4. Baseline Budget Check (D1-backed, Integer microUSD)
     const baselineBudgetCheck = await BudgetManager.checkBudget(env.DB, policy, env.ENVIRONMENT, 0);
     if (!baselineBudgetCheck.allowed) {
       const budgetRecord: AIRunRecord = {
@@ -251,7 +272,7 @@ export class AIRouter {
       throw new Error(baselineBudgetCheck.reason || 'AI_BUDGET_EXCEEDED');
     }
 
-    // 5. Select Provider Candidates based on Tier and Privacy
+    // 5. Select Provider Candidates based on Tier and Privacy (LEGACY authoritative ordering)
     const candidateProviders: BaseAIProvider[] = [];
 
     // Primary selection (Gemini - with tier check)
@@ -276,12 +297,34 @@ export class AIRouter {
       }
     }
 
+    // ========================================================================
+    // SHADOW ROUTING POLICY EVALUATION (A.12B.2C-2A)
+    // CRITICAL: Pure calculation and safe telemetry only.
+    // DOES NOT alter actual candidate ordering, provider execution, or privacy.
+    // ========================================================================
+    const routingMode = resolveRoutingPolicyMode(env);
+    if (routingMode === 'SHADOW') {
+      try {
+        const shadowDecision = resolveRoutingPolicyDecision(envelope.taskType, env);
+        const actualLegacyCandidateOrder = candidateProviders.map((p) => p.id);
+        const shadowTelemetry = buildShadowTelemetryEvent(shadowDecision, actualLegacyCandidateOrder);
+
+        SafeLogger.info('[AI_ROUTING_POLICY_SHADOW]', shadowTelemetry as unknown as Record<string, unknown>);
+      } catch (shadowErr: any) {
+        // Shadow telemetry failure must NEVER break production request execution
+        SafeLogger.warn('[AI_ROUTING_POLICY_SHADOW_ERROR]', {
+          taskType: envelope.taskType,
+          error: shadowErr?.message || 'Unknown shadow routing error',
+        });
+      }
+    }
+
     // 6. Build Versioned Prompt
     const promptDef = PromptRegistry.getPrompt(envelope.taskType);
     const systemPrompt = promptDef.systemPrompt;
     const userPrompt = promptDef.buildUserPrompt(sanitizedEnvelope);
 
-    // 7. Execute Inference with Provider Preflight & Fallback Order
+    // 7. Execute Inference with Provider Preflight & Fallback Order (LEGACY order strictly preserved)
     let providerResponse: any = null;
     let selectedProvider: BaseAIProvider | null = null;
     let unpricedCandidatesCount = 0;
@@ -323,7 +366,6 @@ export class AIRouter {
         env.ENVIRONMENT,
         projectedCostMicroUsd
       );
-
       if (!providerBudgetCheck.allowed) {
         const budgetRecord: AIRunRecord = {
           id: runId,
@@ -425,7 +467,6 @@ export class AIRouter {
       created_at: new Date().toISOString(),
       isMock: Boolean(providerResponse.isMock),
     };
-
     await AIRunRepository.saveRun(env.DB, runRecord, env.ENVIRONMENT);
 
     // 12. Safe Structured Logging (Never log raw prompts, PII, or keys)

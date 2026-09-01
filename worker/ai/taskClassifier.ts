@@ -17,16 +17,20 @@ export class TaskClassifier {
       case 'SEO_CONTENT_SUGGESTION':
       case 'ANOMALY_TRIAGE':
         return 'FAST_LOW_COST';
-
       case 'GROWTH_ACTION_DRAFT':
         return 'REASONING';
-
       case 'BUSINESS_TWIN_SUMMARY':
         return 'LONG_CONTEXT';
-
       default:
         return 'DETERMINISTIC_ONLY';
     }
+  }
+
+  /**
+   * Backward-compatible alias for getRoutingTier.
+   */
+  public static classifyTask(taskType: TaskType): RoutingTier {
+    return this.getRoutingTier(taskType);
   }
 
   /**
@@ -63,19 +67,15 @@ export class TaskClassifier {
     if (tier === 'DETERMINISTIC_ONLY') {
       return { eligible: false, reason: 'Task requires deterministic code execution only.' };
     }
-
     if (classification === 'SECRET') {
       return { eligible: false, reason: 'Data classified as SECRET. External AI execution strictly prohibited.' };
     }
-
     if (classification === 'SENSITIVE') {
       return { eligible: false, reason: 'Data classified as SENSITIVE. External AI execution strictly prohibited.' };
     }
-
     if (classification === 'PERSONAL') {
       return { eligible: false, reason: 'Data classified as PERSONAL. External AI execution blocked by default.' };
     }
-
     return { eligible: true };
   }
 }

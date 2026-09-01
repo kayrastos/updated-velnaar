@@ -3,7 +3,7 @@
  * @description PII Sanitization & Redaction Layer for External AI Protection with Strict Security Floor
  */
 
-import { DataClassification, RedactionReport } from './types';
+import { DataClassification, RedactionReport, AIRequestEnvelope } from './types';
 import { DataClassifier } from './dataClassifier';
 
 export class RedactionLayer {
@@ -45,6 +45,17 @@ export class RedactionLayer {
   ]);
 
   /**
+   * Sanitizes an AIRequestEnvelope and produces a canonical report.
+   */
+  public static redactEnvelope(envelope: AIRequestEnvelope): RedactionReport & { sanitizedEnvelope: AIRequestEnvelope } {
+    const { sanitized, report } = this.sanitize(envelope, envelope.dataClassification);
+    return {
+      ...report,
+      sanitizedEnvelope: sanitized as AIRequestEnvelope,
+    };
+  }
+
+  /**
    * Sanitizes a string or structured object and produces a RedactionReport.
    * Enforces security floor: declared classification cannot be downgraded.
    */
@@ -54,7 +65,6 @@ export class RedactionLayer {
   ): { sanitized: T; report: RedactionReport } {
     let patternsRedacted = 0;
     const fieldsRemoved: string[] = [];
-
     const declared: DataClassification = 
       declaredClassification ||
       ((typeof input === 'object' && input !== null && (input as any).dataClassification) ? (input as any).dataClassification : 'PUBLIC_BUSINESS');
@@ -63,60 +73,49 @@ export class RedactionLayer {
 
     const sanitizeValue = (val: any): any => {
       if (val === null || val === undefined) return val;
-
       if (typeof val === 'string') {
         let clean = val;
-
         // Mask emails
         clean = clean.replace(this.EMAIL_REGEX, (match) => {
           patternsRedacted++;
           const parts = match.split('@');
           return `${parts[0].charAt(0)}***@${parts[1]}`;
         });
-
         // Mask phone numbers
         clean = clean.replace(this.PHONE_REGEX, () => {
           patternsRedacted++;
           return '[REDACTED_PHONE]';
         });
-
         // Mask IBANs
         clean = clean.replace(this.IBAN_REGEX, () => {
           patternsRedacted++;
           return '[REDACTED_IBAN]';
         });
-
         // Mask TCKN
         clean = clean.replace(this.TCKN_REGEX, () => {
           patternsRedacted++;
           return '[REDACTED_TCKN]';
         });
-
         // Redact URL tokens
         clean = clean.replace(this.URL_TOKEN_REGEX, (match, p1) => {
           patternsRedacted++;
           return match.replace(p1, '[REDACTED_TOKEN]');
         });
-
         // Redact Bearer auth
         clean = clean.replace(this.BEARER_REGEX, () => {
           patternsRedacted++;
           return 'Bearer [REDACTED_TOKEN]';
         });
-
         // Redact API keys
         clean = clean.replace(this.API_KEY_REGEX, () => {
           patternsRedacted++;
           return '[REDACTED_API_KEY]';
         });
-
         return clean;
       }
-
       if (Array.isArray(val)) {
         return val.map((item) => sanitizeValue(item));
       }
-
       if (typeof val === 'object') {
         const result: Record<string, any> = {};
         for (const [k, v] of Object.entries(val)) {
@@ -130,7 +129,6 @@ export class RedactionLayer {
         }
         return result;
       }
-
       return val;
     };
 

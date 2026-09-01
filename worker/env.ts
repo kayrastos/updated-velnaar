@@ -22,4 +22,7 @@ export interface WorkerEnv {
   VELNAR_AI_DEEPSEEK_BASE_URL?: string;
   VELNAR_AI_KIMI_MODEL?: string;
   VELNAR_AI_KIMI_BASE_URL?: string;
+
+  // AI Routing Policy Mode Configuration (Optional; defaults to 'legacy')
+  VELNAR_AI_ROUTING_POLICY_MODE?: 'legacy' | 'shadow' | string;
 }
