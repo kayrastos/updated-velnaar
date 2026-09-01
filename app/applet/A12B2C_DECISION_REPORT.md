@@ -21,7 +21,7 @@ Based on the sealed A.12B.2B full canonical benchmark run (66 invocations per ca
 - **Fallback Provider:** `gemini-3.5-flash-lite-flex-low` (Gemini 2.5/3.5 Flash Lite, Flex low tier)
 
 ### Key Findings:
-1. **Pass Rate & Reliability:** DeepSeek achieved an aggregate pass rate of **90.91% (60/66)** (60/66 passed invocations, 6 unique hard fails) compared to Gemini's **86.36% (57/66)** (57/66 passed invocations, 9 unique hard fails).
+1. **Pass Rate & Reliability:** DeepSeek achieved an aggregate pass rate of **90.91%** (60/66 passed invocations, 6 unique hard fails) compared to Gemini's **86.36%** (57/66 passed invocations, 9 unique hard fails).
 2. **Safety & Injection Defense:** Both models demonstrated **0 prompt-injection compliance failures** across all adversarial injection cases (`lead_03`, `leak_03`, `growth_03`, `twin_03`, `funnel_03`, `seo_03`, `anomaly_03`).
 3. **Schema Robustness:** Gemini suffered 2 `INVALID_OUTPUT_SCHEMA` failures on `eval_v1_funnel_03_injection` when processing prompt injections (outputting malformed JSON syntax), while DeepSeek preserved strict JSON schema compliance.
 4. **Latency Advantage:** DeepSeek demonstrated massive, highly consistent latency advantages across all tasks (Aggregate p50: **286 ms** vs **2,468 ms**; p95: **319 ms** vs **4,523 ms**), delivering an **8.6x to 14x latency reduction**.
@@ -43,7 +43,7 @@ All metrics in this report are sourced directly from the sealed canonical A.12B.
 | **Pass Rate (Score ≥ 8,000 & No Hard Fail)** | **90.91% (60/66)** | **86.36% (57/66)** | **DeepSeek +455 bps** |
 | **Hard Fail Rate** | **9.09% (6/66)** | **13.64% (9/66)** | **DeepSeek -455 bps (lower)** |
 | **Unique Hard Fail Invocations** | **6** | **9** | **DeepSeek 3 fewer fails** |
-| **Mean Score** | **9,402 bps** (94.02%) | **9,361 bps** (93.61%) | DeepSeek +41 bps |
+| **Mean Score** | 9,402 bps (94.02%) | 9,361 bps (93.61%) | DeepSeek +41 bps |
 | **Median Score** | 10,000 bps (100.00%) | 10,000 bps (100.00%) | Tied (10,000 bps) |
 | **p50 Latency** | **286 ms** | **2,468 ms** | **DeepSeek 8.6x faster** |
 | **p95 Latency** | **319 ms** | **4,523 ms** | **DeepSeek 14.2x faster** |
@@ -248,7 +248,7 @@ Understanding failure types is vital for routing safety:
 | Pass Rate | 87.50% (8,750 bps) | 87.50% (8,750 bps) | Tied (87.50%) |
 | Mean Score | 9,450 bps | 9,450 bps | Tied (9,450 bps) |
 | Median Score | 10,000 bps | 10,000 bps | Tied (10,000 bps) |
-| p50 Latency | **286 ms** | **2,591 ms** | DeepSeek 9.4x faster |
+| p50 Latency | **277 ms** | **2,591 ms** | DeepSeek 9.4x faster |
 | p95 Latency | **304 ms** | **3,510 ms** | DeepSeek 11.5x faster |
 | Actual Cost | $0.001523 | $0.002749 | DeepSeek 44.6% lower |
 | Normalized Cost | $0.002175 | $0.005496 | DeepSeek 60.4% lower |
