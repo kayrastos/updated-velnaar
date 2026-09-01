@@ -19,26 +19,47 @@
 
 import { WorkerEnv } from '../../env';
 import { AIRequestEnvelope, DataClassification, RoutingTier } from '../types';
+import { A12B2B_MAX_OUTPUT_TOKENS_BOUND } from '../evaluation/evaluationLiveTypes';
+import { EvaluationCostCalculator } from '../evaluation/evaluationCostCalculator';
 import { 
   CertifiedPromptPayload, 
   CertifiedProviderResponse, 
-  CertifiedProviderError 
+  CertifiedProviderError,
+  isCertifiedA12B2CTaskType,
 } from './certifiedProviderTypes';
 import * as crypto from 'crypto';
+
+export type DeepSeekPricingCertificationStatus =
+  | 'OFF_PEAK_CERTIFIED'
+  | 'PEAK_NOT_CERTIFIED_FOR_ROUTING_DECISION';
 
 export class DeepSeekCertifiedProvider {
   public static readonly CANDIDATE_ID = 'deepseek-v4-flash-offpeak-low';
   public static readonly CERTIFIED_MODEL = 'deepseek-v4-flash';
   public static readonly OFFICIAL_BASE_URL = 'https://api.deepseek.com';
-  public static readonly MAX_OUTPUT_TOKENS = 4096;
+  public static readonly MAX_OUTPUT_TOKENS = A12B2B_MAX_OUTPUT_TOKENS_BOUND; // Exactly 2048
   public static readonly MAX_ATTEMPTS = 3; // Initial + max 2 retries
 
   public static isDataClassificationSupported(classification: DataClassification): boolean {
     return classification === 'PUBLIC_BUSINESS' || classification === 'PSEUDONYMOUS_OPERATIONAL';
   }
 
+  /**
+   * Evaluates if the given routing tier is supported.
+   * NOTE: Task certification eligibility is strictly governed by the canonical 7-task scope
+   * (CERTIFIED_A12B2C_TASK_TYPES), not generic routing tiers.
+   */
   public static supportsTier(tier: RoutingTier): boolean {
     return tier === 'FAST_LOW_COST';
+  }
+
+  /**
+   * Pure helper exposing DeepSeek pricing window certification status based on deterministic UTC schedule.
+   * Metadata only: does not block or reroute production traffic in this phase.
+   */
+  public static getPricingCertificationStatus(date: Date = new Date()): DeepSeekPricingCertificationStatus {
+    const window = EvaluationCostCalculator.getDeepSeekPricingWindow(date);
+    return window === 'OFF_PEAK' ? 'OFF_PEAK_CERTIFIED' : 'PEAK_NOT_CERTIFIED_FOR_ROUTING_DECISION';
   }
 
   /**
@@ -79,7 +100,20 @@ export class DeepSeekCertifiedProvider {
   ): Promise<CertifiedProviderResponse> {
     const startTime = Date.now();
 
-    // 1. Privacy Preflight Gate (Zero-Fetch on Personal/Sensitive/Secret)
+    // 1. Task Certification Preflight Gate (Zero-Fetch on Non-Certified Task Types)
+    if (!isCertifiedA12B2CTaskType(envelope.taskType)) {
+      throw new CertifiedProviderError({
+        providerId: 'deepseek',
+        candidateId: this.CANDIDATE_ID,
+        errorCategory: 'TASK_NOT_CERTIFIED',
+        message: `TASK_NOT_CERTIFIED: TaskType "${envelope.taskType}" is not certified under Phase A.12B.2C.`,
+        attemptCount: 0,
+        latencyMs: Date.now() - startTime,
+        isTransient: false,
+      });
+    }
+
+    // 2. Privacy Preflight Gate (Zero-Fetch on Personal/Sensitive/Secret)
     if (!this.isDataClassificationSupported(envelope.dataClassification)) {
       throw new CertifiedProviderError({
         providerId: 'deepseek',
@@ -92,7 +126,7 @@ export class DeepSeekCertifiedProvider {
       });
     }
 
-    // 2. Credentials Preflight Gate
+    // 3. Credentials Preflight Gate
     const apiKey = env.DEEPSEEK_API_KEY;
     if (!apiKey || apiKey.trim().length === 0) {
       throw new CertifiedProviderError({
@@ -106,18 +140,18 @@ export class DeepSeekCertifiedProvider {
       });
     }
 
-    // 3. Endpoint Resolution
+    // 4. Endpoint Resolution
     const baseUrl = this.validateBaseUrl(env.VELNAR_AI_DEEPSEEK_BASE_URL || this.OFFICIAL_BASE_URL);
     const endpoint = `${baseUrl}/v1/chat/completions`;
 
-    // 4. Certified Request Payload Construction
+    // 5. Certified Request Payload Construction (Exact sealed 2048 bound)
     const requestBody = {
       model: this.CERTIFIED_MODEL,
       messages: [
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user },
       ],
-      max_tokens: envelope.maxTokens || this.MAX_OUTPUT_TOKENS,
+      max_tokens: this.MAX_OUTPUT_TOKENS,
       response_format: { type: 'json_object' },
       thinking: {
         type: 'enabled',
@@ -189,7 +223,7 @@ export class DeepSeekCertifiedProvider {
           });
         }
 
-        // 5. Strict Model Identity Enforcement (Fail-Closed on any substitution)
+        // 6. Strict Model Identity Enforcement (Fail-Closed on any substitution)
         const returnedModel = json.model;
         if (returnedModel !== this.CERTIFIED_MODEL) {
           throw new CertifiedProviderError({
@@ -203,12 +237,12 @@ export class DeepSeekCertifiedProvider {
           });
         }
 
-        // 6. Content Extraction & CoT Isolation (Never expose reasoning_content)
+        // 7. Content Extraction & CoT Isolation (Never expose reasoning_content)
         const choice = json.choices?.[0];
         const content = choice?.message?.content || '{}';
         const providerModelVersion = json.system_fingerprint || json.model_version || json.modelVersion;
 
-        // 7. Telemetry & Cache Hit/Miss Verification
+        // 8. Telemetry & Cache Hit/Miss Verification
         const usage = json.usage;
         if (
           !usage ||
@@ -267,6 +301,7 @@ export class DeepSeekCertifiedProvider {
           totalTokens,
           latencyMs: Date.now() - startTime,
           attemptCount,
+          cacheStatus: 'VERIFIED',
           usageSource: 'PROVIDER_REPORTED',
           isMock: false,
         };

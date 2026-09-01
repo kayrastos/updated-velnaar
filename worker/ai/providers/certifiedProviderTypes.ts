@@ -13,6 +13,26 @@ import { TaskType, DataClassification, AIRequestEnvelope } from '../types';
 
 export type CertifiedProviderId = 'deepseek' | 'gemini';
 
+/**
+ * Immutable canonical list of TaskTypes covered by the Phase A.12B.2C certification benchmark.
+ * Scope is strictly restricted to these seven verified tasks.
+ */
+export const CERTIFIED_A12B2C_TASK_TYPES: readonly TaskType[] = [
+  'LEAD_INTENT_CLASSIFICATION',
+  'LEAK_EXPLANATION',
+  'GROWTH_ACTION_DRAFT',
+  'BUSINESS_TWIN_SUMMARY',
+  'FUNNEL_DIAGNOSTIC_EXPLANATION',
+  'SEO_CONTENT_SUGGESTION',
+  'ANOMALY_TRIAGE',
+] as const;
+
+export const CERTIFIED_A12B2C_TASK_TYPE_SET: ReadonlySet<TaskType> = new Set(CERTIFIED_A12B2C_TASK_TYPES);
+
+export function isCertifiedA12B2CTaskType(taskType: TaskType): boolean {
+  return CERTIFIED_A12B2C_TASK_TYPE_SET.has(taskType);
+}
+
 export interface CertifiedPromptPayload {
   system: string;
   user: string;
@@ -39,6 +59,7 @@ export interface CertifiedProviderResponse extends CertifiedUsageTelemetry {
   rawTextHash: string;
   latencyMs: number;
   attemptCount: number;
+  cacheStatus: 'VERIFIED' | 'NOT_VERIFIED';
   isMock?: boolean;
 }
 
@@ -57,6 +78,7 @@ export type CertifiedFailoverCategory =
   | 'TELEMETRY_INCOMPLETE'
   | 'TELEMETRY_INTEGRITY_FAILURE'
   | 'PRIVACY_VIOLATION'
+  | 'TASK_NOT_CERTIFIED'
   | 'CREDENTIALS_MISSING'
   | 'MAX_RETRIES_EXCEEDED';
 

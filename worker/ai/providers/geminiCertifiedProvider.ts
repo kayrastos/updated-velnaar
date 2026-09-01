@@ -20,10 +20,12 @@
 
 import { WorkerEnv } from '../../env';
 import { AIRequestEnvelope, DataClassification, RoutingTier } from '../types';
+import { A12B2B_MAX_OUTPUT_TOKENS_BOUND } from '../evaluation/evaluationLiveTypes';
 import { 
   CertifiedPromptPayload, 
   CertifiedProviderResponse, 
-  CertifiedProviderError 
+  CertifiedProviderError,
+  isCertifiedA12B2CTaskType,
 } from './certifiedProviderTypes';
 import * as crypto from 'crypto';
 
@@ -32,13 +34,18 @@ export class GeminiCertifiedProvider {
   public static readonly CERTIFIED_MODEL = 'gemini-3.5-flash-lite';
   public static readonly REQUIRED_SERVICE_TIER = 'flex';
   public static readonly INTERACTIONS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/interactions';
-  public static readonly MAX_OUTPUT_TOKENS = 4096;
+  public static readonly MAX_OUTPUT_TOKENS = A12B2B_MAX_OUTPUT_TOKENS_BOUND; // Exactly 2048
   public static readonly MAX_ATTEMPTS = 3; // Initial + max 2 retries
 
   public static isDataClassificationSupported(classification: DataClassification): boolean {
     return classification === 'PUBLIC_BUSINESS' || classification === 'PSEUDONYMOUS_OPERATIONAL';
   }
 
+  /**
+   * Evaluates if the given routing tier is supported.
+   * NOTE: Task certification eligibility is strictly governed by the canonical 7-task scope
+   * (CERTIFIED_A12B2C_TASK_TYPES), not generic routing tiers.
+   */
   public static supportsTier(tier: RoutingTier): boolean {
     return tier === 'FAST_LOW_COST' || tier === 'REASONING' || tier === 'LONG_CONTEXT';
   }
@@ -71,7 +78,20 @@ export class GeminiCertifiedProvider {
   ): Promise<CertifiedProviderResponse> {
     const startTime = Date.now();
 
-    // 1. Privacy Preflight Gate (Zero-Fetch on Personal/Sensitive/Secret)
+    // 1. Task Certification Preflight Gate (Zero-Fetch on Non-Certified Task Types)
+    if (!isCertifiedA12B2CTaskType(envelope.taskType)) {
+      throw new CertifiedProviderError({
+        providerId: 'gemini',
+        candidateId: this.CANDIDATE_ID,
+        errorCategory: 'TASK_NOT_CERTIFIED',
+        message: `TASK_NOT_CERTIFIED: TaskType "${envelope.taskType}" is not certified under Phase A.12B.2C.`,
+        attemptCount: 0,
+        latencyMs: Date.now() - startTime,
+        isTransient: false,
+      });
+    }
+
+    // 2. Privacy Preflight Gate (Zero-Fetch on Personal/Sensitive/Secret)
     if (!this.isDataClassificationSupported(envelope.dataClassification)) {
       throw new CertifiedProviderError({
         providerId: 'gemini',
@@ -84,7 +104,7 @@ export class GeminiCertifiedProvider {
       });
     }
 
-    // 2. Credentials Preflight Gate
+    // 3. Credentials Preflight Gate
     const apiKey = env.GEMINI_API_KEY;
     if (!apiKey || apiKey.trim().length === 0) {
       throw new CertifiedProviderError({
@@ -98,7 +118,7 @@ export class GeminiCertifiedProvider {
       });
     }
 
-    // 3. Certified Request Payload Construction (Interactions API schema)
+    // 4. Certified Request Payload Construction (Exact sealed 2048 bound)
     const requestBody = {
       model: this.CERTIFIED_MODEL,
       service_tier: this.REQUIRED_SERVICE_TIER,
@@ -106,7 +126,7 @@ export class GeminiCertifiedProvider {
       input: prompt.user,
       generation_config: {
         thinking_level: 'low',
-        max_output_tokens: envelope.maxTokens || this.MAX_OUTPUT_TOKENS,
+        max_output_tokens: this.MAX_OUTPUT_TOKENS,
       },
       response_format: {
         type: 'text',
@@ -180,7 +200,7 @@ export class GeminiCertifiedProvider {
           });
         }
 
-        // 4. Strict Service Tier Verification (Fail-Closed on Non-Flex)
+        // 5. Strict Service Tier Verification (Fail-Closed on Non-Flex)
         const returnedServiceTier = json.service_tier;
         if (returnedServiceTier !== this.REQUIRED_SERVICE_TIER) {
           throw new CertifiedProviderError({
@@ -194,7 +214,7 @@ export class GeminiCertifiedProvider {
           });
         }
 
-        // 5. Strict Model Identity Enforcement (Fail-Closed on any substitution)
+        // 6. Strict Model Identity Enforcement (Fail-Closed on any substitution)
         const returnedModel = json.model;
         if (returnedModel !== this.CERTIFIED_MODEL) {
           throw new CertifiedProviderError({
@@ -208,7 +228,7 @@ export class GeminiCertifiedProvider {
           });
         }
 
-        // 6. Text Content Extraction (Isolating Model Outputs from Thought Steps)
+        // 7. Text Content Extraction (Isolating Model Outputs from Thought Steps)
         let content = '';
         if (Array.isArray(json.steps)) {
           for (const step of json.steps) {
@@ -238,7 +258,7 @@ export class GeminiCertifiedProvider {
 
         const providerModelVersion = json.modelVersion || json.system_fingerprint || json.model_version;
 
-        // 7. Telemetry Extraction
+        // 8. Telemetry Extraction & Cache Integrity
         const usage = json.usage;
         if (
           !usage ||
@@ -263,8 +283,28 @@ export class GeminiCertifiedProvider {
         const totalTokens = usage.total_tokens;
 
         const hasCachedTokens = typeof usage.total_cached_tokens === 'number';
-        const cacheHitTokens = hasCachedTokens ? usage.total_cached_tokens : 0;
-        const cacheMissTokens = Math.max(0, promptTokens - cacheHitTokens);
+        let cacheHitTokens = 0;
+        let cacheMissTokens = promptTokens;
+        let cacheStatus: 'VERIFIED' | 'NOT_VERIFIED' = 'NOT_VERIFIED';
+
+        if (hasCachedTokens) {
+          const reportedCached = usage.total_cached_tokens;
+          if (reportedCached < 0 || reportedCached > promptTokens) {
+            throw new CertifiedProviderError({
+              providerId: 'gemini',
+              candidateId: this.CANDIDATE_ID,
+              errorCategory: 'TELEMETRY_INTEGRITY_FAILURE',
+              message: `TELEMETRY_INTEGRITY_FAILURE: Gemini reported total_cached_tokens (${reportedCached}) outside valid range [0, ${promptTokens}].`,
+              attemptCount,
+              latencyMs: attemptLatencyMs,
+              isTransient: false,
+            });
+          }
+          cacheHitTokens = reportedCached;
+          cacheMissTokens = promptTokens - cacheHitTokens;
+          cacheStatus = 'VERIFIED';
+        }
+
         const rawTextHash = crypto.createHash('sha256').update(content).digest('hex');
 
         return {
@@ -284,6 +324,7 @@ export class GeminiCertifiedProvider {
           totalTokens,
           latencyMs: Date.now() - startTime,
           attemptCount,
+          cacheStatus,
           usageSource: 'PROVIDER_REPORTED',
           isMock: false,
         };
