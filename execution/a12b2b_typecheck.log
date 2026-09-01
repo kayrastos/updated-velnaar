@@ -2,4 +2,3 @@
 > react-example@0.0.0 typecheck
 > tsc --noEmit
 
-TYPECHECK_EXIT_CODE=0

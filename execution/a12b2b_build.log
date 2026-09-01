@@ -15,5 +15,4 @@ dist/assets/index-DwwMrMgK.js   847.68 kB │ gzip: 200.71 kB
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 5.28s
-BUILD_EXIT_CODE=0
+✓ built in 4.56s
