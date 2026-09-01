@@ -1982,6 +1982,112 @@ describe('Phase A.12B.2B — Controlled Live Shadow Evaluation Specification & I
         expect(t.replicateInstabilityRateBps).toBe(0);
       }
     });
+
+    // 15.8 Markdown Consistency Validation
+    it('should validate markdown consistency and catch report discrepancies', () => {
+      const canonicalPath = path.resolve(process.cwd(), 'execution/a12b2b_full_v121_results.json');
+      const summaryPath = path.resolve(process.cwd(), 'execution/a12b2b_full_v121_candidate_summary.json');
+      const costPath = path.resolve(process.cwd(), 'execution/a12b2b_full_v121_cost_analysis.json');
+
+      if (fs.existsSync(canonicalPath) && fs.existsSync(summaryPath) && fs.existsSync(costPath)) {
+        const canonical = JSON.parse(fs.readFileSync(canonicalPath, 'utf8'));
+        const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+        const cost = JSON.parse(fs.readFileSync(costPath, 'utf8'));
+
+        const generatedMarkdown = EvaluationLiveRunner.generateMarkdownReportSection(canonical);
+
+        const checkValid = EvaluationLiveRunner.validateArtifactConsistency({
+          resultsPayload: canonical,
+          candidateSummaryPayload: summary,
+          costAnalysisPayload: cost,
+          markdownContent: generatedMarkdown,
+        });
+
+        expect(checkValid.passed).toBe(true);
+        expect(checkValid.errors).toHaveLength(0);
+
+        // Tamper with markdown to test error catching
+        const tamperedMarkdown = generatedMarkdown.replace('90.91%', '50.00%');
+        const checkTampered = EvaluationLiveRunner.validateArtifactConsistency({
+          resultsPayload: canonical,
+          candidateSummaryPayload: summary,
+          costAnalysisPayload: cost,
+          markdownContent: tamperedMarkdown,
+        });
+
+        expect(checkTampered.passed).toBe(false);
+        expect(checkTampered.errors.some((e) => e.includes('Markdown missing pass rates'))).toBe(true);
+      }
+    });
+
+    // 15.9 Report Generator Gemini Token and Dataset Metadata Verification
+    it('should generate markdown report with correct Gemini prompt tokens and dynamic dataset counts', () => {
+      const canonicalPath = path.resolve(process.cwd(), 'execution/a12b2b_full_v121_results.json');
+      if (fs.existsSync(canonicalPath)) {
+        const canonical = JSON.parse(fs.readFileSync(canonicalPath, 'utf8'));
+        const ds = canonical.candidateSummaries['deepseek-v4-flash-offpeak-low'];
+        const gem = canonical.candidateSummaries['gemini-3.5-flash-lite-flex-low'];
+
+        const markdown = EvaluationLiveRunner.generateMarkdownReportSection(canonical);
+
+        // Check Gemini token row has gem.totalPromptTokens, NOT ds.totalPromptTokens
+        const gemTokenRow = `| ${gem.totalPromptTokens} / ${gem.totalCompletionTokens} |`;
+        expect(markdown).toContain(gemTokenRow);
+        expect(markdown).not.toContain(`| ${ds.totalPromptTokens} / ${gem.totalCompletionTokens} |`);
+
+        // Check dynamic dataset counts
+        expect(markdown).toContain(`${canonical.summaryCounts.totalDatasetCases} total cases: ${canonical.summaryCounts.eligibleCasesCount} eligible, ${canonical.summaryCounts.blockedCasesCount} security canaries`);
+      }
+    });
+
+    // 15.10 Full Offline Canonical 132-Run Re-validation & Integrity
+    it('should validate the canonical 132-invocation run artifacts completely offline', () => {
+      const canonicalPath = path.resolve(process.cwd(), 'execution/a12b2b_full_v121_results.json');
+      const summaryPath = path.resolve(process.cwd(), 'execution/a12b2b_full_v121_candidate_summary.json');
+      const costPath = path.resolve(process.cwd(), 'execution/a12b2b_full_v121_cost_analysis.json');
+      const logPath = path.resolve(process.cwd(), 'execution/a12b2b_full_v121.log');
+
+      expect(fs.existsSync(canonicalPath)).toBe(true);
+      expect(fs.existsSync(summaryPath)).toBe(true);
+      expect(fs.existsSync(costPath)).toBe(true);
+      expect(fs.existsSync(logPath)).toBe(true);
+
+      const canonical = JSON.parse(fs.readFileSync(canonicalPath, 'utf8'));
+      const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+      const cost = JSON.parse(fs.readFileSync(costPath, 'utf8'));
+
+      // Validate exactly 132 results
+      expect(canonical.results).toHaveLength(132);
+      expect(canonical.summaryCounts.actualInvocationsCount).toBe(132);
+      expect(canonical.summaryCounts.expectedInvocationsCount).toBe(132);
+
+      // Validate security zero-call proof
+      expect(canonical.securityZeroCallProof.passed).toBe(true);
+      expect(canonical.securityZeroCallProof.providerFetchCallsCount).toBe(0);
+      expect(canonical.securityZeroCallProof.blockedCasesCount).toBe(3);
+
+      // Validate replicate protocol across all 33 eligible cases
+      const eligibleCases = EvaluationSecurityGate.prepareEvaluationBatch(VELNAR_SHADOW_EVAL_V1).filter(
+        (c) => c.disposition === 'ELIGIBLE'
+      );
+      expect(eligibleCases).toHaveLength(33);
+
+      expect(() => {
+        EvaluationLiveRunner.validateReplicateProtocol(canonical.results, eligibleCases, [
+          CANDIDATE_A_DEEPSEEK,
+          CANDIDATE_B_GEMINI,
+        ]);
+      }).not.toThrow();
+
+      // Validate cross-artifact consistency
+      const consistency = EvaluationLiveRunner.validateArtifactConsistency({
+        resultsPayload: canonical,
+        candidateSummaryPayload: summary,
+        costAnalysisPayload: cost,
+      });
+      expect(consistency.passed).toBe(true);
+      expect(consistency.errors).toHaveLength(0);
+    });
   });
 });
 

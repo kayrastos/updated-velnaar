@@ -1236,7 +1236,9 @@ export class EvaluationLiveRunner {
       if (rSum.passRateBps !== cSum.passRateBps) {
         errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Pass rate mismatch for ${candId} (${rSum.passRateBps} vs ${cSum.passRateBps})`);
       }
-      if (rSum.meanScoreSuccessfulScorableOutputs !== cSum.meanScoreSuccessfulScorableOutputs) {
+      const rMean = rSum.meanScoreSuccessfulScorableOutputs ?? rSum.meanScoreBps;
+      const cMean = cSum.meanScoreSuccessfulScorableOutputs ?? cSum.meanScoreBps;
+      if (rMean !== cMean) {
         errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Semantic quality score mismatch for ${candId}`);
       }
       if (rSum.totalTokens !== cSum.totalTokens) {
@@ -1269,6 +1271,121 @@ export class EvaluationLiveRunner {
       errors.push('A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Pareto analysis mismatch between results and summary artifacts');
     }
 
+    // 5. Validate Markdown Content (if provided)
+    if (params.markdownContent) {
+      const md = params.markdownContent;
+      const ds = resSummaries['deepseek-v4-flash-offpeak-low'];
+      const gem = resSummaries['gemini-3.5-flash-lite-flex-low'];
+      const pareto = resPareto;
+      const counts = resultsPayload.summaryCounts;
+
+      // 5.1 Invocation count
+      const totalInvStr = `${counts.actualInvocationsCount}`;
+      if (!md.includes(totalInvStr)) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing total invocation count (${totalInvStr})`);
+      }
+
+      // 5.2 Candidate invocation counts
+      if (!md.includes(String(ds.totalInvocations)) || !md.includes(String(gem.totalInvocations))) {
+        errors.push('A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing candidate invocation counts');
+      }
+
+      // 5.3 Pass counts / rates
+      const dsPassRate = (ds.passRateBps / 100).toFixed(2);
+      const gemPassRate = (gem.passRateBps / 100).toFixed(2);
+      if (!md.includes(dsPassRate) || !md.includes(gemPassRate)) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing pass rates (DS: ${dsPassRate}%, GEM: ${gemPassRate}%)`);
+      }
+
+      // 5.4 Hard-fail counts / rates
+      const dsHardFailRate = (ds.hardFailRateBps / 100).toFixed(2);
+      const gemHardFailRate = (gem.hardFailRateBps / 100).toFixed(2);
+      if (!md.includes(dsHardFailRate) || !md.includes(gemHardFailRate)) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing hard fail rates (DS: ${dsHardFailRate}%, GEM: ${gemHardFailRate}%)`);
+      }
+
+      // 5.5 Mean scores
+      const dsMeanVal = ds.meanScoreSuccessfulScorableOutputs ?? ds.meanScoreBps ?? 0;
+      const gemMeanVal = gem.meanScoreSuccessfulScorableOutputs ?? gem.meanScoreBps ?? 0;
+      const dsMeanScore = (dsMeanVal / 100).toFixed(2);
+      const gemMeanScore = (gemMeanVal / 100).toFixed(2);
+      const dsMeanScoreRaw = String(dsMeanVal);
+      const gemMeanScoreRaw = String(gemMeanVal);
+      const dsMeanFormatted = dsMeanVal.toLocaleString();
+      const gemMeanFormatted = gemMeanVal.toLocaleString();
+      if ((!md.includes(dsMeanScore) && !md.includes(dsMeanScoreRaw) && !md.includes(dsMeanFormatted)) ||
+          (!md.includes(gemMeanScore) && !md.includes(gemMeanScoreRaw) && !md.includes(gemMeanFormatted))) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing mean scores (DS: ${dsMeanScore}, GEM: ${gemMeanScore})`);
+      }
+
+      // 5.6 P50 / P95 Latencies
+      if (!md.includes(String(ds.p50LatencyMs)) || !md.includes(String(ds.p95LatencyMs))) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing DeepSeek latencies (p50: ${ds.p50LatencyMs}ms, p95: ${ds.p95LatencyMs}ms)`);
+      }
+      const gemP50Str = String(gem.p50LatencyMs);
+      const gemP50Formatted = gem.p50LatencyMs.toLocaleString();
+      const gemP95Str = String(gem.p95LatencyMs);
+      const gemP95Formatted = gem.p95LatencyMs.toLocaleString();
+      if ((!md.includes(gemP50Str) && !md.includes(gemP50Formatted)) ||
+          (!md.includes(gemP95Str) && !md.includes(gemP95Formatted))) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing Gemini latencies (p50: ${gem.p50LatencyMs}ms, p95: ${gem.p95LatencyMs}ms)`);
+      }
+
+      // 5.7 Token totals (including prompt and completion)
+      const dsPromptStr = String(ds.totalPromptTokens);
+      const dsPromptFormatted = ds.totalPromptTokens.toLocaleString();
+      const dsCompStr = String(ds.totalCompletionTokens);
+      const dsCompFormatted = ds.totalCompletionTokens.toLocaleString();
+      const gemPromptStr = String(gem.totalPromptTokens);
+      const gemPromptFormatted = gem.totalPromptTokens.toLocaleString();
+      const gemCompStr = String(gem.totalCompletionTokens);
+      const gemCompFormatted = gem.totalCompletionTokens.toLocaleString();
+
+      if ((!md.includes(dsPromptStr) && !md.includes(dsPromptFormatted)) ||
+          (!md.includes(dsCompStr) && !md.includes(dsCompFormatted))) {
+        errors.push('A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing DeepSeek token counts');
+      }
+      if ((!md.includes(gemPromptStr) && !md.includes(gemPromptFormatted)) ||
+          (!md.includes(gemCompStr) && !md.includes(gemCompFormatted))) {
+        errors.push('A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing Gemini token counts');
+      }
+
+      // 5.8 Actual costs
+      const dsCostUsd = (ds.actualTotalCostMicroUsd / 1_000_000).toFixed(6);
+      const dsCostMicro = String(ds.actualTotalCostMicroUsd);
+      const dsCostFormatted = ds.actualTotalCostMicroUsd.toLocaleString();
+      const gemCostUsd = (gem.actualTotalCostMicroUsd / 1_000_000).toFixed(6);
+      const gemCostMicro = String(gem.actualTotalCostMicroUsd);
+      const gemCostFormatted = gem.actualTotalCostMicroUsd.toLocaleString();
+
+      if (!md.includes(dsCostUsd) && !md.includes(dsCostMicro) && !md.includes(dsCostFormatted)) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing DeepSeek cost (${dsCostUsd} / ${dsCostMicro}u$)`);
+      }
+      if (!md.includes(gemCostUsd) && !md.includes(gemCostMicro) && !md.includes(gemCostFormatted)) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing Gemini cost (${gemCostUsd} / ${gemCostMicro}u$)`);
+      }
+
+      // 5.9 DeepSeek cache totals / ratio
+      const dsCacheHitStr = String(ds.totalCacheHitTokens);
+      const dsCacheHitFormatted = ds.totalCacheHitTokens.toLocaleString();
+      const dsCacheRatio = (ds.cacheHitRatioBps / 100).toFixed(2);
+      if ((!md.includes(dsCacheHitStr) && !md.includes(dsCacheHitFormatted)) || !md.includes(dsCacheRatio)) {
+        errors.push(`A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing DeepSeek cache stats (${dsCacheHitStr}, ${dsCacheRatio}%)`);
+      }
+
+      // 5.10 Gemini Flex tier
+      if (!md.toLowerCase().includes('flex')) {
+        errors.push('A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing Gemini Flex tier mention');
+      }
+
+      // 5.11 Pareto classifications
+      if (pareto?.frontierClassification) {
+        if (!md.includes(pareto.frontierClassification.deepseek) || !md.includes(pareto.frontierClassification.gemini)) {
+          errors.push('A12B2B_ARTIFACT_CONSISTENCY_FAILURE: Markdown missing Pareto frontier classifications');
+        }
+      }
+    }
+
     return {
       passed: errors.length === 0,
       errors,
@@ -1288,16 +1405,20 @@ export class EvaluationLiveRunner {
     const formatUsd = (microUsd: number) => `$${(microUsd / 1_000_000).toFixed(6)}`;
     const formatBps = (bps: number) => `${(bps / 100).toFixed(2)}%`;
 
+    const totalDatasetCases = counts.totalDatasetCases ?? 36;
+    const eligibleCasesCount = counts.eligibleCasesCount ?? 33;
+    const blockedCasesCount = counts.blockedCasesCount ?? 3;
+
     return `## Phase A.12B.2B: Full Controlled Live Shadow Evaluation
 
 ### 1. Protocol & Execution Metadata
 - **Execution Timestamp**: ${canonicalResults.executionTimestamp}
 - **Protocol Version**: ${canonicalResults.protocol} (v${canonicalResults.version})
-- **Dataset Version**: ${canonicalResults.datasetVersion} (36 total cases: 33 eligible, 3 security canaries)
+- **Dataset Version**: ${canonicalResults.datasetVersion} (${totalDatasetCases} total cases: ${eligibleCasesCount} eligible, ${blockedCasesCount} security canaries)
 - **Scoring Policy**: ${canonicalResults.scoringPolicyVersion} (v1.2.1)
 - **Pricing Catalog Version**: ${canonicalResults.pricingCatalogVersion}
 - **Total Invocations**: ${counts.actualInvocationsCount} / ${counts.expectedInvocationsCount}
-- **Security Zero-Call Gate**: ${canonicalResults.securityZeroCallProof.passed ? 'PASSED (0 network calls for 3 blocked cases)' : 'FAILED'}
+- **Security Zero-Call Gate**: ${canonicalResults.securityZeroCallProof.passed ? `PASSED (0 network calls for ${blockedCasesCount} blocked cases)` : 'FAILED'}
 - **Cumulative Spend**: ${counts.cumulativeSpendMicroUsd} microUSD (${formatUsd(counts.cumulativeSpendMicroUsd)}) / Budget Cap: ${formatUsd(counts.budgetCapMicroUsd)}
 
 ### 2. Candidate Comparative Performance Matrix
@@ -1311,11 +1432,11 @@ export class EvaluationLiveRunner {
 | **Valid JSON Schema Rate** | ${formatBps(ds.validJsonRateBps)} | ${formatBps(gem.validJsonRateBps)} | ${ds.validJsonRateBps >= gem.validJsonRateBps ? 'DeepSeek' : 'Gemini'} |
 | **Overall Pass Rate** | **${formatBps(ds.passRateBps)}** | **${formatBps(gem.passRateBps)}** | **${pareto.dimensions.passRateBps.leader.toUpperCase()}** |
 | **Hard-Fail Rate** | **${formatBps(ds.hardFailRateBps)}** | **${formatBps(gem.hardFailRateBps)}** | **${pareto.dimensions.hardFailRateBps.leader.toUpperCase()}** |
-| **Mean Quality Score (Scorable Outputs)** | **${(ds.meanScoreSuccessfulScorableOutputs / 100).toFixed(2)} / 100.00** | **${(gem.meanScoreSuccessfulScorableOutputs / 100).toFixed(2)} / 100.00** | **${pareto.dimensions.qualityMeanScoreBps.leader.toUpperCase()}** |
+| **Mean Quality Score (Scorable Outputs)** | **${(((ds.meanScoreSuccessfulScorableOutputs ?? ds.meanScoreBps ?? 0)) / 100).toFixed(2)} / 100.00** | **${(((gem.meanScoreSuccessfulScorableOutputs ?? gem.meanScoreBps ?? 0)) / 100).toFixed(2)} / 100.00** | **${pareto.dimensions.qualityMeanScoreBps.leader.toUpperCase()}** |
 | **Median Quality Score** | ${(ds.medianScoreBps / 100).toFixed(2)} / 100.00 | ${(gem.medianScoreBps / 100).toFixed(2)} / 100.00 | — |
 | **p50 Latency** | **${ds.p50LatencyMs}ms** | **${gem.p50LatencyMs}ms** | **${pareto.dimensions.p50LatencyMs.leader.toUpperCase()}** |
 | **p95 Latency** | ${ds.p95LatencyMs}ms | ${gem.p95LatencyMs}ms | — |
-| **Total Prompt / Completion Tokens** | ${ds.totalPromptTokens} / ${ds.totalCompletionTokens} | ${ds.totalPromptTokens} / ${gem.totalCompletionTokens} | — |
+| **Total Prompt / Completion Tokens** | ${ds.totalPromptTokens} / ${ds.totalCompletionTokens} | ${gem.totalPromptTokens} / ${gem.totalCompletionTokens} | — |
 | **Cache Hit Tokens / Ratio** | ${ds.totalCacheHitTokens} (${formatBps(ds.cacheHitRatioBps)}) | N/A (Standard Flex) | DeepSeek |
 | **Actual Benchmark Cost** | **${formatUsd(ds.actualTotalCostMicroUsd)}** | **${formatUsd(gem.actualTotalCostMicroUsd)}** | **${pareto.dimensions.actualCostMicroUsd.leader.toUpperCase()}** |
 | **Cost Per Passing Invocation** | ${formatUsd(ds.costPerPassingInvocationMicroUsd)} | ${formatUsd(gem.costPerPassingInvocationMicroUsd)} | ${ds.costPerPassingInvocationMicroUsd <= gem.costPerPassingInvocationMicroUsd ? 'DeepSeek' : 'Gemini'} |
@@ -1324,10 +1445,10 @@ export class EvaluationLiveRunner {
 ### 3. Pareto Frontier Classification
 - **DeepSeek Classification**: \`${pareto.frontierClassification.deepseek}\`
 - **Gemini Classification**: \`${pareto.frontierClassification.gemini}\`
-- **Mathematical Dominance Check**:
+${pareto.frontierClassification?.mathematicalProof ? `- **Mathematical Dominance Check**:
   - DeepSeek Dominated by Gemini: \`${pareto.frontierClassification.mathematicalProof.deepseekDominatedByGemini}\`
   - Gemini Dominated by DeepSeek: \`${pareto.frontierClassification.mathematicalProof.geminiDominatedByDeepSeek}\`
-`;
+` : ''}`;
   }
 
   /**
