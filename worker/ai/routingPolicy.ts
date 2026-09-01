@@ -17,40 +17,113 @@
  * ============================================================================
  */
 
-import { TaskType, AIProviderId } from './types';
+import { TaskType, AIProviderId, RoutingTier, DataClassification } from './types';
 import { WorkerEnv } from '../env';
 
 export const VELNAR_ROUTING_POLICY_VERSION = 'a12b2c-v1' as const;
 
 export type RoutingPolicyMode = 'LEGACY' | 'SHADOW';
 
-export interface CertifiedCandidate {
-  readonly candidateId: string;
-  readonly provider: AIProviderId;
-  readonly certifiedModel: string;
-  readonly pricingTier: string;
-  readonly reasoningEffort?: 'low' | 'none' | 'medium' | 'high';
+// Provider-specific certified profile definitions
+export interface DeepSeekCertifiedProfile {
+  readonly candidateId: 'deepseek-v4-flash-offpeak-low';
+  readonly provider: 'deepseek';
+  readonly certifiedModel: 'deepseek-v4-flash';
+  readonly reasoningEnabled: true;
+  readonly reasoningEffort: 'low';
+  readonly pricingWindow: 'offpeak';
 }
 
-export const CERTIFIED_CANDIDATES: Record<'DEEPSEEK_PRIMARY' | 'GEMINI_FALLBACK', CertifiedCandidate> = {
-  DEEPSEEK_PRIMARY: {
-    candidateId: 'deepseek-v4-flash-offpeak-low',
-    provider: 'deepseek',
-    certifiedModel: 'deepseek-v4-flash',
-    pricingTier: 'offpeak',
-    reasoningEffort: 'low',
-  },
-  GEMINI_FALLBACK: {
-    candidateId: 'gemini-3.5-flash-lite-flex-low',
-    provider: 'gemini',
-    certifiedModel: 'gemini-3.5-flash-lite',
-    pricingTier: 'flex-low',
-    reasoningEffort: 'low',
-  },
+export interface GeminiCertifiedProfile {
+  readonly candidateId: 'gemini-3.5-flash-lite-flex-low';
+  readonly provider: 'gemini';
+  readonly certifiedModel: 'gemini-3.5-flash-lite';
+  readonly apiFamily: 'interactions';
+  readonly serviceTier: 'flex';
+  readonly thinkingLevel: 'low';
+}
+
+export type CertifiedCandidateProfile = DeepSeekCertifiedProfile | GeminiCertifiedProfile;
+
+export const DEEPSEEK_CERTIFIED_PROFILE: DeepSeekCertifiedProfile = {
+  candidateId: 'deepseek-v4-flash-offpeak-low',
+  provider: 'deepseek',
+  certifiedModel: 'deepseek-v4-flash',
+  reasoningEnabled: true,
+  reasoningEffort: 'low',
+  pricingWindow: 'offpeak',
 } as const;
+
+export const GEMINI_CERTIFIED_PROFILE: GeminiCertifiedProfile = {
+  candidateId: 'gemini-3.5-flash-lite-flex-low',
+  provider: 'gemini',
+  certifiedModel: 'gemini-3.5-flash-lite',
+  apiFamily: 'interactions',
+  serviceTier: 'flex',
+  thinkingLevel: 'low',
+} as const;
+
+export const CERTIFIED_CANDIDATES = {
+  DEEPSEEK_PRIMARY: DEEPSEEK_CERTIFIED_PROFILE,
+  GEMINI_FALLBACK: GEMINI_CERTIFIED_PROFILE,
+} as const;
+
+// Fallback Contract Specification Metadata
+export type AllowedFallbackTrigger =
+  | 'HTTP_429'
+  | 'HTTP_500'
+  | 'HTTP_502'
+  | 'HTTP_503'
+  | 'HTTP_504'
+  | 'NETWORK_TRANSPORT_FAILURE'
+  | 'PROVIDER_UNAVAILABLE'
+  | 'TIER_UNAVAILABLE'
+  | 'PRICING_PREFLIGHT_UNAVAILABLE';
+
+export type ProhibitedFallbackTrigger =
+  | 'LOW_SEMANTIC_SCORE'
+  | 'POST_HOC_EVALUATOR_REJECTION'
+  | 'UNSATISFACTORY_ACCEPTED_OUTPUT';
+
+export interface FallbackContractMetadata {
+  readonly version: typeof VELNAR_ROUTING_POLICY_VERSION;
+  readonly allowedTriggers: readonly AllowedFallbackTrigger[];
+  readonly prohibitedTriggers: readonly ProhibitedFallbackTrigger[];
+}
+
+export const A12B2C_FALLBACK_CONTRACT: FallbackContractMetadata = {
+  version: VELNAR_ROUTING_POLICY_VERSION,
+  allowedTriggers: [
+    'HTTP_429',
+    'HTTP_500',
+    'HTTP_502',
+    'HTTP_503',
+    'HTTP_504',
+    'NETWORK_TRANSPORT_FAILURE',
+    'PROVIDER_UNAVAILABLE',
+    'TIER_UNAVAILABLE',
+    'PRICING_PREFLIGHT_UNAVAILABLE',
+  ],
+  prohibitedTriggers: [
+    'LOW_SEMANTIC_SCORE',
+    'POST_HOC_EVALUATOR_REJECTION',
+    'UNSATISFACTORY_ACCEPTED_OUTPUT',
+  ],
+} as const;
+
+// Explicit Compatibility States
+export type RuntimeCompatibilityState =
+  | 'COMPATIBLE'
+  | 'PROVIDER_NOT_ALLOWED'
+  | 'PROVIDER_NOT_CONFIGURED'
+  | 'DATA_CLASSIFICATION_UNSUPPORTED'
+  | 'TIER_CAPABILITY_REQUIRED'
+  | 'PROFILE_PARITY_REQUIRED'
+  | 'PEAK_POLICY_UNRESOLVED';
 
 export interface ProviderRuntimeCompatibility {
   readonly provider: AIProviderId;
+  readonly compatibilityStates: readonly RuntimeCompatibilityState[];
   readonly profileParityStatus: 'PROFILE_PARITY_REQUIRED' | 'PROFILE_PARITY_VERIFIED';
   readonly tierSupportGaps: readonly string[];
   readonly knownLimitations: readonly string[];
@@ -59,6 +132,20 @@ export interface ProviderRuntimeCompatibility {
 export interface RuntimeCompatibilityReport {
   readonly deepseek: ProviderRuntimeCompatibility;
   readonly gemini: ProviderRuntimeCompatibility;
+}
+
+export interface RoutingPolicyResolutionContext {
+  readonly taskType: TaskType;
+  readonly routingTier?: RoutingTier;
+  readonly effectiveDataClassification?: DataClassification;
+  readonly allowedProviders?: readonly AIProviderId[];
+  readonly configuredProviders?: {
+    readonly gemini: boolean;
+    readonly deepseek: boolean;
+    readonly kimi?: boolean;
+  };
+  readonly routingPolicyMode?: RoutingPolicyMode;
+  readonly env?: WorkerEnv;
 }
 
 export interface RoutingPolicyDecision {
@@ -72,6 +159,7 @@ export interface RoutingPolicyDecision {
   readonly recommendationConfidence: 'HIGH' | 'MEDIUM';
   readonly decisionReasonCodes: readonly string[];
   readonly runtimeCompatibility: RuntimeCompatibilityReport;
+  readonly fallbackContract: FallbackContractMetadata;
   readonly peakPolicyStatus: 'PEAK_POLICY_UNRESOLVED';
   readonly enforcementAllowed: false; // MUST ALWAYS be false in phase A.12B.2C-2A
 }
@@ -183,12 +271,69 @@ export function resolveRoutingPolicyMode(env?: WorkerEnv): RoutingPolicyMode {
 }
 
 /**
- * Returns current runtime compatibility and profile parity gaps.
+ * Returns context-aware runtime compatibility and profile parity reports for candidates.
  */
-export function getRuntimeCompatibilityReport(): RuntimeCompatibilityReport {
+export function getRuntimeCompatibilityReport(
+  context?: Partial<RoutingPolicyResolutionContext>
+): RuntimeCompatibilityReport {
+  const allowedProviders = context?.allowedProviders;
+  const configuredProviders = context?.configuredProviders;
+  const dataClassification = context?.effectiveDataClassification;
+  const routingTier = context?.routingTier;
+
+  // DeepSeek compatibility state evaluation
+  const deepSeekStates: RuntimeCompatibilityState[] = [];
+
+  if (allowedProviders && !allowedProviders.includes('deepseek')) {
+    deepSeekStates.push('PROVIDER_NOT_ALLOWED');
+  }
+
+  if (configuredProviders && configuredProviders.deepseek === false) {
+    deepSeekStates.push('PROVIDER_NOT_CONFIGURED');
+  }
+
+  if (
+    dataClassification &&
+    dataClassification !== 'PUBLIC_BUSINESS' &&
+    dataClassification !== 'PSEUDONYMOUS_OPERATIONAL'
+  ) {
+    deepSeekStates.push('DATA_CLASSIFICATION_UNSUPPORTED');
+  }
+
+  if (routingTier === 'REASONING' || routingTier === 'LONG_CONTEXT') {
+    deepSeekStates.push('TIER_CAPABILITY_REQUIRED');
+  }
+
+  // Certified DeepSeek profile requirement
+  deepSeekStates.push('PROFILE_PARITY_REQUIRED');
+  deepSeekStates.push('PEAK_POLICY_UNRESOLVED');
+
+  // Gemini compatibility state evaluation
+  const geminiStates: RuntimeCompatibilityState[] = [];
+
+  if (allowedProviders && !allowedProviders.includes('gemini')) {
+    geminiStates.push('PROVIDER_NOT_ALLOWED');
+  }
+
+  if (configuredProviders && configuredProviders.gemini === false) {
+    geminiStates.push('PROVIDER_NOT_CONFIGURED');
+  }
+
+  if (
+    dataClassification &&
+    dataClassification !== 'PUBLIC_BUSINESS' &&
+    dataClassification !== 'PSEUDONYMOUS_OPERATIONAL'
+  ) {
+    geminiStates.push('DATA_CLASSIFICATION_UNSUPPORTED');
+  }
+
+  // Certified Gemini Flex profile requirement
+  geminiStates.push('PROFILE_PARITY_REQUIRED');
+
   return {
     deepseek: {
       provider: 'deepseek',
+      compatibilityStates: deepSeekStates,
       profileParityStatus: 'PROFILE_PARITY_REQUIRED',
       tierSupportGaps: ['REASONING', 'LONG_CONTEXT'],
       knownLimitations: [
@@ -199,6 +344,7 @@ export function getRuntimeCompatibilityReport(): RuntimeCompatibilityReport {
     },
     gemini: {
       provider: 'gemini',
+      compatibilityStates: geminiStates,
       profileParityStatus: 'PROFILE_PARITY_REQUIRED',
       tierSupportGaps: [],
       knownLimitations: [
@@ -211,17 +357,29 @@ export function getRuntimeCompatibilityReport(): RuntimeCompatibilityReport {
 
 /**
  * Deterministic pure resolver for routing policy decisions.
+ * Accepts either a context object or taskType.
  * Always returns enforcementAllowed: false in Phase A.12B.2C-2A.
  */
 export function resolveRoutingPolicyDecision(
-  taskType: TaskType,
-  env?: WorkerEnv
+  contextOrTaskType: RoutingPolicyResolutionContext | TaskType,
+  envParam?: WorkerEnv
 ): RoutingPolicyDecision {
-  const mode = resolveRoutingPolicyMode(env);
+  const context: RoutingPolicyResolutionContext =
+    typeof contextOrTaskType === 'string'
+      ? {
+          taskType: contextOrTaskType,
+          env: envParam,
+        }
+      : contextOrTaskType;
+
+  const mode = context.routingPolicyMode || resolveRoutingPolicyMode(context.env || envParam);
+  const taskType = context.taskType;
   const meta = TASK_DECISION_METADATA[taskType] || {
     confidence: 'MEDIUM' as const,
     reasonCodes: ['DEFAULT_CERTIFIED_BENCHMARK_POLICY'],
   };
+
+  const runtimeCompatibility = getRuntimeCompatibilityReport(context);
 
   return {
     routingPolicyVersion: VELNAR_ROUTING_POLICY_VERSION,
@@ -233,7 +391,8 @@ export function resolveRoutingPolicyDecision(
     recommendedFallbackProvider: CERTIFIED_CANDIDATES.GEMINI_FALLBACK.provider,
     recommendationConfidence: meta.confidence,
     decisionReasonCodes: meta.reasonCodes,
-    runtimeCompatibility: getRuntimeCompatibilityReport(),
+    runtimeCompatibility,
+    fallbackContract: A12B2C_FALLBACK_CONTRACT,
     peakPolicyStatus: 'PEAK_POLICY_UNRESOLVED',
     enforcementAllowed: false,
   };

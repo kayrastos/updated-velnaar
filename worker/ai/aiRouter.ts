@@ -305,7 +305,19 @@ export class AIRouter {
     const routingMode = resolveRoutingPolicyMode(env);
     if (routingMode === 'SHADOW') {
       try {
-        const shadowDecision = resolveRoutingPolicyDecision(envelope.taskType, env);
+        const shadowDecision = resolveRoutingPolicyDecision({
+          taskType: envelope.taskType,
+          routingTier,
+          effectiveDataClassification: effectiveClassification,
+          allowedProviders: policy.allowedProviders,
+          configuredProviders: {
+            gemini: (this.providers.gemini as GeminiProvider).isConfigured(env),
+            deepseek: this.providers.deepseek.isConfigured(env),
+            kimi: this.providers.kimi.isConfigured(env),
+          },
+          routingPolicyMode: 'SHADOW',
+          env,
+        });
         const actualLegacyCandidateOrder = candidateProviders.map((p) => p.id);
         const shadowTelemetry = buildShadowTelemetryEvent(shadowDecision, actualLegacyCandidateOrder);
 
