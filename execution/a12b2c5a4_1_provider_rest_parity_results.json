@@ -11,8 +11,11 @@
     "deepseek": {
       "providerId": "deepseek",
       "modelId": "deepseek-v4-flash",
-      "certifiedCandidate": "deepseek-v4-flash-standard",
-      "endpoint": "https://api.deepseek.com/chat/completions",
+      "certifiedCandidate": "deepseek-v4-flash-offpeak-low",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "certifiedPricingTier": "offpeak",
+      "reasoningEffort": "low",
+      "reasoningBudgetTokens": 2048,
       "method": "POST",
       "requiredServiceTier": null,
       "responseSchemaKeysChecked": [
@@ -24,14 +27,32 @@
         "usage.prompt_cache_miss_tokens",
         "usage.completion_tokens_details.reasoning_tokens"
       ],
+      "pricingSnapshot": {
+        "OFF_PEAK": {
+          "cacheHitPerMillionTokens": 0.007,
+          "cacheHitRateMicroUsd": 0.007,
+          "cacheMissPerMillionTokens": 0.22,
+          "cacheMissRateMicroUsd": 0.22,
+          "outputPerMillionTokens": 0.66,
+          "outputRateMicroUsd": 0.66
+        },
+        "PEAK": {
+          "cacheHitPerMillionTokens": 0.014,
+          "cacheHitRateMicroUsd": 0.014,
+          "cacheMissPerMillionTokens": 0.44,
+          "cacheMissRateMicroUsd": 0.44,
+          "outputPerMillionTokens": 1.32,
+          "outputRateMicroUsd": 1.32
+        }
+      },
       "pricingRatesChecked": {
-        "cacheHitPerMillionTokens": 0.07,
-        "cacheHitRateMicroUsd": 0.07,
-        "cacheMissPerMillionTokens": 0.27,
-        "cacheMissRateMicroUsd": 0.27,
-        "outputPerMillionTokens": 1.10,
-        "outputRateMicroUsd": 1.10,
-        "reasoningTokenRateMicroUsd": 1.10
+        "cacheHitPerMillionTokens": 0.007,
+        "cacheHitRateMicroUsd": 0.007,
+        "cacheMissPerMillionTokens": 0.22,
+        "cacheMissRateMicroUsd": 0.22,
+        "outputPerMillionTokens": 0.66,
+        "outputRateMicroUsd": 0.66,
+        "reasoningTokenRateMicroUsd": 0.66
       },
       "arithmeticCacheValidationEquation": {
         "formula": "prompt_tokens === prompt_cache_hit_tokens + prompt_cache_miss_tokens",
@@ -45,6 +66,7 @@
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/interactions",
       "method": "POST",
       "requiredServiceTier": "flex",
+      "thinkingLevel": "low",
       "responseSchemaKeysChecked": [
         "model",
         "service_tier",
@@ -77,6 +99,19 @@
       }
     }
   },
+  "canaryCostLimits": {
+    "maxEstimatedCostMicroUsd": 25000,
+    "hardCeilingMicroUsd": 50000,
+    "maxSingleInvocationMicroUsd": 5000
+  },
+  "canaryInvocationLimits": {
+    "maxTotalInvocations": 14,
+    "maxInvocationsPerProvider": 7,
+    "maxSameProviderRetries": 1,
+    "maxCrossProviderFallbacks": 1,
+    "maxConcurrentInvocations": 1,
+    "timeoutMsPerInvocation": 15000
+  },
   "tokenGeneratorContract": {
     "cliInvocationPattern": "npm run generate-canary-token -- --approved-by=\"<IDENTITY>\" --max-budget-micro-usd=50000 --target-phase=\"A.12B.2C-5B\"",
     "parsedArguments": [
@@ -106,8 +141,8 @@
     "ANOMALY_TRIAGE": { "enforcementAllowed": false }
   },
   "verificationSummary": {
-    "testFilesPassed": 38,
-    "totalTestsPassed": 697,
+    "testFilesPassed": 39,
+    "totalTestsPassed": 708,
     "failedTests": 0,
     "typeCheckPassed": true,
     "lintPassed": true,

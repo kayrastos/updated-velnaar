@@ -39,6 +39,7 @@ export interface TokenGeneratorResult {
   approvalToken: string;
   envelope: CanaryHumanApprovalEnvelope;
   exportCommand: string;
+  exportBundle: string;
 }
 
 /**
@@ -289,11 +290,21 @@ export function generateOfflineCanaryToken(input?: TokenGeneratorInput): TokenGe
   delete (envelope as any).capabilitySecret;
 
   const exportCommand = `export VELNAR_CANARY_APPROVAL_TOKEN="${approvalToken}"`;
+  const exportBundle = [
+    `export VELNAR_CANARY_APPROVAL_TOKEN="${approvalToken}"`,
+    `export VELNAR_CANARY_APPROVED_BY="${approvedBy}"`,
+    `export APPROVAL_TIMESTAMP="${approvalTimestamp}"`,
+    `export GIT_COMMIT_SHA="${sourceCommitSha}"`,
+    `export VELNAR_CANARY_RUN_NONCE="${runNonce}"`,
+    `export VELNAR_CANARY_MAX_BUDGET_MICRO_USD="${maxBudgetMicroUsd}"`,
+    `export VELNAR_CANARY_PHASE="${targetPhase}"`,
+  ].join('\n');
 
   return {
     approvalToken,
     envelope,
     exportCommand,
+    exportBundle,
   };
 }
 
@@ -312,8 +323,9 @@ if (process.argv[1] && (process.argv[1].endsWith('tokenGenerator.ts') || process
     console.log(`Timestamp (UTC):    ${result.envelope.approvalTimestamp}`);
     console.log(`Commit SHA:         ${result.envelope.sourceCommitSha}`);
     console.log(`Run Nonce:          ${result.envelope.runNonce}`);
-    console.log(`\nBash export statement:`);
-    console.log(`  ${result.exportCommand}\n`);
+    console.log(`\nBash export statements (Operator Metadata Bundle):`);
+    console.log(result.exportBundle);
+    console.log('');
     process.exit(0);
   } catch (err: any) {
     console.error(`\n[FATAL ERROR] Token generation failed: ${err.message}\n`);

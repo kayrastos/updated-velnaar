@@ -172,9 +172,44 @@ describe('Token Generator CLI Argument Parity & Redaction Suite', () => {
 
       const serializedResult = JSON.stringify(result);
       expect(serializedResult.includes(validSecret64)).toBe(false);
+      expect(serializedResult.includes('VELNAR_CANARY_CAPABILITY_SECRET')).toBe(false);
 
       const serializedEnvelope = JSON.stringify(result.envelope);
       expect(serializedEnvelope.includes(validSecret64)).toBe(false);
+      expect(serializedEnvelope.includes('VELNAR_CANARY_CAPABILITY_SECRET')).toBe(false);
+
+      // Verify exportBundle is present and strictly redacted
+      expect(result.exportBundle).toBeDefined();
+      expect(result.exportBundle.includes(validSecret64)).toBe(false);
+      expect(result.exportBundle.includes('VELNAR_CANARY_CAPABILITY_SECRET')).toBe(false);
+    });
+
+    it('emits a complete and valid executable operator export bundle without capability secret', () => {
+      const fixedDate = new Date('2026-09-02T12:00:00.000Z');
+      const dateYyyyMmDd = formatUtcYyyyMmDd(fixedDate);
+
+      const result = generateOfflineCanaryToken({
+        approvedBy: 'security-lead@velnar.internal',
+        capabilitySecret: validSecret64,
+        sourceCommitSha: validCommit40,
+        maxBudgetMicroUsd: 50000,
+        targetPhase: 'A.12B.2C-5B',
+        approvalTimestamp: fixedDate.toISOString(),
+        dateYyyyMmDd,
+        runNonce: 'fixed-run-nonce-1234567890abcdef',
+      });
+
+      expect(result.exportBundle).toContain(`export VELNAR_CANARY_APPROVAL_TOKEN="${result.approvalToken}"`);
+      expect(result.exportBundle).toContain(`export VELNAR_CANARY_APPROVED_BY="security-lead@velnar.internal"`);
+      expect(result.exportBundle).toContain(`export APPROVAL_TIMESTAMP="${fixedDate.toISOString()}"`);
+      expect(result.exportBundle).toContain(`export GIT_COMMIT_SHA="${validCommit40}"`);
+      expect(result.exportBundle).toContain(`export VELNAR_CANARY_RUN_NONCE="fixed-run-nonce-1234567890abcdef"`);
+      expect(result.exportBundle).toContain(`export VELNAR_CANARY_MAX_BUDGET_MICRO_USD="50000"`);
+      expect(result.exportBundle).toContain(`export VELNAR_CANARY_PHASE="A.12B.2C-5B"`);
+
+      // NEVER include VELNAR_CANARY_CAPABILITY_SECRET in exportBundle
+      expect(result.exportBundle).not.toContain('VELNAR_CANARY_CAPABILITY_SECRET');
+      expect(result.exportBundle).not.toContain(validSecret64);
     });
 
     it('generates a token that successfully passes HMAC validation using the capability secret', () => {

@@ -31,45 +31,62 @@ Live canary execution requires a cryptographically strong, secret-backed Human A
    `VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_HMAC_SHA256_SIGNATURE>`
 10. **Clean Working Tree**: The repository must be clean (`git status --porcelain` empty) matching the approved commit.
 
-### 1.2 Capability Secret & Token Generation Procedure (Offline / Air-Gapped)
+### 1.2 Operator Execution Sequence
 
 The security operator generates the capability secret and token using the offline utility (`npm run generate-canary-token`):
-- **Capability Secret**: Exactly 32 cryptographically random bytes encoded as **64 lowercase hexadecimal characters** (`^[0-9a-f]{64}$`). Created first by the operator via `openssl rand -hex 32`.
+- **Capability Secret**: Exactly 64 lowercase hexadecimal characters representing 32 cryptographically random bytes (`^[0-9a-f]{64}$`). Created first by the operator via `openssl rand -hex 32`.
 - **Secret Transmission**: Passed strictly via the `VELNAR_CANARY_CAPABILITY_SECRET` environment variable (never via CLI `--arguments`). `tokenGenerator.ts` strictly requires this secret from the protected environment channel.
 - **Canonical Approved-By Identity**: Must be established before generation and must match identically between token generation and live execution (no USER/default identity fallbacks allowed).
+
+The documented, executable operator sequence consists of 7 distinct steps:
 
 ```bash
 # Step 1: Establish canonical approved-by identity
 export VELNAR_CANARY_APPROVED_BY="security-lead@velnar.internal"
 
-# Step 2: Generate the 64-hex capability secret (256 bits entropy) in protected environment:
+# Step 2: Generate the 64-hex capability secret (32 cryptographically random bytes) in protected environment:
 export VELNAR_CANARY_CAPABILITY_SECRET="$(openssl rand -hex 32)"
 
-# Step 3: Generate the cryptographically bound offline approval token:
+# Step 3: Verify clean working tree and resolve git HEAD SHA:
+git status --porcelain
+git rev-parse HEAD
+
+# Step 4: Generate the cryptographically bound offline approval token:
 npm run generate-canary-token -- \
   --approved-by="${VELNAR_CANARY_APPROVED_BY}" \
   --max-budget-micro-usd=50000 \
   --target-phase="A.12B.2C-5B"
 
-# Step 4: Export the resulting token and execution metadata (as output by the utility):
-# export VELNAR_CANARY_APPROVAL_TOKEN="VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE>"
-
-# Canonical HMAC Payload:
-# ${approvedBy}:${targetPhase}:${environmentTarget}:${dateYyyyMmDd}:${maxBudgetMicroUsd}:${approvalTimestamp}:${specificationVersion}:${sourceCommitSha}:${runNonce}
-```
-
-### 1.3 Required Environment Variables (Phase A.12B.2C-5B Only)
-```bash
-export VELNAR_CANARY_PHASE="A.12B.2C-5B"
+# Step 5: Apply the REDACTED metadata export bundle emitted by the generator:
+# (Copy and paste the export block printed by npm run generate-canary-token)
+export VELNAR_CANARY_APPROVAL_TOKEN="<emitted_approval_token>"
 export VELNAR_CANARY_APPROVED_BY="security-lead@velnar.internal"
-export VELNAR_CANARY_APPROVAL_TOKEN="VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_${APPROVAL_DATE}_<64_hex_signature>"
-export VELNAR_CANARY_MAX_BUDGET_USD="0.05"
+export APPROVAL_TIMESTAMP="<emitted_approval_timestamp>"
+export GIT_COMMIT_SHA="<emitted_git_commit_sha>"
+export VELNAR_CANARY_RUN_NONCE="<emitted_run_nonce>"
 export VELNAR_CANARY_MAX_BUDGET_MICRO_USD="50000"
-export VELNAR_CANARY_RUN_NONCE="${VELNAR_CANARY_RUN_NONCE}"
-export VELNAR_CANARY_CAPABILITY_SECRET="${VELNAR_CANARY_CAPABILITY_SECRET}"
+export VELNAR_CANARY_PHASE="A.12B.2C-5B"
+
+# Step 6: Supply temporary scoped canary API keys:
 export DEEPSEEK_API_KEY="<temporary_scoped_deepseek_canary_key>"
 export GEMINI_API_KEY="<temporary_scoped_gemini_canary_key>"
+
+# Step 7: ONLY AFTER explicit human authorization, execute the existing bounded Phase 5B command.
 ```
+
+### 1.3 Required Environment State Summary (Phase A.12B.2C-5B Only)
+
+Upon completion of Steps 1–6, all environment variables required for bounded canary execution are fully populated:
+- `VELNAR_CANARY_APPROVED_BY="security-lead@velnar.internal"`
+- `VELNAR_CANARY_CAPABILITY_SECRET` (exactly 64 lowercase hexadecimal characters representing 32 cryptographically random bytes)
+- `VELNAR_CANARY_APPROVAL_TOKEN` (HMAC-SHA256 signature bound to all execution parameters)
+- `APPROVAL_TIMESTAMP` (UTC ISO string)
+- `GIT_COMMIT_SHA` (40 lowercase hex characters matching git HEAD)
+- `VELNAR_CANARY_RUN_NONCE` (unique 32-hex random nonce)
+- `VELNAR_CANARY_MAX_BUDGET_MICRO_USD="50000"`
+- `VELNAR_CANARY_PHASE="A.12B.2C-5B"`
+- `DEEPSEEK_API_KEY` (scoped temporary key)
+- `GEMINI_API_KEY` (scoped temporary key)
 
 ---
 
@@ -78,7 +95,7 @@ export GEMINI_API_KEY="<temporary_scoped_gemini_canary_key>"
 Before executing the Phase A.12B.2C-5B canary, the operator must verify:
 
 - [ ] **1. Offline Regression Suite Green**: Complete offline test suite passing 100%.
-- [ ] **2. Capability Secret Supplied via Secure Channel**: `VELNAR_CANARY_CAPABILITY_SECRET` is present in process environment and $\ge 32$ chars (never passed as CLI argv).
+- [ ] **2. Capability Secret Supplied via Secure Channel**: `VELNAR_CANARY_CAPABILITY_SECRET` is present in process environment as exactly 64 lowercase hexadecimal characters representing 32 cryptographically random bytes (never passed as CLI argv).
 - [ ] **3. Commit SHA Match & Pristine Tree**: Working tree is clean and matches approved `GIT_COMMIT_SHA`.
 - [ ] **4. Pricing Window Status**: Verify current UTC time falls in off-peak window for DeepSeek (or weekend).
 - [ ] **5. Task Scope Restriction**: Exactly 7 certified tasks (`CERTIFIED_A12B2C_TASK_TYPES`).
@@ -130,7 +147,7 @@ The canary harness automatically terminates fail-closed under any of the 17 form
 
 | Kill Switch Event | Category | Abort Trigger | Consequence |
 | :--- | :--- | :--- | :--- |
-| `HUMAN_APPROVAL_INVALID` | Security Gate | Missing/invalid token, wrong secret (< 32 chars), date/signature mismatch, expired timestamp, dirty git tree, or commit SHA mismatch. | Immediate abort; 0 provider calls. |
+| `HUMAN_APPROVAL_INVALID` | Security Gate | Missing/invalid token, wrong secret format (not exactly 64 lowercase hexadecimal characters representing 32 cryptographically random bytes), date/signature mismatch, expired timestamp, dirty git tree, or commit SHA mismatch. | Immediate abort; 0 provider calls. |
 | `UNAUTHORIZED_ENVIRONMENT` | Security Gate | Live execution attempted in non-5B phase or invalid environment. | Immediate abort; 0 provider calls. |
 | `PRIVACY_CLASSIFICATION_VIOLATION` | Privacy | Prompt contains `PERSONAL`, `SENSITIVE`, or `SECRET` classification. | Immediate abort; 0 provider calls. |
 | `TASK_SCOPE_VIOLATION` | Scope | Requested task is outside the 7 certified tasks. | Immediate abort; 0 provider calls. |
