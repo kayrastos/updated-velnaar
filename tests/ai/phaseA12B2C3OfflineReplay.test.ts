@@ -228,9 +228,18 @@ describe('Phase A.12B.2C-3: Offline Canonical Replay & Fallback Regression', () 
       const mockFetch = async () => {
         callCount++;
         return new Response(JSON.stringify({
-          model: 'test',
+          model: 'deepseek-v4-flash',
           choices: [{ message: { content: '{}' } }],
-          usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 },
+          usage: {
+            prompt_tokens: 10,
+            prompt_cache_hit_tokens: 0,
+            prompt_cache_miss_tokens: 10,
+            completion_tokens: 10,
+            completion_tokens_details: {
+              reasoning_tokens: 0,
+            },
+            total_tokens: 20,
+          },
         }));
       };
 
@@ -385,41 +394,37 @@ describe('Phase A.12B.2C-3: Offline Canonical Replay & Fallback Regression', () 
     it('simulates allowlist scenario A: DeepSeek + Gemini allowed', () => {
       const report = getRuntimeCompatibilityReport({
         allowedProviders: ['deepseek', 'gemini'],
-        configuredProviders: { deepseek: true, gemini: true },
+        configuredProviders: { deepseek: true, gemini: true, kimi: false },
       });
-      expect(report.primaryCompatible).toBe(true);
-      expect(report.fallbackCompatible).toBe(true);
-      expect(report.isFullyCompatible).toBe(true);
+      expect(report.deepseek.compatibilityStates).not.toContain('PROVIDER_NOT_ALLOWED');
+      expect(report.gemini.compatibilityStates).not.toContain('PROVIDER_NOT_ALLOWED');
     });
 
     it('simulates allowlist scenario B: DeepSeek disallowed / Gemini allowed', () => {
       const report = getRuntimeCompatibilityReport({
         allowedProviders: ['gemini'],
-        configuredProviders: { deepseek: true, gemini: true },
+        configuredProviders: { deepseek: true, gemini: true, kimi: false },
       });
-      expect(report.primaryCompatible).toBe(false);
-      expect(report.fallbackCompatible).toBe(true);
-      expect(report.blockers).toContain('PRIMARY_PROVIDER_NOT_ALLOWED');
+      expect(report.deepseek.compatibilityStates).toContain('PROVIDER_NOT_ALLOWED');
+      expect(report.gemini.compatibilityStates).not.toContain('PROVIDER_NOT_ALLOWED');
     });
 
     it('simulates allowlist scenario C: DeepSeek allowed / Gemini disallowed', () => {
       const report = getRuntimeCompatibilityReport({
         allowedProviders: ['deepseek'],
-        configuredProviders: { deepseek: true, gemini: true },
+        configuredProviders: { deepseek: true, gemini: true, kimi: false },
       });
-      expect(report.primaryCompatible).toBe(true);
-      expect(report.fallbackCompatible).toBe(false);
-      expect(report.blockers).toContain('FALLBACK_PROVIDER_NOT_ALLOWED');
+      expect(report.deepseek.compatibilityStates).not.toContain('PROVIDER_NOT_ALLOWED');
+      expect(report.gemini.compatibilityStates).toContain('PROVIDER_NOT_ALLOWED');
     });
 
     it('simulates allowlist scenario D: neither external provider allowed', () => {
       const report = getRuntimeCompatibilityReport({
         allowedProviders: [],
-        configuredProviders: { deepseek: true, gemini: true },
+        configuredProviders: { deepseek: true, gemini: true, kimi: false },
       });
-      expect(report.primaryCompatible).toBe(false);
-      expect(report.fallbackCompatible).toBe(false);
-      expect(report.isFullyCompatible).toBe(false);
+      expect(report.deepseek.compatibilityStates).toContain('PROVIDER_NOT_ALLOWED');
+      expect(report.gemini.compatibilityStates).toContain('PROVIDER_NOT_ALLOWED');
     });
   });
 

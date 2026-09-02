@@ -408,7 +408,7 @@ export class CertifiedProviderReplayer {
       // Recover prompt definition
       const promptDef = PromptRegistry.getPrompt(taskType);
       const promptPayload: CertifiedPromptPayload = {
-        system: promptDef.system,
+        system: promptDef.systemPrompt,
         user: `[CANONICAL_REPLAY_INPUT_CASE_${canonicalRecord.caseId}]`,
       };
 
