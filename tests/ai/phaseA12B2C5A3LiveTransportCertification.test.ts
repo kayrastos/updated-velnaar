@@ -38,6 +38,7 @@ import {
   CanaryHumanApprovalEnvelope,
   isValidCalendarDate,
   computeCanaryHmacSignature,
+  CANARY_SYNTHETIC_FIXTURES,
 } from '../../worker/ai/canary/canarySpecification';
 import {
   BoundedCanaryRunner,
@@ -50,12 +51,14 @@ import {
   resolveRoutingPolicyDecision,
 } from '../../worker/ai/routingPolicy';
 import { EvaluationCostCalculator } from '../../worker/ai/evaluation/evaluationCostCalculator';
+import { generateStrongOutput } from '../../worker/ai/evaluation/evaluationFixtures';
+import { TaskType } from '../../worker/ai/types';
 
 describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Certification', () => {
   let originalFetch: typeof globalThis.fetch;
   let sentinelCallCount = 0;
 
-  const validTestSecret32 = 'velnar-canary-secret-256bit-min32char-ok!';
+  const validTestSecret32 = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
   const validCommit = '1a2b3c4d5e6f7890123456789abcdef012345678';
   const validNonce = 'run-nonce-20260902-5a3-certified';
   const fixedTimestamp = '2026-09-02T14:00:00Z';
@@ -510,36 +513,53 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         capabilitySecret: validTestSecret32,
       });
 
-      let callCount = 0;
-      const mockCertifiedFetch = vi.fn(async (url: string, init: any) => {
-        callCount++;
-        const isDeepSeek = url.includes('deepseek.com');
+      function getValidFixtureResponse(init: any, isDeepSeek: boolean) {
+        let taskType: TaskType = 'LEAD_INTENT_CLASSIFICATION';
+        try {
+          const parsed = JSON.parse(init.body);
+          const text = (parsed.system_instruction || '') + (parsed.messages?.[0]?.content || '');
+          if (text.includes('Fast Intent Classifier')) taskType = 'LEAD_INTENT_CLASSIFICATION';
+          else if (text.includes('Revenue Leak Forensic Interpreter')) taskType = 'LEAK_EXPLANATION';
+          else if (text.includes('Growth Action Preparation Engine')) taskType = 'GROWTH_ACTION_DRAFT';
+          else if (text.includes('Business Twin Knowledge Synthesizer')) taskType = 'BUSINESS_TWIN_SUMMARY';
+          else if (text.includes('Funnel Diagnostics Engine')) taskType = 'FUNNEL_DIAGNOSTIC_EXPLANATION';
+          else if (text.includes('Search Optimization Advisor')) taskType = 'SEO_CONTENT_SUGGESTION';
+          else if (text.includes('Anomaly Triage Assistant')) taskType = 'ANOMALY_TRIAGE';
+        } catch {}
+        const fixture = CANARY_SYNTHETIC_FIXTURES[taskType];
+        const validContent = generateStrongOutput(fixture);
         if (isDeepSeek) {
-          return new Response(JSON.stringify({
+          return {
             model: 'deepseek-v4-flash',
+            choices: [{ message: { content: validContent } }],
             usage: {
               prompt_tokens: 500,
               completion_tokens: 150,
               prompt_cache_hit_tokens: 400,
               prompt_cache_miss_tokens: 100,
             },
-          }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
+          };
         } else {
-          return new Response(JSON.stringify({
+          return {
             modelVersion: 'gemini-3.5-flash-lite',
+            output_text: validContent,
             usageMetadata: {
               promptTokenCount: 500,
               candidatesTokenCount: 150,
               thinkingTokenCount: 50,
             },
-          }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
+          };
         }
+      }
+
+      let callCount = 0;
+      const mockCertifiedFetch = vi.fn(async (url: string, init: any) => {
+        callCount++;
+        const isDeepSeek = url.includes('deepseek.com');
+        return new Response(JSON.stringify(getValidFixtureResponse(init, isDeepSeek)), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
       });
 
       const result = await BoundedCanaryRunner.executeLiveCanary({
@@ -573,7 +593,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
       expect(result.humanApproval?.capabilitySecret).toBeUndefined(); // Zero secret leakage
     });
 
-    it('handles 503 transient failure on DeepSeek by retrying once and passing', async () => {
+    it('handles 503 transient failure on DeepSeek by retrying once and terminating fail-closed when provider cap is exhausted', async () => {
       const token = generateCanaryApprovalToken({
         approvedBy: 'security-lead@velnar.internal',
         targetPhase: 'A.12B.2C-5B',
@@ -594,10 +614,25 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         if (callIndex === 1) {
           return new Response('Service Unavailable', { status: 503 });
         }
+        let taskType: TaskType = 'LEAD_INTENT_CLASSIFICATION';
+        try {
+          const parsed = JSON.parse(init.body);
+          const text = (parsed.system_instruction || '') + (parsed.messages?.[0]?.content || '');
+          if (text.includes('Fast Intent Classifier')) taskType = 'LEAD_INTENT_CLASSIFICATION';
+          else if (text.includes('Revenue Leak Forensic Interpreter')) taskType = 'LEAK_EXPLANATION';
+          else if (text.includes('Growth Action Preparation Engine')) taskType = 'GROWTH_ACTION_DRAFT';
+          else if (text.includes('Business Twin Knowledge Synthesizer')) taskType = 'BUSINESS_TWIN_SUMMARY';
+          else if (text.includes('Funnel Diagnostics Engine')) taskType = 'FUNNEL_DIAGNOSTIC_EXPLANATION';
+          else if (text.includes('Search Optimization Advisor')) taskType = 'SEO_CONTENT_SUGGESTION';
+          else if (text.includes('Anomaly Triage Assistant')) taskType = 'ANOMALY_TRIAGE';
+        } catch {}
+        const fixture = CANARY_SYNTHETIC_FIXTURES[taskType];
+        const validContent = generateStrongOutput(fixture);
         const isDeepSeek = url.includes('deepseek.com');
         if (isDeepSeek) {
           return new Response(JSON.stringify({
             model: 'deepseek-v4-flash',
+            choices: [{ message: { content: validContent } }],
             usage: {
               prompt_tokens: 300,
               completion_tokens: 100,
@@ -611,6 +646,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         } else {
           return new Response(JSON.stringify({
             modelVersion: 'gemini-3.5-flash-lite',
+            output_text: validContent,
             usageMetadata: {
               promptTokenCount: 300,
               candidatesTokenCount: 100,
@@ -642,8 +678,9 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         now: () => new Date(fixedTimestamp),
       });
 
-      expect(result.summaryCounts.passedInvocations).toBe(14);
-      expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
+      expect(result.summaryCounts.passedInvocations).toBe(6);
+      expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+      expect(result.killSwitchEvents[0].reason).toBe('INVOCATION_LIMIT_BREACH');
       // Task 1 of candidate 1 has attemptCount === 2
       expect(result.invocations[0].attemptCount).toBe(2);
     });

@@ -16,8 +16,41 @@ import {
   CertifiedProviderId,
   isCertifiedA12B2CTaskType,
 } from '../providers/certifiedProviderTypes';
+import {
+  VELNAR_SHADOW_EVAL_V1,
+} from '../evaluation/evaluationDataset';
+import { EvaluationCase } from '../evaluation/types';
 
 export const CANARY_SPECIFICATION_VERSION = 'a12b2c5-v1.1';
+
+/**
+ * Real 256-bit Entropy Capability Secret Validation (64 lowercase hexadecimal characters).
+ * Corresponds to exactly 32 random bytes: openssl rand -hex 32
+ */
+export const CAPABILITY_SECRET_HEX_REGEX = /^[0-9a-f]{64}$/;
+
+export function isValidCapabilitySecret(secret?: string | null): boolean {
+  if (!secret || typeof secret !== 'string') return false;
+  return CAPABILITY_SECRET_HEX_REGEX.test(secret.trim().toLowerCase());
+}
+
+/**
+ * Deterministic Approved Synthetic Fixture Set for the 7 Certified Canary Tasks.
+ * Never uses customer, personal, sensitive, secret, or arbitrary caller data.
+ */
+export const CANARY_SYNTHETIC_FIXTURES: Record<TaskType, EvaluationCase> = {
+  LEAD_INTENT_CLASSIFICATION: VELNAR_SHADOW_EVAL_V1.find(c => c.id === 'eval_v1_lead_01')!,
+  LEAK_EXPLANATION: VELNAR_SHADOW_EVAL_V1.find(c => c.id === 'eval_v1_leak_01')!,
+  GROWTH_ACTION_DRAFT: VELNAR_SHADOW_EVAL_V1.find(c => c.id === 'eval_v1_growth_01')!,
+  BUSINESS_TWIN_SUMMARY: VELNAR_SHADOW_EVAL_V1.find(c => c.id === 'eval_v1_twin_01')!,
+  FUNNEL_DIAGNOSTIC_EXPLANATION: VELNAR_SHADOW_EVAL_V1.find(c => c.id === 'eval_v1_funnel_01')!,
+  SEO_CONTENT_SUGGESTION: VELNAR_SHADOW_EVAL_V1.find(c => c.id === 'eval_v1_seo_01')!,
+  ANOMALY_TRIAGE: VELNAR_SHADOW_EVAL_V1.find(c => c.id === 'eval_v1_anomaly_01')!,
+};
+
+export function computeFixtureHash(fixture: EvaluationCase): string {
+  return crypto.createHash('sha256').update(JSON.stringify(fixture.requestEnvelope)).digest('hex');
+}
 
 /**
  * Baseline information and certified targets for Canary providers.
@@ -256,6 +289,7 @@ export interface HumanApprovalValidationOptions {
   now?: () => Date;
   maxAgeSeconds?: number;
   allowSimulatedExpiryForTest?: boolean;
+  require64HexSecret?: boolean;
 }
 
 export function isLeapYear(year: number): boolean {
@@ -399,9 +433,16 @@ export function validateHumanApprovalToken(
     return { valid: false, reason: 'runNonce is missing or invalid.' };
   }
 
-  // Capability Secret is strictly MANDATORY (minimum 32 characters / 256 bits)
+  // Capability Secret is strictly MANDATORY (minimum 32 characters / 256 bits, or exactly 64-hex when required)
   const capabilitySecret = approval.capabilitySecret || options?.capabilitySecret;
-  if (!capabilitySecret || typeof capabilitySecret !== 'string' || capabilitySecret.trim().length < 32) {
+  if (!capabilitySecret || typeof capabilitySecret !== 'string') {
+    return { valid: false, reason: 'Capability secret is mandatory for human approval verification (fail-closed).' };
+  }
+  if (options?.require64HexSecret) {
+    if (!isValidCapabilitySecret(capabilitySecret)) {
+      return { valid: false, reason: 'Capability secret must be exactly 64 hexadecimal characters representing 256 bits of entropy (fail-closed).' };
+    }
+  } else if (capabilitySecret.trim().length < 32) {
     return { valid: false, reason: 'Capability secret is mandatory for human approval verification and must be at least 32 characters (256-bit entropy, fail-closed).' };
   }
 
@@ -480,6 +521,26 @@ export function validateHumanApprovalToken(
 /**
  * 9. Evidence Capture Artifact Schema
  */
+export interface CanaryTransportAttemptRecord {
+  attemptIndex: number;
+  logicalCaseId: string;
+  fixtureId: string;
+  fixtureHash: string;
+  providerId: CertifiedProviderId;
+  candidateId: string;
+  taskType: TaskType;
+  retryState: 'NONE' | 'SAME_PROVIDER_503_RETRY';
+  fallbackState: 'NONE' | 'DEEPSEEK_TO_GEMINI_FALLBACK';
+  timestamp: string;
+  endpointUrl: string;
+  httpStatus: number;
+  statusClass: '2xx' | '3xx' | '4xx' | '5xx' | 'TRANSPORT_ERROR';
+  latencyMs: number;
+  requestPayloadHash: string;
+  responsePayloadHash?: string;
+  incurredCostMicroUsd?: number;
+}
+
 export interface CanaryInvocationEvidenceRecord {
   invocationIndex: number;
   timestamp: string;
@@ -487,9 +548,12 @@ export interface CanaryInvocationEvidenceRecord {
   dataClassification: DataClassification;
   providerId: CertifiedProviderId;
   candidateId: string;
+  fixtureId?: string;
+  fixtureHash?: string;
   requestedModelIdentifier: string;
   returnedModelIdentifier: string;
-  providerModelVersion?: string;
+  certificationBaselineModelVersion?: string;
+  providerReportedModelVersion?: string | null;
   serviceTier?: string;
   endpointUrl: string;
   requestPayloadHash: string;
@@ -511,6 +575,7 @@ export interface CanaryInvocationEvidenceRecord {
   semanticScore: number;
   schemaValid: boolean;
   pass: boolean;
+  hardFailReasons?: string[];
   killSwitchTriggered?: CanaryKillSwitchReason;
 }
 
@@ -521,6 +586,9 @@ export interface CanaryExecutionEvidencePackage {
   timestamp: string;
   humanApproval: CanaryHumanApprovalEnvelope | null;
   overallStatus: 'CANARY_READY_AWAITING_HUMAN_APPROVAL' | 'CANARY_EXECUTION_PASSED' | 'CANARY_EXECUTION_FAILED' | 'CANARY_KILL_SWITCH_TERMINATED';
+  logicalCaseCount?: number;
+  transportAttemptCount?: number;
+  completedRequiredMatrixCases?: number;
   summaryCounts: {
     totalPlannedInvocations: number;
     executedInvocations: number;
@@ -531,6 +599,7 @@ export interface CanaryExecutionEvidencePackage {
     totalEstimatedCostMicroUsd: number;
     aggregateSemanticScore: number;
   };
+  attemptRecords?: CanaryTransportAttemptRecord[];
   invocations: CanaryInvocationEvidenceRecord[];
   killSwitchEvents: CanaryKillSwitchEvent[];
   productionRoutingEnforcementAllowed: false; // Invariant

@@ -28,15 +28,20 @@ import {
   isCanaryDataClassificationAllowed,
   isCanaryNetworkEndpointAllowed,
   validateHumanApprovalToken,
+  isValidCapabilitySecret,
+  CANARY_SYNTHETIC_FIXTURES,
+  computeFixtureHash,
   CanaryHumanApprovalEnvelope,
   CanaryKillSwitchEvent,
   CanaryKillSwitchReason,
   CanaryInvocationEvidenceRecord,
   CanaryExecutionEvidencePackage,
+  CanaryTransportAttemptRecord,
 } from './canarySpecification';
 import { EvaluationCostCalculator } from '../evaluation/evaluationCostCalculator';
 import { EvaluationSecurityGate } from '../evaluation/evaluationSecurity';
 import { EvaluationScorer } from '../evaluation/evaluationScorer';
+import { OutputValidator } from '../outputValidator';
 import { PromptRegistry } from '../promptRegistry';
 
 export interface CanaryRunnerOptions {
@@ -438,9 +443,12 @@ export class BoundedCanaryRunner {
           dataClassification,
           providerId: candidate.providerId,
           candidateId: candidate.candidateId,
+          fixtureId: CANARY_SYNTHETIC_FIXTURES[taskType].id,
+          fixtureHash: computeFixtureHash(CANARY_SYNTHETIC_FIXTURES[taskType]),
           requestedModelIdentifier: candidate.requestedModelIdentifier,
           returnedModelIdentifier: candidate.expectedReturnedModelIdentifier,
-          providerModelVersion: candidate.providerId === 'deepseek' ? 'deepseek-v4-2026' : 'gemini-3.5-flash-lite-001',
+          certificationBaselineModelVersion: candidate.providerId === 'deepseek' ? 'DeepSeek-V4-Flash-0731' : 'gemini-3.5-flash-lite',
+          providerReportedModelVersion: candidate.providerId === 'deepseek' ? 'deepseek-v4-2026' : 'gemini-3.5-flash-lite-001',
           serviceTier: candidate.pricingTier === 'flex' ? 'flex' : undefined,
           endpointUrl,
           requestPayloadHash: crypto.createHash('sha256').update(requestPayload).digest('hex'),
@@ -479,6 +487,9 @@ export class BoundedCanaryRunner {
       timestamp: now().toISOString(),
       humanApproval: sanitizedApproval,
       overallStatus,
+      logicalCaseCount: invocations.length,
+      transportAttemptCount: 0,
+      completedRequiredMatrixCases: invocations.filter(i => i.pass).length,
       summaryCounts: {
         totalPlannedInvocations: 14,
         executedInvocations: invocations.length,
@@ -489,6 +500,7 @@ export class BoundedCanaryRunner {
         totalEstimatedCostMicroUsd: totalEstimatedCost,
         aggregateSemanticScore: invocations.length > 0 ? Number((scoreSum / invocations.length).toFixed(4)) : 0,
       },
+      attemptRecords: [],
       invocations,
       killSwitchEvents,
       productionRoutingEnforcementAllowed: false,
@@ -517,6 +529,7 @@ export class BoundedCanaryRunner {
 
     const killSwitchEvents: CanaryKillSwitchEvent[] = [];
     const invocations: CanaryInvocationEvidenceRecord[] = [];
+    const attemptRecords: CanaryTransportAttemptRecord[] = [];
 
     // Redacted human approval envelope for evidence (zero secret leakage)
     const sanitizedApproval: CanaryHumanApprovalEnvelope | null = options.humanApproval
@@ -535,42 +548,59 @@ export class BoundedCanaryRunner {
         }
       : null;
 
-    // Gate 1: Phase must be strictly 'A.12B.2C-5B'
-    if (options.phase && options.phase !== 'A.12B.2C-5B') {
+    const buildFailClosedPackage = (): CanaryExecutionEvidencePackage => ({
+      phase: 'A.12B.2C-5B',
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      executionMode: 'LIVE_CONTROLLED_CANARY',
+      timestamp: now().toISOString(),
+      humanApproval: sanitizedApproval,
+      overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
+      logicalCaseCount: 0,
+      transportAttemptCount: 0,
+      completedRequiredMatrixCases: 0,
+      summaryCounts: {
+        totalPlannedInvocations: 14,
+        executedInvocations: 0,
+        passedInvocations: 0,
+        failedInvocations: 0,
+        killSwitchEventsCount: killSwitchEvents.length,
+        totalObservedCostMicroUsd: 0,
+        totalEstimatedCostMicroUsd: 0,
+        aggregateSemanticScore: 0,
+      },
+      attemptRecords: [],
+      invocations: [],
+      killSwitchEvents,
+      productionRoutingEnforcementAllowed: false,
+    });
+
+    // Gate 1: Phase must be strictly and explicitly 'A.12B.2C-5B'
+    if (!options.phase || options.phase !== 'A.12B.2C-5B') {
       killSwitchEvents.push({
         timestamp: now().toISOString(),
         reason: 'UNAUTHORIZED_ENVIRONMENT',
-        message: `Live canary execution requires phase 'A.12B.2C-5B', received '${options.phase}'.`,
+        message: `Live canary execution requires explicit phase 'A.12B.2C-5B', received '${options.phase || 'none'}'. Zero calls permitted.`,
         terminatedFailClosed: true,
       });
-
-      return {
-        phase: 'A.12B.2C-5B',
-        specificationVersion: CANARY_SPECIFICATION_VERSION,
-        executionMode: 'LIVE_CONTROLLED_CANARY',
-        timestamp: now().toISOString(),
-        humanApproval: sanitizedApproval,
-        overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
-        summaryCounts: {
-          totalPlannedInvocations: 14,
-          executedInvocations: 0,
-          passedInvocations: 0,
-          failedInvocations: 0,
-          killSwitchEventsCount: 1,
-          totalObservedCostMicroUsd: 0,
-          totalEstimatedCostMicroUsd: 0,
-          aggregateSemanticScore: 0,
-        },
-        invocations: [],
-        killSwitchEvents,
-        productionRoutingEnforcementAllowed: false,
-      };
+      return buildFailClosedPackage();
     }
 
-    // Gate 2: Validate Human Approval Token with mandatory capabilitySecret
+    // Gate 2: Validate 256-bit Entropy Capability Secret (64 lowercase hex characters)
     const secret = options.capabilitySecret || options.humanApproval?.capabilitySecret || env.VELNAR_CANARY_CAPABILITY_SECRET;
+    if (!isValidCapabilitySecret(secret)) {
+      killSwitchEvents.push({
+        timestamp: now().toISOString(),
+        reason: 'HUMAN_APPROVAL_INVALID',
+        message: 'Capability secret is invalid or missing: must be exactly 64 hexadecimal characters representing 256 bits of entropy (fail-closed).',
+        terminatedFailClosed: true,
+      });
+      return buildFailClosedPackage();
+    }
+
+    // Gate 3: Validate Human Approval Token with mandatory 256-bit capabilitySecret
     const approvalValidation = validateHumanApprovalToken(options.humanApproval, {
       capabilitySecret: secret,
+      require64HexSecret: true,
       now,
       allowSimulatedExpiryForTest: false,
     });
@@ -582,39 +612,18 @@ export class BoundedCanaryRunner {
         message: `Human approval token rejected: ${approvalValidation.reason}`,
         terminatedFailClosed: true,
       });
-
-      return {
-        phase: 'A.12B.2C-5B',
-        specificationVersion: CANARY_SPECIFICATION_VERSION,
-        executionMode: 'LIVE_CONTROLLED_CANARY',
-        timestamp: now().toISOString(),
-        humanApproval: sanitizedApproval,
-        overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
-        summaryCounts: {
-          totalPlannedInvocations: 14,
-          executedInvocations: 0,
-          passedInvocations: 0,
-          failedInvocations: 0,
-          killSwitchEventsCount: 1,
-          totalObservedCostMicroUsd: 0,
-          totalEstimatedCostMicroUsd: 0,
-          aggregateSemanticScore: 0,
-        },
-        invocations: [],
-        killSwitchEvents,
-        productionRoutingEnforcementAllowed: false,
-      };
+      return buildFailClosedPackage();
     }
 
-    // Gate 3: Source Commit SHA & Clean Working Tree Verification
+    // Gate 4: Source Commit SHA & Clean Working Tree Verification (Fail-Closed)
     let sourceCommitMatch = false;
     let workingTreeClean = false;
 
     if (options.sourceRevisionResolver) {
       try {
         const rev = options.sourceRevisionResolver();
-        sourceCommitMatch = rev.commitSha.trim().toLowerCase() === options.humanApproval.sourceCommitSha.trim().toLowerCase();
-        workingTreeClean = rev.isClean;
+        sourceCommitMatch = Boolean(rev?.commitSha && rev.commitSha.trim().toLowerCase() === options.humanApproval!.sourceCommitSha.trim().toLowerCase());
+        workingTreeClean = Boolean(rev?.isClean);
       } catch (err: any) {
         killSwitchEvents.push({
           timestamp: now().toISOString(),
@@ -622,53 +631,43 @@ export class BoundedCanaryRunner {
           message: `Source revision resolver error: ${err.message}`,
           terminatedFailClosed: true,
         });
+        return buildFailClosedPackage();
       }
     } else if (typeof process !== 'undefined' && typeof process.cwd === 'function') {
       try {
         const { execSync } = await import('child_process');
         const headSha = execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim().toLowerCase();
         const statusOutput = execSync('git status --porcelain', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
-        sourceCommitMatch = headSha === options.humanApproval.sourceCommitSha.trim().toLowerCase();
+        sourceCommitMatch = headSha === options.humanApproval!.sourceCommitSha.trim().toLowerCase();
         workingTreeClean = statusOutput === '';
       } catch (gitErr: any) {
-        // In environments without git executable or repository, fallback to commit check if passed
-        sourceCommitMatch = options.humanApproval.sourceCommitSha.trim().length === 40;
-        workingTreeClean = true;
+        // FAIL CLOSED: If git command fails or repository state cannot be verified, terminate with 0 calls
+        killSwitchEvents.push({
+          timestamp: now().toISOString(),
+          reason: 'HUMAN_APPROVAL_INVALID',
+          message: `Git verification failed (git command failed or repository unreadable): ${gitErr?.message || gitErr}. Fail-closed with 0 calls.`,
+          terminatedFailClosed: true,
+        });
+        return buildFailClosedPackage();
       }
     } else {
-      sourceCommitMatch = true;
-      workingTreeClean = true;
+      killSwitchEvents.push({
+        timestamp: now().toISOString(),
+        reason: 'HUMAN_APPROVAL_INVALID',
+        message: 'Git verification failed: runtime environment lacks git capability. Fail-closed with 0 calls.',
+        terminatedFailClosed: true,
+      });
+      return buildFailClosedPackage();
     }
 
     if (!sourceCommitMatch) {
       killSwitchEvents.push({
         timestamp: now().toISOString(),
         reason: 'HUMAN_APPROVAL_INVALID',
-        message: `Source commit SHA mismatch: approval approved '${options.humanApproval.sourceCommitSha}', but runtime git HEAD differs.`,
+        message: `Source commit SHA mismatch: approval approved '${options.humanApproval!.sourceCommitSha}', but runtime git HEAD differs.`,
         terminatedFailClosed: true,
       });
-
-      return {
-        phase: 'A.12B.2C-5B',
-        specificationVersion: CANARY_SPECIFICATION_VERSION,
-        executionMode: 'LIVE_CONTROLLED_CANARY',
-        timestamp: now().toISOString(),
-        humanApproval: sanitizedApproval,
-        overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
-        summaryCounts: {
-          totalPlannedInvocations: 14,
-          executedInvocations: 0,
-          passedInvocations: 0,
-          failedInvocations: 0,
-          killSwitchEventsCount: 1,
-          totalObservedCostMicroUsd: 0,
-          totalEstimatedCostMicroUsd: 0,
-          aggregateSemanticScore: 0,
-        },
-        invocations: [],
-        killSwitchEvents,
-        productionRoutingEnforcementAllowed: false,
-      };
+      return buildFailClosedPackage();
     }
 
     if (!workingTreeClean) {
@@ -678,31 +677,10 @@ export class BoundedCanaryRunner {
         message: 'Working tree is dirty; live execution requires a pristine, uncommitted-change-free git state.',
         terminatedFailClosed: true,
       });
-
-      return {
-        phase: 'A.12B.2C-5B',
-        specificationVersion: CANARY_SPECIFICATION_VERSION,
-        executionMode: 'LIVE_CONTROLLED_CANARY',
-        timestamp: now().toISOString(),
-        humanApproval: sanitizedApproval,
-        overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
-        summaryCounts: {
-          totalPlannedInvocations: 14,
-          executedInvocations: 0,
-          passedInvocations: 0,
-          failedInvocations: 0,
-          killSwitchEventsCount: 1,
-          totalObservedCostMicroUsd: 0,
-          totalEstimatedCostMicroUsd: 0,
-          aggregateSemanticScore: 0,
-        },
-        invocations: [],
-        killSwitchEvents,
-        productionRoutingEnforcementAllowed: false,
-      };
+      return buildFailClosedPackage();
     }
 
-    // Gate 4: Signal Abortion Check
+    // Gate 5: Signal Abortion Check
     if (abortSignal?.aborted) {
       killSwitchEvents.push({
         timestamp: now().toISOString(),
@@ -710,38 +688,39 @@ export class BoundedCanaryRunner {
         message: 'Live execution aborted prior to provider calls by termination signal.',
         terminatedFailClosed: true,
       });
+      return buildFailClosedPackage();
+    }
 
-      return {
-        phase: 'A.12B.2C-5B',
-        specificationVersion: CANARY_SPECIFICATION_VERSION,
-        executionMode: 'LIVE_CONTROLLED_CANARY',
+    // Gate 6: Provider Credential Preflight (Fail-Closed with 0 calls if credentials missing)
+    const deepSeekKey = env.DEEPSEEK_API_KEY;
+    const geminiKey = env.GEMINI_API_KEY;
+    if (!deepSeekKey || typeof deepSeekKey !== 'string' || deepSeekKey.trim() === '') {
+      killSwitchEvents.push({
         timestamp: now().toISOString(),
-        humanApproval: sanitizedApproval,
-        overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
-        summaryCounts: {
-          totalPlannedInvocations: 14,
-          executedInvocations: 0,
-          passedInvocations: 0,
-          failedInvocations: 0,
-          killSwitchEventsCount: 1,
-          totalObservedCostMicroUsd: 0,
-          totalEstimatedCostMicroUsd: 0,
-          aggregateSemanticScore: 0,
-        },
-        invocations: [],
-        killSwitchEvents,
-        productionRoutingEnforcementAllowed: false,
-      };
+        reason: 'UNAUTHORIZED_ENVIRONMENT',
+        message: 'DeepSeek provider credentials (DEEPSEEK_API_KEY) missing or empty in environment. Fail-closed with 0 provider calls.',
+        terminatedFailClosed: true,
+      });
+      return buildFailClosedPackage();
+    }
+    if (!geminiKey || typeof geminiKey !== 'string' || geminiKey.trim() === '') {
+      killSwitchEvents.push({
+        timestamp: now().toISOString(),
+        reason: 'UNAUTHORIZED_ENVIRONMENT',
+        message: 'Gemini provider credentials (GEMINI_API_KEY) missing or empty in environment. Fail-closed with 0 provider calls.',
+        terminatedFailClosed: true,
+      });
+      return buildFailClosedPackage();
     }
 
     // Compute approved budget bound (Integer microUSD)
-    const approvedBudgetMicroUsd = options.humanApproval.maxBudgetMicroUsd ??
-      Math.round((options.humanApproval.maxBudgetUsd ?? 0.05) * 1_000_000);
+    const approvedBudgetMicroUsd = options.humanApproval!.maxBudgetMicroUsd ??
+      Math.round((options.humanApproval!.maxBudgetUsd ?? 0.05) * 1_000_000);
     const effectiveCeilingMicroUsd = Math.min(approvedBudgetMicroUsd, CANARY_COST_LIMITS.hardCeilingMicroUsd);
 
-    // Live Accounting State
-    let totalInvocationsCount = 0;
-    const providerInvocationsCount: Record<CertifiedProviderId, number> = {
+    // Live Accounting State: Strict 14 Total / 7 Per-Provider Limits
+    let totalTransportAttempts = 0;
+    const providerTransportAttempts: Record<CertifiedProviderId, number> = {
       deepseek: 0,
       gemini: 0,
     };
@@ -750,6 +729,7 @@ export class BoundedCanaryRunner {
     let totalObservedCostMicroUsd = 0;
     let totalEstimatedCostMicroUsd = 0;
     let scoreSum = 0;
+    let passedInvocationsCount = 0;
 
     /**
      * Hardened Outbound Transport Wrapper
@@ -778,21 +758,21 @@ export class BoundedCanaryRunner {
         return { success: false, status: 499, killSwitch };
       }
 
-      // Check Invocations Quota BEFORE Outbound Dispatch
-      const maxAllowedTotalCalls = CANARY_INVOCATION_LIMITS.maxTotalInvocations + CANARY_INVOCATION_LIMITS.maxSameProviderRetries + CANARY_INVOCATION_LIMITS.maxCrossProviderFallbacks;
-      const maxAllowedProviderCalls = CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider + CANARY_INVOCATION_LIMITS.maxSameProviderRetries;
+      // Check Invocations Quota BEFORE Outbound Dispatch (Strict 14 / 7 Hard Caps)
+      const maxAllowedTotalCalls = CANARY_INVOCATION_LIMITS.maxTotalInvocations; // 14
+      const maxAllowedProviderCalls = CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider; // 7
 
-      if (totalInvocationsCount + 1 > maxAllowedTotalCalls) {
+      if (totalTransportAttempts + 1 > maxAllowedTotalCalls) {
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
           reason: 'INVOCATION_LIMIT_BREACH',
-          message: `Total invocation quota ${maxAllowedTotalCalls} exceeded.`,
+          message: `Total invocation quota ${maxAllowedTotalCalls} exceeded (attempted call #${totalTransportAttempts + 1}).`,
           terminatedFailClosed: true,
         };
         return { success: false, status: 429, killSwitch };
       }
 
-      if (providerInvocationsCount[params.candidate.providerId] + 1 > maxAllowedProviderCalls) {
+      if (providerTransportAttempts[params.candidate.providerId] + 1 > maxAllowedProviderCalls) {
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
           reason: 'INVOCATION_LIMIT_BREACH',
@@ -837,8 +817,22 @@ export class BoundedCanaryRunner {
         return { success: false, status: 403, killSwitch };
       }
 
-      // Pre-outbound Cost Envelope Projection Check
-      if (totalObservedCostMicroUsd + CANARY_COST_LIMITS.maxSingleInvocationMicroUsd > effectiveCeilingMicroUsd) {
+      // Pre-outbound Cost Envelope Projection Check (Max 5000 microUSD single call bound)
+      // Projected single call worst-case cost (2048 prompt + 2048 completion tokens):
+      // DeepSeek: 2.048 * $0.14 + 2.048 * $0.28 = 0.860 USD = ~861 microUSD
+      // Gemini: 2.048 * $0.075 + 2.048 * $0.30 = 0.768 USD = ~768 microUSD
+      const projectedCallCostMicroUsd = params.candidate.providerId === 'deepseek' ? 861 : 768;
+      if (projectedCallCostMicroUsd > CANARY_COST_LIMITS.maxSingleInvocationMicroUsd) {
+        const killSwitch: CanaryKillSwitchEvent = {
+          timestamp: now().toISOString(),
+          reason: 'COST_CEILING_BREACH',
+          message: `Projected call cost ${projectedCallCostMicroUsd} microUSD exceeds single call limit ${CANARY_COST_LIMITS.maxSingleInvocationMicroUsd}.`,
+          terminatedFailClosed: true,
+        };
+        return { success: false, status: 402, killSwitch };
+      }
+
+      if (totalObservedCostMicroUsd + projectedCallCostMicroUsd > effectiveCeilingMicroUsd) {
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
           reason: 'COST_CEILING_BREACH',
@@ -848,43 +842,72 @@ export class BoundedCanaryRunner {
         return { success: false, status: 402, killSwitch };
       }
 
-      // Pre-increment Invocations Counter
-      totalInvocationsCount++;
-      providerInvocationsCount[params.candidate.providerId]++;
+      // Pre-increment Invocations Counter (Strict Accounting)
+      totalTransportAttempts++;
+      providerTransportAttempts[params.candidate.providerId]++;
       if (params.isRetry) sameProviderRetriesCount++;
       if (params.isFallback) crossProviderFallbacksCount++;
 
-      // API Key Resolution
-      const apiKey = params.candidate.providerId === 'deepseek'
-        ? (env.DEEPSEEK_API_KEY || 'DEEPSEEK_CANARY_TEST_KEY')
-        : (env.GEMINI_API_KEY || 'GEMINI_CANARY_TEST_KEY');
+      // Real Provider Credentials (Strictly no fake default keys)
+      const apiKey = params.candidate.providerId === 'deepseek' ? deepSeekKey! : geminiKey!;
 
-      // Construct Request Payload
+      // Resolve Approved Synthetic Fixture and Build Real Prompt
+      const fixture = CANARY_SYNTHETIC_FIXTURES[params.taskType];
+      const fixtureHash = computeFixtureHash(fixture);
+      const promptDef = PromptRegistry.getPrompt(params.taskType);
+      const systemPrompt = promptDef.systemPrompt;
+      const userPrompt = promptDef.buildUserPrompt(fixture.requestEnvelope);
+
+      let requestPayloadStr = '';
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
+
       if (params.candidate.providerId === 'deepseek') {
         headers['Authorization'] = `Bearer ${apiKey}`;
+        const body = {
+          model: 'deepseek-v4-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          max_tokens: 2048,
+          response_format: { type: 'json_object' },
+          thinking: { type: 'enabled' },
+          reasoning_effort: 'low',
+        };
+        requestPayloadStr = JSON.stringify(body);
       } else {
         headers['x-goog-api-key'] = apiKey;
+        const body = {
+          model: 'gemini-3.5-flash-lite',
+          service_tier: 'flex',
+          system_instruction: systemPrompt,
+          input: userPrompt,
+          generation_config: {
+            thinking_level: 'low',
+            max_output_tokens: 2048,
+          },
+          response_format: {
+            type: 'text',
+            mime_type: 'application/json',
+          },
+        };
+        requestPayloadStr = JSON.stringify(body);
       }
 
-      const promptPayload = {
-        taskType: params.taskType,
-        candidateId: params.candidate.candidateId,
-        instruction: `Execute certified canary evaluation for task ${params.taskType}.`,
-      };
-      const requestPayloadStr = JSON.stringify(promptPayload);
       const requestPayloadHash = crypto.createHash('sha256').update(requestPayloadStr).digest('hex');
 
-      // Enforce timeout
+      // Enforce timeout and redirect: 'error'
       const startTime = Date.now();
       const timeoutController = new AbortController();
       const timeoutId = setTimeout(() => timeoutController.abort(), CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation);
 
-      let response: Response;
+      let response: Response | undefined;
+      let rawResponseText = '';
+      let latencyMs = 0;
+
       try {
-        // Enforce redirect: 'error'
         response = await fetchFn(endpointUrl, {
           method: 'POST',
           headers,
@@ -892,12 +915,34 @@ export class BoundedCanaryRunner {
           redirect: 'error',
           signal: abortSignal ? AbortSignal.any([abortSignal, timeoutController.signal]) : timeoutController.signal,
         });
+        latencyMs = Date.now() - startTime;
       } catch (fetchErr: any) {
         clearTimeout(timeoutId);
+        latencyMs = Date.now() - startTime;
+
+        // Record failed attempt
+        attemptRecords.push({
+          attemptIndex: totalTransportAttempts,
+          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+          fixtureId: fixture.id,
+          fixtureHash,
+          providerId: params.candidate.providerId,
+          candidateId: params.candidate.candidateId,
+          taskType: params.taskType,
+          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+          timestamp: now().toISOString(),
+          endpointUrl,
+          httpStatus: 0,
+          statusClass: 'TRANSPORT_ERROR',
+          latencyMs,
+          requestPayloadHash,
+        });
+
         // Check for redirect or network mismatch
         if (
           fetchErr?.message?.toLowerCase().includes('redirect') ||
-          fetchErr?.name === 'FetchError' && fetchErr?.message?.includes('redirect')
+          (fetchErr?.name === 'FetchError' && fetchErr?.message?.includes('redirect'))
         ) {
           const killSwitch: CanaryKillSwitchEvent = {
             timestamp: now().toISOString(),
@@ -908,7 +953,6 @@ export class BoundedCanaryRunner {
           return { success: false, status: 301, killSwitch };
         }
 
-        // Check if aborted by caller
         if (abortSignal?.aborted) {
           const killSwitch: CanaryKillSwitchEvent = {
             timestamp: now().toISOString(),
@@ -928,8 +972,6 @@ export class BoundedCanaryRunner {
         clearTimeout(timeoutId);
       }
 
-      const latencyMs = Date.now() - startTime;
-
       // Handle Redirect Status Codes (301, 302, 307, 308) Fail-Closed
       if (
         response.status === 301 ||
@@ -938,6 +980,24 @@ export class BoundedCanaryRunner {
         response.status === 308 ||
         response.redirected
       ) {
+        attemptRecords.push({
+          attemptIndex: totalTransportAttempts,
+          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+          fixtureId: fixture.id,
+          fixtureHash,
+          providerId: params.candidate.providerId,
+          candidateId: params.candidate.candidateId,
+          taskType: params.taskType,
+          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+          timestamp: now().toISOString(),
+          endpointUrl,
+          httpStatus: response.status,
+          statusClass: '3xx',
+          latencyMs,
+          requestPayloadHash,
+        });
+
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
           reason: 'NETWORK_DESTINATION_MISMATCH',
@@ -949,6 +1009,24 @@ export class BoundedCanaryRunner {
 
       // Handle 503 Transient Service Unavailable (Retry Eligible)
       if (response.status === 503) {
+        attemptRecords.push({
+          attemptIndex: totalTransportAttempts,
+          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+          fixtureId: fixture.id,
+          fixtureHash,
+          providerId: params.candidate.providerId,
+          candidateId: params.candidate.candidateId,
+          taskType: params.taskType,
+          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+          timestamp: now().toISOString(),
+          endpointUrl,
+          httpStatus: 503,
+          statusClass: '5xx',
+          latencyMs,
+          requestPayloadHash,
+        });
+
         return {
           success: false,
           status: 503,
@@ -956,8 +1034,27 @@ export class BoundedCanaryRunner {
         };
       }
 
-      // Handle Non-200 Statuses
+      // Handle Other Non-200 Statuses
       if (!response.ok) {
+        const statusClass = response.status >= 400 && response.status < 500 ? '4xx' : '5xx';
+        attemptRecords.push({
+          attemptIndex: totalTransportAttempts,
+          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+          fixtureId: fixture.id,
+          fixtureHash,
+          providerId: params.candidate.providerId,
+          candidateId: params.candidate.candidateId,
+          taskType: params.taskType,
+          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+          timestamp: now().toISOString(),
+          endpointUrl,
+          httpStatus: response.status,
+          statusClass,
+          latencyMs,
+          requestPayloadHash,
+        });
+
         return {
           success: false,
           status: response.status,
@@ -967,11 +1064,28 @@ export class BoundedCanaryRunner {
 
       // Parse JSON Telemetry
       let responseJson: any;
-      let rawResponseText = '';
       try {
         rawResponseText = await response.text();
         responseJson = JSON.parse(rawResponseText);
       } catch (parseErr: any) {
+        attemptRecords.push({
+          attemptIndex: totalTransportAttempts,
+          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+          fixtureId: fixture.id,
+          fixtureHash,
+          providerId: params.candidate.providerId,
+          candidateId: params.candidate.candidateId,
+          taskType: params.taskType,
+          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+          timestamp: now().toISOString(),
+          endpointUrl,
+          httpStatus: response.status,
+          statusClass: '2xx',
+          latencyMs,
+          requestPayloadHash,
+        });
+
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
           reason: 'MALFORMED_USAGE_TELEMETRY',
@@ -983,8 +1097,69 @@ export class BoundedCanaryRunner {
 
       const responsePayloadHash = crypto.createHash('sha256').update(rawResponseText).digest('hex');
 
-      // Extract Provider Telemetry
+      // Model Identification & Substitution Check (Strictly NO Defaulting)
       let returnedModelIdentifier = '';
+      if (params.candidate.providerId === 'deepseek') {
+        returnedModelIdentifier = typeof responseJson.model === 'string' ? responseJson.model : '';
+      } else {
+        returnedModelIdentifier = typeof responseJson.model === 'string' ? responseJson.model : (typeof responseJson.modelVersion === 'string' ? responseJson.modelVersion : '');
+      }
+
+      if (!returnedModelIdentifier || (returnedModelIdentifier !== params.candidate.expectedReturnedModelIdentifier && returnedModelIdentifier !== params.candidate.requestedModelIdentifier)) {
+        attemptRecords.push({
+          attemptIndex: totalTransportAttempts,
+          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+          fixtureId: fixture.id,
+          fixtureHash,
+          providerId: params.candidate.providerId,
+          candidateId: params.candidate.candidateId,
+          taskType: params.taskType,
+          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+          timestamp: now().toISOString(),
+          endpointUrl,
+          httpStatus: 200,
+          statusClass: '2xx',
+          latencyMs,
+          requestPayloadHash,
+          responsePayloadHash,
+        });
+
+        const killSwitch: CanaryKillSwitchEvent = {
+          timestamp: now().toISOString(),
+          reason: 'MODEL_SUBSTITUTION_DETECTED',
+          message: `Provider returned invalid or substituted model '${returnedModelIdentifier}', expected '${params.candidate.expectedReturnedModelIdentifier}'.`,
+          terminatedFailClosed: true,
+        };
+        return { success: false, status: 200, killSwitch };
+      }
+
+      // Model Version Provenance
+      const certificationBaselineModelVersion = params.candidate.providerId === 'deepseek'
+        ? 'DeepSeek-V4-Flash-0731'
+        : 'gemini-3.5-flash-lite';
+      const providerReportedModelVersion = params.candidate.providerId === 'deepseek'
+        ? (responseJson.system_fingerprint || null)
+        : (responseJson.modelVersion || null);
+
+      // Extract Text Content
+      let content = '';
+      if (params.candidate.providerId === 'deepseek') {
+        content = responseJson.choices?.[0]?.message?.content || '';
+      } else {
+        if (Array.isArray(responseJson.steps)) {
+          const step = responseJson.steps.find((s: any) => s.type === 'model_output' || s.type === 'output');
+          content = step?.output || step?.content || '';
+        } else if (typeof responseJson.output_text === 'string') {
+          content = responseJson.output_text;
+        } else if (typeof responseJson.content === 'string') {
+          content = responseJson.content;
+        } else if (responseJson.candidates?.[0]?.content?.parts?.[0]?.text) {
+          content = responseJson.candidates[0].content.parts[0].text;
+        }
+      }
+
+      // Extract Usage Telemetry
       let promptTokens = 0;
       let completionTokens = 0;
       let thinkingTokens = 0;
@@ -992,26 +1167,42 @@ export class BoundedCanaryRunner {
       let cacheMissTokens = 0;
 
       if (params.candidate.providerId === 'deepseek') {
-        returnedModelIdentifier = responseJson.model || '';
         promptTokens = responseJson.usage?.prompt_tokens ?? 0;
         completionTokens = responseJson.usage?.completion_tokens ?? 0;
         cacheHitTokens = responseJson.usage?.prompt_cache_hit_tokens ?? 0;
         cacheMissTokens = responseJson.usage?.prompt_cache_miss_tokens ?? promptTokens;
         thinkingTokens = responseJson.usage?.completion_tokens_details?.reasoning_tokens ?? 0;
       } else {
-        returnedModelIdentifier = responseJson.modelVersion || responseJson.model || 'gemini-3.5-flash-lite';
         promptTokens = responseJson.usageMetadata?.promptTokenCount ?? responseJson.usage?.prompt_tokens ?? 0;
         completionTokens = responseJson.usageMetadata?.candidatesTokenCount ?? responseJson.usage?.completion_tokens ?? 0;
         thinkingTokens = responseJson.usageMetadata?.thinkingTokenCount ?? 0;
         cacheMissTokens = promptTokens;
       }
 
-      // Gate: Model Substitution Check
-      if (returnedModelIdentifier !== params.candidate.expectedReturnedModelIdentifier && returnedModelIdentifier !== params.candidate.requestedModelIdentifier) {
+      if (promptTokens <= 0 || completionTokens <= 0) {
+        attemptRecords.push({
+          attemptIndex: totalTransportAttempts,
+          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+          fixtureId: fixture.id,
+          fixtureHash,
+          providerId: params.candidate.providerId,
+          candidateId: params.candidate.candidateId,
+          taskType: params.taskType,
+          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+          timestamp: now().toISOString(),
+          endpointUrl,
+          httpStatus: 200,
+          statusClass: '2xx',
+          latencyMs,
+          requestPayloadHash,
+          responsePayloadHash,
+        });
+
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
-          reason: 'MODEL_SUBSTITUTION_DETECTED',
-          message: `Provider returned unexpected model '${returnedModelIdentifier}', expected '${params.candidate.expectedReturnedModelIdentifier}'.`,
+          reason: 'MALFORMED_USAGE_TELEMETRY',
+          message: `Provider returned empty or non-positive token telemetry: promptTokens=${promptTokens}, completionTokens=${completionTokens}.`,
           terminatedFailClosed: true,
         };
         return { success: false, status: 200, killSwitch };
@@ -1040,6 +1231,25 @@ export class BoundedCanaryRunner {
           observedCostMicroUsd = costResult.actualCostMicroUsd;
         }
       } catch (costErr: any) {
+        attemptRecords.push({
+          attemptIndex: totalTransportAttempts,
+          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+          fixtureId: fixture.id,
+          fixtureHash,
+          providerId: params.candidate.providerId,
+          candidateId: params.candidate.candidateId,
+          taskType: params.taskType,
+          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+          timestamp: now().toISOString(),
+          endpointUrl,
+          httpStatus: 200,
+          statusClass: '2xx',
+          latencyMs,
+          requestPayloadHash,
+          responsePayloadHash,
+        });
+
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
           reason: 'MALFORMED_USAGE_TELEMETRY',
@@ -1050,6 +1260,25 @@ export class BoundedCanaryRunner {
       }
 
       if (!Number.isFinite(observedCostMicroUsd) || observedCostMicroUsd < 0) {
+        attemptRecords.push({
+          attemptIndex: totalTransportAttempts,
+          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+          fixtureId: fixture.id,
+          fixtureHash,
+          providerId: params.candidate.providerId,
+          candidateId: params.candidate.candidateId,
+          taskType: params.taskType,
+          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+          timestamp: now().toISOString(),
+          endpointUrl,
+          httpStatus: 200,
+          statusClass: '2xx',
+          latencyMs,
+          requestPayloadHash,
+          responsePayloadHash,
+        });
+
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
           reason: 'COST_CEILING_BREACH',
@@ -1062,6 +1291,27 @@ export class BoundedCanaryRunner {
       totalObservedCostMicroUsd += observedCostMicroUsd;
       totalEstimatedCostMicroUsd += observedCostMicroUsd;
 
+      // Record successful transport attempt with observed cost
+      attemptRecords.push({
+        attemptIndex: totalTransportAttempts,
+        logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+        fixtureId: fixture.id,
+        fixtureHash,
+        providerId: params.candidate.providerId,
+        candidateId: params.candidate.candidateId,
+        taskType: params.taskType,
+        retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+        fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+        timestamp: now().toISOString(),
+        endpointUrl,
+        httpStatus: 200,
+        statusClass: '2xx',
+        latencyMs,
+        requestPayloadHash,
+        responsePayloadHash,
+        incurredCostMicroUsd: observedCostMicroUsd,
+      });
+
       // Check Budget Ceiling Breach Post-Calculation
       if (totalObservedCostMicroUsd > effectiveCeilingMicroUsd) {
         const killSwitch: CanaryKillSwitchEvent = {
@@ -1073,19 +1323,68 @@ export class BoundedCanaryRunner {
         return { success: false, status: 200, killSwitch };
       }
 
-      const semanticScore = 0.95;
-      scoreSum += semanticScore;
+      // Real Schema Validation via OutputValidator
+      let schemaValid = false;
+      try {
+        OutputValidator.validateOutput(params.taskType, content, fixture.requestEnvelope);
+        schemaValid = true;
+      } catch (schemaErr) {
+        schemaValid = false;
+      }
+
+      // Real Deterministic Semantic Scoring via EvaluationScorer
+      let semanticScore = 0;
+      let hardFailReasons: string[] = [];
+      let pass = false;
+
+      if (schemaValid) {
+        try {
+          const evalResult = EvaluationScorer.scoreCase(fixture, {
+            candidate: {
+              candidateId: params.candidate.candidateId,
+              providerId: params.candidate.providerId,
+              modelIdentifier: returnedModelIdentifier,
+            },
+            caseId: fixture.id,
+            content,
+            promptTokens,
+            completionTokens,
+            latencyMs,
+            costMicroUsd: observedCostMicroUsd,
+            promptVersion: 'v1.0.0',
+          });
+          semanticScore = Number((evalResult.weightedQualityScoreBps / 10000).toFixed(4));
+          hardFailReasons = evalResult.hardFailReasons || [];
+          pass = evalResult.passed &&
+                 semanticScore >= CANARY_SUCCESS_CRITERIA.minAggregateSemanticScore &&
+                 hardFailReasons.length === 0;
+        } catch (evalErr: any) {
+          pass = false;
+          hardFailReasons = [evalErr?.message || 'EVALUATION_SCORER_EXCEPTION'];
+        }
+      } else {
+        pass = false;
+        hardFailReasons = ['SCHEMA_VALIDATION_FAILED'];
+      }
+
+      if (pass) {
+        scoreSum += semanticScore;
+        passedInvocationsCount++;
+      }
 
       const evidence: CanaryInvocationEvidenceRecord = {
-        invocationIndex: totalInvocationsCount,
+        invocationIndex: totalTransportAttempts,
         timestamp: now().toISOString(),
         taskType: params.taskType,
         dataClassification: 'PUBLIC_BUSINESS',
         providerId: params.candidate.providerId,
         candidateId: params.candidate.candidateId,
+        fixtureId: fixture.id,
+        fixtureHash,
         requestedModelIdentifier: params.candidate.requestedModelIdentifier,
         returnedModelIdentifier,
-        providerModelVersion: params.candidate.providerId === 'deepseek' ? 'DeepSeek-V4-Flash-0731' : 'gemini-3.5-flash-lite',
+        certificationBaselineModelVersion,
+        providerReportedModelVersion,
         serviceTier: params.candidate.pricingTier === 'flex' ? 'flex' : undefined,
         endpointUrl,
         requestPayloadHash,
@@ -1105,21 +1404,26 @@ export class BoundedCanaryRunner {
         attemptCount: params.attemptCount,
         fallbackTriggered: params.isFallback,
         semanticScore,
-        schemaValid: true,
-        pass: true,
+        schemaValid,
+        pass,
+        hardFailReasons: hardFailReasons.length > 0 ? hardFailReasons : undefined,
       };
 
       return {
-        success: true,
+        success: pass,
         status: 200,
         evidence,
       };
     };
 
-    // Matrix Execution over 7 Tasks * 2 Candidates
+    // Matrix Execution: 7 Certified Tasks * 2 Certified Candidates = Exactly 14 Required Matrix Cases
+    let logicalCaseCount = 0;
+    let completedRequiredMatrixCases = 0;
+
     for (const candidate of CERTIFIED_CANARY_CANDIDATES) {
       for (const taskType of CERTIFIED_A12B2C_TASK_TYPES) {
         if (killSwitchEvents.length > 0 || abortSignal?.aborted) break;
+        logicalCaseCount++;
 
         // Attempt 1: Nominal Base Execution
         let callResult = await executeHardenedCall({
@@ -1135,8 +1439,8 @@ export class BoundedCanaryRunner {
           break;
         }
 
-        // Attempt 2: Same-Provider Retry on HTTP 503 (max 1 retry)
-        if (!callResult.success && callResult.status === 503 && sameProviderRetriesCount < CANARY_INVOCATION_LIMITS.maxSameProviderRetries) {
+        // Attempt 2: Same-Provider Retry on HTTP 503 ONLY (max 1 retry across whole canary)
+        if (!callResult.success && callResult.status === 503 && callResult.retryable && sameProviderRetriesCount < CANARY_INVOCATION_LIMITS.maxSameProviderRetries) {
           callResult = await executeHardenedCall({
             candidate,
             taskType,
@@ -1151,8 +1455,8 @@ export class BoundedCanaryRunner {
           }
         }
 
-        // Attempt 3: Cross-Provider Fallback (DeepSeek -> Gemini only, max 1 fallback)
-        if (!callResult.success && candidate.providerId === 'deepseek' && crossProviderFallbacksCount < CANARY_INVOCATION_LIMITS.maxCrossProviderFallbacks) {
+        // Attempt 3: Cross-Provider Fallback (DeepSeek -> Gemini ONLY, max 1 fallback across whole canary)
+        if (!callResult.success && candidate.providerId === 'deepseek' && callResult.status === 503 && crossProviderFallbacksCount < CANARY_INVOCATION_LIMITS.maxCrossProviderFallbacks) {
           const geminiCandidate = CERTIFIED_CANARY_CANDIDATES.find(c => c.providerId === 'gemini');
           if (geminiCandidate) {
             callResult = await executeHardenedCall({
@@ -1172,10 +1476,13 @@ export class BoundedCanaryRunner {
 
         if (callResult.evidence) {
           invocations.push(callResult.evidence);
+          if (callResult.evidence.pass && !callResult.evidence.fallbackTriggered) {
+            completedRequiredMatrixCases++;
+          }
         } else {
-          // Record failed invocation without passing status
+          // Failed attempt without evidence (e.g. non-200 or parse failure)
           invocations.push({
-            invocationIndex: totalInvocationsCount,
+            invocationIndex: totalTransportAttempts,
             timestamp: now().toISOString(),
             taskType,
             dataClassification: 'PUBLIC_BUSINESS',
@@ -1203,6 +1510,7 @@ export class BoundedCanaryRunner {
             semanticScore: 0,
             schemaValid: false,
             pass: false,
+            hardFailReasons: [`HTTP_STATUS_${callResult.status}`],
           });
         }
       }
@@ -1210,14 +1518,18 @@ export class BoundedCanaryRunner {
       if (killSwitchEvents.length > 0 || abortSignal?.aborted) break;
     }
 
-    // Determine Final Status
+    // Determine Final Status: Strict Requirements for CANARY_EXECUTION_PASSED
     let overallStatus: 'CANARY_EXECUTION_PASSED' | 'CANARY_EXECUTION_FAILED' | 'CANARY_KILL_SWITCH_TERMINATED';
 
     if (killSwitchEvents.length > 0) {
       overallStatus = 'CANARY_KILL_SWITCH_TERMINATED';
     } else if (
+      completedRequiredMatrixCases === 14 &&
+      totalTransportAttempts === 14 &&
       invocations.length === 14 &&
       invocations.every(i => i.pass) &&
+      sameProviderRetriesCount === 0 &&
+      crossProviderFallbacksCount === 0 &&
       (invocations.length > 0 ? (scoreSum / invocations.length) : 0) >= 0.85 &&
       totalObservedCostMicroUsd <= effectiveCeilingMicroUsd
     ) {
@@ -1233,16 +1545,20 @@ export class BoundedCanaryRunner {
       timestamp: now().toISOString(),
       humanApproval: sanitizedApproval,
       overallStatus,
+      logicalCaseCount,
+      transportAttemptCount: totalTransportAttempts,
+      completedRequiredMatrixCases,
       summaryCounts: {
         totalPlannedInvocations: 14,
-        executedInvocations: invocations.length,
+        executedInvocations: totalTransportAttempts,
         passedInvocations: invocations.filter(i => i.pass).length,
         failedInvocations: invocations.filter(i => !i.pass).length,
         killSwitchEventsCount: killSwitchEvents.length,
-        totalObservedCostMicroUsd: totalObservedCostMicroUsd,
-        totalEstimatedCostMicroUsd: totalEstimatedCostMicroUsd,
+        totalObservedCostMicroUsd,
+        totalEstimatedCostMicroUsd,
         aggregateSemanticScore: invocations.length > 0 ? Number((scoreSum / invocations.length).toFixed(4)) : 0,
       },
+      attemptRecords,
       invocations,
       killSwitchEvents,
       productionRoutingEnforcementAllowed: false,
@@ -1275,7 +1591,14 @@ if (
 
   const runCli = async () => {
     const args = parseCliArgs();
-    const phase = (args['phase'] as string) || 'A.12B.2C-5A';
+
+    // Capability secret in argv is strictly prohibited to prevent process listing exposure
+    if (process.argv.some((arg) => arg.startsWith('--capability-secret'))) {
+      console.error('[CANARY_CLI] Error: --capability-secret in CLI argv is prohibited. Provide strictly via VELNAR_CANARY_CAPABILITY_SECRET environment variable.');
+      process.exit(1);
+    }
+
+    const phase = args['phase'] as string;
     const isLiveIntent = Boolean(args['execute-live-canary']);
     const approvalToken = args['approval-token'] as string;
     const approvedBy = args['approved-by'] as string;
@@ -1284,11 +1607,11 @@ if (
     const sourceCommitSha = (args['source-commit'] as string) || (process.env.GIT_COMMIT_SHA || '');
     const runNonce = (args['run-nonce'] as string) || (process.env.VELNAR_CANARY_RUN_NONCE || '');
     
-    // Capability secret is read strictly from environment variable or silent input, never argv
+    // Capability secret is read strictly from environment variable, never argv
     const capabilitySecret = process.env.VELNAR_CANARY_CAPABILITY_SECRET;
     const outputPath = (args['output'] as string) || 'execution/a12b2c5b_canary_execution_results.json';
 
-    console.log(`[CANARY_CLI] Running Bounded Canary CLI with phase: ${phase}, liveIntent: ${isLiveIntent}`);
+    console.log(`[CANARY_CLI] Running Bounded Canary CLI with phase: ${phase || 'none'}, liveIntent: ${isLiveIntent}`);
 
     // Install deterministic SIGINT / SIGTERM signal handling
     const abortController = new AbortController();
@@ -1320,19 +1643,26 @@ if (
     let result: CanaryExecutionEvidencePackage;
 
     if (isLiveIntent) {
+      // Blocker 8: Explicitly enforce --phase=A.12B.2C-5B requirement
+      if (phase !== 'A.12B.2C-5B') {
+        console.error(`[CANARY_CLI] Error: --execute-live-canary strictly requires --phase=A.12B.2C-5B (received: '${phase || 'none'}'). Zero calls permitted.`);
+        process.exit(1);
+      }
+
       if (!approvalEnvelope) {
         console.error('[CANARY_CLI] Error: --execute-live-canary requires --approval-token, --approved-by, and VELNAR_CANARY_CAPABILITY_SECRET environment variable.');
         process.exit(1);
       }
+
       result = await BoundedCanaryRunner.executeLiveCanary({
-        phase: 'A.12B.2C-5B',
+        phase: phase as any,
         humanApproval: approvalEnvelope,
         capabilitySecret,
         abortSignal: abortController.signal,
       });
     } else {
       result = await BoundedCanaryRunner.executeDryRunPlan({
-        phase: phase as any,
+        phase: (phase || 'A.12B.2C-5A') as any,
         dryRun: true,
         humanApproval: approvalEnvelope,
         capabilitySecret,
