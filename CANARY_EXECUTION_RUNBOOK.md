@@ -33,26 +33,26 @@ Live canary execution requires a cryptographically strong, secret-backed Human A
 
 ### 1.2 Capability Secret & Token Generation Procedure (Offline / Air-Gapped)
 
-The security operator generates the capability secret and token using the offline utility (`npm run generate-canary-token`) or `openssl`:
-- **Capability Secret**: Exactly 32 cryptographically random bytes encoded as **64 lowercase hexadecimal characters** (`^[0-9a-f]{64}$`).
-- **Secret Transmission**: Passed strictly via the `VELNAR_CANARY_CAPABILITY_SECRET` environment variable (never via CLI `--arguments`).
+The security operator generates the capability secret and token using the offline utility (`npm run generate-canary-token`):
+- **Capability Secret**: Exactly 32 cryptographically random bytes encoded as **64 lowercase hexadecimal characters** (`^[0-9a-f]{64}$`). Created first by the operator via `openssl rand -hex 32`.
+- **Secret Transmission**: Passed strictly via the `VELNAR_CANARY_CAPABILITY_SECRET` environment variable (never via CLI `--arguments`). `tokenGenerator.ts` strictly requires this secret from the protected environment channel.
+- **Canonical Approved-By Identity**: Must be established before generation and must match identically between token generation and live execution (no USER/default identity fallbacks allowed).
 
 ```bash
-# Option A: Generate a new 64-hex capability secret offline:
+# Step 1: Establish canonical approved-by identity
+export VELNAR_CANARY_APPROVED_BY="security-lead@velnar.internal"
+
+# Step 2: Generate the 64-hex capability secret (256 bits entropy) in protected environment:
 export VELNAR_CANARY_CAPABILITY_SECRET="$(openssl rand -hex 32)"
 
-# Option B: Use the built-in offline token generator utility:
+# Step 3: Generate the cryptographically bound offline approval token:
 npm run generate-canary-token -- \
-  --approved-by="security-lead@velnar.internal" \
+  --approved-by="${VELNAR_CANARY_APPROVED_BY}" \
   --max-budget-micro-usd=50000 \
   --target-phase="A.12B.2C-5B"
 
-# Operator environment setup for manual generation:
-export GIT_COMMIT_SHA="$(git rev-parse HEAD)"
-export VELNAR_CANARY_RUN_NONCE="$(openssl rand -hex 16)"
-export APPROVAL_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-export APPROVAL_DATE="$(date -u +"%Y%m%d")"
-export MAX_BUDGET_MICRO_USD="50000"
+# Step 4: Export the resulting token and execution metadata (as output by the utility):
+# export VELNAR_CANARY_APPROVAL_TOKEN="VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE>"
 
 # Canonical HMAC Payload:
 # ${approvedBy}:${targetPhase}:${environmentTarget}:${dateYyyyMmDd}:${maxBudgetMicroUsd}:${approvalTimestamp}:${specificationVersion}:${sourceCommitSha}:${runNonce}

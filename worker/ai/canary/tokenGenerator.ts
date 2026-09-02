@@ -6,9 +6,10 @@
  * - 100% OFFLINE: ZERO network calls, zero provider calls.
  * - Enforces the 64-hex capability secret contract:
  *   32 cryptographically random bytes encoded as 64 lowercase hexadecimal characters.
- * - Verifies working tree status (fails closed on dirty working tree).
+ * - Fails closed on dirty working tree.
  * - Requires explicit Phase A.12B.2C-5B and CONTROLLED_CANARY environment target.
- * - Output conforms to CanaryHumanApprovalEnvelope without exposing capability secret.
+ * - Strict CLI parsing for documented arguments: --approved-by, --max-budget-micro-usd, --target-phase.
+ * - Capability secret is strictly redacted and NEVER included in TokenGeneratorResult or envelope.
  */
 
 import * as crypto from 'crypto';
@@ -38,6 +39,126 @@ export interface TokenGeneratorResult {
   approvalToken: string;
   envelope: CanaryHumanApprovalEnvelope;
   exportCommand: string;
+}
+
+/**
+ * Strict CLI argument parser for token generator invocation.
+ * Rejects unknown or security-sensitive arguments, invalid budgets, wrong phases, and empty approved-by.
+ */
+export function parseTokenGeneratorCliArgs(argv: string[]): TokenGeneratorInput {
+  const result: TokenGeneratorInput = {};
+  let i = 0;
+
+  while (i < argv.length) {
+    const rawArg = argv[i];
+    if (!rawArg) {
+      i++;
+      continue;
+    }
+
+    if (rawArg === '--allow-dirty-git') {
+      result.allowDirtyGit = true;
+      i++;
+      continue;
+    }
+
+    if (rawArg.startsWith('--approved-by=')) {
+      const val = rawArg.slice('--approved-by='.length).trim();
+      if (!val) {
+        throw new Error("Argument '--approved-by' cannot be empty.");
+      }
+      result.approvedBy = val;
+      i++;
+      continue;
+    } else if (rawArg === '--approved-by') {
+      i++;
+      if (i >= argv.length || argv[i].startsWith('--')) {
+        throw new Error("Argument '--approved-by' requires a non-empty value.");
+      }
+      const val = argv[i].trim();
+      if (!val) {
+        throw new Error("Argument '--approved-by' cannot be empty.");
+      }
+      result.approvedBy = val;
+      i++;
+      continue;
+    }
+
+    if (rawArg.startsWith('--max-budget-micro-usd=')) {
+      const valStr = rawArg.slice('--max-budget-micro-usd='.length).trim();
+      const val = Number(valStr);
+      if (!valStr || !Number.isInteger(val) || val <= 0 || val > 50000) {
+        throw new Error(`Argument '--max-budget-micro-usd' must be an integer between 1 and 50000 microUSD (got '${valStr}').`);
+      }
+      result.maxBudgetMicroUsd = val;
+      i++;
+      continue;
+    } else if (rawArg === '--max-budget-micro-usd') {
+      i++;
+      if (i >= argv.length || argv[i].startsWith('--')) {
+        throw new Error("Argument '--max-budget-micro-usd' requires an integer value between 1 and 50000.");
+      }
+      const valStr = argv[i].trim();
+      const val = Number(valStr);
+      if (!valStr || !Number.isInteger(val) || val <= 0 || val > 50000) {
+        throw new Error(`Argument '--max-budget-micro-usd' must be an integer between 1 and 50000 microUSD (got '${valStr}').`);
+      }
+      result.maxBudgetMicroUsd = val;
+      i++;
+      continue;
+    }
+
+    if (rawArg.startsWith('--target-phase=')) {
+      const val = rawArg.slice('--target-phase='.length).trim();
+      if (val !== 'A.12B.2C-5B') {
+        throw new Error(`Argument '--target-phase' must be exactly 'A.12B.2C-5B' (got '${val}').`);
+      }
+      result.targetPhase = 'A.12B.2C-5B';
+      i++;
+      continue;
+    } else if (rawArg === '--target-phase') {
+      i++;
+      if (i >= argv.length || argv[i].startsWith('--')) {
+        throw new Error("Argument '--target-phase' requires a value of 'A.12B.2C-5B'.");
+      }
+      const val = argv[i].trim();
+      if (val !== 'A.12B.2C-5B') {
+        throw new Error(`Argument '--target-phase' must be exactly 'A.12B.2C-5B' (got '${val}').`);
+      }
+      result.targetPhase = 'A.12B.2C-5B';
+      i++;
+      continue;
+    }
+
+    if (rawArg.startsWith('--source-commit-sha=')) {
+      const val = rawArg.slice('--source-commit-sha='.length).trim().toLowerCase();
+      if (!/^[0-9a-f]{40}$/.test(val)) {
+        throw new Error("Argument '--source-commit-sha' must be 40 lowercase hexadecimal characters.");
+      }
+      result.sourceCommitSha = val;
+      i++;
+      continue;
+    } else if (rawArg === '--source-commit-sha') {
+      i++;
+      if (i >= argv.length || argv[i].startsWith('--')) {
+        throw new Error("Argument '--source-commit-sha' requires a 40-character hex value.");
+      }
+      const val = argv[i].trim().toLowerCase();
+      if (!/^[0-9a-f]{40}$/.test(val)) {
+        throw new Error("Argument '--source-commit-sha' must be 40 lowercase hexadecimal characters.");
+      }
+      result.sourceCommitSha = val;
+      i++;
+      continue;
+    }
+
+    // Reject unknown or unauthorized arguments
+    throw new Error(
+      `Unknown or unauthorized argument: '${rawArg}'. Supported arguments: --approved-by, --max-budget-micro-usd, --target-phase, --source-commit-sha, --allow-dirty-git.`
+    );
+  }
+
+  return result;
 }
 
 /**
@@ -83,6 +204,7 @@ export function formatUtcYyyyMmDd(d: Date): string {
 
 /**
  * Generates an approval token and CanaryHumanApprovalEnvelope offline.
+ * Capability secret is strictly redacted from public output.
  */
 export function generateOfflineCanaryToken(input?: TokenGeneratorInput): TokenGeneratorResult {
   const now = new Date();
@@ -111,9 +233,11 @@ export function generateOfflineCanaryToken(input?: TokenGeneratorInput): TokenGe
     );
   }
 
-  const approvedBy = (input?.approvedBy || process.env.CANARY_APPROVED_BY || process.env.USER || 'velnar-security-officer').trim();
+  const approvedBy = (input?.approvedBy || process.env.VELNAR_CANARY_APPROVED_BY || process.env.CANARY_APPROVED_BY || '').trim();
   if (!approvedBy || approvedBy.length < 3) {
-    throw new Error('approvedBy must be a valid identifier of at least 3 characters.');
+    throw new Error(
+      'approvedBy is required and must be at least 3 characters. Provide via --approved-by CLI argument or set VELNAR_CANARY_APPROVED_BY in the environment.'
+    );
   }
 
   const dateYyyyMmDd = input?.dateYyyyMmDd || formatUtcYyyyMmDd(now);
@@ -130,7 +254,7 @@ export function generateOfflineCanaryToken(input?: TokenGeneratorInput): TokenGe
   const specificationVersion = input?.specificationVersion || CANARY_SPECIFICATION_VERSION;
   const runNonce = input?.runNonce || Buffer.from(crypto.randomBytes(16)).toString('hex');
 
-  let sourceCommitSha = (input?.sourceCommitSha || '').trim().toLowerCase();
+  let sourceCommitSha = (input?.sourceCommitSha || process.env.GIT_COMMIT_SHA || process.env.VELNAR_CANARY_SOURCE_COMMIT || '').trim().toLowerCase();
   if (!sourceCommitSha) {
     sourceCommitSha = resolveGitState(process.cwd(), input?.allowDirtyGit ?? false);
   } else if (!/^[0-9a-f]{40}$/.test(sourceCommitSha)) {
@@ -150,6 +274,7 @@ export function generateOfflineCanaryToken(input?: TokenGeneratorInput): TokenGe
     capabilitySecret,
   });
 
+  // Redact capability secret completely from the return envelope
   const envelope: CanaryHumanApprovalEnvelope = {
     approvalToken,
     approvedBy,
@@ -160,8 +285,8 @@ export function generateOfflineCanaryToken(input?: TokenGeneratorInput): TokenGe
     specificationVersion,
     sourceCommitSha,
     runNonce,
-    capabilitySecret,
   };
+  delete (envelope as any).capabilitySecret;
 
   const exportCommand = `export VELNAR_CANARY_APPROVAL_TOKEN="${approvalToken}"`;
 
@@ -175,7 +300,9 @@ export function generateOfflineCanaryToken(input?: TokenGeneratorInput): TokenGe
 // CLI Entrypoint execution
 if (process.argv[1] && (process.argv[1].endsWith('tokenGenerator.ts') || process.argv[1].endsWith('tokenGenerator.js'))) {
   try {
-    const result = generateOfflineCanaryToken();
+    const rawArgs = process.argv.slice(2);
+    const parsedArgs = parseTokenGeneratorCliArgs(rawArgs);
+    const result = generateOfflineCanaryToken(parsedArgs);
     console.log('\n=== Phase A.12B.2C-5B Human Approval Token Generated ===\n');
     console.log(`Approval Token:     ${result.approvalToken}`);
     console.log(`Approved By:        ${result.envelope.approvedBy}`);

@@ -1183,70 +1183,44 @@ export class BoundedCanaryRunner {
         : 'gemini-3.5-flash-lite';
       const providerReportedModelVersion = params.candidate.providerId === 'deepseek'
         ? (responseJson.system_fingerprint || null)
-        : (responseJson.modelVersion || null);
+        : (responseJson.modelVersion || responseJson.model || null);
 
       // Blocker 2: Gemini Flex Provenance Enforcement
       let providerReportedServiceTier: string | null = null;
       if (params.candidate.providerId === 'gemini') {
-        if (responseJson.service_tier !== undefined) {
-          if (typeof responseJson.service_tier === 'string') {
-            providerReportedServiceTier = responseJson.service_tier;
-            if (responseJson.service_tier !== 'flex') {
-              attemptRecords.push({
-                attemptIndex: totalTransportAttempts,
-                logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
-                fixtureId: fixture.id,
-                fixtureHash,
-                providerId: params.candidate.providerId,
-                candidateId: params.candidate.candidateId,
-                taskType: params.taskType,
-                retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
-                fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
-                timestamp: now().toISOString(),
-                endpointUrl,
-                httpStatus: 200,
-                statusClass: '2xx',
-                latencyMs,
-                requestPayloadHash,
-                responsePayloadHash,
-              });
+        if (typeof responseJson.service_tier === 'string') {
+          providerReportedServiceTier = responseJson.service_tier;
+        } else {
+          providerReportedServiceTier = null;
+        }
 
-              const killSwitch: CanaryKillSwitchEvent = {
-                timestamp: now().toISOString(),
-                reason: 'PROVENANCE_MISMATCH',
-                message: `Gemini response service_tier '${responseJson.service_tier}' does not match certified requested tier 'flex'.`,
-                terminatedFailClosed: true,
-              };
-              return { success: false, status: 200, killSwitch };
-            }
-          } else {
-            attemptRecords.push({
-              attemptIndex: totalTransportAttempts,
-              logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
-              fixtureId: fixture.id,
-              fixtureHash,
-              providerId: params.candidate.providerId,
-              candidateId: params.candidate.candidateId,
-              taskType: params.taskType,
-              retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
-              fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
-              timestamp: now().toISOString(),
-              endpointUrl,
-              httpStatus: 200,
-              statusClass: '2xx',
-              latencyMs,
-              requestPayloadHash,
-              responsePayloadHash,
-            });
+        if (responseJson.service_tier !== 'flex') {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
 
-            const killSwitch: CanaryKillSwitchEvent = {
-              timestamp: now().toISOString(),
-              reason: 'PROVENANCE_MISMATCH',
-              message: `Gemini response contains invalid non-string service_tier field.`,
-              terminatedFailClosed: true,
-            };
-            return { success: false, status: 200, killSwitch };
-          }
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'PROVENANCE_MISMATCH',
+            message: `Gemini response service_tier is invalid, absent, or does not match required certified tier 'flex' (got: ${JSON.stringify(responseJson.service_tier)}).`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
         }
       }
 
@@ -1894,7 +1868,7 @@ export class BoundedCanaryRunner {
         returnedModelIdentifier,
         certificationBaselineModelVersion,
         providerReportedModelVersion,
-        serviceTier: providerReportedServiceTier === 'flex' ? 'flex' : (params.candidate.pricingTier === 'flex' ? 'flex' : undefined),
+        serviceTier: providerReportedServiceTier === 'flex' ? 'flex' : undefined,
         requestedServiceTier: params.candidate.providerId === 'gemini' ? 'flex' : undefined,
         providerReportedServiceTier: params.candidate.providerId === 'gemini' ? providerReportedServiceTier : null,
         endpointUrl,

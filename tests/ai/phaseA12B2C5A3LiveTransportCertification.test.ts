@@ -544,7 +544,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
           };
         } else {
           return {
-            modelVersion: 'gemini-3.5-flash-lite',
+            model: 'gemini-3.5-flash-lite',
             service_tier: 'flex',
             steps: [
               {
@@ -557,6 +557,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
               total_output_tokens: 150,
               total_thought_tokens: 50,
               total_cached_tokens: 100,
+              total_tokens: 650,
               non_cached_input_tokens: 400,
             },
           };
@@ -659,7 +660,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
           });
         } else {
           return new Response(JSON.stringify({
-            modelVersion: 'gemini-3.5-flash-lite',
+            model: 'gemini-3.5-flash-lite',
             service_tier: 'flex',
             steps: [
               {
@@ -672,6 +673,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
               total_output_tokens: 100,
               total_thought_tokens: 20,
               total_cached_tokens: 50,
+              total_tokens: 400,
               non_cached_input_tokens: 250,
             },
           }), {
@@ -727,6 +729,289 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
 
     it('verifies global fetch sentinel received 0 unauthorized calls throughout entire suite', () => {
       expect(sentinelCallCount).toBe(0);
+    });
+  });
+
+  // =========================================================================
+  // 9. Gemini Service-Tier Provenance and Fail-Closed Verification
+  // =========================================================================
+  describe('9. Gemini Service-Tier Provenance and Fail-Closed Verification', () => {
+    const fixedTimestamp = '2026-09-02T12:00:00.000Z';
+    const validCommit = '1a2b3c4d5e6f7890123456789abcdef012345678';
+    const validNonce = '11223344556677889900aabbccddeeff';
+    const validTestSecret32 = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
+    function buildApprovalToken(): string {
+      return generateCanaryApprovalToken({
+        approvedBy: 'security-lead@velnar.internal',
+        targetPhase: 'A.12B.2C-5B',
+        environmentTarget: 'CONTROLLED_CANARY',
+        dateYyyyMmDd: '20260902',
+        maxBudgetMicroUsd: 50000,
+        approvalTimestamp: fixedTimestamp,
+        specificationVersion: CANARY_SPECIFICATION_VERSION,
+        sourceCommitSha: validCommit,
+        runNonce: validNonce,
+        capabilitySecret: validTestSecret32,
+      });
+    }
+
+    it('terminates fail-closed with PROVENANCE_MISMATCH when Gemini response omits service_tier', async () => {
+      const token = buildApprovalToken();
+      const mockFetch = vi.fn(async (url: string) => {
+        if (url.includes('deepseek.com')) {
+          return new Response(JSON.stringify({
+            model: 'deepseek-v4-flash',
+            choices: [{ message: { content: '{"intentScore": 85, "intentStage": "high_intent", "keyIndicators": ["pricing"]}' } }],
+            usage: {
+              prompt_tokens: 500,
+              completion_tokens: 150,
+              prompt_cache_hit_tokens: 400,
+              prompt_cache_miss_tokens: 100,
+              completion_tokens_details: { reasoning_tokens: 50 },
+            },
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        } else {
+          // Gemini response missing service_tier
+          return new Response(JSON.stringify({
+            model: 'gemini-3.5-flash-lite',
+            steps: [{ type: 'model_output', content: [{ type: 'text', text: '{"intentScore": 85, "intentStage": "high_intent", "keyIndicators": ["pricing"]}' }] }],
+            usage: {
+              total_input_tokens: 500,
+              total_output_tokens: 150,
+              total_thought_tokens: 50,
+              total_cached_tokens: 100,
+              total_tokens: 650,
+              non_cached_input_tokens: 400,
+            },
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+      });
+
+      const result = await BoundedCanaryRunner.executeLiveCanary({
+        phase: 'A.12B.2C-5B',
+        humanApproval: {
+          approvedBy: 'security-lead@velnar.internal',
+          approvalTimestamp: fixedTimestamp,
+          targetPhase: 'A.12B.2C-5B',
+          approvalToken: token,
+          maxBudgetMicroUsd: 50000,
+          environmentTarget: 'CONTROLLED_CANARY',
+          specificationVersion: CANARY_SPECIFICATION_VERSION,
+          sourceCommitSha: validCommit,
+          runNonce: validNonce,
+        },
+        capabilitySecret: validTestSecret32,
+        customFetch: mockFetch as any,
+        sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
+        now: () => new Date(fixedTimestamp),
+      });
+
+      expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+      expect(result.killSwitchEvents.length).toBeGreaterThan(0);
+      const provenanceMismatch = result.killSwitchEvents.find(e => e.reason === 'PROVENANCE_MISMATCH');
+      expect(provenanceMismatch).toBeDefined();
+      expect(provenanceMismatch?.message).toContain("required certified tier 'flex'");
+    });
+
+    it('terminates fail-closed with PROVENANCE_MISMATCH when Gemini response service_tier is null', async () => {
+      const token = buildApprovalToken();
+      const mockFetch = vi.fn(async (url: string) => {
+        if (url.includes('deepseek.com')) {
+          return new Response(JSON.stringify({
+            model: 'deepseek-v4-flash',
+            choices: [{ message: { content: '{"intentScore": 85, "intentStage": "high_intent", "keyIndicators": ["pricing"]}' } }],
+            usage: {
+              prompt_tokens: 500,
+              completion_tokens: 150,
+              prompt_cache_hit_tokens: 400,
+              prompt_cache_miss_tokens: 100,
+              completion_tokens_details: { reasoning_tokens: 50 },
+            },
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        } else {
+          return new Response(JSON.stringify({
+            model: 'gemini-3.5-flash-lite',
+            service_tier: null,
+            steps: [{ type: 'model_output', content: [{ type: 'text', text: '{"intentScore": 85, "intentStage": "high_intent", "keyIndicators": ["pricing"]}' }] }],
+            usage: {
+              total_input_tokens: 500,
+              total_output_tokens: 150,
+              total_thought_tokens: 50,
+              total_cached_tokens: 100,
+              total_tokens: 650,
+              non_cached_input_tokens: 400,
+            },
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+      });
+
+      const result = await BoundedCanaryRunner.executeLiveCanary({
+        phase: 'A.12B.2C-5B',
+        humanApproval: {
+          approvedBy: 'security-lead@velnar.internal',
+          approvalTimestamp: fixedTimestamp,
+          targetPhase: 'A.12B.2C-5B',
+          approvalToken: token,
+          maxBudgetMicroUsd: 50000,
+          environmentTarget: 'CONTROLLED_CANARY',
+          specificationVersion: CANARY_SPECIFICATION_VERSION,
+          sourceCommitSha: validCommit,
+          runNonce: validNonce,
+        },
+        capabilitySecret: validTestSecret32,
+        customFetch: mockFetch as any,
+        sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
+        now: () => new Date(fixedTimestamp),
+      });
+
+      expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+      const provenanceMismatch = result.killSwitchEvents.find(e => e.reason === 'PROVENANCE_MISMATCH');
+      expect(provenanceMismatch).toBeDefined();
+    });
+
+    it('terminates fail-closed with PROVENANCE_MISMATCH when Gemini response service_tier is non-flex string (standard)', async () => {
+      const token = buildApprovalToken();
+      const mockFetch = vi.fn(async (url: string) => {
+        if (url.includes('deepseek.com')) {
+          return new Response(JSON.stringify({
+            model: 'deepseek-v4-flash',
+            choices: [{ message: { content: '{"intentScore": 85, "intentStage": "high_intent", "keyIndicators": ["pricing"]}' } }],
+            usage: {
+              prompt_tokens: 500,
+              completion_tokens: 150,
+              prompt_cache_hit_tokens: 400,
+              prompt_cache_miss_tokens: 100,
+              completion_tokens_details: { reasoning_tokens: 50 },
+            },
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        } else {
+          return new Response(JSON.stringify({
+            model: 'gemini-3.5-flash-lite',
+            service_tier: 'standard',
+            steps: [{ type: 'model_output', content: [{ type: 'text', text: '{"intentScore": 85, "intentStage": "high_intent", "keyIndicators": ["pricing"]}' }] }],
+            usage: {
+              total_input_tokens: 500,
+              total_output_tokens: 150,
+              total_thought_tokens: 50,
+              total_cached_tokens: 100,
+              total_tokens: 650,
+              non_cached_input_tokens: 400,
+            },
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+      });
+
+      const result = await BoundedCanaryRunner.executeLiveCanary({
+        phase: 'A.12B.2C-5B',
+        humanApproval: {
+          approvedBy: 'security-lead@velnar.internal',
+          approvalTimestamp: fixedTimestamp,
+          targetPhase: 'A.12B.2C-5B',
+          approvalToken: token,
+          maxBudgetMicroUsd: 50000,
+          environmentTarget: 'CONTROLLED_CANARY',
+          specificationVersion: CANARY_SPECIFICATION_VERSION,
+          sourceCommitSha: validCommit,
+          runNonce: validNonce,
+        },
+        capabilitySecret: validTestSecret32,
+        customFetch: mockFetch as any,
+        sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
+        now: () => new Date(fixedTimestamp),
+      });
+
+      expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+      const provenanceMismatch = result.killSwitchEvents.find(e => e.reason === 'PROVENANCE_MISMATCH');
+      expect(provenanceMismatch).toBeDefined();
+    });
+
+    it('verifies explicit service_tier flex preserves separate requestedServiceTier and providerReportedServiceTier fields', async () => {
+      const token = buildApprovalToken();
+      function getValidFixtureResponse(init: any, isDeepSeek: boolean) {
+        let taskType: TaskType = 'LEAD_INTENT_CLASSIFICATION';
+        try {
+          const parsed = JSON.parse(init.body);
+          const text = (parsed.system_instruction || '') + (parsed.messages?.[0]?.content || '') + (parsed.contents?.[0]?.parts?.[0]?.text || '');
+          if (text.includes('Fast Intent Classifier') || text.includes('intentScore')) taskType = 'LEAD_INTENT_CLASSIFICATION';
+          else if (text.includes('Revenue Leak Forensic Interpreter') || text.includes('leakId')) taskType = 'LEAK_EXPLANATION';
+          else if (text.includes('Growth Action Preparation Engine') || text.includes('growthActionId')) taskType = 'GROWTH_ACTION_DRAFT';
+          else if (text.includes('Business Twin Knowledge Synthesizer') || text.includes('entityId')) taskType = 'BUSINESS_TWIN_SUMMARY';
+          else if (text.includes('Funnel Diagnostics Engine') || text.includes('funnelId')) taskType = 'FUNNEL_DIAGNOSTIC_EXPLANATION';
+          else if (text.includes('Search Optimization Advisor') || text.includes('targetKeyword')) taskType = 'SEO_CONTENT_SUGGESTION';
+          else if (text.includes('Anomaly Triage Assistant') || text.includes('metricName')) taskType = 'ANOMALY_TRIAGE';
+        } catch {}
+        const fixture = CANARY_SYNTHETIC_FIXTURES[taskType];
+        const validContent = generateStrongOutput(fixture);
+        if (isDeepSeek) {
+          return {
+            model: 'deepseek-v4-flash',
+            choices: [{ message: { content: validContent } }],
+            usage: {
+              prompt_tokens: 500,
+              completion_tokens: 150,
+              prompt_cache_hit_tokens: 400,
+              prompt_cache_miss_tokens: 100,
+              completion_tokens_details: { reasoning_tokens: 50 },
+            },
+          };
+        } else {
+          return {
+            model: 'gemini-3.5-flash-lite',
+            service_tier: 'flex',
+            steps: [
+              {
+                type: 'model_output',
+                content: [{ type: 'text', text: validContent }],
+              },
+            ],
+            usage: {
+              total_input_tokens: 500,
+              total_output_tokens: 150,
+              total_thought_tokens: 50,
+              total_cached_tokens: 100,
+              total_tokens: 650,
+              non_cached_input_tokens: 400,
+            },
+          };
+        }
+      }
+
+      const mockFetch = vi.fn(async (url: string, init: any) => {
+        const isDeepSeek = url.includes('deepseek.com');
+        return new Response(JSON.stringify(getValidFixtureResponse(init, isDeepSeek)), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      });
+
+      const result = await BoundedCanaryRunner.executeLiveCanary({
+        phase: 'A.12B.2C-5B',
+        humanApproval: {
+          approvedBy: 'security-lead@velnar.internal',
+          approvalTimestamp: fixedTimestamp,
+          targetPhase: 'A.12B.2C-5B',
+          approvalToken: token,
+          maxBudgetMicroUsd: 50000,
+          environmentTarget: 'CONTROLLED_CANARY',
+          specificationVersion: CANARY_SPECIFICATION_VERSION,
+          sourceCommitSha: validCommit,
+          runNonce: validNonce,
+        },
+        capabilitySecret: validTestSecret32,
+        customFetch: mockFetch as any,
+        sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
+        now: () => new Date(fixedTimestamp),
+      });
+
+      expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
+      const geminiInvocations = result.invocations.filter(i => i.providerId === 'gemini');
+      expect(geminiInvocations.length).toBe(7);
+      for (const inv of geminiInvocations) {
+        expect(inv.requestedServiceTier).toBe('flex');
+        expect(inv.providerReportedServiceTier).toBe('flex');
+        expect(inv.serviceTier).toBe('flex');
+      }
     });
   });
 });

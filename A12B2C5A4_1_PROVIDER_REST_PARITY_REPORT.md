@@ -22,7 +22,7 @@ This phase was executed entirely **offline** with mock synthetic fixtures and de
 | Blocker # | Area | Issue Identified | Resolution & Verification |
 | :--- | :--- | :--- | :--- |
 | **Blocker 1** | Gemini REST Parsing | SDK-level parsing assumed (`output_text`, `usageMetadata`) instead of raw REST schema. | Implemented raw REST extraction in `boundedCanaryRunner.ts` inspecting `steps` array with `model_output` type, extracting `total_input_tokens`, `total_output_tokens`, `total_thought_tokens`, `total_cached_tokens`. |
-| **Blocker 2** | Gemini Flex Provenance | Missing strict verification of `service_tier: "flex"` in provider responses. | Implemented fail-closed validation rejecting any response lacking `service_tier === "flex"` with `PROVENANCE_MISMATCH`. |
+| **Blocker 2** | Gemini Flex Provenance | Missing strict verification of `service_tier: "flex"` in provider responses. | Implemented fail-closed validation: if `service_tier` is absent, null, non-string, or any value other than `"flex"`, terminates immediately with `PROVENANCE_MISMATCH`. Preserves separate `requestedServiceTier` and `providerReportedServiceTier` in evidence without silent substitution. |
 | **Blocker 3 & 4** | Gemini Pricing Rates | Reconciled standard vs flex pricing. | Standard: \$0.30/1M input, \$2.50/1M output. Flex: \$0.15/1M input, \$1.25/1M output. Enforced in `boundedCanaryRunner.ts` and `evaluationCostCalculator.ts`. |
 | **Blocker 5** | DeepSeek Cache Telemetry | Telemetry lacked strict arithmetic verification between hit/miss and total prompt tokens. | Implemented arithmetic integrity check: `prompt_tokens === prompt_cache_hit_tokens + prompt_cache_miss_tokens`. Discrepancies abort fail-closed with `CACHE_ARITHMETIC_INCONSISTENCY`. |
 | **Blocker 6** | DeepSeek Reasoning Tokens | Missing extraction from `completion_tokens_details.reasoning_tokens`. | Extracted and accounted for reasoning tokens; verified against reasoning budget. |
@@ -43,7 +43,7 @@ This phase was executed entirely **offline** with mock synthetic fixtures and de
 - **Response Structure**:
 ```json
 {
-  "modelVersion": "gemini-3.5-flash-lite",
+  "model": "gemini-3.5-flash-lite",
   "service_tier": "flex",
   "steps": [
     {
@@ -61,6 +61,7 @@ This phase was executed entirely **offline** with mock synthetic fixtures and de
     "total_output_tokens": 150,
     "total_thought_tokens": 50,
     "total_cached_tokens": 100,
+    "total_tokens": 650,
     "non_cached_input_tokens": 400
   }
 }
@@ -123,20 +124,25 @@ This phase was executed entirely **offline** with mock synthetic fixtures and de
 
 ## 5. Offline Capability Token Generator
 
-An offline cryptographic generator has been added in `worker/ai/canary/tokenGenerator.ts` and registered in `package.json` under `generate-canary-token`.
+An offline cryptographic generator is provided in `worker/ai/canary/tokenGenerator.ts` and registered in `package.json` under `generate-canary-token`.
 
-### Usage:
-```bash
-npm run generate-canary-token -- \
-  --approved-by="security-lead@velnar.internal" \
-  --max-budget-micro-usd=50000 \
-  --target-phase="A.12B.2C-5B"
-```
+### Operator Execution Contract:
+1. The operator first creates the capability secret in the protected environment:
+   ```bash
+   export VELNAR_CANARY_CAPABILITY_SECRET="$(openssl rand -hex 32)"
+   ```
+2. The operator runs the generator with strict CLI arguments:
+   ```bash
+   npm run generate-canary-token -- \
+     --approved-by="security-lead@velnar.internal" \
+     --max-budget-micro-usd=50000 \
+     --target-phase="A.12B.2C-5B"
+   ```
 
 ### Invariants:
-1. Capability secret is generated using `crypto.randomBytes(32).toString('hex')` (64 lowercase hex chars).
-2. Never exposed or logged on CLI command arguments; read directly from `VELNAR_CANARY_CAPABILITY_SECRET` or generated securely in-memory.
-3. Completely redacted from execution evidence JSON files.
+1. `tokenGenerator.ts` strictly requires `VELNAR_CANARY_CAPABILITY_SECRET` from the environment and enforces exactly 64 lowercase hexadecimal characters (`^[0-9a-f]{64}$`). It does not silently generate secrets or accept uppercase characters.
+2. The CLI parser strictly validates `--approved-by`, `--max-budget-micro-usd`, and `--target-phase`, rejecting unknown or unauthorized arguments fail-closed.
+3. The capability secret is strictly redacted from public output and is never returned in `TokenGeneratorResult` or serialized in the approval envelope.
 
 ---
 

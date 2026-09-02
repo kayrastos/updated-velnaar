@@ -31,7 +31,7 @@ export const CAPABILITY_SECRET_HEX_REGEX = /^[0-9a-f]{64}$/;
 
 export function isValidCapabilitySecret(secret?: string | null): boolean {
   if (!secret || typeof secret !== 'string') return false;
-  return CAPABILITY_SECRET_HEX_REGEX.test(secret.trim().toLowerCase());
+  return CAPABILITY_SECRET_HEX_REGEX.test(secret.trim());
 }
 
 /**
