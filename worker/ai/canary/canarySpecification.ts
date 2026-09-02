@@ -551,7 +551,9 @@ export interface CanaryInvocationEvidenceRecord {
   fixtureHash?: string;
   requestedModelIdentifier: string;
   returnedModelIdentifier: string;
+  documentedVersionTarget?: string;
   certificationBaselineModelVersion?: string;
+  providerReportedBackendFingerprint?: string | null;
   providerReportedModelVersion?: string | null;
   serviceTier?: string;
   requestedServiceTier?: string;
@@ -598,6 +600,7 @@ export interface CanaryExecutionEvidencePackage {
     killSwitchEventsCount: number;
     totalObservedCostMicroUsd: number;
     totalEstimatedCostMicroUsd: number;
+    totalPreflightWorstCaseCostMicroUsd?: number;
     aggregateSemanticScore: number;
   };
   attemptRecords?: CanaryTransportAttemptRecord[];

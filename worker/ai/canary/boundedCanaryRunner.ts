@@ -239,6 +239,7 @@ export class BoundedCanaryRunner {
           killSwitchEventsCount: 1,
           totalObservedCostMicroUsd: 0,
           totalEstimatedCostMicroUsd: 0,
+          totalPreflightWorstCaseCostMicroUsd: 0,
           aggregateSemanticScore: 0,
         },
         invocations: [],
@@ -459,8 +460,10 @@ export class BoundedCanaryRunner {
           fixtureHash: computeFixtureHash(CANARY_SYNTHETIC_FIXTURES[taskType]),
           requestedModelIdentifier: candidate.requestedModelIdentifier,
           returnedModelIdentifier: candidate.expectedReturnedModelIdentifier,
+          documentedVersionTarget: candidate.providerId === 'deepseek' ? 'DeepSeek-V4-Flash-0731' : 'gemini-3.5-flash-lite',
           certificationBaselineModelVersion: candidate.providerId === 'deepseek' ? 'DeepSeek-V4-Flash-0731' : 'gemini-3.5-flash-lite',
-          providerReportedModelVersion: candidate.providerId === 'deepseek' ? 'deepseek-v4-2026' : 'gemini-3.5-flash-lite-001',
+          providerReportedBackendFingerprint: candidate.providerId === 'deepseek' ? 'mock-fingerprint-001' : null,
+          providerReportedModelVersion: candidate.providerId === 'deepseek' ? null : 'gemini-3.5-flash-lite',
           serviceTier: candidate.pricingTier === 'flex' ? 'flex' : undefined,
           endpointUrl,
           requestPayloadHash: crypto.createHash('sha256').update(requestPayload).digest('hex'),
@@ -510,6 +513,7 @@ export class BoundedCanaryRunner {
         killSwitchEventsCount: killSwitchEvents.length,
         totalObservedCostMicroUsd: totalObservedCost,
         totalEstimatedCostMicroUsd: totalEstimatedCost,
+        totalPreflightWorstCaseCostMicroUsd: totalEstimatedCost,
         aggregateSemanticScore: invocations.length > 0 ? Number((scoreSum / invocations.length).toFixed(4)) : 0,
       },
       attemptRecords: [],
@@ -578,6 +582,7 @@ export class BoundedCanaryRunner {
         killSwitchEventsCount: killSwitchEvents.length,
         totalObservedCostMicroUsd: 0,
         totalEstimatedCostMicroUsd: 0,
+        totalPreflightWorstCaseCostMicroUsd: 0,
         aggregateSemanticScore: 0,
       },
       attemptRecords: [],
@@ -740,6 +745,7 @@ export class BoundedCanaryRunner {
     let crossProviderFallbacksCount = 0;
     let totalObservedCostMicroUsd = 0;
     let totalEstimatedCostMicroUsd = 0;
+    let totalPreflightWorstCaseCostMicroUsd = 0;
     let scoreSum = 0;
     let passedInvocationsCount = 0;
 
@@ -944,26 +950,249 @@ export class BoundedCanaryRunner {
       // Enforce timeout and redirect: 'error'
       const startTime = Date.now();
       const timeoutController = new AbortController();
-      const timeoutId = setTimeout(() => timeoutController.abort(), CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation);
+      let timeoutTriggered = false;
+      const timeoutId = setTimeout(() => {
+        timeoutTriggered = true;
+        timeoutController.abort();
+      }, CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation);
 
       let response: Response | undefined;
       let rawResponseText = '';
       let latencyMs = 0;
 
       try {
+        const combinedSignal = abortSignal
+          ? AbortSignal.any([abortSignal, timeoutController.signal])
+          : timeoutController.signal;
+
         response = await fetchFn(endpointUrl, {
           method: 'POST',
           headers,
           body: requestPayloadStr,
           redirect: 'error',
-          signal: abortSignal ? AbortSignal.any([abortSignal, timeoutController.signal]) : timeoutController.signal,
+          signal: combinedSignal,
         });
-        latencyMs = Date.now() - startTime;
-      } catch (fetchErr: any) {
+
+        // Handle Redirect Status Codes (301, 302, 307, 308) Fail-Closed
+        if (
+          response.status === 301 ||
+          response.status === 302 ||
+          response.status === 307 ||
+          response.status === 308 ||
+          response.redirected
+        ) {
+          clearTimeout(timeoutId);
+          latencyMs = Date.now() - startTime;
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: response.status,
+            statusClass: '3xx',
+            latencyMs,
+            requestPayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'NETWORK_DESTINATION_MISMATCH',
+            message: `Target endpoint returned redirect status ${response.status}. Prohibited fail-closed.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: response.status, killSwitch };
+        }
+
+        // Handle 503 Transient Service Unavailable (Retry Eligible)
+        if (response.status === 503) {
+          clearTimeout(timeoutId);
+          latencyMs = Date.now() - startTime;
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 503,
+            statusClass: '5xx',
+            latencyMs,
+            requestPayloadHash,
+          });
+
+          return {
+            success: false,
+            status: 503,
+            retryable: true,
+          };
+        }
+
+        // Handle Other Non-200 Statuses
+        if (!response.ok) {
+          clearTimeout(timeoutId);
+          latencyMs = Date.now() - startTime;
+          const statusClass = response.status >= 400 && response.status < 500 ? '4xx' : '5xx';
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: response.status,
+            statusClass,
+            latencyMs,
+            requestPayloadHash,
+          });
+
+          return {
+            success: false,
+            status: response.status,
+            retryable: false,
+          };
+        }
+
+        // Full-Lifecycle 15s Deadline: Read body while timeoutController remains actively armed
+        rawResponseText = await new Promise<string>((resolve, reject) => {
+          if (timeoutTriggered || timeoutController.signal.aborted) {
+            return reject(new Error(`Lifecycle timeout of ${CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation}ms exceeded before body read.`));
+          }
+          const onAbort = () => {
+            reject(new Error(`Lifecycle timeout of ${CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation}ms exceeded during body read.`));
+          };
+          timeoutController.signal.addEventListener('abort', onAbort, { once: true });
+          response!.text()
+            .then((text) => {
+              timeoutController.signal.removeEventListener('abort', onAbort);
+              resolve(text);
+            })
+            .catch((err) => {
+              timeoutController.signal.removeEventListener('abort', onAbort);
+              reject(err);
+            });
+        });
+
         clearTimeout(timeoutId);
         latencyMs = Date.now() - startTime;
 
-        // Record failed attempt
+        if (latencyMs >= CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation || timeoutTriggered || timeoutController.signal.aborted) {
+          throw new Error(`Lifecycle timeout of ${CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation}ms exceeded after body read (elapsed: ${latencyMs}ms).`);
+        }
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        latencyMs = Date.now() - startTime;
+
+        // Check for redirect or network mismatch
+        if (
+          err?.message?.toLowerCase().includes('redirect') ||
+          (err?.name === 'FetchError' && err?.message?.includes('redirect'))
+        ) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 301,
+            statusClass: '3xx',
+            latencyMs,
+            requestPayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'NETWORK_DESTINATION_MISMATCH',
+            message: `Outbound request encountered prohibited HTTP redirect: ${err.message}`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 301, killSwitch };
+        }
+
+        if (abortSignal?.aborted) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 0,
+            statusClass: 'TRANSPORT_ERROR',
+            latencyMs,
+            requestPayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'UNEXPECTED_EXCEPTION',
+            message: 'Outbound request interrupted by termination signal.',
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 499, killSwitch };
+        }
+
+        const isTimeout = timeoutTriggered || timeoutController.signal.aborted ||
+          err?.message?.includes('Lifecycle timeout') ||
+          (err?.name === 'AbortError' && !abortSignal?.aborted) ||
+          latencyMs >= CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation;
+
+        if (isTimeout) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 0,
+            statusClass: 'TRANSPORT_ERROR',
+            latencyMs,
+            requestPayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'UNEXPECTED_EXCEPTION',
+            message: `Hard lifecycle timeout bound of ${CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation}ms exceeded (elapsed: ${latencyMs}ms). Terminated fail-closed.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 408, killSwitch };
+        }
+
+        // Transport error or aborted body read
         attemptRecords.push({
           attemptIndex: totalTransportAttempts,
           logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
@@ -982,133 +1211,18 @@ export class BoundedCanaryRunner {
           requestPayloadHash,
         });
 
-        // Check for redirect or network mismatch
-        if (
-          fetchErr?.message?.toLowerCase().includes('redirect') ||
-          (fetchErr?.name === 'FetchError' && fetchErr?.message?.includes('redirect'))
-        ) {
-          const killSwitch: CanaryKillSwitchEvent = {
-            timestamp: now().toISOString(),
-            reason: 'NETWORK_DESTINATION_MISMATCH',
-            message: `Outbound request encountered prohibited HTTP redirect: ${fetchErr.message}`,
-            terminatedFailClosed: true,
-          };
-          return { success: false, status: 301, killSwitch };
-        }
-
-        if (abortSignal?.aborted) {
-          const killSwitch: CanaryKillSwitchEvent = {
-            timestamp: now().toISOString(),
-            reason: 'UNEXPECTED_EXCEPTION',
-            message: 'Outbound request interrupted by termination signal.',
-            terminatedFailClosed: true,
-          };
-          return { success: false, status: 499, killSwitch };
-        }
-
-        return {
-          success: false,
-          status: 500,
-          retryable: false,
-        };
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      // Handle Redirect Status Codes (301, 302, 307, 308) Fail-Closed
-      if (
-        response.status === 301 ||
-        response.status === 302 ||
-        response.status === 307 ||
-        response.status === 308 ||
-        response.redirected
-      ) {
-        attemptRecords.push({
-          attemptIndex: totalTransportAttempts,
-          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
-          fixtureId: fixture.id,
-          fixtureHash,
-          providerId: params.candidate.providerId,
-          candidateId: params.candidate.candidateId,
-          taskType: params.taskType,
-          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
-          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
-          timestamp: now().toISOString(),
-          endpointUrl,
-          httpStatus: response.status,
-          statusClass: '3xx',
-          latencyMs,
-          requestPayloadHash,
-        });
-
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
-          reason: 'NETWORK_DESTINATION_MISMATCH',
-          message: `Target endpoint returned redirect status ${response.status}. Prohibited fail-closed.`,
+          reason: 'UNEXPECTED_EXCEPTION',
+          message: `Outbound transport error or aborted body read: ${err?.message || err}. Fail-closed.`,
           terminatedFailClosed: true,
         };
-        return { success: false, status: response.status, killSwitch };
-      }
-
-      // Handle 503 Transient Service Unavailable (Retry Eligible)
-      if (response.status === 503) {
-        attemptRecords.push({
-          attemptIndex: totalTransportAttempts,
-          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
-          fixtureId: fixture.id,
-          fixtureHash,
-          providerId: params.candidate.providerId,
-          candidateId: params.candidate.candidateId,
-          taskType: params.taskType,
-          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
-          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
-          timestamp: now().toISOString(),
-          endpointUrl,
-          httpStatus: 503,
-          statusClass: '5xx',
-          latencyMs,
-          requestPayloadHash,
-        });
-
-        return {
-          success: false,
-          status: 503,
-          retryable: true,
-        };
-      }
-
-      // Handle Other Non-200 Statuses
-      if (!response.ok) {
-        const statusClass = response.status >= 400 && response.status < 500 ? '4xx' : '5xx';
-        attemptRecords.push({
-          attemptIndex: totalTransportAttempts,
-          logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
-          fixtureId: fixture.id,
-          fixtureHash,
-          providerId: params.candidate.providerId,
-          candidateId: params.candidate.candidateId,
-          taskType: params.taskType,
-          retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
-          fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
-          timestamp: now().toISOString(),
-          endpointUrl,
-          httpStatus: response.status,
-          statusClass,
-          latencyMs,
-          requestPayloadHash,
-        });
-
-        return {
-          success: false,
-          status: response.status,
-          retryable: false,
-        };
+        return { success: false, status: 500, killSwitch };
       }
 
       // Parse JSON Telemetry
       let responseJson: any;
       try {
-        rawResponseText = await response.text();
         responseJson = JSON.parse(rawResponseText);
       } catch (parseErr: any) {
         attemptRecords.push({
@@ -1177,13 +1291,64 @@ export class BoundedCanaryRunner {
         return { success: false, status: 200, killSwitch };
       }
 
-      // Model Version Provenance
-      const certificationBaselineModelVersion = params.candidate.providerId === 'deepseek'
+      // Model Version Provenance & Backend Fingerprint Distinction
+      const documentedVersionTarget = params.candidate.providerId === 'deepseek'
         ? 'DeepSeek-V4-Flash-0731'
         : 'gemini-3.5-flash-lite';
-      const providerReportedModelVersion = params.candidate.providerId === 'deepseek'
-        ? (responseJson.system_fingerprint || null)
-        : (responseJson.modelVersion || responseJson.model || null);
+      const certificationBaselineModelVersion = documentedVersionTarget;
+
+      // DeepSeek system_fingerprint is the backend configuration fingerprint, NOT the model version
+      const providerReportedBackendFingerprint = params.candidate.providerId === 'deepseek'
+        ? (typeof responseJson.system_fingerprint === 'string' ? responseJson.system_fingerprint : null)
+        : null;
+
+      // For DeepSeek, providerReportedModelVersion is null unless an explicit runtime model version is returned
+      let providerReportedModelVersion: string | null = null;
+      if (params.candidate.providerId === 'deepseek') {
+        if (typeof responseJson.modelVersion === 'string') {
+          providerReportedModelVersion = responseJson.modelVersion;
+        } else if (typeof responseJson.model_version === 'string') {
+          providerReportedModelVersion = responseJson.model_version;
+        } else {
+          providerReportedModelVersion = null;
+        }
+      } else {
+        providerReportedModelVersion = typeof responseJson.modelVersion === 'string'
+          ? responseJson.modelVersion
+          : (typeof responseJson.model === 'string' ? responseJson.model : null);
+      }
+
+      // If an explicit runtime version field is exposed, enforce it against certified baseline
+      if (providerReportedModelVersion !== null) {
+        if (params.candidate.providerId === 'deepseek' && providerReportedModelVersion !== documentedVersionTarget) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'UNEXPECTED_MODEL_VERSION',
+            message: `DeepSeek explicit runtime model version '${providerReportedModelVersion}' does not match certified baseline '${documentedVersionTarget}'.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+      }
 
       // Blocker 2: Gemini Flex Provenance Enforcement
       let providerReportedServiceTier: string | null = null;
@@ -1772,7 +1937,8 @@ export class BoundedCanaryRunner {
       }
 
       totalObservedCostMicroUsd += observedCostMicroUsd;
-      totalEstimatedCostMicroUsd += observedCostMicroUsd;
+      totalEstimatedCostMicroUsd += worstCaseInvocationCostMicroUsd;
+      totalPreflightWorstCaseCostMicroUsd += worstCaseInvocationCostMicroUsd;
 
       // Record successful transport attempt with observed cost
       attemptRecords.push({
@@ -1866,7 +2032,9 @@ export class BoundedCanaryRunner {
         fixtureHash,
         requestedModelIdentifier: params.candidate.requestedModelIdentifier,
         returnedModelIdentifier,
+        documentedVersionTarget,
         certificationBaselineModelVersion,
+        providerReportedBackendFingerprint,
         providerReportedModelVersion,
         serviceTier: providerReportedServiceTier === 'flex' ? 'flex' : undefined,
         requestedServiceTier: params.candidate.providerId === 'gemini' ? 'flex' : undefined,
@@ -1975,6 +2143,10 @@ export class BoundedCanaryRunner {
             candidateId: candidate.candidateId,
             requestedModelIdentifier: candidate.requestedModelIdentifier,
             returnedModelIdentifier: candidate.expectedReturnedModelIdentifier,
+            documentedVersionTarget: candidate.providerId === 'deepseek' ? 'DeepSeek-V4-Flash-0731' : 'gemini-3.5-flash-lite',
+            certificationBaselineModelVersion: candidate.providerId === 'deepseek' ? 'DeepSeek-V4-Flash-0731' : 'gemini-3.5-flash-lite',
+            providerReportedBackendFingerprint: null,
+            providerReportedModelVersion: null,
             endpointUrl: candidate.providerId === 'deepseek' ? 'https://api.deepseek.com/v1/chat/completions' : 'https://generativelanguage.googleapis.com/v1beta/interactions',
             requestPayloadHash: '',
             responsePayloadHash: '',
@@ -2041,6 +2213,7 @@ export class BoundedCanaryRunner {
         killSwitchEventsCount: killSwitchEvents.length,
         totalObservedCostMicroUsd,
         totalEstimatedCostMicroUsd,
+        totalPreflightWorstCaseCostMicroUsd,
         aggregateSemanticScore: invocations.length > 0 ? Number((scoreSum / invocations.length).toFixed(4)) : 0,
       },
       attemptRecords,
@@ -2049,6 +2222,14 @@ export class BoundedCanaryRunner {
       productionRoutingEnforcementAllowed: false,
     };
   }
+}
+
+export function writeEvidenceArtifact(outputPath: string, result: CanaryExecutionEvidencePackage): void {
+  const fs = require('fs');
+  const path = require('path');
+  const fullPath = path.resolve(process.cwd(), outputPath);
+  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+  fs.writeFileSync(fullPath, JSON.stringify(result, null, 2), 'utf8');
 }
 
 // =========================================================================
@@ -2156,14 +2337,11 @@ if (
     }
 
     try {
-      const fs = await import('fs');
-      const path = await import('path');
-      const fullPath = path.resolve(process.cwd(), outputPath);
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, JSON.stringify(result, null, 2), 'utf8');
-      console.log(`[CANARY_CLI] Wrote execution evidence to: ${fullPath}`);
+      writeEvidenceArtifact(outputPath, result);
+      console.log(`[CANARY_CLI] Wrote execution evidence to: ${outputPath}`);
     } catch (e) {
-      console.error('[CANARY_CLI] Failed to write evidence artifact:', e);
+      console.error('[CANARY_CLI] FATAL: Failed to write execution evidence artifact:', e);
+      process.exit(1);
     }
 
     console.log(`[CANARY_CLI] Execution finished with overallStatus: ${result.overallStatus}`);
