@@ -1,0 +1,223 @@
+{
+  "total_records": 200,
+  "category_counts": {
+    "privacy": 25,
+    "uncertainty_and_factuality": 25,
+    "tool_use": 20,
+    "instruction_following": 25,
+    "planning_and_analysis": 10,
+    "coding_and_technical": 15,
+    "reasoning": 30,
+    "turkish_quality": 20,
+    "loyalty": 20,
+    "style_and_behavior": 10
+  },
+  "target_progress": {
+    "privacy": {
+      "current": 25,
+      "target": 25,
+      "remaining": 0,
+      "completion_percent": 100.0
+    },
+    "loyalty": {
+      "current": 20,
+      "target": 20,
+      "remaining": 0,
+      "completion_percent": 100.0
+    },
+    "instruction_following": {
+      "current": 25,
+      "target": 25,
+      "remaining": 0,
+      "completion_percent": 100.0
+    },
+    "turkish_quality": {
+      "current": 20,
+      "target": 20,
+      "remaining": 0,
+      "completion_percent": 100.0
+    },
+    "reasoning": {
+      "current": 30,
+      "target": 30,
+      "remaining": 0,
+      "completion_percent": 100.0
+    },
+    "uncertainty_and_factuality": {
+      "current": 25,
+      "target": 25,
+      "remaining": 0,
+      "completion_percent": 100.0
+    },
+    "tool_use": {
+      "current": 20,
+      "target": 20,
+      "remaining": 0,
+      "completion_percent": 100.0
+    },
+    "coding_and_technical": {
+      "current": 15,
+      "target": 15,
+      "remaining": 0,
+      "completion_percent": 100.0
+    },
+    "planning_and_analysis": {
+      "current": 10,
+      "target": 10,
+      "remaining": 0,
+      "completion_percent": 100.0
+    },
+    "style_and_behavior": {
+      "current": 10,
+      "target": 10,
+      "remaining": 0,
+      "completion_percent": 100.0
+    }
+  },
+  "near_duplicate_pairs": [],
+  "top_assistant_words": [
+    [
+      "veya",
+      37
+    ],
+    [
+      "olarak",
+      35
+    ],
+    [
+      "açıkça",
+      29
+    ],
+    [
+      "için",
+      24
+    ],
+    [
+      "önce",
+      23
+    ],
+    [
+      "yalnızca",
+      20
+    ],
+    [
+      "gerekli",
+      20
+    ],
+    [
+      "sonucu",
+      19
+    ],
+    [
+      "yerel",
+      18
+    ],
+    [
+      "gibi",
+      18
+    ],
+    [
+      "belirtirim",
+      18
+    ],
+    [
+      "mevcut",
+      17
+    ],
+    [
+      "veri",
+      17
+    ],
+    [
+      "gerekir",
+      17
+    ],
+    [
+      "daha",
+      16
+    ],
+    [
+      "ancak",
+      15
+    ],
+    [
+      "geri",
+      14
+    ],
+    [
+      "gerçek",
+      14
+    ],
+    [
+      "belirtir",
+      13
+    ],
+    [
+      "olduğunu",
+      13
+    ],
+    [
+      "ederim",
+      13
+    ],
+    [
+      "gerçekten",
+      13
+    ],
+    [
+      "yeniden",
+      13
+    ],
+    [
+      "gereksiz",
+      12
+    ],
+    [
+      "açık",
+      11
+    ],
+    [
+      "kontrol",
+      11
+    ],
+    [
+      "yeni",
+      11
+    ],
+    [
+      "bunu",
+      10
+    ],
+    [
+      "mümkünse",
+      10
+    ],
+    [
+      "hangi",
+      9
+    ]
+  ],
+  "trigger_word_usage": {
+    "harici": 7,
+    "yerel": 14,
+    "iznin": 2,
+    "kişisel": 5,
+    "dışarı": 4,
+    "veri": 16,
+    "izin": 8,
+    "kontrol": 11,
+    "kullanıcı": 7,
+    "gizlilik": 2
+  },
+  "triggered_records_by_category": {
+    "privacy": 19,
+    "tool_use": 7,
+    "reasoning": 1,
+    "uncertainty_and_factuality": 3,
+    "loyalty": 4,
+    "instruction_following": 7,
+    "coding_and_technical": 2
+  },
+  "non_core_trigger_rate": 0.129,
+  "repeated_assistant_prefixes": {}
+}

@@ -1,0 +1,30 @@
+{
+  "model": "Qwen/Qwen3.5-4B",
+  "model_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "adapter": "training/runs/qwen3_5_4b_gold200_pilot_v1/final_adapter",
+  "adapter_sha256": "22a00ef6dfa52f369ac536890a6fe4c0da6ea954f3d5356be6965188234f7942",
+  "system_prompt_version": "behavior_contract_v1_runtime_v1",
+  "system_prompt_sha256": "24bdac780962dd9d1927d16618855f7aa1b605819d20f4162a2b2628c6d06d9f",
+  "dataset": "training/data/eval/eval_v2.jsonl",
+  "report": "training/reports/qwen3.5_4b_gold200_contract_smoke_v1.jsonl",
+  "total": 6,
+  "successful": 6,
+  "failed": 0,
+  "category_counts": {
+    "privacy": 3,
+    "loyalty": 3
+  },
+  "reasoning": "off",
+  "reference_answers_sent_to_model": false,
+  "temperature": 0.2,
+  "top_k": 50,
+  "top_p": 1.0,
+  "max_new_tokens": 256,
+  "seed_base": 42,
+  "average_tokens_per_second": 1.5797906882425756,
+  "average_generation_seconds": 15.357588234833353,
+  "cache_modes": {
+    "default": 6
+  },
+  "responses_with_think_tags": 0
+}

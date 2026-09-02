@@ -1,0 +1,868 @@
+FULGOR RAY v1.1 CANDIDATE J — DATA AUDIT v2
+train_sha256=1134f58a38984f5fde421a83c4b0e7b138542770f2936b16fb51159c16be02d6
+records=620 added=300 reserved=290
+dev_eval_read=False
+locked_eval_read=False
+real_training_started=False
+
+TASK_COUNTS
+{
+  "capec_to_cwe_mapping_lookup_required": 16,
+  "capec_to_cwe_mapping_source_grounded": 120,
+  "cwe_classification": 22,
+  "general_regression/coding_and_technical": 3,
+  "general_regression/instruction_following": 6,
+  "general_regression/loyalty": 5,
+  "general_regression/planning_and_analysis": 2,
+  "general_regression/privacy": 6,
+  "general_regression/reasoning": 7,
+  "general_regression/style_and_behavior": 2,
+  "general_regression/tool_use": 4,
+  "general_regression/turkish_quality": 4,
+  "general_regression/uncertainty_and_factuality": 6,
+  "patch_repair": 55,
+  "patch_repair_exact_scope": 18,
+  "regression_exact_repository_context_required": 18,
+  "regression_test": 36,
+  "source_detection": 40,
+  "source_id_classification": 61,
+  "source_impact": 61,
+  "source_remediation_capec_grounded_concise": 48,
+  "source_remediation_cwe_grounded_concise": 80
+}
+
+ADDED_TASK_COUNTS
+{
+  "capec_to_cwe_mapping_lookup_required": 16,
+  "capec_to_cwe_mapping_source_grounded": 120,
+  "patch_repair_exact_scope": 18,
+  "regression_exact_repository_context_required": 18,
+  "source_remediation_capec_grounded_concise": 48,
+  "source_remediation_cwe_grounded_concise": 80
+}
+
+MAPPING_SOURCE_LIST_SIZE_DISTRIBUTION={1: 30, 2: 15, 3: 15, 4: 10, 5: 13, 6: 7, 7: 6, 8: 9, 9: 4, 10: 6, 11: 2, 12: 1, 14: 1, 16: 1}
+REMEDIATION_WORDS_MIN=6
+REMEDIATION_WORDS_MAX=66
+RESERVED_ROWS_CLEAN=290/290
+
+==============================================================================================================
+TASK=capec_to_cwe_mapping_lookup_required | count=16 | deterministic_sample=5
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPMAP-GUARD-0002
+META:
+{
+  "contract": "do_not_guess_source_linked_identifiers_without_lookup",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-323"
+}
+USER:
+Attack pattern title: TCP (ISN) Counter Rate Probe
+Summary: This OS detection probe measures the average rate of initial sequence number increments during a period of time. Sequence numbers are incremented using a time-based algorithm and are susceptible to a timing analysis that can determine the number of increments per unit time. The result of this analysis is then compared against a database of operating systems and versions to determine likely operation system matches.
+
+Return the complete source-linked CWE identifier(s) from the authoritative CAPEC record.
+The authoritative Related_Weaknesses field itself is not provided in this prompt.
+
+ASSISTANT:
+Do not infer the source-linked CWE list from the summary. Look up the authoritative CAPEC record and return only its Related_Weaknesses identifiers.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPMAP-GUARD-0013
+META:
+{
+  "contract": "do_not_guess_source_linked_identifiers_without_lookup",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-155"
+}
+USER:
+Attack pattern title: Screen Temporary Files for Sensitive Information
+Summary: An adversary exploits the temporary, insecure storage of information by monitoring the content of files used to store temp data during an application's routine execution flow. Many applications use temporary files to accelerate processing or to provide records of state across multiple executions of the application. Sometimes, however, these temporary files may end up storing sensitive information. By screening an application's temporary files, an adversary might be able to discover such sensitive information. For example, web browsers often cache content to accelerate subsequent lookups. If the content contains sensitive information then the adversary could recover this from the web cache.
+
+Return the complete source-linked CWE identifier(s) from the authoritative CAPEC record.
+The authoritative Related_Weaknesses field itself is not provided in this prompt.
+
+ASSISTANT:
+Exact source-linked CWE identifiers require CAPEC lookup here. Retrieve the authoritative record; do not add or omit identifiers based on inference.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPMAP-GUARD-0007
+META:
+{
+  "contract": "do_not_guess_source_linked_identifiers_without_lookup",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-279"
+}
+USER:
+Attack pattern title: SOAP Manipulation
+Summary: Simple Object Access Protocol (SOAP) is used as a communication protocol between a client and server to invoke web services on the server. It is an XML-based protocol, and therefore suffers from many of the same shortcomings as other XML-based protocols. Adversaries can make use of these shortcomings and manipulate the content of SOAP paramters, leading to undesirable behavior on the server and allowing the adversary to carry out a number of further attacks.
+
+Return the complete source-linked CWE identifier(s) from the authoritative CAPEC record.
+The authoritative Related_Weaknesses field itself is not provided in this prompt.
+
+ASSISTANT:
+Use authoritative CAPEC lookup for this request. The prose summary is not a substitute for the record's Related_Weaknesses identifiers.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPMAP-GUARD-0006
+META:
+{
+  "contract": "do_not_guess_source_linked_identifiers_without_lookup",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-299"
+}
+USER:
+Attack pattern title: TCP SYN Ping
+Summary: An adversary uses TCP SYN packets as a means towards host discovery. Typical RFC 793 behavior specifies that when a TCP port is open, a host must respond to an incoming SYN "synchronize" packet by completing stage two of the 'three-way handshake' - by sending an SYN/ACK in response. When a port is closed, RFC 793 behavior is to respond with a RST "reset" packet. This behavior can be used to 'ping' a target to see if it is alive by sending a TCP SYN packet to a port and then looking for a RST or an ACK packet in response.
+
+Return the complete source-linked CWE identifier(s) from the authoritative CAPEC record.
+The authoritative Related_Weaknesses field itself is not provided in this prompt.
+
+ASSISTANT:
+No complete CWE mapping can be justified from the description alone. Consult the authoritative CAPEC Related_Weaknesses field and return that list.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPMAP-GUARD-0015
+META:
+{
+  "contract": "do_not_guess_source_linked_identifiers_without_lookup",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-480"
+}
+USER:
+Attack pattern title: Escaping Virtualization
+Summary: An adversary gains access to an application, service, or device with the privileges of an authorized or privileged user by escaping the confines of a virtualized environment. The adversary is then able to access resources or execute unauthorized code within the host environment, generally with the privileges of the user running the virtualized process. Successfully executing an attack of this type is often the first step in executing more complex attacks.
+
+Return the complete source-linked CWE identifier(s) from the authoritative CAPEC record.
+The authoritative Related_Weaknesses field itself is not provided in this prompt.
+
+ASSISTANT:
+Use authoritative CAPEC lookup for this request. The prose summary is not a substitute for the record's Related_Weaknesses identifiers.
+
+==============================================================================================================
+TASK=capec_to_cwe_mapping_source_grounded | count=120 | deterministic_sample=5
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPMAP-SRC-0076
+META:
+{
+  "contract": "complete_and_only_from_explicit_authoritative_source",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-162"
+}
+USER:
+Authoritative CAPEC source record:
+CAPEC-162 | Manipulating Hidden Fields
+Related_Weaknesses: CWE-602
+
+Return the complete source-linked CWE identifier list exactly as supported by the authoritative record.
+Do not infer additional identifiers, do not omit identifiers, and stop after the list.
+
+ASSISTANT:
+CWE-602
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPMAP-SRC-0030
+META:
+{
+  "contract": "complete_and_only_from_explicit_authoritative_source",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-7"
+}
+USER:
+Authoritative CAPEC source record:
+CAPEC-7 | Blind SQL Injection
+Related_Weaknesses: CWE-89, CWE-209, CWE-74, CWE-20, CWE-697, CWE-707
+
+Return the complete source-linked CWE identifier list exactly as supported by the authoritative record.
+Do not infer additional identifiers, do not omit identifiers, and stop after the list.
+
+ASSISTANT:
+CWE-89, CWE-209, CWE-74, CWE-20, CWE-697, CWE-707
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPMAP-SRC-0039
+META:
+{
+  "contract": "complete_and_only_from_explicit_authoritative_source",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-640"
+}
+USER:
+Authoritative CAPEC source record:
+CAPEC-640 | Inclusion of Code in Existing Process
+Related_Weaknesses: CWE-114, CWE-829
+
+Return the complete source-linked CWE identifier list exactly as supported by the authoritative record.
+Do not infer additional identifiers, do not omit identifiers, and stop after the list.
+
+ASSISTANT:
+CWE-114, CWE-829
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPMAP-SRC-0013
+META:
+{
+  "contract": "complete_and_only_from_explicit_authoritative_source",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-81"
+}
+USER:
+Authoritative CAPEC source record:
+CAPEC-81 | Web Server Logs Tampering
+Related_Weaknesses: CWE-117, CWE-93, CWE-75, CWE-221, CWE-96, CWE-20, CWE-150, CWE-276, CWE-279, CWE-116
+
+Return the complete source-linked CWE identifier list exactly as supported by the authoritative record.
+Do not infer additional identifiers, do not omit identifiers, and stop after the list.
+
+ASSISTANT:
+CWE-117, CWE-93, CWE-75, CWE-221, CWE-96, CWE-20, CWE-150, CWE-276, CWE-279, CWE-116
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPMAP-SRC-0002
+META:
+{
+  "contract": "complete_and_only_from_explicit_authoritative_source",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-388"
+}
+USER:
+Authoritative CAPEC source record:
+CAPEC-388 | Application API Button Hijacking
+Related_Weaknesses: CWE-471, CWE-345, CWE-346, CWE-602, CWE-311
+
+Return the complete source-linked CWE identifier list exactly as supported by the authoritative record.
+Do not infer additional identifiers, do not omit identifiers, and stop after the list.
+
+ASSISTANT:
+CWE-471, CWE-345, CWE-346, CWE-602, CWE-311
+
+==============================================================================================================
+TASK=patch_repair_exact_scope | count=18 | deterministic_sample=5
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-PATCHSCOPE-0018
+META:
+{
+  "contract": "exact_supported_patch_span_only",
+  "derived_from_train_id": "FR-CY-SFT-0078"
+}
+USER:
+Repository path: mm/gup.c
+CVE: CVE-2016-5195
+CWE: CWE-362
+Section: static struct page *follow_page_pte(struct vm_area_struct *vma,
+
+Vulnerable code region:
+```text
+}
+	if ((flags & FOLL_NUMA) && pte_protnone(pte))
+		goto no_page;
+	if ((flags & FOLL_WRITE) && !pte_write(pte)) {
+		pte_unmap_unlock(ptep, ptl);
+		return NULL;
+	}
+```
+
+Return the corrected version of this same code region.
+
+Patch-output contract:
+Return only the source-supported replacement span needed for this patch.
+Do not reconstruct adjacent imports, includes, handlers, functions, fixtures, or unrelated file content.
+Stop immediately when the supported replacement span ends.
+
+ASSISTANT:
+}
+	if ((flags & FOLL_NUMA) && pte_protnone(pte))
+		goto no_page;
+	if ((flags & FOLL_WRITE) && !can_follow_write_pte(pte, flags)) {
+		pte_unmap_unlock(ptep, ptl);
+		return NULL;
+	}
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-PATCHSCOPE-0016
+META:
+{
+  "contract": "exact_supported_patch_span_only",
+  "derived_from_train_id": "FR-CY-SFT-0001"
+}
+USER:
+Repository path: program/lib/Roundcube/rcube_washtml.php
+CVE: CVE-2024-37383
+CWE: CWE-79
+Section: private static function attribute_value($node, $attr_name, $attr_value)
+
+Vulnerable code region:
+```text
+foreach ($node->attributes as $name => $attr) {
+            if (strtolower($name) === $attr_name) {
+                if (strtolower($attr_value) === strtolower($attr->nodeValue)) {
+                    return true;
+                }
+            }
+```
+
+Return the corrected version of this same code region.
+
+Patch-output contract:
+Return only the source-supported replacement span needed for this patch.
+Do not reconstruct adjacent imports, includes, handlers, functions, fixtures, or unrelated file content.
+Stop immediately when the supported replacement span ends.
+
+ASSISTANT:
+foreach ($node->attributes as $name => $attr) {
+            if (strtolower($name) === $attr_name) {
+                if (strtolower($attr_value) === strtolower(trim($attr->nodeValue))) {
+                    return true;
+                }
+            }
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-PATCHSCOPE-0012
+META:
+{
+  "contract": "exact_supported_patch_span_only",
+  "derived_from_train_id": "FR-CY-SFT-0088"
+}
+USER:
+Repository path: lib/internet.js
+CVE: CVE-2021-21315
+CWE: CWE-78
+Section: function inetChecksite(url, callback) {
+
+Vulnerable code region:
+```text
+status: 404,
+        ms: null
+      };
+      if (typeof url !== "string") {
+        if (callback) { callback(result); }
+        return resolve(result);
+      }
+```
+
+Return the corrected version of this same code region.
+
+Patch-output contract:
+Return only the source-supported replacement span needed for this patch.
+Do not reconstruct adjacent imports, includes, handlers, functions, fixtures, or unrelated file content.
+Stop immediately when the supported replacement span ends.
+
+ASSISTANT:
+status: 404,
+        ms: null
+      };
+      if (typeof url !== 'string') {
+        if (callback) { callback(result); }
+        return resolve(result);
+      }
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-PATCHSCOPE-0001
+META:
+{
+  "contract": "exact_supported_patch_span_only",
+  "derived_from_train_id": "FR-CY-SFT-0129"
+}
+USER:
+Repository path: src/dec/vp8l_dec.c
+CVE: CVE-2023-4863
+CWE: CWE-787
+Section: static void ClearMetadata(VP8LMetadata* const hdr) {
+
+Vulnerable code region:
+```text
+assert(hdr != NULL);
+
+  WebPSafeFree(hdr->huffman_image_);
+  WebPSafeFree(hdr->huffman_tables_);
+  VP8LHtreeGroupsFree(hdr->htree_groups_);
+  VP8LColorCacheClear(&hdr->color_cache_);
+  VP8LColorCacheClear(&hdr->saved_color_cache_);
+```
+
+Return the corrected version of this same code region.
+
+Patch-output contract:
+Return only the source-supported replacement span needed for this patch.
+Do not reconstruct adjacent imports, includes, handlers, functions, fixtures, or unrelated file content.
+Stop immediately when the supported replacement span ends.
+
+ASSISTANT:
+assert(hdr != NULL);
+
+  WebPSafeFree(hdr->huffman_image_);
+  VP8LHuffmanTablesDeallocate(&hdr->huffman_tables_);
+  VP8LHtreeGroupsFree(hdr->htree_groups_);
+  VP8LColorCacheClear(&hdr->color_cache_);
+  VP8LColorCacheClear(&hdr->saved_color_cache_);
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-PATCHSCOPE-0002
+META:
+{
+  "contract": "exact_supported_patch_span_only",
+  "derived_from_train_id": "FR-CY-SFT-0094"
+}
+USER:
+Repository path: modules/mappers/mod_rewrite.c
+CVE: CVE-2024-38475
+CWE: CWE-116
+Section: static int apply_rewrite_rule(rewriterule_entry *p, rewrite_ctx *ctx)
+
+Vulnerable code region:
+```text
+r->filename);
+
+        r->status = p->forced_responsecode;
+        return 1;
+    }
+
+    /* Special Rewriting Feature: Self-Reduction
+```
+
+Return the corrected version of this same code region.
+
+Patch-output contract:
+Return only the source-supported replacement span needed for this patch.
+Do not reconstruct adjacent imports, includes, handlers, functions, fixtures, or unrelated file content.
+Stop immediately when the supported replacement span ends.
+
+ASSISTANT:
+r->filename);
+
+        r->status = p->forced_responsecode;
+        return RULE_RC_MATCH;
+    }
+
+    /* Special Rewriting Feature: Self-Reduction
+
+==============================================================================================================
+TASK=regression_exact_repository_context_required | count=18 | deterministic_sample=5
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-REGEXACT-GUARD-0008
+META:
+{
+  "contract": "no_repository_api_fabrication_without_verified_context",
+  "derived_from_train_id": "FR-CY-REGF-0003"
+}
+USER:
+Design focused regression checks for the following verified patch. Keep the answer short and test observable behavior rather than writing a full source file.
+
+Problem:
+SVG data-URI media types were inspected before whitespace normalization. Whitespace embedded in the media type could prevent the sanitizer from recognizing the content as SVG and applying the SVG-specific sanitization path.
+
+Remediation:
+The media-type portion is normalized by removing whitespace before SVG and base64 checks. This ensures equivalent media-type spellings follow the same SVG sanitization path. Added tests cover spaces, newlines, and tabs in the media type.
+
+Now provide the exact repository-specific regression-test implementation, including the real helper names, fixtures, imports, endpoint constants, and surrounding test API.
+No repository file or verified test-source region is provided beyond the behavior description above.
+
+ASSISTANT:
+The verified behavior supports regression assertions, but not the repository's exact helpers, fixtures, imports, or APIs. Provide the relevant test-source context before requesting exact code.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-REGEXACT-GUARD-0012
+META:
+{
+  "contract": "no_repository_api_fabrication_without_verified_context",
+  "derived_from_train_id": "FR-CY-REGF-0010"
+}
+USER:
+A defensive patch has this verified security invariant:
+VP8 encoder allocations are established using the initial threading configuration, but runtime configuration changes could later alter the thread count without rebuilding the corresponding allocation layout.
+
+Patch behavior:
+Once the encoder has been initialized, the patch preserves the original multi-threaded setting instead of allowing a thread-count transition that the existing allocation lifecycle cannot safely accommodate. The related test gating is updated accordingly.
+
+Give a minimal regression-test plan. Return only 2–3 observable checks; do not reconstruct repository code or invent APIs.
+
+Now provide the exact repository-specific regression-test implementation, including the real helper names, fixtures, imports, endpoint constants, and surrounding test API.
+No repository file or verified test-source region is provided beyond the behavior description above.
+
+ASSISTANT:
+Repository-exact regression code is underdetermined here. Provide verified surrounding test source rather than guessing project-specific APIs.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-REGEXACT-GUARD-0016
+META:
+{
+  "contract": "no_repository_api_fabrication_without_verified_context",
+  "derived_from_train_id": "FR-CY-REGG-0004"
+}
+USER:
+A defensive patch has this verified security invariant:
+The GeoJSON retrieval path accepted locations without applying the same URL/location validation everywhere and the endpoint lacked an explicit superuser gate, allowing unsafe location handling outside the intended trust boundary.
+
+Patch behavior:
+The patch centralizes GeoJSON location validation, rejects invalid decoded locations before retrieval, and adds an explicit superuser check. The tests verify rejection of an invalid file-style location and denial to a non-admin user.
+
+What regression behavior should be checked so this fix does not regress?
+
+Now provide the exact repository-specific regression-test implementation, including the real helper names, fixtures, imports, endpoint constants, and surrounding test API.
+No repository file or verified test-source region is provided beyond the behavior description above.
+
+ASSISTANT:
+Exact test implementation requires the repository's real test context. Supply the relevant file or source span; otherwise keep the answer at observable regression behavior.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-REGEXACT-GUARD-0018
+META:
+{
+  "contract": "no_repository_api_fabrication_without_verified_context",
+  "derived_from_train_id": "FR-CY-REGG-0016"
+}
+USER:
+A defensive patch has this verified security invariant:
+The development-server endpoint passed a caller-controlled URL to an OS URL-opening facility without first restricting the URL to network schemes that are appropriate for the endpoint.
+
+Patch behavior:
+The input is parsed as a URL and processing stops unless the protocol is HTTP or HTTPS. Invalid URLs are rejected before the value reaches the OS-opening function, closing the unsafe protocol boundary shown by the patch.
+
+What regression behavior should be checked so this fix does not regress?
+
+Now provide the exact repository-specific regression-test implementation, including the real helper names, fixtures, imports, endpoint constants, and surrounding test API.
+No repository file or verified test-source region is provided beyond the behavior description above.
+
+ASSISTANT:
+Repository-exact regression code is underdetermined here. Provide verified surrounding test source rather than guessing project-specific APIs.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-REGEXACT-GUARD-0009
+META:
+{
+  "contract": "no_repository_api_fabrication_without_verified_context",
+  "derived_from_train_id": "FR-CY-REGG-0007"
+}
+USER:
+A defensive patch has this verified security invariant:
+The terminal WebSocket route did not perform the authentication validation used by protected server routes, allowing a connection to reach terminal functionality before the user's identity was established.
+
+Patch behavior:
+The WebSocket handler now validates authentication when authentication is enabled and closes unauthorized connections before terminal setup. Tests verify both missing and incorrect credentials are rejected.
+
+What regression behavior should be checked so this fix does not regress?
+
+Now provide the exact repository-specific regression-test implementation, including the real helper names, fixtures, imports, endpoint constants, and surrounding test API.
+No repository file or verified test-source region is provided beyond the behavior description above.
+
+ASSISTANT:
+Do not reconstruct repository test code from this description alone. With no verified test-file context, only behavior-level checks can be given without inventing project APIs.
+
+==============================================================================================================
+TASK=source_remediation_capec_grounded_concise | count=48 | deterministic_sample=5
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPREM-0023
+META:
+{
+  "contract": "1_to_2_source_supported_actions_only",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-52"
+}
+USER:
+CAPEC-52 | Embedding NULL Bytes
+
+Authoritative CAPEC mitigation source:
+[1] Properly handle the NULL characters supplied as part of user input prior to doing anything with the data.
+
+Give only 1–2 directly source-supported remediation actions.
+Do not add outside advice, do not repeat equivalent guidance, and stop after those actions.
+
+ASSISTANT:
+- Properly handle the NULL characters supplied as part of user input prior to doing anything with the data.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPREM-0006
+META:
+{
+  "contract": "1_to_2_source_supported_actions_only",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-11"
+}
+USER:
+CAPEC-11 | Cause Web Server Misclassification
+
+Authoritative CAPEC mitigation source:
+[1] Implementation: Server routines should be determined by content not determined by filename or file extension.
+
+Give only 1–2 directly source-supported remediation actions.
+Do not add outside advice, do not repeat equivalent guidance, and stop after those actions.
+
+ASSISTANT:
+- Implementation: Server routines should be determined by content not determined by filename or file extension.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPREM-0008
+META:
+{
+  "contract": "1_to_2_source_supported_actions_only",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-108"
+}
+USER:
+CAPEC-108 | Command Line Execution through SQL Injection
+
+Authoritative CAPEC mitigation source:
+[1] Disable MSSQL xp_cmdshell directive on the database
+[2] Properly validate the data (syntactically and semantically) before writing it to the database.
+
+Give only 1–2 directly source-supported remediation actions.
+Do not add outside advice, do not repeat equivalent guidance, and stop after those actions.
+
+ASSISTANT:
+- Disable MSSQL xp_cmdshell directive on the database
+- Properly validate the data (syntactically and semantically) before writing it to the database.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPREM-0037
+META:
+{
+  "contract": "1_to_2_source_supported_actions_only",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-664"
+}
+USER:
+CAPEC-664 | Server Side Request Forgery
+
+Authoritative CAPEC mitigation source:
+[1] Handling incoming requests securely is the first line of action to mitigate this vulnerability. This can be done through URL validation.
+[2] Further down the process flow, examining the response and verifying that it is as expected before sending would be another way to secure the server.
+
+Give only 1–2 directly source-supported remediation actions.
+Do not add outside advice, do not repeat equivalent guidance, and stop after those actions.
+
+ASSISTANT:
+- Handling incoming requests securely is the first line of action to mitigate this vulnerability.
+- Further down the process flow, examining the response and verifying that it is as expected before sending would be another way to secure the server.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CAPREM-0019
+META:
+{
+  "contract": "1_to_2_source_supported_actions_only",
+  "source": "CAPEC 3.9",
+  "source_id": "CAPEC-275"
+}
+USER:
+CAPEC-275 | DNS Rebinding
+
+Authoritative CAPEC mitigation source:
+[1] Design: IP Pinning causes browsers to record the IP address to which a given name resolves and continue using this address regardless of the TTL set in the DNS response. Unfortunately, this is incompatible with the design of some legitimate sites.
+[2] Implementation: Reject HTTP request with a malicious Host header.
+
+Give only 1–2 directly source-supported remediation actions.
+Do not add outside advice, do not repeat equivalent guidance, and stop after those actions.
+
+ASSISTANT:
+- Design: IP Pinning causes browsers to record the IP address to which a given name resolves and continue using this address regardless of the TTL set in the DNS response.
+- Implementation: Reject HTTP request with a malicious Host header.
+
+==============================================================================================================
+TASK=source_remediation_cwe_grounded_concise | count=80 | deterministic_sample=5
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CWEREM-0012
+META:
+{
+  "contract": "1_to_2_source_supported_actions_only",
+  "source": "CWE 4.20",
+  "source_id": "CWE-1274"
+}
+USER:
+CWE-1274 | Improper Access Control for Volatile Memory Containing Boot Code
+
+Authoritative CWE mitigation source:
+[1] Phase=Architecture and Design; Ensure that the design of volatile-memory protections is enough to prevent modification from an adversary or untrusted code.
+[2] Phase=Testing; Test the volatile-memory protections to ensure they are safe from modification or untrusted code.
+
+Give only 1–2 directly source-supported remediation actions.
+Do not add outside advice, do not repeat equivalent guidance, and stop after those actions.
+
+ASSISTANT:
+- Architecture and Design: Ensure that the design of volatile-memory protections is enough to prevent modification from an adversary or untrusted code.
+- Testing: Test the volatile-memory protections to ensure they are safe from modification or untrusted code.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CWEREM-0072
+META:
+{
+  "contract": "1_to_2_source_supported_actions_only",
+  "source": "CWE 4.20",
+  "source_id": "CWE-487"
+}
+USER:
+CWE-487 | Reliance on Package-level Scope
+
+Authoritative CWE mitigation source:
+[1] Phase=Architecture and Design; Data should be private static and final whenever possible. This will assure that your code is protected by instantiating early, preventing access and tampering.
+
+Give only 1–2 directly source-supported remediation actions.
+Do not add outside advice, do not repeat equivalent guidance, and stop after those actions.
+
+ASSISTANT:
+- Architecture and Design: Data should be private static and final whenever possible.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CWEREM-0046
+META:
+{
+  "contract": "1_to_2_source_supported_actions_only",
+  "source": "CWE 4.20",
+  "source_id": "CWE-395"
+}
+USER:
+CWE-395 | Use of NullPointerException Catch to Detect NULL Pointer Dereference
+
+Authoritative CWE mitigation source:
+[1] Phase=Architecture and Design; Do not extensively rely on catching exceptions (especially for validating user input) to handle errors. Handling exceptions can decrease the performance of an application.
+
+Give only 1–2 directly source-supported remediation actions.
+Do not add outside advice, do not repeat equivalent guidance, and stop after those actions.
+
+ASSISTANT:
+- Architecture and Design: Do not extensively rely on catching exceptions (especially for validating user input) to handle errors.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CWEREM-0021
+META:
+{
+  "contract": "1_to_2_source_supported_actions_only",
+  "source": "CWE 4.20",
+  "source_id": "CWE-1282"
+}
+USER:
+CWE-1282 | Assumed-Immutable Data is Stored in Writable Memory
+
+Authoritative CWE mitigation source:
+[1] Phase=Implementation; All immutable code or data should be programmed into ROM or write-once memory.
+
+Give only 1–2 directly source-supported remediation actions.
+Do not add outside advice, do not repeat equivalent guidance, and stop after those actions.
+
+ASSISTANT:
+- Implementation: All immutable code or data should be programmed into ROM or write-once memory.
+
+--------------------------------------------------------------------------------------------------------------
+FR-CY-J-CWEREM-0070
+META:
+{
+  "contract": "1_to_2_source_supported_actions_only",
+  "source": "CWE 4.20",
+  "source_id": "CWE-102"
+}
+USER:
+CWE-102 | Struts: Duplicate Validation Forms
+
+Authoritative CWE mitigation source:
+[1] Phase=Implementation; The DTD or schema validation will not catch the duplicate occurrence of the same form name. To find the issue in the implementation, manual checks or automated static analysis could be applied to the xml configuration files.
+
+Give only 1–2 directly source-supported remediation actions.
+Do not add outside advice, do not repeat equivalent guidance, and stop after those actions.
+
+ASSISTANT:
+- Implementation: The DTD or schema validation will not catch the duplicate occurrence of the same form name.
+
+==============================================================================================================
+MANIFEST_SUMMARY
+{
+  "contract_change": {
+    "final_rows": 620,
+    "new_families": {
+      "capec_mapping_lookup_guard": 16,
+      "capec_mapping_source_grounded": 120,
+      "capec_remediation_grounded_concise": 48,
+      "cwe_remediation_grounded_concise": 80,
+      "patch_exact_scope": 18,
+      "regression_exact_context_guard": 18
+    },
+    "new_rows": 300,
+    "new_target_group_max_by_task": {
+      "capec_to_cwe_mapping_lookup_required": 2,
+      "capec_to_cwe_mapping_source_grounded": 7,
+      "patch_repair_exact_scope": 1,
+      "regression_exact_repository_context_required": 3,
+      "source_remediation_capec_grounded_concise": 3,
+      "source_remediation_cwe_grounded_concise": 3
+    },
+    "new_target_group_max_multiplicity_any_family": 7,
+    "removed_old_task_rows": {
+      "capec_to_cwe_mapping": 26,
+      "source_remediation": 79
+    },
+    "reserved_source_overlap_removed_ids": [
+      "FR-CY-GROUND-0005",
+      "FR-CY-GROUND-0007",
+      "FR-CY-GROUND-0077",
+      "FR-CY-GROUND-0079",
+      "FR-CY-GROUND-0081",
+      "FR-CY-GROUND-0083",
+      "FR-CY-GROUND-0101",
+      "FR-CY-GROUND-0108",
+      "FR-CY-GROUND-0110",
+      "FR-CY-GROUND-0132",
+      "FR-CY-GROUND-0134",
+      "FR-CY-GROUND-0135",
+      "FR-CY-GROUND-0136",
+      "FR-CY-GROUND-0138",
+      "FR-CY-GROUND-0139",
+      "FR-CY-GROUND-0140",
+      "FR-CY-GROUND-0142",
+      "FR-CY-GROUND-0143",
+      "FR-CY-GROUND-0156",
+      "FR-CY-GROUND-0158",
+      "FR-CY-GROUND-0159",
+      "FR-CY-GROUND-0239",
+      "FR-CY-GROUND-0241",
+      "FR-CY-GROUND-0242",
+      "FR-CY-GROUND-0259",
+      "FR-CY-GROUND-0261",
+      "FR-CY-GROUND-0262",
+      "FR-CY-GROUND-0263",
+      "FR-CY-GROUND-0265",
+      "FR-CY-GROUND-0266",
+      "FR-CY-GROUND-0295",
+      "FR-CY-GROUND-0297",
+      "FR-CY-GROUND-0298",
+      "FR-CY-GROUND-0299",
+      "FR-CY-GROUND-0301",
+      "FR-CY-GROUND-0302",
+      "FR-CY-GROUND-0309",
+      "FR-CY-GROUND-0311",
+      "FR-CY-GROUND-0312",
+      "FR-CY-GROUND-0313",
+      "FR-CY-GROUND-0315",
+      "FR-CY-GROUND-0316",
+      "FR-CY-PATCHSTOP-G-0002",
+      "FR-CY-PATCHSTOP-G-0004",
+      "FR-CY-PATCHSTOP-G-0005",
+      "FR-CY-SFT-0027",
+      "FR-CY-SFT-0028",
+      "FR-CY-SFT-0029",
+      "FR-CY-SFT-0030",
+      "FR-CY-SFT-0064",
+      "FR-CY-SFT-0065",
+      "FR-CY-SFT-0066",
+      "FR-CY-SFT-0067",
+      "FR-CY-SFT-0097",
+      "FR-CY-SFT-0098",
+      "FR-CY-SFT-0099",
+      "FR-CY-SFT-0100",
+      "FR-CY-SFT-0104",
+      "FR-CY-SFT-0111",
+      "FR-CY-SFT-0112",
+      "FR-CY-SFT-0113",
+      "FR-CY-SFT-0114"
+    ],
+    "reserved_source_overlap_rows_removed": 62,
+    "retained_pre_source_split_rows": 382,
+    "retained_structure_exact_rows": 320
+  },
+  "source_split": {
+    "capec_reserved_sources": 113,
+    "capec_train_sources": 502,
+    "cwe_reserved_sources": 177,
+    "cwe_train_sources": 792,
+    "namespace": "fulgor-ray-v1.1-candidate-j-source-split-v1",
+    "note": "Reserved sources are excluded from Candidate J training example construction and matching retained rows are removed. This is a source-reservation split for Candidate J data hygiene, NOT the final blind release holdout.",
+    "reserved_clean_against_candidate_j_training": 290,
+    "reserved_manifest_rows": 290,
+    "train_percent": 80
+  }
+}

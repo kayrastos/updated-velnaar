@@ -1,0 +1,15 @@
+{
+  "model": "qwen/qwen3.5-9b",
+  "eval": "training/data/eval/eval_v2.jsonl",
+  "total": 30,
+  "successful": 30,
+  "failed": 0,
+  "reasoning_mode": "off",
+  "total_reasoning_output_tokens": 0,
+  "average_tokens_per_second": 7.452,
+  "average_ttft_seconds": 1.963,
+  "reference_answers_sent_to_model": false,
+  "temperature": 0.2,
+  "max_output_tokens": 256,
+  "store": false
+}

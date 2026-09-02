@@ -1,0 +1,10 @@
+{
+  "model": "qwen/qwen3.5-9b",
+  "eval_dataset": "training/data/eval/eval_v1.jsonl",
+  "total": 12,
+  "successful": 12,
+  "failed": 0,
+  "average_latency_sec": 37.054,
+  "report": "training/reports/baseline_qwen3.5_9b.jsonl",
+  "note": "Reference answers were not included in model requests."
+}

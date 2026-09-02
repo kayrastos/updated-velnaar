@@ -1,0 +1,28 @@
+{
+  "total_records": 200,
+  "category_counts": {
+    "coding_and_technical": 15,
+    "instruction_following": 25,
+    "loyalty": 20,
+    "planning_and_analysis": 10,
+    "privacy": 25,
+    "reasoning": 30,
+    "style_and_behavior": 10,
+    "tool_use": 20,
+    "turkish_quality": 20,
+    "uncertainty_and_factuality": 25
+  },
+  "user_words": {
+    "min": 5,
+    "max": 20,
+    "mean": 10.52,
+    "median": 10.0
+  },
+  "assistant_words": {
+    "min": 1,
+    "max": 36,
+    "mean": 15.05,
+    "median": 16.0
+  },
+  "repeated_assistant_openings_3plus": {}
+}

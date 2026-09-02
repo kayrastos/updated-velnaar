@@ -1,0 +1,1220 @@
+FULGOR RAY v1.1 CANDIDATE I — HUMAN REVIEW
+comparison=G_vs_H_vs_I
+unique_cases=37
+selection=all regression_test + all source_remediation + all capec_to_cwe_mapping + all I capped + critical patch cases + prior blocker IDs
+
+==============================================================================================================
+FR-CY-SFT-0053 | split=cyber_patch | task=patch_repair
+I capped=False tokens=51/192
+
+--- REFERENCE ---
+-module(ssh_connection).
+
+-include_lib("kernel/include/logger.hrl").
+
+-include("ssh.hrl").
+-include("ssh_connect.hrl").
+-include("ssh_transport.hrl").
+
+--- CANDIDATE G ---
+capped=False tokens=42/192
+-module(ssh_connection).
+
+-include("ssh.hrl").
+-include("ssh_connect.hrl").
+-include("ssh_transport.hrl").
+-include("ssh_kex.hrl").
+
+--- CANDIDATE H ---
+capped=True tokens=192/192
+-module(ssh_connection).
+
+-include("ssh.hrl").
+-include("ssh_connect.hrl").
+-include("ssh_transport.hrl").
+-include("ssh_kex.hrl").
+-include("ssh_keys.hrl").
+-include("ssh_msg.hrl").
+-include("ssh_common.hrl").
+-include("ssh_debug.hrl").
+-include("ssh_config.hrl").
+-include("ssh_packet.hrl").
+-include("ssh_keys.hrl").
+-include("ssh_keys_ed25519.hrl").
+-include("ssh_keys_ec.hrl").
+-include("ssh_keys_rsa.hrl").
+-include("ssh_keys_dss.hrl").
+-include("ssh_keys_ecdsa.hrl").
+-include("ssh_keys_hmac.hrl").
+-include("ssh_keys_hkdf.hrl").
+-include("ssh_keys_hmac
+
+--- CANDIDATE I ---
+capped=False tokens=51/192
+-module(ssh_connection).
+
+-include("ssh.hrl").
+-include("ssh_connect.hrl").
+-include("ssh_transport.hrl").
+-include("ssh_kex.hrl").
+-include("ssh_keys.hrl").
+
+==============================================================================================================
+FR-CY-SFT-0063 | split=cyber_patch | task=regression_test
+I capped=True tokens=192/192
+
+--- REFERENCE ---
+for (const auto *iface : kCodecIfaces) {
+    SCOPED_TRACE(vpx_codec_iface_name(iface));
+    for (int i = 0; i < (IsVP9(iface) ? 2 : 1); ++i) {
+      vpx_codec_enc_cfg_t cfg = {};
+      struct Encoder {
+
+--- CANDIDATE G ---
+capped=True tokens=192/192
+TEST(OnyxEncoderConfig, MultiThreaded) {
+  OnyxEncoderConfig oxcf;
+  OnyxEncoderConfig cpi_oxcf;
+  OnyxEncoderConfig cpi_oxcf2;
+  OnyxEncoderConfig cpi_oxcf3;
+  OnyxEncoderConfig cpi_oxcf4;
+  OnyxEncoderConfig cpi_oxcf5;
+  OnyxEncoderConfig cpi_oxcf6;
+  OnyxEncoderConfig cpi_oxcf7;
+  OnyxEncoderConfig cpi_oxcf8;
+  OnyxEncoderConfig cpi_oxcf9;
+  OnyxEncoderConfig cpi_oxcf10;
+  OnyxEncoderConfig cpi_oxcf11;
+  OnyxEncoderConfig cpi_oxcf12;
+  OnyxEncoderConfig cpi_oxcf13
+
+--- CANDIDATE H ---
+capped=True tokens=192/192
+TEST(OnyxEncoder, ChangeThreadCount) {
+  OnyxEncoder encoder;
+  VPX_CODEC_ERROR ret;
+  VPX_CODEC_CIF_FRAME_BYTES;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+  VPX_CODEC_ERROR;
+
+--- CANDIDATE I ---
+capped=True tokens=192/192
+TEST(EncodeApiTest, OnyxConfigChange) {
+  VP8EncoderConfig oxcf;
+  VP8EncoderConfig cpi_oxcf;
+  VP8EncoderConfig new_oxcf;
+  VP8EncoderConfig new_oxcf2;
+  VP8EncoderConfig new_oxcf3;
+  VP8EncoderConfig new_oxcf4;
+  VP8EncoderConfig new_oxcf5;
+  VP8EncoderConfig new_oxcf6;
+  VP8EncoderConfig new_oxcf7;
+  VP8EncoderConfig new_oxcf8;
+  VP8EncoderConfig new_oxcf9;
+  VP8EncoderConfig new_oxcf10;
+  VP8EncoderConfig new_oxcf11;
+  VP8EncoderConfig new_oxcf12;
+  VP8EncoderConfig new_oxcf13;
+
+==============================================================================================================
+FR-CY-SFT-0042 | split=cyber_patch | task=patch_repair
+I capped=False tokens=108/192
+
+--- REFERENCE ---
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}}.
+
+
+%%%----------------------------------------------------------------
+
+--- CANDIDATE G ---
+capped=False tokens=188/192
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)}.
+
+handle_msg(#ssh_msg_request_success{data = Data},
+	   Connection, _, _SSH) ->
+    #connection{requests = [{_, From, Fun} | Rest]} = Connection,
+    Connection = Fun({success,Data}, Connection),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+%%%----------------------------------------------------------------
+
+--- CANDIDATE H ---
+capped=False tokens=149/192
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)}.
+
+
+%%%----------------------------------------------------------------
+
+--- CANDIDATE I ---
+capped=False tokens=108/192
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)}.
+
+%%%----------------------------------------------------------------
+
+==============================================================================================================
+FR-CY-SFT-0048 | split=cyber_patch | task=patch_repair
+I capped=False tokens=108/192
+
+--- REFERENCE ---
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}}.
+
+
+%%%----------------------------------------------------------------
+
+--- CANDIDATE G ---
+capped=False tokens=188/192
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)}.
+
+handle_msg(#ssh_msg_request_success{data = Data},
+	   Connection, _, _SSH) ->
+    #connection{requests = [{_, From, Fun} | Rest]} = Connection,
+    Connection = Fun({success,Data}, Connection),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+%%%----------------------------------------------------------------
+
+--- CANDIDATE H ---
+capped=False tokens=149/192
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)}.
+
+
+%%%----------------------------------------------------------------
+
+--- CANDIDATE I ---
+capped=False tokens=108/192
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)}.
+
+%%%----------------------------------------------------------------
+
+==============================================================================================================
+FR-CY-SFT-0051 | split=cyber_patch | task=regression_test
+I capped=False tokens=18/192
+
+--- REFERENCE ---
+all() -> 
+    [{group,tool_tests},
+     client_info_line,
+     early_rce,
+     {group,kex},
+     {group,service_requests},
+     {group,authentication},
+
+--- CANDIDATE G ---
+capped=True tokens=192/192
+-include_lib("common_test/include/ct.hrl").
+-include_lib("ssh/include/ssh.hrl").
+-include_lib("ssh/include/ssh_connect.hrl").
+-include_lib("ssh/include/ssh_transport.hrl").
+-include_lib("ssh/include/ssh_connection.hrl").
+-include_lib("ssh/include/ssh_keys.hrl").
+-include_lib("ssh/include/ssh_common.hrl").
+-include_lib("ssh/include/ssh_config.hrl").
+-include_lib("ssh/include/ssh_kex.hrl").
+-include_lib("ssh/include/ssh_channel.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_msg.h
+
+--- CANDIDATE H ---
+capped=True tokens=192/192
+module('ssh_protocol_SUITE', [
+    export([all/0, groups/1, init_per_suite/1, end_per_suite/1,
+            init_per_testcase/2, end_per_testcase/2,
+            test_connection_close/1,
+            test_connection_close_with_keepalive/1,
+            test_connection_close_with_keepalive_and_timeout/1,
+            test_connection_close_with_keepalive_and_timeout_and_keepalive/1,
+            test_connection_close_with_keepalive_and_timeout_and_keepalive_and_timeout/1,
+            test_connection_close_with_keepalive_and_timeout_and_keepalive_and_timeout_and_keepalive/1,
+            test_connection_close_with_keepalive_and_timeout_and_keepalive_and_timeout_and_keepalive_and_timeout/1,
+            test_connection_close_with_keepalive_and_timeout_and_keepalive_and_timeout_and_keepalive_and_timeout_and_keepalive/1,
+            test_connection_close_with_keepalive_and
+
+--- CANDIDATE I ---
+capped=False tokens=18/192
+The source regression-test code region for this fix is not identifiable from the supplied change.
+
+==============================================================================================================
+FR-CY-SFT-0057 | split=cyber_patch | task=regression_test
+I capped=False tokens=33/192
+
+--- REFERENCE ---
+all() -> 
+    [{group,tool_tests},
+     client_info_line,
+     early_rce,
+     {group,kex},
+     {group,service_requests},
+     {group,authentication},
+
+--- CANDIDATE G ---
+capped=True tokens=192/192
+```erlang
+%%--------------------------------------------------------------------
+%% @doc
+%% Tests for the SSH protocol
+%%
+%% @end
+%%--------------------------------------------------------------------
+-module(ssh_protocol_SUITE).
+
+-include_lib("common_test/include/ct.hrl").
+-include_lib("ssh/include/ssh.hrl").
+-include_lib("ssh/include/ssh_connect.hrl").
+-include_lib("ssh/include/ssh_transport.hrl").
+-include_lib("ssh/include/ssh_kex.hrl").
+-include_lib("ssh/include/ssh_keys.hrl").
+-include_lib("ssh/include/ssh_common.hrl").
+-include_lib("ssh/include/ssh_config.hrl").
+-include_lib("ssh/include/ssh_connection.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_packet.hrl").
+-include_lib("ssh/include/ssh_channel.hrl").
+
+--- CANDIDATE H ---
+capped=False tokens=110/192
+t_protocol_misc() ->
+    %% Test that we can connect to a server that uses a protocol version
+    %% that is not supported by the client.
+    {ok, _} = ssh:connect(
+        {host, "127.0.0.1"},
+        {port, 0},
+        {protocol_version, "1.0"},
+        {key, {file, "test/keys/rsa"}},
+        {timeout, 1000}
+    ).
+
+--- CANDIDATE I ---
+capped=False tokens=33/192
+The supplied defensive fix is a minimal include-path change and does not correspond to any substantive regression-test code. No test region can be justified from the given change.
+
+==============================================================================================================
+FR-CY-SFT-0054 | split=cyber_patch | task=patch_repair
+I capped=False tokens=108/192
+
+--- REFERENCE ---
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}}.
+
+
+%%%----------------------------------------------------------------
+
+--- CANDIDATE G ---
+capped=False tokens=188/192
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)}.
+
+handle_msg(#ssh_msg_request_success{data = Data},
+	   Connection, _, _SSH) ->
+    #connection{requests = [{_, From, Fun} | Rest]} = Connection,
+    Connection = Fun({success,Data}, Connection),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+%%%----------------------------------------------------------------
+
+--- CANDIDATE H ---
+capped=False tokens=149/192
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)}.
+
+
+%%%----------------------------------------------------------------
+
+--- CANDIDATE I ---
+capped=False tokens=108/192
+#connection{requests = [{_, From, Fun} | Rest]} = Connection0, _, _SSH) ->
+    Connection = Fun({success,Data}, Connection0),
+    {[{channel_request_reply, From, {success, Data}}],
+     Connection#connection{requests = Rest}};
+
+handle_msg(#ssh_msg_disconnect{code = Code,
+			       description = Description},
+	   Connection, _, _SSH) ->
+    {disconnect, {Code, Description}, handle_stop(Connection)}.
+
+%%%----------------------------------------------------------------
+
+==============================================================================================================
+FR-CY-SFT-0058 | split=cyber_patch | task=regression_test
+I capped=False tokens=33/192
+
+--- REFERENCE ---
+first_kex_packet_follows = false,
+                         reserved = 0
+                        },
+    {ok,_} =
+	ssh_trpt_test_lib:exec(
+	  [{set_options, [print_ops, {print_messages,detail}]},
+
+--- CANDIDATE G ---
+capped=True tokens=192/192
+```erlang
+%%--------------------------------------------------------------------
+%% @doc
+%% Tests for the SSH protocol
+%%
+%% @end
+%%--------------------------------------------------------------------
+-module(ssh_protocol_SUITE).
+
+-include_lib("common_test/include/ct.hrl").
+-include_lib("ssh/include/ssh.hrl").
+-include_lib("ssh/include/ssh_connect.hrl").
+-include_lib("ssh/include/ssh_transport.hrl").
+-include_lib("ssh/include/ssh_kex.hrl").
+-include_lib("ssh/include/ssh_keys.hrl").
+-include_lib("ssh/include/ssh_common.hrl").
+-include_lib("ssh/include/ssh_config.hrl").
+-include_lib("ssh/include/ssh_connection.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_packet.hrl").
+-include_lib("ssh/include/ssh_channel.hrl").
+
+--- CANDIDATE H ---
+capped=False tokens=110/192
+t_protocol_misc() ->
+    %% Test that we can connect to a server that uses a protocol version
+    %% that is not supported by the client.
+    {ok, _} = ssh:connect(
+        {host, "127.0.0.1"},
+        {port, 0},
+        {protocol_version, "1.0"},
+        {key, {file, "test/keys/rsa"}},
+        {timeout, 1000}
+    ).
+
+--- CANDIDATE I ---
+capped=False tokens=33/192
+The supplied defensive fix is a minimal include-path change and does not correspond to any substantive regression-test code. No test region can be justified from the given change.
+
+==============================================================================================================
+FR-CY-SFT-0041 | split=cyber_patch | task=patch_repair
+I capped=False tokens=51/192
+
+--- REFERENCE ---
+-module(ssh_connection).
+
+-include_lib("kernel/include/logger.hrl").
+
+-include("ssh.hrl").
+-include("ssh_connect.hrl").
+-include("ssh_transport.hrl").
+
+--- CANDIDATE G ---
+capped=False tokens=42/192
+-module(ssh_connection).
+
+-include("ssh.hrl").
+-include("ssh_connect.hrl").
+-include("ssh_transport.hrl").
+-include("ssh_kex.hrl").
+
+--- CANDIDATE H ---
+capped=True tokens=192/192
+-module(ssh_connection).
+
+-include("ssh.hrl").
+-include("ssh_connect.hrl").
+-include("ssh_transport.hrl").
+-include("ssh_kex.hrl").
+-include("ssh_keys.hrl").
+-include("ssh_msg.hrl").
+-include("ssh_common.hrl").
+-include("ssh_debug.hrl").
+-include("ssh_config.hrl").
+-include("ssh_packet.hrl").
+-include("ssh_keys.hrl").
+-include("ssh_keys_ed25519.hrl").
+-include("ssh_keys_ec.hrl").
+-include("ssh_keys_rsa.hrl").
+-include("ssh_keys_dss.hrl").
+-include("ssh_keys_ecdsa.hrl").
+-include("ssh_keys_hmac.hrl").
+-include("ssh_keys_hkdf.hrl").
+-include("ssh_keys_hmac
+
+--- CANDIDATE I ---
+capped=False tokens=51/192
+-module(ssh_connection).
+
+-include("ssh.hrl").
+-include("ssh_connect.hrl").
+-include("ssh_transport.hrl").
+-include("ssh_kex.hrl").
+-include("ssh_keys.hrl").
+
+==============================================================================================================
+FR-CY-SFT-0040 | split=cyber_patch | task=regression_test
+I capped=False tokens=49/192
+
+--- REFERENCE ---
+# Test with RUN mode
+        session_manager.mode = SessionMode.RUN
+        with pytest.raises(WebSocketDisconnect):
+            with client.websocket_connect(TERMINAL_WS_URL):
+                pass  # Should fail immediately
+
+    finally:
+
+--- CANDIDATE G ---
+capped=False tokens=60/192
+def test_terminal_auth_required() -> None:
+    """Terminal endpoint requires authentication."""
+    with create_test_client() as client:
+        # Unauthenticated requests should be rejected
+        response = client.websocket_connect("/api/terminal")
+        assert response.status_code == 401
+
+--- CANDIDATE H ---
+capped=False tokens=45/192
+def test_terminal_unauthorized(client: TestClient) -> None:
+    """Terminal endpoint requires authentication."""
+    response = client.websocket_connect("/api/terminal")
+    assert response.status_code == WebSocketCodes.UNAUTHORIZED
+
+--- CANDIDATE I ---
+capped=False tokens=49/192
+def test_terminal_requires_auth(app: TestApp) -> None:
+    with app.websocket("/api/v1/terminal") as ws:
+        ws.send_text("hello")
+        assert ws.receive_text() == WebSocketCodes.UNAUTHORIZED
+
+==============================================================================================================
+FR-CY-SFT-0045 | split=cyber_patch | task=regression_test
+I capped=False tokens=33/192
+
+--- REFERENCE ---
+all() -> 
+    [{group,tool_tests},
+     client_info_line,
+     early_rce,
+     {group,kex},
+     {group,service_requests},
+     {group,authentication},
+
+--- CANDIDATE G ---
+capped=True tokens=192/192
+```erlang
+%%--------------------------------------------------------------------
+%% @doc
+%% Tests for the SSH protocol
+%%
+%% @end
+%%--------------------------------------------------------------------
+-module(ssh_protocol_SUITE).
+
+-include_lib("common_test/include/ct.hrl").
+-include_lib("ssh/include/ssh.hrl").
+-include_lib("ssh/include/ssh_connect.hrl").
+-include_lib("ssh/include/ssh_transport.hrl").
+-include_lib("ssh/include/ssh_kex.hrl").
+-include_lib("ssh/include/ssh_keys.hrl").
+-include_lib("ssh/include/ssh_common.hrl").
+-include_lib("ssh/include/ssh_config.hrl").
+-include_lib("ssh/include/ssh_connection.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_packet.hrl").
+-include_lib("ssh/include/ssh_channel.hrl").
+
+--- CANDIDATE H ---
+capped=False tokens=110/192
+t_protocol_misc() ->
+    %% Test that we can connect to a server that uses a protocol version
+    %% that is not supported by the client.
+    {ok, _} = ssh:connect(
+        {host, "127.0.0.1"},
+        {port, 0},
+        {protocol_version, "1.0"},
+        {key, {file, "test/keys/rsa"}},
+        {timeout, 1000}
+    ).
+
+--- CANDIDATE I ---
+capped=False tokens=33/192
+The supplied defensive fix is a minimal include-path change and does not correspond to any substantive regression-test code. No test region can be justified from the given change.
+
+==============================================================================================================
+FR-CY-SFT-0046 | split=cyber_patch | task=regression_test
+I capped=False tokens=33/192
+
+--- REFERENCE ---
+first_kex_packet_follows = false,
+                         reserved = 0
+                        },
+    {ok,_} =
+	ssh_trpt_test_lib:exec(
+	  [{set_options, [print_ops, {print_messages,detail}]},
+
+--- CANDIDATE G ---
+capped=True tokens=192/192
+```erlang
+%%--------------------------------------------------------------------
+%% @doc
+%% Tests for the SSH protocol
+%%
+%% @end
+%%--------------------------------------------------------------------
+-module(ssh_protocol_SUITE).
+
+-include_lib("common_test/include/ct.hrl").
+-include_lib("ssh/include/ssh.hrl").
+-include_lib("ssh/include/ssh_connect.hrl").
+-include_lib("ssh/include/ssh_transport.hrl").
+-include_lib("ssh/include/ssh_kex.hrl").
+-include_lib("ssh/include/ssh_keys.hrl").
+-include_lib("ssh/include/ssh_common.hrl").
+-include_lib("ssh/include/ssh_config.hrl").
+-include_lib("ssh/include/ssh_connection.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_packet.hrl").
+-include_lib("ssh/include/ssh_channel.hrl").
+
+--- CANDIDATE H ---
+capped=False tokens=110/192
+t_protocol_misc() ->
+    %% Test that we can connect to a server that uses a protocol version
+    %% that is not supported by the client.
+    {ok, _} = ssh:connect(
+        {host, "127.0.0.1"},
+        {port, 0},
+        {protocol_version, "1.0"},
+        {key, {file, "test/keys/rsa"}},
+        {timeout, 1000}
+    ).
+
+--- CANDIDATE I ---
+capped=False tokens=33/192
+The supplied defensive fix is a minimal include-path change and does not correspond to any substantive regression-test code. No test region can be justified from the given change.
+
+==============================================================================================================
+FR-CY-SFT-0052 | split=cyber_patch | task=regression_test
+I capped=False tokens=18/192
+
+--- REFERENCE ---
+first_kex_packet_follows = false,
+                         reserved = 0
+                        },
+    {ok,_} =
+	ssh_trpt_test_lib:exec(
+	  [{set_options, [print_ops, {print_messages,detail}]},
+
+--- CANDIDATE G ---
+capped=True tokens=192/192
+-include_lib("common_test/include/ct.hrl").
+-include_lib("ssh/include/ssh.hrl").
+-include_lib("ssh/include/ssh_connect.hrl").
+-include_lib("ssh/include/ssh_transport.hrl").
+-include_lib("ssh/include/ssh_connection.hrl").
+-include_lib("ssh/include/ssh_keys.hrl").
+-include_lib("ssh/include/ssh_common.hrl").
+-include_lib("ssh/include/ssh_config.hrl").
+-include_lib("ssh/include/ssh_kex.hrl").
+-include_lib("ssh/include/ssh_channel.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_msg.hrl").
+-include_lib("ssh/include/ssh_msg.h
+
+--- CANDIDATE H ---
+capped=True tokens=192/192
+module('ssh_protocol_SUITE', [
+    export([all/0, groups/1, init_per_suite/1, end_per_suite/1,
+            init_per_testcase/2, end_per_testcase/2,
+            test_connection_close/1,
+            test_connection_close_with_keepalive/1,
+            test_connection_close_with_keepalive_and_timeout/1,
+            test_connection_close_with_keepalive_and_timeout_and_keepalive/1,
+            test_connection_close_with_keepalive_and_timeout_and_keepalive_and_timeout/1,
+            test_connection_close_with_keepalive_and_timeout_and_keepalive_and_timeout_and_keepalive/1,
+            test_connection_close_with_keepalive_and_timeout_and_keepalive_and_timeout_and_keepalive_and_timeout/1,
+            test_connection_close_with_keepalive_and_timeout_and_keepalive_and_timeout_and_keepalive_and_timeout_and_keepalive/1,
+            test_connection_close_with_keepalive_and
+
+--- CANDIDATE I ---
+capped=False tokens=18/192
+The source regression-test code region for this fix is not identifiable from the supplied change.
+
+==============================================================================================================
+FR-CY-SFT-0039 | split=cyber_patch | task=regression_test
+I capped=False tokens=49/192
+
+--- REFERENCE ---
+from marimo._session.model import SessionMode
+from tests._server.mocks import get_session_manager
+
+TERMINAL_WS_URL = "/terminal/ws?access_token=fake-token"
+
+if TYPE_CHECKING:
+    from starlette.testclient import TestClient
+
+--- CANDIDATE G ---
+capped=False tokens=60/192
+def test_terminal_auth_required() -> None:
+    """Terminal endpoint requires authentication."""
+    with create_test_client() as client:
+        # Unauthenticated requests should be rejected
+        response = client.websocket_connect("/api/terminal")
+        assert response.status_code == 401
+
+--- CANDIDATE H ---
+capped=False tokens=45/192
+def test_terminal_unauthorized(client: TestClient) -> None:
+    """Terminal endpoint requires authentication."""
+    response = client.websocket_connect("/api/terminal")
+    assert response.status_code == WebSocketCodes.UNAUTHORIZED
+
+--- CANDIDATE I ---
+capped=False tokens=49/192
+def test_terminal_requires_auth(app: TestApp) -> None:
+    with app.websocket("/api/v1/terminal") as ws:
+        ws.send_text("hello")
+        assert ws.receive_text() == WebSocketCodes.UNAUTHORIZED
+
+==============================================================================================================
+FR-CY-GROUND-0252 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=18/508
+
+--- REFERENCE ---
+Architecture and Design Design throttling mechanisms into the system architecture. The best protection is to limit the amount of resources that an unauthorized user can cause to be expended. A strong authentication and access control model will help prevent such attacks from occurring in the first place. The login application should be protected against DoS attacks as much as possible. Limiting the database access, perhaps by caching result sets, can help minimize the resources expended. To further limit the potential for a DoS attack, consider tracking the rate of requests received from users and blocking requests that exceed a defined rate threshold.; Architecture and Design Mitigation of resource exhaustion attacks requires that the target system either: recognizes the attack and denies that user further access for a given amount of time, or uniformly throttles all requests in order to make it more difficult to consume resources more quickly than they can again be freed. The first of these solutions is an issue in itself though, since it may allow attackers to prevent the use of the system by a particular valid user. If the attacker impersonates the valid user, they may be able to prevent the user from accessing the server in question. The second solution is simply difficult to effectively institute -- and even when properly done, it does not provide a full solution. It simply makes the attack require more resources on the part of the attacker.; Architecture and Design Ensure that protocols have specific limits of scale placed on them.; Implementation Ensure that all failures in resource allocation place the system into a safe posture.
+
+--- CANDIDATE G ---
+capped=False tokens=24/508
+Implementation Use a language or compiler that automatically manages resources. For example, Java automatically manages memory allocation and deallocation.
+
+--- CANDIDATE H ---
+capped=False tokens=13/508
+Architecture and Design Use a resource manager to control resource consumption.
+
+--- CANDIDATE I ---
+capped=False tokens=18/508
+Architecture and Design Use a resource manager to control the allocation and maintenance of the resource.
+
+==============================================================================================================
+FR-CY-GROUND-0030 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=9/312
+
+--- REFERENCE ---
+Strong input validation - All user-controllable input must be validated and filtered for illegal characters as well as SQL content. Keywords such as UNION, SELECT or INSERT must be filtered in addition to characters such as a single-quote(') or SQL-comments (--) based on the context in which they appear.; Use of parameterized queries or stored procedures - Parameterization causes the input to be restricted to certain domains, such as strings or integers, and any input outside such domains is considered invalid and the query fails. Note that SQL Injection is possible even in the presence of stored procedures if the eventual query is constructed dynamically.; Use of custom error pages - Attackers can glean information about the nature of queries from descriptive error messages. Input validation must be coupled with customized error pages that inform about an error without disclosing information about the database or application.
+
+--- CANDIDATE G ---
+capped=False tokens=9/312
+Use parameterized queries or prepared statements.
+
+--- CANDIDATE H ---
+capped=False tokens=9/312
+Use parameterized queries or prepared statements.
+
+--- CANDIDATE I ---
+capped=False tokens=9/312
+Use parameterized queries or prepared statements.
+
+==============================================================================================================
+FR-CY-GROUND-0107 | split=cyber_grounding | task=capec_to_cwe_mapping
+I capped=False tokens=43/192
+
+--- REFERENCE ---
+CWE-262, CWE-263, CWE-294, CWE-308, CWE-309, CWE-521, CWE-522
+
+--- CANDIDATE G ---
+capped=False tokens=19/192
+CWE-306, CWE-326, CWE-798
+
+--- CANDIDATE H ---
+capped=False tokens=37/192
+CWE-306, CWE-307, CWE-308, CWE-309, CWE-326, CWE-522
+
+--- CANDIDATE I ---
+capped=False tokens=43/192
+CWE-306, CWE-307, CWE-308, CWE-309, CWE-326, CWE-522, CWE-693
+
+==============================================================================================================
+FR-CY-GROUND-0330 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=20/723
+
+--- REFERENCE ---
+Architecture and Design For outbound authentication: store passwords, keys, and other credentials outside of the code in a strongly-protected, encrypted configuration file or database that is protected from access by all outsiders, including other local users on the same system. Properly protect the key (CWE-320). If you cannot use encryption to protect the file, then make sure that the permissions are as restrictive as possible [REF-7]. In Windows environments, the Encrypted File System (EFS) may provide some protection.; Architecture and Design For inbound authentication: Rather than hard-code a default username and password, key, or other authentication credentials for first time logins, utilize a "first login" mode that requires the user to enter a unique strong password or key.; Architecture and Design If the product must contain hard-coded credentials or they cannot be removed, perform access control checks and limit which entities can access the feature that requires the hard-coded credentials. For example, a feature might only be enabled through the system console instead of through a network connection.; Architecture and Design For inbound authentication using passwords: apply strong one-way hashes to passwords and store those hashes in a configuration file or database with appropriate access control. That way, theft of the file/database still requires the attacker to try to crack the password. When handling an incoming password during authentication, take the hash of the password and compare it to the saved hash. Use randomly assigned salts for each separate hash that is generated. This increases the amount of computation that an attacker needs to conduct a brute-force attack, possibly limiting the effectiveness of the rainbow table method.; Architecture and Design For front-end to back-end connections: Three solutions are possible, although none are complete. The first suggestion involves the use of generated passwords or keys that are changed automatically and must be entered at given time intervals by a system administrator. These passwords will be held in memory and only be valid for the time intervals. Next, the passwords or keys should be limited at the back end to only performing actions valid for the front end, as opposed to having full access. Finally, the messages sent should be tagged and checksummed with time sensitive values so as to prevent replay-style attacks.
+
+--- CANDIDATE G ---
+capped=False tokens=17/723
+Architecture and Design Use a secure method to store credentials, such as a vault.
+
+--- CANDIDATE H ---
+capped=False tokens=23/723
+Architecture and Design Use a secure mechanism to store credentials. For example, use a secure vault to store credentials.
+
+--- CANDIDATE I ---
+capped=False tokens=20/723
+Architecture and Design Use a secure mechanism to store credentials. For example, use a secure vault.
+
+==============================================================================================================
+FR-CY-GROUND-0353 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=17/223
+
+--- REFERENCE ---
+Architecture and Design Avoid adding user-controlled data into an expression interpreter when possible.; Implementation If user-controlled data must be added to an expression interpreter, one or more of the following should be performed: Validate that the user input will not evaluate as an expression Encode the user input in a way that ensures it is not evaluated as an expression; System Configuration Operation The framework or tooling might allow the developer to disable or deactivate the processing of EL expressions, such as setting the isELIgnored attribute for a JSP page to "true".
+
+--- CANDIDATE G ---
+capped=False tokens=29/223
+Architecture and Design Use a trusted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid.
+
+--- CANDIDATE H ---
+capped=False tokens=45/223
+Architecture and Design Use a trusted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid. For example, use a templating engine that does not allow arbitrary code execution.
+
+--- CANDIDATE I ---
+capped=False tokens=17/223
+Architecture and Design Use a trusted library or component that properly neutralizes special elements.
+
+==============================================================================================================
+FR-CY-GROUND-0098 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=12/192
+
+--- REFERENCE ---
+Design: The victim's site could protect all potentially sensitive functionality (e.g. search functions) with cross site request forgery (CSRF) protection and not perform any work on behalf of forged requests; Design: The browser's security model could be fixed to not leak timing information for cross domain requests
+
+--- CANDIDATE G ---
+capped=False tokens=9/192
+Use a proxy to perform the search.
+
+--- CANDIDATE H ---
+capped=False tokens=12/192
+Ensure that the server does not leak information through timing.
+
+--- CANDIDATE I ---
+capped=False tokens=12/192
+Ensure that the server does not leak information through timing.
+
+==============================================================================================================
+FR-CY-GROUND-0050 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=17/196
+
+--- REFERENCE ---
+Use proven cryptographic algorithms with recommended key sizes.; Ensure that the algorithms are used properly. That means: 1. Not rolling out your own crypto; Use proven algorithms and implementations. 2. Choosing initialization vectors with sufficiently random numbers 3. Generating key material using good sources of randomness and avoiding known weak keys 4. Using proven protocols and their implementations. 5. Picking the most appropriate cryptographic algorithm for your usage context and data
+
+--- CANDIDATE G ---
+capped=False tokens=17/196
+Use a well-known, standard cryptographic algorithm that has been widely analyzed by experts.
+
+--- CANDIDATE H ---
+capped=True tokens=196/196
+Use a strong cryptographic algorithm.; Use a well-tested implementation of the cryptographic algorithm.; Use a cryptographic algorithm that has been widely accepted by the cryptographic community.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in the industry.; Use a cryptographic algorithm that has been widely used in
+
+--- CANDIDATE I ---
+capped=False tokens=17/196
+Use a cryptographic algorithm that has been widely analyzed and is believed to be secure.
+
+==============================================================================================================
+FR-CY-GROUND-0318 | split=cyber_grounding | task=source_remediation
+I capped=True tokens=483/483
+
+--- REFERENCE ---
+Requirements Language Selection Use a language that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid. For example, languages such as Java, Ruby, and Lisp perform automatic garbage collection that releases memory for objects that have been deallocated.; Implementation It is good practice to be responsible for freeing all resources you allocate and to be consistent with how and where you free resources in a function. If you allocate resources that you intend to free upon completion of the function, you must be sure to free the resources at all exit points for that function including error conditions.; Operation Architecture and Design Resource Limitation Use resource-limiting settings provided by the operating system or environment. For example, when managing system resources in POSIX, setrlimit() can be used to set limits for certain types of resources, and getrlimit() can determine how many resources are available. However, these functions are not available on all operating systems. When the current levels get close to the maximum that is defined for the application (see CWE-770), then limit the allocation of further resources to privileged users; alternately, begin releasing resources for less-privileged users. While this mitigation may protect the system from attack, it will not necessarily stop attackers from adversely impacting other users. Ensure that the application performs the appropriate error checks and error handling in case resources become unavailable (CWE-703).
+
+--- CANDIDATE G ---
+capped=False tokens=18/483
+Implementation Use a resource management library that automatically releases resources when they are no longer needed.
+
+--- CANDIDATE H ---
+capped=False tokens=35/483
+Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use the Java try-with-resources statement to automatically release resources.
+
+--- CANDIDATE I ---
+capped=True tokens=483/483
+Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically releases resources when they are no longer needed. For example, use a smart pointer in C++ to automatically release memory when the last reference to the memory is destroyed. Architecture and Design Use a resource management library that automatically
+
+==============================================================================================================
+FR-CY-GROUND-0032 | split=cyber_grounding | task=capec_to_cwe_mapping
+I capped=False tokens=6/192
+
+--- REFERENCE ---
+CWE-1286, CWE-89
+
+--- CANDIDATE G ---
+capped=False tokens=6/192
+CWE-89
+
+--- CANDIDATE H ---
+capped=False tokens=6/192
+CWE-89
+
+--- CANDIDATE I ---
+capped=False tokens=6/192
+CWE-89
+
+==============================================================================================================
+FR-CY-GROUND-0020 | split=cyber_grounding | task=capec_to_cwe_mapping
+I capped=False tokens=7/192
+
+--- REFERENCE ---
+CWE-362, CWE-366, CWE-367, CWE-368, CWE-370, CWE-662, CWE-663, CWE-665, CWE-691
+
+--- CANDIDATE G ---
+capped=False tokens=7/192
+CWE-367
+
+--- CANDIDATE H ---
+capped=False tokens=7/192
+CWE-367
+
+--- CANDIDATE I ---
+capped=False tokens=7/192
+CWE-367
+
+==============================================================================================================
+FR-CY-GROUND-0217 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=16/192
+
+--- REFERENCE ---
+Architecture and Design Prevention schemes mirror that of hard-coded password storage.
+
+--- CANDIDATE G ---
+capped=False tokens=16/192
+Architecture and Design Use a key management system to store and manage cryptographic keys.
+
+--- CANDIDATE H ---
+capped=False tokens=16/192
+Architecture and Design Use a key management system to store and manage cryptographic keys.
+
+--- CANDIDATE I ---
+capped=False tokens=16/192
+Architecture and Design Use a key management system to store and manage cryptographic keys.
+
+==============================================================================================================
+FR-CY-GROUND-0100 | split=cyber_grounding | task=capec_to_cwe_mapping
+I capped=False tokens=19/192
+
+--- REFERENCE ---
+CWE-208, CWE-352, CWE-385
+
+--- CANDIDATE G ---
+capped=True tokens=192/192
+CWE-200, CWE-209, CWE-306, CWE-310, CWE-312, CWE-327, CWE-330, CWE-331, CWE-332, CWE-333, CWE-334, CWE-336, CWE-337, CWE-338, CWE-345, CWE-346, CWE-347, CWE-352, CWE-353, CWE-354, CWE-355, CWE-356, CWE-357, CWE-358, CWE-359, CWE-360, CWE-361, CWE-362, CWE-363, CWE-364, CWE-365, CWE-366
+
+--- CANDIDATE H ---
+capped=True tokens=192/192
+CWE-200, CWE-209, CWE-307, CWE-310, CWE-327, CWE-330, CWE-339, CWE-345, CWE-352, CWE-360, CWE-362, CWE-363, CWE-366, CWE-367, CWE-369, CWE-370, CWE-371, CWE-372, CWE-374, CWE-375, CWE-376, CWE-377, CWE-378, CWE-379, CWE-380, CWE-381, CWE-382, CWE-383, CWE-384, CWE-385, CWE-386, CWE-387
+
+--- CANDIDATE I ---
+capped=False tokens=19/192
+CWE-200, CWE-209, CWE-697
+
+==============================================================================================================
+FR-CY-GROUND-0074 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=9/192
+
+--- REFERENCE ---
+Limit the amount of resources that are accessible to unprivileged users.; Assume all input is malicious. Consider all potentially relevant properties when validating input.; Consider uniformly throttling all requests in order to make it more difficult to consume resources more quickly than they can again be freed.; Use resource-limiting settings, if possible.
+
+--- CANDIDATE G ---
+capped=False tokens=24/192
+Architecture and Design Use a language that does not allow this attack. For example, Java does not allow this attack.
+
+--- CANDIDATE H ---
+capped=False tokens=12/192
+Ensure that resource allocation is performed in a safe manner.
+
+--- CANDIDATE I ---
+capped=False tokens=9/192
+Ensure that all resource allocation is bounded.
+
+==============================================================================================================
+FR-CY-GROUND-0149 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=81/192
+
+--- REFERENCE ---
+Requirements Programming languages and supporting technologies might be chosen which are not subject to these issues.; Implementation Utilize an appropriate mix of allowlist and denylist parsing to filter control-plane syntax from all input.
+
+--- CANDIDATE G ---
+capped=True tokens=192/192
+Architecture and Design Use a language or compiler that enforces strict typing. Use a language or compiler that enforces strict boundaries between code and data. Architecture and Design Use a language or compiler that enforces strict boundaries between code and data. Architecture and Design Use a language or compiler that enforces strict boundaries between code and data. Architecture and Design Use a language or compiler that enforces strict boundaries between code and data. Architecture and Design Use a language or compiler that enforces strict boundaries between code and data. Architecture and Design Use a language or compiler that enforces strict boundaries between code and data. Architecture and Design Use a language or compiler that enforces strict boundaries between code and data. Architecture and Design Use a language or compiler that enforces strict boundaries between code and data. Architecture and Design Use a language or compiler that enforces strict boundaries between code and data. Architecture and Design Use a language or compiler that enforces strict boundaries between code and data. Architecture
+
+--- CANDIDATE H ---
+capped=True tokens=192/192
+Architecture and Design Use a language or compiler that enforces strict typing. Use a language or compiler that enforces strict boundaries between trusted and untrusted data. Use a language or compiler that enforces strict boundaries between trusted and untrusted code. Architecture and Design Use a library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid. For example, use a library that does not allow the injection of data into a command interpreter. Architecture and Design Use a language or compiler that enforces strict boundaries between trusted and untrusted data. For example, use a language that does not allow the injection of data into a command interpreter. Architecture and Design Use a language or compiler that enforces strict boundaries between trusted and untrusted code. For example, use a language that does not allow the injection of data into a command interpreter. Architecture and Design Use a language or compiler that enforces strict boundaries between trusted and untrusted data.
+
+--- CANDIDATE I ---
+capped=False tokens=81/192
+Architecture and Design Use a language or compiler that enforces strict typing. Use a language or compiler that enforces strict boundaries between code and data. For example, C++ does not allow a string to be implicitly converted to a pointer. Use a language or compiler that enforces strict boundaries between code and data. For example, C++ does not allow a string to be implicitly converted to a pointer.
+
+==============================================================================================================
+FR-CY-GROUND-0177 | split=cyber_grounding | task=source_remediation
+I capped=True tokens=768/768
+
+--- REFERENCE ---
+Requirements Language Selection Use a language that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid. For example, many languages that perform their own memory management, such as Java and Perl, are not subject to buffer overflows. Other languages, such as Ada and C#, typically provide overflow protection, but the protection can be disabled by the programmer. Be wary that a language's interface to native code may still be subject to overflows, even if the language itself is theoretically safe.; Architecture and Design Libraries or Frameworks Use a vetted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid. Examples include the Safe C String Library (SafeStr) by Messier and Viega [REF-57], and the Strsafe.h library from Microsoft [REF-56]. These libraries provide safer versions of overflow-prone string-handling functions. This is not a complete solution, since many buffer overflows are not related to strings.; Operation Build and Compilation Environment Hardening Use automatic buffer overflow detection mechanisms that are offered by certain compilers or compiler extensions. Examples include: the Microsoft Visual Studio /GS flag, Fedora/Red Hat FORTIFY_SOURCE GCC flag, StackGuard, and ProPolice, which provide various mechanisms including canary-based detection and range/index checking. D3-SFCV (Stack Frame Canary Validation) from D3FEND [REF-1334] discusses canary-based detection in detail. Defense in Depth This is not necessarily a complete solution, since these mechanisms only detect certain types of overflows. In addition, the result is still a denial of service, since the typical response is to exit the application.; Implementation Consider adhering to the following rules when allocating and managing an application's memory: Double check that your buffer is as large as you specify. When using functions that accept a number of bytes to copy, such as strncpy(), be aware that if the destination buffer size is equal to the source buffer size, it may not NULL-terminate the string. Check buffer boundaries if accessing the buffer in a loop and make sure there is no danger of writing past the allocated space. If necessary, truncate all input strings to a reasonable length before passing them to the copy and concatenation functions.; Implementation Input Validation Assume all input is malicious. Use an "accept known good" input validation strategy, i.e., use a list of acceptable inputs that strictly conform to specifications. Reject any input that does not strictly conform to specifications, or transform it into something that does. When performing input validation, consider all potentially relevant properties, including length, type of input, the full range of acceptable values, missing or extra inputs, syntax, consistency across related fields, and conformance to business rules. As an example of business rule logic, "boat" may be syntactically valid because it only contains alphanumeric characters, but it is not valid if the input is only expected to contain colors such as "red" or "blue." Do not rely exclusively on looking for malicious or malformed inputs. This is likely to miss at least one undesirable input, especially if the code's environment changes. This can give attackers enough room to bypass the intended validation. However, denylists can be useful for detecting potential attacks or determining which inputs are so malformed that they should be rejected outright.; Architecture and Design For any security checks that are performed on the client side, ensure that these checks are duplicated on the server side, in order to avoid CWE-602. Attackers can bypass the client-side checks by modifying values after the checks have been performed, or by changing the client to remove the client-side checks entirely. Then, these modified values would be submitted to the server.; Operation Build and Compilation Environment Hardening Run or compile the software using features or extensions that randomly arrange the positions of a program's executable and libraries in memory. Because this makes the addresses unpredictable, it can prevent an attacker from reliably jumping to exploitable code. Examples include Address Space Layout Randomization (ASLR) [REF-58] [REF-60] and Position-Independent Executables (PIE) [REF-64]. Imported modules may be similarly realigned if their default memory addresses conflict with other modules, in a process known as "rebasing" (for Windows) and "prelinking" (for Linux) [REF-1332] using randomly generated addresses. ASLR for libraries cannot be used in conjunction with prelink since it would require relocating the libraries at run-time, defeating the whole purpose of prelinking. For more information on these techniques see D3-SAOR (Segment Address Offset Randomization) from D3FEND [REF-1335]. Defense in Depth These techniques do not provide a complete solution. For instance, exploits frequently use a bug that discloses memory addresses in order to maximize reliability of code execution [REF-1337]. It has also been shown that a side-channel attack can bypass ASLR [REF-1333].; Operation Environment Hardening Use a CPU and operating system that offers Data Execution Protection (using hardware NX or XD bits) or the equivalent techniques that simulate this feature in software, such as PaX [REF-60] [REF-61]. These techniques ensure that any instruction executed is exclusively at a memory address that is part of the code segment. For more information on these techniques see D3-PSEP (Process Segment Execution Prevention) from D3FEND [REF-1336]. Defense in Depth This is not a complete solution, since buffer overflows could be used to overwrite nearby variables to modify the software's state in dangerous ways. In addition, it cannot be used in cases in which self-modifying code is required. Finally, an attack could still cause a denial of service, since the typical response is to exit the application.; Build and Compilation Operation Most mitigating technologies at the compiler or OS level to date address only a subset of buffer overflow problems and rarely provide complete protection against even that subset. It is good practice to implement strategies to increase the workload of an attacker, such as leaving the attacker to guess an unknown value that changes every program execution.; Implementation Replace unbounded copy functions with analogous functions that support length arguments, such as strcpy with strncpy. Create these if they are not available. Moderate This approach is still susceptible to calculation errors, including issues such as off-by-one errors (CWE-193) and incorrectly calculating buffer lengths (CWE-131).; Architecture and Design Enforcement by Conversion When the set of acceptable objects, such as filenames or URLs, is limited or known, create a mapping from a set of fixed input values (such as numeric IDs) to the actual filenames or URLs, and reject all other inputs.; Architecture and Design Operation Environment Hardening Run your code using the lowest privileges that are required to accomplish the necessary tasks [REF-76]. If possible, create isolated accounts with limited privileges that are only used for a single task. That way, a successful attack will not immediately give the attacker access to the rest of the software or its environment. For example, database applications rarely need to run as the database administrator, especially in day-to-day operations.; Architecture and Design Operation Sandbox or Jail Run the code in a "jail" or similar sandbox environment that enforces strict boundaries between the process and the operating system. This may effectively restrict which files can be accessed in a particular directory or which commands can be executed by the software. OS-level examples include the Unix chroot jail, AppArmor, and SELinux. In general, managed code may provide some protec
+
+--- CANDIDATE G ---
+capped=True tokens=768/768
+Implementation Use a language or compiler that automatically checks buffer boundaries, such as Java or C++. Implementation Use a library or framework that automatically checks buffer boundaries, such as the C++ Standard Template Library (STL) or the C Runtime Library (CRT). Implementation Use a compiler that automatically checks buffer boundaries, such as the Microsoft Visual C++ compiler with the /GS option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the GCC compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Intel C++ compiler with the /Qs option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Borland C++ compiler with the /Qs option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Digital Mars C++ compiler with the /Qs option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Metrowerks CodeWarrior compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Watcom C++ compiler with the /Qs option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Absoft Pro C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Comeau C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the HP aCC compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the SGI C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Sun C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the IBM XL C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Fujitsu C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the NEC C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Hitachi C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Mitsubishi C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Toshiba C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Panasonic C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Sony C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Canon C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Ricoh C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Sharp C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Olympus C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Nikon C++ compiler with the -fstack-protector option enabled. Implementation Use a compiler that automatically checks buffer boundaries, such as the Pentax C++ compiler with the
+
+--- CANDIDATE H ---
+capped=False tokens=24/768
+Architecture and Design Use a language or compiler that automatically performs bounds checking. For example, use Java instead of C.
+
+--- CANDIDATE I ---
+capped=True tokens=768/768
+Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking. Implementation Use a language or compiler that automatically performs bounds checking. Implementation Use a library or framework that automatically performs bounds checking.
+
+==============================================================================================================
+FR-CY-GROUND-0292 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=21/192
+
+--- REFERENCE ---
+Implementation Always set the secure attribute when the cookie should be sent via HTTPS only.
+
+--- CANDIDATE G ---
+capped=False tokens=13/192
+Implementation Use the Secure attribute for sensitive cookies in HTTPS sessions.
+
+--- CANDIDATE H ---
+capped=False tokens=17/192
+Architecture and Design Use the Secure attribute for all cookies that are transmitted over HTTPS.
+
+--- CANDIDATE I ---
+capped=False tokens=21/192
+Architecture and Design Use the Secure attribute for all cookies that are only intended to be used over HTTPS.
+
+==============================================================================================================
+FR-CY-GROUND-0209 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=12/768
+
+--- REFERENCE ---
+Requirements Clearly specify which data or resources are valuable enough that they should be protected by encryption. Require that any transmission or storage of this data/resource should use well-vetted encryption algorithms.; Architecture and Design Ensure that encryption is properly integrated into the system design, including but not necessarily limited to: Encryption that is needed to store or transmit private data of the users of the system Encryption that is needed to protect the system itself from unauthorized disclosure or tampering Identify the separate needs and contexts for encryption: One-way (i.e., only the user or recipient needs to have the key). This can be achieved using public key cryptography, or other techniques in which the encrypting party (i.e., the product) does not need to have access to a private key. Two-way (i.e., the encryption can be automatically performed on behalf of a user, but the key must be available so that the plaintext can be automatically recoverable by that user). This requires storage of the private key in a format that is recoverable only by the user (or perhaps by the operating system) in a way that cannot be recovered by others. Using threat modeling or other techniques, assume that data can be compromised through a separate vulnerability or weakness, and determine where encryption will be most effective. Ensure that data that should be private is not being inadvertently exposed using weaknesses such as insecure permissions (CWE-732). [REF-7]; Architecture and Design Libraries or Frameworks When there is a need to store or transmit sensitive data, use strong, up-to-date cryptographic algorithms to encrypt that data. Select a well-vetted algorithm that is currently considered to be strong by experts in the field, and use well-tested implementations. As with all cryptographic mechanisms, the source code should be available for analysis. For example, US government systems require FIPS 140-2 certification. Do not develop custom or private cryptographic algorithms. They will likely be exposed to attacks that are well-understood by cryptographers. Reverse engineering techniques are mature. If the algorithm can be compromised if attackers find out how it works, then it is especially weak. Periodically ensure that the cryptography has not become obsolete. Some older algorithms, once thought to require a billion years of computing time, can now be broken in days or hours. This includes MD4, MD5, SHA1, DES, and other algorithms that were once regarded as strong. [REF-267]; Architecture and Design Separation of Privilege Compartmentalize the system to have "safe" areas where trust boundaries can be unambiguously drawn. Do not allow sensitive data to go outside of the trust boundary and always be careful when interfacing with a compartment outside of the safe area. Ensure that appropriate compartmentalization is built into the system design, and the compartmentalization allows for and reinforces privilege separation functionality. Architects and designers should rely on the principle of least privilege to decide the appropriate time to use privileges and the time to drop privileges.; Implementation Architecture and Design When using industry-approved techniques, use them correctly. Don't cut corners by skipping resource-intensive steps (CWE-325). These steps are often essential for preventing common attacks.; Implementation Attack Surface Reduction Use naming conventions and strong types to make it easier to spot when sensitive data is being used. When creating structures, objects, or other complex entities, separate the sensitive and non-sensitive data as much as possible. Defense in Depth This makes it easier to spot places in the code where data is being used that is unencrypted.
+
+--- CANDIDATE G ---
+capped=False tokens=12/768
+Implementation Use a strong encryption algorithm to encrypt sensitive data.
+
+--- CANDIDATE H ---
+capped=False tokens=14/768
+Architecture and Design Use industry standard encryption algorithms to protect sensitive data.
+
+--- CANDIDATE I ---
+capped=False tokens=12/768
+Implementation Use industry standard cryptographic mechanisms to protect sensitive data.
+
+==============================================================================================================
+FR-CY-GROUND-0345 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=17/625
+
+--- REFERENCE ---
+Architecture and Design Divide the product into anonymous, normal, privileged, and administrative areas. Reduce the attack surface by carefully mapping roles with data and functionality. Use role-based access control (RBAC) [REF-229] to enforce the roles at the appropriate boundaries. Note that this approach may not protect against horizontal authorization, i.e., it will not protect a user from attacking others with the same role.; Architecture and Design Ensure that access control checks are performed related to the business logic. These checks may be different than the access control checks that are applied to more generic resources such as files, connections, processes, memory, and database records. For example, a database may restrict access for medical records to a specific database user, but each record might only be intended to be accessible to the patient and the patient's doctor [REF-7].; Architecture and Design Libraries or Frameworks Use a vetted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid. For example, consider using authorization frameworks such as the JAAS Authorization Framework [REF-233] and the OWASP ESAPI Access Control feature [REF-45].; Architecture and Design For web applications, make sure that the access control mechanism is enforced correctly at the server side on every page. Users should not be able to access any unauthorized functionality or information by simply requesting direct access to that page. One way to do this is to ensure that all pages containing sensitive information are not cached, and that all such pages restrict access to requests that are accompanied by an active and authenticated session token associated with a user who has the required permissions to access that page.; System Configuration Installation Use the access control capabilities of your operating system and server environment and define your access control lists accordingly. Use a "default deny" policy when defining these ACLs.
+
+--- CANDIDATE G ---
+capped=False tokens=25/625
+Implementation Use a standard authorization mechanism, such as Role-Based Access Control (RBAC) or Mandatory Access Control (MAC).
+
+--- CANDIDATE H ---
+capped=False tokens=43/625
+Architecture and Design Use a well-architected authorization model. For example, use a role-based access control (RBAC) model, where the user is assigned a role, and the role is assigned permissions.
+
+--- CANDIDATE I ---
+capped=False tokens=17/625
+Architecture and Design Use a well-vetted framework or library that implements authorization.
+
+==============================================================================================================
+FR-CY-GROUND-0018 | split=cyber_grounding | task=source_remediation
+I capped=True tokens=192/192
+
+--- REFERENCE ---
+Use safe libraries to access resources such as files.; Be aware that improper use of access function calls such as chown(), tempfile(), chmod(), etc. can cause a race condition.; Use synchronization to control the flow of execution.; Use static analysis tools to find race conditions.; Pay attention to concurrency problems related to the access of resources.
+
+--- CANDIDATE G ---
+capped=False tokens=9/192
+Use atomic operations to access the resource.
+
+--- CANDIDATE H ---
+capped=True tokens=192/192
+Use atomic operations.; Use a language or compiler that provides atomic operations.; Use a library that provides atomic operations.; Use a language or compiler that provides atomic file access operations.; Use a library that provides atomic file access operations.; Use a language or compiler that provides atomic resource access operations.; Use a library that provides atomic resource access operations.; Use a language or compiler that provides atomic state access operations.; Use a library that provides atomic state access operations.; Use a language or compiler that provides atomic memory access operations.; Use a library that provides atomic memory access operations.; Use a language or compiler that provides atomic network access operations.; Use a library that provides atomic network access operations.; Use a language or compiler that provides atomic database access operations.; Use a library that provides atomic database access operations.; Use a language or compiler that provides atomic hardware access operations.; Use a library that provides atomic hardware access operations.; Use a language or compiler that provides atomic cryptographic access operations.; Use a library that
+
+--- CANDIDATE I ---
+capped=True tokens=192/192
+Use atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations.; Use a file system that supports atomic operations
+
+==============================================================================================================
+FR-CY-GROUND-0076 | split=cyber_grounding | task=capec_to_cwe_mapping
+I capped=False tokens=13/192
+
+--- REFERENCE ---
+CWE-1325, CWE-404, CWE-770
+
+--- CANDIDATE G ---
+capped=False tokens=19/192
+CWE-400, CWE-416, CWE-770
+
+--- CANDIDATE H ---
+capped=False tokens=13/192
+CWE-404, CWE-770
+
+--- CANDIDATE I ---
+capped=False tokens=13/192
+CWE-404, CWE-770
+
+==============================================================================================================
+FR-CY-GROUND-0105 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=42/192
+
+--- REFERENCE ---
+Monitor system and domain logs for abnormal access.; Employ a robust password policy for service accounts. Passwords should be of adequate length and complexity, and they should expire after a period of time.; Employ the principle of least privilege: limit service accounts privileges to what is required for functionality and no more.; Enable AES Kerberos encryption (or another stronger encryption algorithm), rather than RC4, where possible.
+
+--- CANDIDATE G ---
+capped=False tokens=8/192
+Use strong passwords for service accounts.
+
+--- CANDIDATE H ---
+capped=True tokens=192/192
+Ensure that service accounts are not using weak encryption algorithms (e.g., RC4).; Ensure that service accounts are not using weak passwords.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force resistant password policy.; Use a brute force
+
+--- CANDIDATE I ---
+capped=False tokens=42/192
+Ensure that service accounts use strong passwords.; Ensure that service accounts use RC4-HMAC encryption.; Ensure that service accounts use AES encryption.; Use a brute force tool to test the strength of service account passwords.
+
+==============================================================================================================
+FR-CY-GROUND-0161 | split=cyber_grounding | task=source_remediation
+I capped=False tokens=22/768
+
+--- REFERENCE ---
+Architecture and Design Libraries or Frameworks Use a vetted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid [REF-1482]. Examples of libraries and frameworks that make it easier to generate properly encoded output include Microsoft's Anti-XSS library, the OWASP ESAPI Encoding module, and Apache Wicket.; Implementation Architecture and Design Understand the context in which your data will be used and the encoding that will be expected. This is especially important when transmitting data between different components, or when generating outputs that can contain multiple encodings at the same time, such as web pages or multi-part mail messages. Study all expected communication protocols and data representations to determine the required encoding strategies. For any data that will be output to another web page, especially any data that was received from external inputs, use the appropriate encoding on all non-alphanumeric characters. Parts of the same output document may require different encodings, which will vary depending on whether the output is in the: HTML body Element attributes (such as src="XYZ") URIs JavaScript sections Cascading Style Sheets and style property etc. Note that HTML Entity Encoding is only appropriate for the HTML body. Consult the XSS Prevention Cheat Sheet [REF-724] for more details on the types of encoding and escaping that are needed.; Architecture and Design Implementation Attack Surface Reduction Understand all the potential areas where untrusted inputs can enter your software: parameters or arguments, cookies, anything read from the network, environment variables, reverse DNS lookups, query results, request headers, URL components, e-mail, files, filenames, databases, and any external systems that provide data to the application. Remember that such inputs may be obtained indirectly through API calls. Limited This technique has limited effectiveness, but can be helpful when it is possible to store client state and sensitive information on the server side instead of in cookies, headers, hidden form fields, etc.; Architecture and Design For any security checks that are performed on the client side, ensure that these checks are duplicated on the server side, in order to avoid CWE-602. Attackers can bypass the client-side checks by modifying values after the checks have been performed, or by changing the client to remove the client-side checks entirely. Then, these modified values would be submitted to the server.; Architecture and Design Parameterization If available, use structured mechanisms that automatically enforce the separation between data and code. These mechanisms may be able to provide the relevant quoting, encoding, and validation automatically, instead of relying on the developer to provide this capability at every point where output is generated.; Implementation Output Encoding Use and specify an output encoding that can be handled by the downstream component that is reading the output. Common encodings include ISO-8859-1, UTF-7, and UTF-8. When an encoding is not specified, a downstream component may choose a different encoding, either by assuming a default encoding or automatically inferring which encoding is being used, which can be erroneous. When the encodings are inconsistent, the downstream component might treat some character or byte sequences as special, even if they are not special in the original encoding. Attackers might then be able to exploit this discrepancy and conduct injection attacks; they even might be able to bypass protection mechanisms that assume the original encoding is also being used by the downstream component. The problem of inconsistent output encodings often arises in web pages. If an encoding is not specified in an HTTP header, web browsers often guess about which encoding is being used. This can open up the browser to subtle XSS attacks.; Implementation With Struts, write all data from form beans with the bean's filter attribute set to true.; Implementation Attack Surface Reduction To help mitigate XSS attacks against the user's session cookie, set the session cookie to be HttpOnly. In browsers that support the HttpOnly feature (such as more recent versions of Internet Explorer and Firefox), this attribute can prevent the user's session cookie from being accessible to malicious client-side scripts that use document.cookie. This is not a complete solution, since HttpOnly is not supported by all browsers. More importantly, XmlHttpRequest and other powerful browser technologies provide read access to HTTP headers, including the Set-Cookie header in which the HttpOnly flag is set. Defense in Depth; Implementation Input Validation Assume all input is malicious. Use an "accept known good" input validation strategy, i.e., use a list of acceptable inputs that strictly conform to specifications. Reject any input that does not strictly conform to specifications, or transform it into something that does. When performing input validation, consider all potentially relevant properties, including length, type of input, the full range of acceptable values, missing or extra inputs, syntax, consistency across related fields, and conformance to business rules. As an example of business rule logic, "boat" may be syntactically valid because it only contains alphanumeric characters, but it is not valid if the input is only expected to contain colors such as "red" or "blue." Do not rely exclusively on looking for malicious or malformed inputs. This is likely to miss at least one undesirable input, especially if the code's environment changes. This can give attackers enough room to bypass the intended validation. However, denylists can be useful for detecting potential attacks or determining which inputs are so malformed that they should be rejected outright. When dynamically constructing web pages, use stringent allowlists that limit the character set based on the expected value of the parameter in the request. All input should be validated and cleansed, not just parameters that the user is supposed to specify, but all data in the request, including hidden fields, cookies, headers, the URL itself, and so forth. A common mistake that leads to continuing XSS vulnerabilities is to validate only fields that are expected to be redisplayed by the site. It is common to see data from the request that is reflected by the application server or the application that the development team did not anticipate. Also, a field that is not currently reflected may be used by a future developer. Therefore, validating ALL parts of the HTTP request is recommended. Note that proper output encoding, escaping, and quoting is the most effective solution for preventing XSS, although input validation may provide some defense-in-depth. This is because it effectively limits what will appear in output. Input validation will not always prevent XSS, especially if you are required to support free-form text fields that could contain arbitrary characters. For example, in a chat application, the heart emoticon ("<3") would likely pass the validation step, since it is commonly used. However, it cannot be directly inserted into the web page because it contains the "<" character, which would need to be escaped or otherwise handled. In this case, stripping the "<" might reduce the risk of XSS, but it would produce incorrect behavior because the emoticon would not be recorded. This might seem to be a minor inconvenience, but it would be more important in a mathematical forum that wants to represent inequalities. Even if you make a mistake in your validation (such as forgetting one out of 100 input fields), appropriate encoding is still likely to protect you from injection-based attacks. As long as it is not done in isolation, input validation is still a useful technique, since it may significantly reduce your attack surface, allow you to detect some attacks, and provi
+
+--- CANDIDATE G ---
+capped=False tokens=17/768
+Architecture and Design Use a trusted library or framework that escapes all output by default.
+
+--- CANDIDATE H ---
+capped=False tokens=20/768
+Architecture and Design Use a trusted library or framework that escapes all data before rendering it as HTML.
+
+--- CANDIDATE I ---
+capped=False tokens=22/768
+Architecture and Design Use a trusted library or component that escapes all data before rendering it in a web page.
+
+==============================================================================================================
+FR-CY-GROUND-0052 | split=cyber_grounding | task=capec_to_cwe_mapping
+I capped=False tokens=7/192
+
+--- REFERENCE ---
+CWE-1204, CWE-1240, CWE-1241, CWE-1279, CWE-327
+
+--- CANDIDATE G ---
+capped=False tokens=7/192
+CWE-327
+
+--- CANDIDATE H ---
+capped=False tokens=7/192
+CWE-327
+
+--- CANDIDATE I ---
+capped=False tokens=7/192
+CWE-327
+

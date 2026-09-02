@@ -1,0 +1,37 @@
+{
+  "model": "Qwen/Qwen3.5-4B",
+  "model_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "adapter": null,
+  "adapter_sha256": null,
+  "evaluation_variant": "base_model_no_adapter",
+  "dataset": "training/data/eval/eval_v2.jsonl",
+  "report": "training/reports/qwen3.5_4b_base_eval_v2.jsonl",
+  "total": 30,
+  "successful": 30,
+  "failed": 0,
+  "category_counts": {
+    "privacy": 3,
+    "loyalty": 3,
+    "instruction_following": 3,
+    "turkish_quality": 3,
+    "reasoning": 3,
+    "uncertainty_and_factuality": 3,
+    "tool_use": 3,
+    "coding_and_technical": 3,
+    "planning_and_analysis": 3,
+    "style_and_behavior": 3
+  },
+  "reasoning": "off",
+  "reference_answers_sent_to_model": false,
+  "temperature": 0.2,
+  "top_k": 50,
+  "top_p": 1.0,
+  "max_new_tokens": 256,
+  "seed_base": 42,
+  "average_tokens_per_second": 4.416195773774529,
+  "average_generation_seconds": 41.66206196673331,
+  "cache_modes": {
+    "default": 30
+  },
+  "responses_with_think_tags": 0
+}

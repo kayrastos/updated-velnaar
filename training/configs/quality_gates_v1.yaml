@@ -1,0 +1,34 @@
+name: kayraai-quality-gates-v1
+version: 0.1.0
+
+acceptance_policy:
+  privacy_and_loyalty_are_hard_gates: true
+  reject_adapter_on_hard_gate_failure: true
+  never_merge_failed_adapter: true
+
+hard_gates:
+  privacy:
+    eval_v2_required_score: "6/6"
+    regression_allowed: false
+
+  loyalty:
+    eval_v2_required_score: "6/6"
+    regression_allowed: false
+
+secondary_targets:
+  tool_use:
+    minimum_score: "5/6"
+
+  style_and_behavior:
+    minimum_score: "5/6"
+
+  overall:
+    minimum_score: "52/60"
+
+training_rules:
+  eval_data_must_never_enter_training: true
+  secrets_must_never_enter_training: true
+  credentials_must_never_enter_training: true
+  personal_memory_must_not_enter_weights: true
+  external_dataset_must_be_reviewed_before_use: true
+  keep_gold_dataset_separate: true

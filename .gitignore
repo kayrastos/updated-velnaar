@@ -57,3 +57,26 @@ logs/
 !data/processed/README.md
 !reports/README.md
 
+
+# Fulgor recovery baseline ignores
+
+# Training runtime outputs and heavyweight model artifacts
+training/runs/
+training/adapters/
+training/sources/
+
+# Ignore bulk artifacts, but retain compact human-review/audit evidence
+training/artifacts/*
+!training/artifacts/candidate_*_human_review.txt
+!training/artifacts/candidate_*_data_audit.txt
+!training/artifacts/candidate_*_dev_comparison.md
+!training/artifacts/candidate_*_dev_results.json
+!training/artifacts/candidate_*_semantic_risk_audit.txt
+!training/artifacts/candidate_*_train_side_audit.txt
+!training/artifacts/candidate_*_final_data_audit.txt
+
+# Recovery / historical root artifacts
+/*.patch
+/kayra-ai-cloud-data.tar.gz
+/Training durumu*.html
+/Training durumu*_files/

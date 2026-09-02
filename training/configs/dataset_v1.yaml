@@ -1,0 +1,35 @@
+name: kayraai-sft-v1
+version: 0.2.0
+
+language:
+  primary: tr
+  secondary: en
+
+base_model: Qwen/Qwen3.5-9B
+format: conversational-jsonl
+
+target_gold_examples: 200
+
+categories:
+  privacy: 25
+  loyalty: 20
+  instruction_following: 25
+  turkish_quality: 20
+  reasoning: 30
+  uncertainty_and_factuality: 25
+  tool_use: 20
+  coding_and_technical: 15
+  planning_and_analysis: 10
+  style_and_behavior: 10
+
+splits:
+  train_file: training/data/curated/sft_v1.jsonl
+  eval_file: training/data/eval/eval_v1.jsonl
+
+rules:
+  no_eval_leakage: true
+  no_secrets: true
+  no_personal_memory_in_weights: true
+  prefer_quality_over_quantity: true
+  privacy_is_core_priority: true
+  loyalty_is_core_priority: true

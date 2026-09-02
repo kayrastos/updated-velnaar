@@ -1,0 +1,1383 @@
+FULGOR RAY v1.1 — CANDIDATE J TRAIN-SIDE AUDIT
+train_sha256=7bdcbf4f267c7b230e325a5791be669efc8435d486686089bde1e10472e4c918
+records=487
+dev_eval_read=False
+locked_eval_read=False
+real_training_started=False
+
+TASK_COUNTS
+{
+  "capec_to_cwe_mapping": 26,
+  "cwe_classification": 22,
+  "general_regression/coding_and_technical": 3,
+  "general_regression/instruction_following": 6,
+  "general_regression/loyalty": 5,
+  "general_regression/planning_and_analysis": 2,
+  "general_regression/privacy": 6,
+  "general_regression/reasoning": 7,
+  "general_regression/style_and_behavior": 2,
+  "general_regression/tool_use": 4,
+  "general_regression/turkish_quality": 4,
+  "general_regression/uncertainty_and_factuality": 6,
+  "patch_repair": 75,
+  "regression_test": 36,
+  "source_detection": 51,
+  "source_id_classification": 77,
+  "source_impact": 76,
+  "source_remediation": 79
+}
+
+====================================================================================================
+CAPEC_TO_CWE_MAPPING — ALL TRAIN-SIDE ROWS
+count=26
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0004 | prompt_cwes=[] | target_cwes=['CWE-20', 'CWE-209', 'CWE-697', 'CWE-707', 'CWE-74', 'CWE-89'] | target_words=6
+USER:
+Attack pattern title: Blind SQL Injection
+Summary: Blind SQL Injection results from an insufficient mitigation for SQL Injection. Although suppressing database error messages are considered best practice, the suppression alone is not sufficient to prevent SQL Injection. Blind SQL Injection is a form of SQL Injection that overcomes the lack of error messages. Without the error messages that facilitate SQL Injection, the adversary constructs input strings that probe the target through simple Boolean SQL expressions. The adversary can determine if the syntax and structure of the injection was successful based on whether the query was executed or not. Applied iteratively, the adversary determines how and where the target is vulnerable to SQL Injection.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-20, CWE-209, CWE-697, CWE-707, CWE-74, CWE-89
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0008 | prompt_cwes=[] | target_cwes=['CWE-1322', 'CWE-412', 'CWE-567', 'CWE-662', 'CWE-667', 'CWE-833'] | target_words=6
+USER:
+Attack pattern title: Forced Deadlock
+Summary: The adversary triggers and exploits a deadlock condition in the target software to cause a denial of service. A deadlock can occur when two or more competing actions are waiting for each other to finish, and thus neither ever does. Deadlock conditions can be difficult to detect.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-1322, CWE-412, CWE-567, CWE-662, CWE-667, CWE-833
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0012 | prompt_cwes=[] | target_cwes=['CWE-1223', 'CWE-1254', 'CWE-1298', 'CWE-362', 'CWE-363', 'CWE-366', 'CWE-368', 'CWE-370', 'CWE-662', 'CWE-665', 'CWE-667', 'CWE-689'] | target_words=12
+USER:
+Attack pattern title: Leveraging Race Conditions
+Summary: The adversary targets a race condition occurring when multiple processes access and manipulate the same resource concurrently, and the outcome of the execution depends on the particular order in which the access takes place. The adversary can leverage a race condition by "running the race", modifying the resource and modifying the normal execution flow. For instance, a race condition can occur while accessing a file: the adversary can trick the system by replacing the original file with their version and cause the system to read the malicious file.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-1223, CWE-1254, CWE-1298, CWE-362, CWE-363, CWE-366, CWE-368, CWE-370, CWE-662, CWE-665, CWE-667, CWE-689
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0016 | prompt_cwes=[] | target_cwes=['CWE-367', 'CWE-61', 'CWE-662', 'CWE-667', 'CWE-689'] | target_words=5
+USER:
+Attack pattern title: Leveraging Race Conditions via Symbolic Links
+Summary: This attack leverages the use of symbolic links (Symlinks) in order to write to sensitive files. An attacker can create a Symlink link to a target file not otherwise accessible to them. When the privileged program tries to create a temporary file with the same name as the Symlink link, it will actually write to the target file pointed to by the attackers' Symlink link. If the attacker can insert malicious content in the temporary file they will be writing to the sensitive file by using the Symlink. The race occurs because the system checks if the temporary file exists, then creates the file. The attacker would typically create the Symlink during the interval between the check and the creation of the temporary file.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-367, CWE-61, CWE-662, CWE-667, CWE-689
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0024 | prompt_cwes=[] | target_cwes=['CWE-444'] | target_words=1
+USER:
+Attack pattern title: HTTP Request Smuggling
+Summary: An adversary abuses the flexibility and discrepancies in the parsing and interpretation of HTTP Request messages using various HTTP headers, request-line and body parameters as well as message sizes (denoted by the end of message signaled by a given HTTP header) by different intermediary HTTP agents (e.g., load balancer, reverse proxy, web caching proxies, application firewalls, etc.) to secretly send unauthorized and malicious HTTP requests to a back-end HTTP agent (e.g., web server). See CanPrecede relationships for possible consequences.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-444
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0028 | prompt_cwes=[] | target_cwes=['CWE-179', 'CWE-181', 'CWE-183', 'CWE-184', 'CWE-20', 'CWE-697', 'CWE-707', 'CWE-74', 'CWE-77', 'CWE-78'] | target_words=10
+USER:
+Attack pattern title: Exploiting Multiple Input Interpretation Layers
+Summary: An attacker supplies the target software with input data that contains sequences of special characters designed to bypass input validation logic. This exploit relies on the target making multiples passes over the input data and processing a "layer" of special characters with each pass. In this manner, the attacker can disguise input that would otherwise be rejected as invalid by concealing it with layers of special/escape characters that are stripped off by subsequent processing steps. The goal is to first discover cases where the input validation layer executes before one or more parsing layers. That is, user input may go through the following logic in an application: <parser1> --> <input validator> --> <parser2>. In such cases, the attacker will need to provide input that will pass through the input validator, but after passing through parser2, will be converted into something that the input validator was supposed to stop.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-179, CWE-181, CWE-183, CWE-184, CWE-20, CWE-697, CWE-707, CWE-74, CWE-77, CWE-78
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0036 | prompt_cwes=[] | target_cwes=['CWE-120', 'CWE-134', 'CWE-20', 'CWE-680', 'CWE-697', 'CWE-74'] | target_words=6
+USER:
+Attack pattern title: String Format Overflow in syslog()
+Summary: This attack targets applications and software that uses the syslog() function insecurely. If an application does not explicitely use a format string parameter in a call to syslog(), user input can be placed in the format string parameter leading to a format string injection attack. Adversaries can then inject malicious format string commands into the function call leading to a buffer overflow. There are many reported software vulnerabilities with the root cause being a misuse of the syslog() function.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-120, CWE-134, CWE-20, CWE-680, CWE-697, CWE-74
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0040 | prompt_cwes=[] | target_cwes=['CWE-172', 'CWE-173', 'CWE-180', 'CWE-181', 'CWE-20', 'CWE-22', 'CWE-697', 'CWE-707', 'CWE-73', 'CWE-74'] | target_words=10
+USER:
+Attack pattern title: Using Escaped Slashes in Alternate Encoding
+Summary: This attack targets the use of the backslash in alternate encoding. An adversary can provide a backslash as a leading character and causes a parser to believe that the next character is special. This is called an escape. By using that trick, the adversary tries to exploit alternate ways to encode the same character which leads to filter problems and opens avenues to attack.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-172, CWE-173, CWE-180, CWE-181, CWE-20, CWE-22, CWE-697, CWE-707, CWE-73, CWE-74
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0044 | prompt_cwes=[] | target_cwes=['CWE-173', 'CWE-180', 'CWE-181', 'CWE-185', 'CWE-20', 'CWE-200', 'CWE-22', 'CWE-697', 'CWE-707', 'CWE-73', 'CWE-74'] | target_words=11
+USER:
+Attack pattern title: Using Slashes in Alternate Encoding
+Summary: This attack targets the encoding of the Slash characters. An adversary would try to exploit common filtering problems related to the use of the slashes characters to gain access to resources on the target host. Directory-driven systems, such as file systems and databases, typically use the slash character to indicate traversal between directories or other container components. For murky historical reasons, PCs (and, as a result, Microsoft OSs) choose to use a backslash, whereas the UNIX world typically makes use of the forward slash. The schizophrenic result is that many MS-based systems are required to understand both forms of the slash. This gives the adversary many opportunities to discover and abuse a number of common filtering problems. The goal of this pattern is to discover server software that only applies filters to one version, but not the other.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-173, CWE-180, CWE-181, CWE-185, CWE-20, CWE-200, CWE-22, CWE-697, CWE-707, CWE-73, CWE-74
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0048 | prompt_cwes=[] | target_cwes=['CWE-120', 'CWE-122', 'CWE-128', 'CWE-190', 'CWE-196', 'CWE-680', 'CWE-697'] | target_words=7
+USER:
+Attack pattern title: Forced Integer Overflow
+Summary: This attack forces an integer variable to go out of range. The integer variable is often used as an offset such as size of memory allocation or similarly. The attacker would typically control the value of such variable and try to get it out of range. For instance the integer in question is incremented past the maximum possible value, it may wrap to become a very small, or negative number, therefore providing a very incorrect value which can lead to unexpected behavior. At worst the attacker can execute arbitrary code.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-120, CWE-122, CWE-128, CWE-190, CWE-196, CWE-680, CWE-697
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0056 | prompt_cwes=[] | target_cwes=['CWE-119', 'CWE-120', 'CWE-129', 'CWE-131', 'CWE-680', 'CWE-805'] | target_words=6
+USER:
+Attack pattern title: Overflow Buffers
+Summary: Buffer Overflow attacks target improper or missing bounds checking on buffer operations, typically triggered by input injected by an adversary. As a consequence, an adversary is able to write past the boundaries of allocated buffer regions in memory, causing a program crash or potentially redirection of execution as per the adversaries' choice.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-119, CWE-120, CWE-129, CWE-131, CWE-680, CWE-805
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0060 | prompt_cwes=[] | target_cwes=['CWE-20', 'CWE-74', 'CWE-97'] | target_words=3
+USER:
+Attack pattern title: Server Side Include (SSI) Injection
+Summary: An attacker can use Server Side Include (SSI) Injection to send code to a web application that then gets executed by the web server. Doing so enables the attacker to achieve similar results to Cross Site Scripting, viz., arbitrary code execution and information disclosure, albeit on a more limited scale, since the SSI directives are nowhere near as powerful as a full-fledged scripting language. Nonetheless, the attacker can conveniently gain access to sensitive files, such as password files, and execute shell commands.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-20, CWE-74, CWE-97
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0064 | prompt_cwes=[] | target_cwes=['CWE-345', 'CWE-346', 'CWE-352'] | target_words=3
+USER:
+Attack pattern title: JSON Hijacking (aka JavaScript Hijacking)
+Summary: An attacker targets a system that uses JavaScript Object Notation (JSON) as a transport mechanism between the client and the server (common in Web 2.0 systems using AJAX) to steal possibly confidential information transmitted from the server back to the client inside the JSON object by taking advantage of the loophole in the browser's Same Origin Policy that does not prohibit JavaScript from one website to be included and executed in the context of another website.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-345, CWE-346, CWE-352
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0068 | prompt_cwes=[] | target_cwes=['CWE-119'] | target_words=1
+USER:
+Attack pattern title: Buffer Manipulation
+Summary: An adversary manipulates an application's interaction with a buffer in an attempt to read or modify data they shouldn't have access to. Buffer attacks are distinguished in that it is the buffer space itself that is the target of the attack rather than any code responsible for interpreting the content of the buffer. In virtually all buffer attacks the content that is placed in the buffer is immaterial. Instead, most buffer attacks involve retrieving or providing more input than can be stored in the allocated buffer, resulting in the reading or overwriting of other unintended program memory.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-119
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0072 | prompt_cwes=[] | target_cwes=['CWE-404', 'CWE-770'] | target_words=2
+USER:
+Attack pattern title: Flooding
+Summary: An adversary consumes the resources of a target by rapidly engaging in a large number of interactions with the target. This type of attack generally exposes a weakness in rate limiting or flow. When successful this attack prevents legitimate users from accessing the service and can cause the target to crash. This attack differs from resource depletion through leaks or allocations in that the latter attacks do not rely on the volume of requests made to the target but instead focus on manipulation of the target's operations. The key factor in a flooding attack is the number of requests the adversary can make in a given period of time. The greater this number, the more likely an attack is to succeed against a given target.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-404, CWE-770
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0080 | prompt_cwes=[] | target_cwes=['CWE-20', 'CWE-77', 'CWE-90'] | target_words=3
+USER:
+Attack pattern title: LDAP Injection
+Summary: An attacker manipulates or crafts an LDAP query for the purpose of undermining the security of the target. Some applications use user input to create LDAP queries that are processed by an LDAP server. For example, a user might provide their username during authentication and the username might be inserted in an LDAP query during the authentication process. An attacker could use this input to inject additional commands into an LDAP query that could disclose sensitive information. For example, entering a * in the aforementioned query might return information about all users on the system. This attack is very similar to an SQL injection attack in that it manipulates a query to gather additional information or coerce a particular return value.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-20, CWE-77, CWE-90
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0084 | prompt_cwes=[] | target_cwes=['CWE-23'] | target_words=1
+USER:
+Attack pattern title: Relative Path Traversal
+Summary: An attacker exploits a weakness in input validation on the target by supplying a specially constructed path utilizing dot and slash characters for the purpose of obtaining access to arbitrary files or resources. An attacker modifies a known path on the target in order to reach material that is not available through intended channels. These attacks normally involve adding additional path separators (/ or \) and/or dots (.), or encodings thereof, in various combinations in order to reach parent directories or entirely separate trees of the target's directory structure.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-23
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0088 | prompt_cwes=[] | target_cwes=['CWE-611'] | target_words=1
+USER:
+Attack pattern title: Data Serialization External Entities Blowup
+Summary: This attack takes advantage of the entity replacement property of certain data serialization languages (e.g., XML, YAML, etc.) where the value of the replacement is a URI. A well-crafted file could have the entity refer to a URI that consumes a large amount of resources to create a denial of service condition. This can cause the system to either freeze, crash, or execute arbitrary code depending on the URI.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-611
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0092 | prompt_cwes=[] | target_cwes=['CWE-112', 'CWE-20', 'CWE-674', 'CWE-770'] | target_words=4
+USER:
+Attack pattern title: Serialized Data with Nested Payloads
+Summary: Applications often need to transform data in and out of a data format (e.g., XML and YAML) by using a parser. It may be possible for an adversary to inject data that may have an adverse effect on the parser when it is being processed. Many data format languages allow the definition of macro-like structures that can be used to simplify the creation of complex structures. By nesting these structures, causing the data to be repeatedly substituted, an adversary can cause the parser to consume more resources while processing, causing excessive memory consumption and CPU utilization.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-112, CWE-20, CWE-674, CWE-770
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0096 | prompt_cwes=[] | target_cwes=['CWE-290', 'CWE-295', 'CWE-327'] | target_words=3
+USER:
+Attack pattern title: Creating a Rogue Certification Authority Certificate
+Summary: An adversary exploits a weakness resulting from using a hashing algorithm with weak collision resistance to generate certificate signing requests (CSR) that contain collision blocks in their "to be signed" parts. The adversary submits one CSR to be signed by a trusted certificate authority then uses the signed blob to make a second certificate appear signed by said certificate authority. Due to the hash collision, both certificates, though different, hash to the same value and so the signed blob works just as well in the second certificate. The net effect is that the adversary's second X.509 certificate, which the Certification Authority has never seen, is now signed and validated by that Certification Authority.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-290, CWE-295, CWE-327
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0103 | prompt_cwes=[] | target_cwes=['CWE-330'] | target_words=1
+USER:
+Attack pattern title: Signature Spoofing by Key Recreation
+Summary: An attacker obtains an authoritative or reputable signer's private signature key by exploiting a cryptographic weakness in the signature algorithm or pseudorandom number generation and then uses this key to forge signatures from the original signer to mislead a victim into performing actions that benefit the attacker.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-330
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0111 | prompt_cwes=[] | target_cwes=['CWE-1273', 'CWE-262', 'CWE-263', 'CWE-307', 'CWE-308', 'CWE-309', 'CWE-522', 'CWE-654'] | target_words=8
+USER:
+Attack pattern title: Use of Known Domain Credentials
+Summary: An adversary guesses or obtains (i.e. steals or purchases) legitimate credentials (e.g. userID/password) to achieve authentication and to perform authorized actions under the guise of an authenticated user or service.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-1273, CWE-262, CWE-263, CWE-307, CWE-308, CWE-309, CWE-522, CWE-654
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0115 | prompt_cwes=[] | target_cwes=['CWE-262', 'CWE-263', 'CWE-307', 'CWE-308', 'CWE-309', 'CWE-522', 'CWE-654'] | target_words=7
+USER:
+Attack pattern title: Credential Stuffing
+Summary: An adversary tries known username/password combinations against different systems, applications, or services to gain additional authenticated access. Credential Stuffing attacks rely upon the fact that many users leverage the same username/password combination for multiple systems, applications, and services.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-262, CWE-263, CWE-307, CWE-308, CWE-309, CWE-522, CWE-654
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0119 | prompt_cwes=[] | target_cwes=['CWE-327'] | target_words=1
+USER:
+Attack pattern title: Cryptanalysis of Cellular Encryption
+Summary: The use of cryptanalytic techniques to derive cryptographic keys or otherwise effectively defeat cellular encryption to reveal traffic content. Some cellular encryption algorithms such as A5/1 and A5/2 (specified for GSM use) are known to be vulnerable to such attacks and commercial tools are available to execute these attacks and decrypt mobile phone conversations in real-time. Newer encryption algorithms in use by UMTS and LTE are stronger and currently believed to be less vulnerable to these types of attacks. Note, however, that an attacker with a Cellular Rogue Base Station can force the use of weak cellular encryption even by newer mobile devices.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-327
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0123 | prompt_cwes=[] | target_cwes=['CWE-294', 'CWE-308', 'CWE-522', 'CWE-836'] | target_words=4
+USER:
+Attack pattern title: Use of Captured Hashes (Pass The Hash)
+Summary: An adversary obtains (i.e. steals or purchases) legitimate Windows domain credential hash values to access systems within the domain that leverage the Lan Man (LM) and/or NT Lan Man (NTLM) authentication protocols.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-294, CWE-308, CWE-522, CWE-836
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0127 | prompt_cwes=[] | target_cwes=['CWE-20', 'CWE-918'] | target_words=2
+USER:
+Attack pattern title: Server Side Request Forgery
+Summary: An adversary exploits improper input validation by submitting maliciously crafted input to a target application running on a server, with the goal of forcing the server to make a request either to itself, to web services running in the server’s internal network, or to external third parties. If successful, the adversary’s request will be made with the server’s privilege level, bypassing its authentication controls. This ultimately allows the adversary to access sensitive data, execute commands on the server’s network, and make external requests with the stolen identity of the server. Server Side Request Forgery attacks differ from Cross Site Request Forgery attacks in that they target the server itself, whereas CSRF attacks exploit an insecure user authentication mechanism to perform unauthorized actions on the user's behalf.
+
+Return the source-linked CWE identifier(s).
+
+ASSISTANT:
+CWE-20, CWE-918
+
+====================================================================================================
+SOURCE_REMEDIATION — TARGET STRUCTURE
+count=79
+min_words=9 max_words=87
+normalized_duplicate_target_groups=15
+dup_count=2 ids=['FR-CY-GROUND-0264', 'FR-CY-REMSTOP-G-0004']
+TARGET_NORM=implementation use a web server that employs a strict http parsing procedure, such as apache [ref-433].; implementation use only ssl communication.; implementation terminate the client session after each request.; system configuration turn all pages to non-cacheable.
+dup_count=2 ids=['FR-CY-GROUND-0260', 'FR-CY-REMSTOP-G-0002']
+TARGET_NORM=architecture and design language selection choose a language that provides automatic memory management.; implementation attack surface reduction when freeing pointers, be sure to set them to null once they are freed. however, the utilization of multiple or complex data structures may lower the usefulness of this strategy. defense in depth if a bug causes an attempted access of this pointer, then a null dereference could still lead to a crash or other unexpected behavior, but it will reduce or eliminate the risk of code execution.
+dup_count=2 ids=['FR-CY-GROUND-0236', 'FR-CY-REMSTOP-G-0007']
+TARGET_NORM=architecture and design libraries or frameworks use a vetted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid [ref-1482]. for example, use anti-csrf packages such as the owasp csrfguard. [ref-330] another example is the esapi session management control, which includes a component for csrf. [ref-45]
+dup_count=2 ids=['FR-CY-GROUND-0193', 'FR-CY-REMSTOP-G-0010']
+TARGET_NORM=architecture and design operation the architecture needs to access and modification attributes for files to only those users who actually require those actions. architecture and design separation of privilege compartmentalize the system to have "safe" areas where trust boundaries can be unambiguously drawn. do not allow sensitive data to go outside of the trust boundary and always be careful when interfacing with a compartment outside of the safe area.
+dup_count=2 ids=['FR-CY-GROUND-0185', 'FR-CY-REMSTOP-G-0012']
+TARGET_NORM=requirements ensure that all protocols are strictly defined, such that all out-of-bounds behavior can be identified simply, and require strict conformance to the protocol. requirements language selection use a language that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid. if possible, choose a language or compiler that performs automatic bounds checking.
+dup_count=2 ids=['FR-CY-GROUND-0181', 'FR-CY-GROUND-0133']
+TARGET_NORM=implementation input validation assume all input is malicious. use an "accept known good" input validation strategy, i.e., use a list of acceptable inputs that strictly conform to specifications. reject any input that does not strictly conform to specifications, or transform it into something that does.
+dup_count=2 ids=['FR-CY-GROUND-0173', 'FR-CY-GROUND-0326']
+TARGET_NORM=requirements language selection use a language that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid. for example, many languages that perform their own memory management, such as java and perl, are not subject to buffer overflows. other languages, such as ada and c#, typically provide overflow protection, but the protection can be disabled by the programmer.
+dup_count=2 ids=['FR-CY-GROUND-0117', 'FR-CY-REMSTOP-G-0003']
+TARGET_NORM=use of hardened baseband firmware on retransmission device to detect and prevent the use of weak cellular encryption.; monitor cellular rf interface to detect the usage of weaker-than-expected cellular encryption.
+dup_count=2 ids=['FR-CY-GROUND-0113', 'FR-CY-GROUND-0109']
+TARGET_NORM=leverage multi-factor authentication for all authentication services and prior to granting an entity access to the domain network. create a strong password policy and ensure that your system enforces this policy. ensure users are not reusing username/password combinations for multiple systems, applications, or services. do not reuse local administrator account credentials across systems. deny remote use of local admin credentials to log into domain systems. do not allow accounts to be a local administrator on more than one system.
+dup_count=2 ids=['FR-CY-GROUND-0094', 'FR-CY-REMSTOP-G-0005']
+TARGET_NORM=certification authorities need to stop using deprecated or cryptographically insecure hashing algorithms to hash the certificates that they are about to sign. instead they should be using stronger hashing functions such as sha-256 or sha-512.
+dup_count=2 ids=['FR-CY-GROUND-0086', 'FR-CY-REMSTOP-G-0006']
+TARGET_NORM=this attack may be mitigated by tweaking the xml parser to not resolve external entities. if external entities are needed, then implement a custom xmlresolver that has a request timeout, data retrieval limit, and restrict resources it can retrieve locally.; this attack may be mitigated by tweaking the serialized data parser to not resolve external entities. if external entities are needed, then implement a custom resolver that has a request timeout, data retrieval limit, and restrict resources it can retrieve locally.
+dup_count=2 ids=['FR-CY-GROUND-0082', 'FR-CY-REMSTOP-G-0009']
+TARGET_NORM=design: input validation. assume that user inputs are malicious. utilize strict type, character, and encoding enforcement implementation: perform input validation for all remote content, including remote and user-generated content. implementation: validate user input by only accepting known good. ensure all content that is delivered to client is sanitized against an acceptable content specification -- using an allowlist approach. implementation: prefer working without user input when using file system calls implementation: use indirect references rather than actual file names.
+dup_count=2 ids=['FR-CY-GROUND-0062', 'FR-CY-REMSTOP-G-0011']
+TARGET_NORM=ensure that server side code can differentiate between legitimate requests and forged requests. the solution is similar to protection against cross site request forger (csrf), which is to use a hard to guess random nonce (that is unique to the victim's session with the server) that the attacker has no way of knowing (at least in the absence of other weaknesses).
+dup_count=2 ids=['FR-CY-GROUND-0054', 'FR-CY-REMSTOP-G-0008']
+TARGET_NORM=use a language or compiler that performs automatic bounds checking. use secure functions not vulnerable to buffer overflow. if you have to use dangerous functions, make sure that you do boundary checking. compiler-based canary mechanisms such as stackguard, propolice and the microsoft visual studio /gs flag. unless this provides automatic bounds checking, it is not a complete solution. use os-level preventative functionality. not a complete solution.
+dup_count=2 ids=['FR-CY-GROUND-0002', 'FR-CY-REMSTOP-G-0001']
+TARGET_NORM=security by obscurity is not a solution to preventing sql injection. rather than suppress error messages and exceptions, the application must handle them gracefully, returning either a custom error page or redirecting the user to a default page, without revealing any information about the database or the application internals. strong input validation - all user-controllable input must be validated and filtered for illegal characters as well as sql content.
+
+LONGEST_AND_REPETITION_RISK_ROWS
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0248 | target_words=87 | repeated_5gram_excess=1 | max_5gram_count=2
+USER:
+Title: Time-of-check Time-of-use (TOCTOU) Race Condition
+Summary: The product checks the state of a resource before using that resource, but the resource's state can change between the check and the use in a way that invalidates the results of the check.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Implementation The most basic advice for TOCTOU vulnerabilities is to not perform a check before the use. This does not resolve the underlying issue of the execution of a function on a resource whose state and identity cannot be assured, but it does help to limit the false sense of security given by the check. Implementation When the file being altered is owned by the current user and group, set the effective gid and uid to that of the current user and group when executing this statement.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REMSTOP-G-0002 | target_words=85 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Use After Free
+Summary: The product reuses or references memory after it has been freed. At some point afterward, the memory may be allocated again and saved in another pointer, while the original pointer references a location somewhere within the new allocation. Any operations using the original pointer are no longer valid because the memory "belongs" to the code that operates on the new pointer.
+
+Return the source remediation guidance.
+
+Give only the most relevant source-supported remediation steps needed here. Do not repeat equivalent advice.
+
+ASSISTANT:
+Architecture and Design Language Selection Choose a language that provides automatic memory management.; Implementation Attack Surface Reduction When freeing pointers, be sure to set them to NULL once they are freed. However, the utilization of multiple or complex data structures may lower the usefulness of this strategy. Defense in Depth If a bug causes an attempted access of this pointer, then a NULL dereference could still lead to a crash or other unexpected behavior, but it will reduce or eliminate the risk of code execution.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0260 | target_words=85 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Use After Free
+Summary: The product reuses or references memory after it has been freed. At some point afterward, the memory may be allocated again and saved in another pointer, while the original pointer references a location somewhere within the new allocation. Any operations using the original pointer are no longer valid because the memory "belongs" to the code that operates on the new pointer.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design Language Selection Choose a language that provides automatic memory management.; Implementation Attack Surface Reduction When freeing pointers, be sure to set them to NULL once they are freed. However, the utilization of multiple or complex data structures may lower the usefulness of this strategy. Defense in Depth If a bug causes an attempted access of this pointer, then a NULL dereference could still lead to a crash or other unexpected behavior, but it will reduce or eliminate the risk of code execution.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0205 | target_words=83 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Missing Authentication for Critical Function
+Summary: The product does not perform any authentication for functionality that requires a provable user identity or consumes a significant amount of resources.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design Divide the software into anonymous, normal, privileged, and administrative areas. Identify which of these areas require a proven user identity, and use a centralized authentication capability. Identify all potential communication channels, or other means of interaction with the software, to ensure that all channels are appropriately protected, including those channels that are assumed to be accessible only by authorized parties. Developers sometimes perform authentication at the primary channel, but open up a secondary channel that is assumed to be private.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0026 | target_words=82 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Exploiting Multiple Input Interpretation Layers
+Summary: An attacker supplies the target software with input data that contains sequences of special characters designed to bypass input validation logic. This exploit relies on the target making multiples passes over the input data and processing a "layer" of special characters with each pass. In this manner, the attacker can disguise input that would otherwise be rejected as invalid by concealing it with layers of special/escape characters that are stripped off by subsequent processing steps. The goal is to first discover cases where the input validation layer executes before one or more parsing layers. That is, user input may go through the following logic in an application: <parser1> --> <input validator> --> <parser2>. In such cases, the attacker will need to provide input that will pass through the input validator, but after passing through parser2, will be converted into something that the input validator was supposed to stop.
+Vulnerable condition: User input is used to construct a command to be executed on the target system or as part of the file name.; Multiple parser passes are performed on the data supplied by the user.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+An iterative approach to input validation may be required to ensure that no dangerous characters are present. It may be necessary to implement redundant checking across different input validation layers. Ensure that invalid data is rejected as soon as possible and do not continue to work with it. Make sure to perform input validation on canonicalized data (i.e. data that is data in its most standard form). This will help avoid tricky encodings getting past the filters. Assume all input is malicious.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REMSTOP-G-0006 | target_words=81 | repeated_5gram_excess=31 | max_5gram_count=2
+USER:
+Title: Data Serialization External Entities Blowup
+Summary: This attack takes advantage of the entity replacement property of certain data serialization languages (e.g., XML, YAML, etc.) where the value of the replacement is a URI. A well-crafted file could have the entity refer to a URI that consumes a large amount of resources to create a denial of service condition. This can cause the system to either freeze, crash, or execute arbitrary code depending on the URI.
+Vulnerable condition: A server that has an implementation that accepts entities containing URI values.
+
+Return the source remediation guidance.
+
+Give only the most relevant source-supported remediation steps needed here. Do not repeat equivalent advice.
+
+ASSISTANT:
+This attack may be mitigated by tweaking the XML parser to not resolve external entities. If external entities are needed, then implement a custom XmlResolver that has a request timeout, data retrieval limit, and restrict resources it can retrieve locally.; This attack may be mitigated by tweaking the serialized data parser to not resolve external entities. If external entities are needed, then implement a custom resolver that has a request timeout, data retrieval limit, and restrict resources it can retrieve locally.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0086 | target_words=81 | repeated_5gram_excess=31 | max_5gram_count=2
+USER:
+Title: Data Serialization External Entities Blowup
+Summary: This attack takes advantage of the entity replacement property of certain data serialization languages (e.g., XML, YAML, etc.) where the value of the replacement is a URI. A well-crafted file could have the entity refer to a URI that consumes a large amount of resources to create a denial of service condition. This can cause the system to either freeze, crash, or execute arbitrary code depending on the URI.
+Vulnerable condition: A server that has an implementation that accepts entities containing URI values.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+This attack may be mitigated by tweaking the XML parser to not resolve external entities. If external entities are needed, then implement a custom XmlResolver that has a request timeout, data retrieval limit, and restrict resources it can retrieve locally.; This attack may be mitigated by tweaking the serialized data parser to not resolve external entities. If external entities are needed, then implement a custom resolver that has a request timeout, data retrieval limit, and restrict resources it can retrieve locally.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0042 | target_words=81 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Using Slashes in Alternate Encoding
+Summary: This attack targets the encoding of the Slash characters. An adversary would try to exploit common filtering problems related to the use of the slashes characters to gain access to resources on the target host. Directory-driven systems, such as file systems and databases, typically use the slash character to indicate traversal between directories or other container components. For murky historical reasons, PCs (and, as a result, Microsoft OSs) choose to use a backslash, whereas the UNIX world typically makes use of the forward slash. The schizophrenic result is that many MS-based systems are required to understand both forms of the slash. This gives the adversary many opportunities to discover and abuse a number of common filtering problems. The goal of this pattern is to discover server software that only applies filters to one version, but not the other.
+Vulnerable condition: The application server accepts paths to locate resources.; The application server does insufficient input data validation on the resource path requested by the user.; The access right to resources are not set properly.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Any security checks should occur after the data has been decoded and validated as correct data format. Do not repeat decoding process, if bad character are left after decoding process, treat the data as suspicious, and fail the validation process. Refer to the RFCs to safely decode URL. When client input is required from web-based forms, avoid using the "GET" method to submit data, as the method causes the form data to be appended to the URL and is easily manipulated.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0014 | target_words=80 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Leveraging Race Conditions via Symbolic Links
+Summary: This attack leverages the use of symbolic links (Symlinks) in order to write to sensitive files. An attacker can create a Symlink link to a target file not otherwise accessible to them. When the privileged program tries to create a temporary file with the same name as the Symlink link, it will actually write to the target file pointed to by the attackers' Symlink link. If the attacker can insert malicious content in the temporary file they will be writing to the sensitive file by using the Symlink. The race occurs because the system checks if the temporary file exists, then creates the file. The attacker would typically create the Symlink during the interval between the check and the creation of the temporary file.
+Vulnerable condition: The attacker is able to create Symlink links on the target host.; Tainted data from the attacker is used and copied to temporary files.; The target host does insecure temporary file creation.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Use safe libraries when creating temporary files. For instance the standard library function mkstemp can be used to safely create temporary files. For shell scripts, the system utility mktemp does the same thing. Access to the directories should be restricted as to prevent attackers from manipulating the files. Denying access to a file can prevent an attacker from replacing that file with a link to a sensitive file. Follow the principle of least privilege when assigning access rights to files.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0157 | target_words=79 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')
+Summary: The product constructs all or part of an OS command using externally-influenced input from an upstream component, but it does not neutralize or incorrectly neutralizes special elements that could modify the intended OS command when it is sent to a downstream component.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design If at all possible, use library calls rather than external processes to recreate the desired functionality. Architecture and Design Operation Sandbox or Jail Run the code in a "jail" or similar sandbox environment that enforces strict boundaries between the process and the operating system. This may effectively restrict which files can be accessed in a particular directory or which commands can be executed by the software. OS-level examples include the Unix chroot jail, AppArmor, and SELinux.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0153 | target_words=79 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Improper Neutralization of Special Elements used in a Command ('Command Injection')
+Summary: The product constructs all or part of a command using externally-influenced input from an upstream component, but it does not neutralize or incorrectly neutralizes special elements that could modify the intended command when it is sent to a downstream component.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design If at all possible, use library calls rather than external processes to recreate the desired functionality. Implementation If possible, ensure that all external commands called from the program are statically created. Implementation Input Validation Assume all input is malicious. Use an "accept known good" input validation strategy, i.e., use a list of acceptable inputs that strictly conform to specifications. Reject any input that does not strictly conform to specifications, or transform it into something that does.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0125 | target_words=79 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Server Side Request Forgery
+Summary: An adversary exploits improper input validation by submitting maliciously crafted input to a target application running on a server, with the goal of forcing the server to make a request either to itself, to web services running in the server’s internal network, or to external third parties. If successful, the adversary’s request will be made with the server’s privilege level, bypassing its authentication controls. This ultimately allows the adversary to access sensitive data, execute commands on the server’s network, and make external requests with the stolen identity of the server. Server Side Request Forgery attacks differ from Cross Site Request Forgery attacks in that they target the server itself, whereas CSRF attacks exploit an insecure user authentication mechanism to perform unauthorized actions on the user's behalf.
+Vulnerable condition: Server must be running a web application that processes HTTP requests.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Handling incoming requests securely is the first line of action to mitigate this vulnerability. This can be done through URL validation. Further down the process flow, examining the response and verifying that it is as expected before sending would be another way to secure the server. Allowlist the DNS name or IP address of every service the web application is required to access is another effective security measure. This ensures the server cannot make external requests to arbitrary services.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0113 | target_words=79 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Credential Stuffing
+Summary: An adversary tries known username/password combinations against different systems, applications, or services to gain additional authenticated access. Credential Stuffing attacks rely upon the fact that many users leverage the same username/password combination for multiple systems, applications, and services.
+Vulnerable condition: The system/application uses one factor password based authentication, SSO, and/or cloud-based authentication.; The system/application does not have a sound password policy that is being enforced.; The system/application does not implement an effective password throttling mechanism.; The adversary possesses a list of known user accounts and corresponding passwords that may exist on the target.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Leverage multi-factor authentication for all authentication services and prior to granting an entity access to the domain network. Create a strong password policy and ensure that your system enforces this policy. Ensure users are not reusing username/password combinations for multiple systems, applications, or services. Do not reuse local administrator account credentials across systems. Deny remote use of local admin credentials to log into domain systems. Do not allow accounts to be a local administrator on more than one system.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0109 | target_words=79 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Use of Known Domain Credentials
+Summary: An adversary guesses or obtains (i.e. steals or purchases) legitimate credentials (e.g. userID/password) to achieve authentication and to perform authorized actions under the guise of an authenticated user or service.
+Vulnerable condition: The system/application uses one factor password based authentication, SSO, and/or cloud-based authentication.; The system/application does not have a sound password policy that is being enforced.; The system/application does not implement an effective password throttling mechanism.; The adversary possesses a list of known user accounts and corresponding passwords that may exist on the target.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Leverage multi-factor authentication for all authentication services and prior to granting an entity access to the domain network. Create a strong password policy and ensure that your system enforces this policy. Ensure users are not reusing username/password combinations for multiple systems, applications, or services. Do not reuse local administrator account credentials across systems. Deny remote use of local admin credentials to log into domain systems. Do not allow accounts to be a local administrator on more than one system.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REMSTOP-G-0009 | target_words=78 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Relative Path Traversal
+Summary: An attacker exploits a weakness in input validation on the target by supplying a specially constructed path utilizing dot and slash characters for the purpose of obtaining access to arbitrary files or resources. An attacker modifies a known path on the target in order to reach material that is not available through intended channels. These attacks normally involve adding additional path separators (/ or \) and/or dots (.), or encodings thereof, in various combinations in order to reach parent directories or entirely separate trees of the target's directory structure.
+Vulnerable condition: The target application must accept a string as user input, fail to sanitize combinations of characters in the input that have a special meaning in the context of path navigation, and insert the user-supplied string into path navigation commands.
+
+Return the source remediation guidance.
+
+Give only the most relevant source-supported remediation steps needed here. Do not repeat equivalent advice.
+
+ASSISTANT:
+Design: Input validation. Assume that user inputs are malicious. Utilize strict type, character, and encoding enforcement Implementation: Perform input validation for all remote content, including remote and user-generated content. Implementation: Validate user input by only accepting known good. Ensure all content that is delivered to client is sanitized against an acceptable content specification -- using an allowlist approach. Implementation: Prefer working without user input when using file system calls Implementation: Use indirect references rather than actual file names.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0082 | target_words=78 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Relative Path Traversal
+Summary: An attacker exploits a weakness in input validation on the target by supplying a specially constructed path utilizing dot and slash characters for the purpose of obtaining access to arbitrary files or resources. An attacker modifies a known path on the target in order to reach material that is not available through intended channels. These attacks normally involve adding additional path separators (/ or \) and/or dots (.), or encodings thereof, in various combinations in order to reach parent directories or entirely separate trees of the target's directory structure.
+Vulnerable condition: The target application must accept a string as user input, fail to sanitize combinations of characters in the input that have a special meaning in the context of path navigation, and insert the user-supplied string into path navigation commands.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Design: Input validation. Assume that user inputs are malicious. Utilize strict type, character, and encoding enforcement Implementation: Perform input validation for all remote content, including remote and user-generated content. Implementation: Validate user input by only accepting known good. Ensure all content that is delivered to client is sanitized against an acceptable content specification -- using an allowlist approach. Implementation: Prefer working without user input when using file system calls Implementation: Use indirect references rather than actual file names.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0197 | target_words=77 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Improper Authorization
+Summary: The product does not perform or incorrectly performs an authorization check when an actor attempts to access a resource or perform an action.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design Divide the product into anonymous, normal, privileged, and administrative areas. Reduce the attack surface by carefully mapping roles with data and functionality. Use role-based access control (RBAC) to enforce the roles at the appropriate boundaries. Note that this approach may not protect against horizontal authorization, i.e., it will not protect a user from attacking others with the same role. Architecture and Design Ensure that you perform access control checks related to your business logic.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0058 | target_words=77 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Server Side Include (SSI) Injection
+Summary: An attacker can use Server Side Include (SSI) Injection to send code to a web application that then gets executed by the web server. Doing so enables the attacker to achieve similar results to Cross Site Scripting, viz., arbitrary code execution and information disclosure, albeit on a more limited scale, since the SSI directives are nowhere near as powerful as a full-fledged scripting language. Nonetheless, the attacker can conveniently gain access to sensitive files, such as password files, and execute shell commands.
+Vulnerable condition: A web server that supports server side includes and has them enabled; User controllable input that can carry include directives to the web server
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Set the OPTIONS IncludesNOEXEC in the global access.conf file or local .htaccess (Apache) file to deny SSI execution in directories that do not need them All user controllable input must be appropriately sanitized before use in the application. This includes omitting, or encoding, certain characters or strings that have the potential of being interpreted as part of an SSI directive Server Side Includes must be enabled only if there is a strong business reason to do so.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0310 | target_words=76 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Use of a One-Way Hash without a Salt
+Summary: The product uses a one-way cryptographic hash against an input that should not be reversible, such as a password, but the product does not also use a salt as part of the input.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design Use an adaptive hash function that can be configured to change the amount of computational effort needed to compute the hash, such as the number of iterations ("stretching") or the amount of memory required. Some hash functions perform salting automatically. These functions can significantly increase the overhead for a brute force attack compared to intentionally-fast functions such as MD5. For example, rainbow table attacks can become infeasible due to the high computing overhead.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0189 | target_words=75 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Execution with Unnecessary Privileges
+Summary: The product performs an operation at a privilege level that is higher than the minimum level required, which creates new weaknesses or amplifies the consequences of other weaknesses.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design Operation Environment Hardening Run your code using the lowest privileges that are required to accomplish the necessary tasks [REF-76]. If possible, create isolated accounts with limited privileges that are only used for a single task. That way, a successful attack will not immediately give the attacker access to the rest of the software or its environment. For example, database applications rarely need to run as the database administrator, especially in day-to-day operations.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0256 | target_words=74 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Improper Resource Shutdown or Release
+Summary: The product does not release or incorrectly releases a resource before it is made available for re-use.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Requirements Language Selection Use a language that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid. For example, languages such as Java, Ruby, and Lisp perform automatic garbage collection that releases memory for objects that have been deallocated. Implementation It is good practice to be responsible for freeing all resources you allocate and to be consistent with how and where you free memory in a function.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0229 | target_words=74 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Use of Insufficiently Random Values
+Summary: The product uses insufficiently random numbers or values in a security context that depends on unpredictable numbers.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design Use a well-vetted algorithm that is currently considered to be strong by experts in the field, and select well-tested implementations with adequate length seeds. In general, if a pseudo-random number generator is not advertised as being cryptographically secure, then it is probably a statistical PRNG and should not be used in security-sensitive contexts. Pseudo-random number generators can produce predictable numbers if the generator is known and the seed can be guessed.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0165 | target_words=73 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')
+Summary: The product constructs all or part of an SQL command using externally-influenced input from an upstream component, but it does not neutralize or incorrectly neutralizes special elements that could modify the intended SQL command when it is sent to a downstream component. Without sufficient removal or quoting of SQL syntax in user-controllable inputs, the generated SQL query can cause those inputs to be interpreted as SQL instead of ordinary user data.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design Libraries or Frameworks Use a vetted library or framework that does not allow this weakness to occur or provides constructs that make this weakness easier to avoid [REF-1482]. For example, consider using persistence layers such as Hibernate or Enterprise Java Beans, which can provide significant protection against SQL injection if used properly. Architecture and Design Parameterization If available, use structured mechanisms that automatically enforce the separation between data and code.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0038 | target_words=73 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Using Escaped Slashes in Alternate Encoding
+Summary: This attack targets the use of the backslash in alternate encoding. An adversary can provide a backslash as a leading character and causes a parser to believe that the next character is special. This is called an escape. By using that trick, the adversary tries to exploit alternate ways to encode the same character which leads to filter problems and opens avenues to attack.
+Vulnerable condition: The application accepts the backlash character as escape character.; The application server does incomplete input data decoding, filtering and validation.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Verify that the user-supplied data does not use backslash character to escape malicious characters. Assume all input is malicious. Create an allowlist that defines all valid input to the software system based on the requirements specifications. Input that does not match against the allowlist should not be permitted to enter into the system. Be aware of the threat of alternative method of data encoding. Regular expressions can be used to filter out backslash.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0066 | target_words=71 | repeated_5gram_excess=2 | max_5gram_count=2
+USER:
+Title: Buffer Manipulation
+Summary: An adversary manipulates an application's interaction with a buffer in an attempt to read or modify data they shouldn't have access to. Buffer attacks are distinguished in that it is the buffer space itself that is the target of the attack rather than any code responsible for interpreting the content of the buffer. In virtually all buffer attacks the content that is placed in the buffer is immaterial. Instead, most buffer attacks involve retrieving or providing more input than can be stored in the allocated buffer, resulting in the reading or overwriting of other unintended program memory.
+Vulnerable condition: The adversary must identify a programmatic means for interacting with a buffer, such as vulnerable C code, and be able to provide input to this interaction.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+To help protect an application from buffer manipulation attacks, a number of potential mitigations can be leveraged. Before starting the development of the application, consider using a code language (e.g., Java) or compiler that limits the ability of developers to act beyond the bounds of a buffer. If the chosen language is susceptible to buffer related issues (e.g., C) then consider using secure functions instead of those vulnerable to buffer manipulations.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0272 | target_words=71 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Deserialization of Untrusted Data
+Summary: The product deserializes untrusted data without sufficiently ensuring that the resulting data will be valid.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design Implementation If available, use the signing/sealing features of the programming language to assure that deserialized data has not been tainted. For example, a hash-based message authentication code (HMAC) could be used to ensure that data has not been modified. Implementation When deserializing data, populate a new object rather than just deserializing. The result is that the data flows through safe input validation and that the functions are safe.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0034 | target_words=70 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: String Format Overflow in syslog()
+Summary: This attack targets applications and software that uses the syslog() function insecurely. If an application does not explicitely use a format string parameter in a call to syslog(), user input can be placed in the format string parameter leading to a format string injection attack. Adversaries can then inject malicious format string commands into the function call leading to a buffer overflow. There are many reported software vulnerabilities with the root cause being a misuse of the syslog() function.
+Vulnerable condition: The Syslog function is used without specifying a format string argument, allowing user input to be placed direct into the function call as a format string.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+The code should be reviewed for misuse of the Syslog function call. Manual or automated code review can be used. The reviewer needs to ensure that all format string functions are passed a static string which cannot be controlled by the user and that the proper number of arguments are always sent to that function as well. If at all possible, do not use the %n operator in format strings.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REMSTOP-G-0010 | target_words=69 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Incorrect Default Permissions
+Summary: During installation, installed file permissions are set to allow anyone to modify those files.
+
+Return the source remediation guidance.
+
+Give only the most relevant source-supported remediation steps needed here. Do not repeat equivalent advice.
+
+ASSISTANT:
+Architecture and Design Operation The architecture needs to access and modification attributes for files to only those users who actually require those actions. Architecture and Design Separation of Privilege Compartmentalize the system to have "safe" areas where trust boundaries can be unambiguously drawn. Do not allow sensitive data to go outside of the trust boundary and always be careful when interfacing with a compartment outside of the safe area.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REMSTOP-G-0001 | target_words=69 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Blind SQL Injection
+Summary: Blind SQL Injection results from an insufficient mitigation for SQL Injection. Although suppressing database error messages are considered best practice, the suppression alone is not sufficient to prevent SQL Injection. Blind SQL Injection is a form of SQL Injection that overcomes the lack of error messages. Without the error messages that facilitate SQL Injection, the adversary constructs input strings that probe the target through simple Boolean SQL expressions. The adversary can determine if the syntax and structure of the injection was successful based on whether the query was executed or not. Applied iteratively, the adversary determines how and where the target is vulnerable to SQL Injection.
+Vulnerable condition: SQL queries used by the application to store, retrieve or modify data.; User-controllable input that is not properly validated by the application as part of SQL queries.
+
+Return the source remediation guidance.
+
+Give only the most relevant source-supported remediation steps needed here. Do not repeat equivalent advice.
+
+ASSISTANT:
+Security by Obscurity is not a solution to preventing SQL Injection. Rather than suppress error messages and exceptions, the application must handle them gracefully, returning either a custom error page or redirecting the user to a default page, without revealing any information about the database or the application internals. Strong input validation - All user-controllable input must be validated and filtered for illegal characters as well as SQL content.
+
+----------------------------------------------------------------------------------------------------
+FR-CY-GROUND-0193 | target_words=69 | repeated_5gram_excess=0 | max_5gram_count=1
+USER:
+Title: Incorrect Default Permissions
+Summary: During installation, installed file permissions are set to allow anyone to modify those files.
+
+Return the source remediation guidance.
+
+ASSISTANT:
+Architecture and Design Operation The architecture needs to access and modification attributes for files to only those users who actually require those actions. Architecture and Design Separation of Privilege Compartmentalize the system to have "safe" areas where trust boundaries can be unambiguously drawn. Do not allow sensitive data to go outside of the trust boundary and always be careful when interfacing with a compartment outside of the safe area.
+
+====================================================================================================
+REGRESSION_TEST — ALL TRAIN-SIDE ROWS
+count=36
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0001 | target_words=18
+USER:
+A defensive patch has this verified security invariant:
+The SVG sanitizer compared an expected attribute value with a DOM attribute value without normalizing surrounding whitespace. A crafted SVG animate attribute could therefore evade the intended attribute check and preserve a script-capable value.
+
+Patch behavior:
+The change trims the DOM attribute value before the case-insensitive comparison, so whitespace differences no longer bypass the sanitizer's attribute matching. The added washer test verifies that the crafted animate case is blocked.
+
+Give a minimal regression-test plan. Return only 2–3 observable checks; do not reconstruct repository code or invent APIs.
+
+ASSISTANT:
+- SVG animate attributes whose attributeName contains trailing whitespace
+- Sanitized output must block the unsafe animate element
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0002 | target_words=23
+USER:
+Based only on this source-reviewed defensive fix, what regression tests should be added?
+
+Root cause:
+The SVG sanitizer did not consistently canonicalize attribute names and namespace-qualified values before deciding whether an animate target was safe. Namespace prefixes and whitespace could make semantically equivalent dangerous attributes compare differently.
+
+Fix:
+The patch lowercases, trims, and removes namespace prefixes before comparing attribute names and values. This makes the sanitizer evaluate the canonical attribute name rather than a parser-specific representation, and new tests cover namespace-qualified animate cases.
+
+Answer with concise behavior-level assertions only.
+
+ASSISTANT:
+- Namespace-qualified SVG animate attribute names
+- Whitespace and parser-normalization variants of SVG attributeName
+- Unsafe animate elements must be removed after canonicalization
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0003 | target_words=27
+USER:
+Design focused regression checks for the following verified patch. Keep the answer short and test observable behavior rather than writing a full source file.
+
+Problem:
+SVG data-URI media types were inspected before whitespace normalization. Whitespace embedded in the media type could prevent the sanitizer from recognizing the content as SVG and applying the SVG-specific sanitization path.
+
+Remediation:
+The media-type portion is normalized by removing whitespace before SVG and base64 checks. This ensures equivalent media-type spellings follow the same SVG sanitization path. Added tests cover spaces, newlines, and tabs in the media type.
+
+ASSISTANT:
+- SVG data-URI media types containing spaces
+- SVG data-URI media types containing newlines or tabs
+- Normalized SVG data URIs must still pass through SVG sanitization
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0004 | target_words=24
+USER:
+A defensive patch has this verified security invariant:
+The GeoJSON retrieval path accepted locations without applying the same URL/location validation everywhere and the endpoint lacked an explicit superuser gate, allowing unsafe location handling outside the intended trust boundary.
+
+Patch behavior:
+The patch centralizes GeoJSON location validation, rejects invalid decoded locations before retrieval, and adds an explicit superuser check. The tests verify rejection of an invalid file-style location and denial to a non-admin user.
+
+Give a minimal regression-test plan. Return only 2–3 observable checks; do not reconstruct repository code or invent APIs.
+
+ASSISTANT:
+- Reject unsupported GeoJSON location schemes
+- Only authorized administrators can invoke the GeoJSON retrieval endpoint
+- Valid approved GeoJSON locations continue to work
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0005 | target_words=28
+USER:
+Based only on this source-reviewed defensive fix, what regression tests should be added?
+
+Root cause:
+A plugin asset path influenced by the request could be cleaned and joined in a way that still allowed traversal outside the plugin directory. Security checks were being applied to a path representation that was not safely anchored to a root.
+
+Fix:
+The requested path is normalized relative to an explicit root, converted to a relative path, and joined to the absolute plugin directory. Signature checks use the normalized relative path. Tests exercise relative-path handling.
+
+Answer with concise behavior-level assertions only.
+
+ASSISTANT:
+- Traversal components cannot escape the plugin directory
+- Normalized relative plugin paths still resolve correctly
+- Signature checks use the same canonical path representation as file access
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0006 | target_words=24
+USER:
+Design focused regression checks for the following verified patch. Keep the answer short and test observable behavior rather than writing a full source file.
+
+Problem:
+A public flow-build endpoint accepted caller-supplied flow data even though public execution should use the stored flow definition. This let an unauthenticated caller cross the intended public-flow trust boundary by changing executable flow content.
+
+Remediation:
+The public endpoint no longer accepts the supplied flow definition for execution and explicitly passes data=None, forcing execution to load the stored flow definition. A security test verifies that supplied data does not alter the public flow behavior.
+
+ASSISTANT:
+- Public flow execution ignores caller-supplied flow-definition data
+- Public flow execution uses the stored flow definition
+- Legitimate public flow execution remains functional
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0007 | target_words=22
+USER:
+A defensive patch has this verified security invariant:
+The terminal WebSocket route did not perform the authentication validation used by protected server routes, allowing a connection to reach terminal functionality before the user's identity was established.
+
+Patch behavior:
+The WebSocket handler now validates authentication when authentication is enabled and closes unauthorized connections before terminal setup. Tests verify both missing and incorrect credentials are rejected.
+
+Give a minimal regression-test plan. Return only 2–3 observable checks; do not reconstruct repository code or invent APIs.
+
+ASSISTANT:
+- Unauthenticated terminal WebSocket connections are rejected
+- Invalid terminal access tokens are rejected
+- Authorized terminal WebSocket connections continue to work
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0008 | target_words=23
+USER:
+Based only on this source-reviewed defensive fix, what regression tests should be added?
+
+Root cause:
+The SSH server could process connection-protocol messages while the server-side SSH state was still unauthenticated. Messages reserved for post-authentication protocols therefore crossed the authentication state boundary too early.
+
+Fix:
+A server-side handler now detects any such connection message while authenticated=False and terminates the connection with a protocol error. The accompanying protocol test verifies that early connection messages cause disconnect rather than further processing.
+
+Answer with concise behavior-level assertions only.
+
+ASSISTANT:
+- Post-authentication SSH connection messages are rejected before authentication completes
+- Normal authenticated connection-protocol messages remain accepted
+- Protocol disconnect behavior is stable
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0009 | target_words=20
+USER:
+Design focused regression checks for the following verified patch. Keep the answer short and test observable behavior rather than writing a full source file.
+
+Problem:
+The raw-mode echo path in n_tty_write accessed shared line-discipline output state without the output lock, allowing concurrent read/write activity to race and corrupt state.
+
+Remediation:
+The patch acquires the line discipline output mutex around the echo operation in the affected raw-mode path, serializing access to the shared output state that previously raced.
+
+ASSISTANT:
+- Concurrent raw-mode echo/read/write operations must not corrupt line-discipline state
+- The affected path remains functional under repeated concurrency stress
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0010 | target_words=24
+USER:
+A defensive patch has this verified security invariant:
+VP8 encoder allocations are established using the initial threading configuration, but runtime configuration changes could later alter the thread count without rebuilding the corresponding allocation layout.
+
+Patch behavior:
+Once the encoder has been initialized, the patch preserves the original multi-threaded setting instead of allowing a thread-count transition that the existing allocation lifecycle cannot safely accommodate. The related test gating is updated accordingly.
+
+Give a minimal regression-test plan. Return only 2–3 observable checks; do not reconstruct repository code or invent APIs.
+
+ASSISTANT:
+- Changing encoder configuration after initialization must not alter unsupported VP8 thread-count state
+- Resolution changes with a stable VP8 thread configuration remain safe
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0011 | target_words=21
+USER:
+Based only on this source-reviewed defensive fix, what regression tests should be added?
+
+Root cause:
+ALSA control element lookup and callback use were not protected for the full lifetime needed by the affected read path, allowing the control object to be removed concurrently and then used after free.
+
+Fix:
+The patch moves acquisition of controls_rwsem into the element-read operation and funnels error exits through a common unlock path, keeping lookup and subsequent access within the same protected critical section.
+
+Answer with concise behavior-level assertions only.
+
+ASSISTANT:
+- Concurrent removal and element-read operations must not access a freed control object
+- All error paths release controls_rwsem exactly once
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0012 | target_words=25
+USER:
+Design focused regression checks for the following verified patch. Keep the answer short and test observable behavior rather than writing a full source file.
+
+Problem:
+Repository file-update operations could traverse a path hierarchy containing symbolic links, so a repository-relative file operation could ultimately touch a location outside the intended repository work tree.
+
+Remediation:
+The patch walks each component of both old and new tree paths and rejects the update if any component is a symlink before performing the file update. This enforces a no-symlink invariant at the filesystem boundary.
+
+ASSISTANT:
+- Reject updates when any path component is a symlink
+- Check both source and destination tree names
+- Ordinary in-repository file updates remain functional
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0013 | target_words=22
+USER:
+A defensive patch has this verified security invariant:
+The get_user_pages write path reused FOLL_WRITE state in a racy way around copy-on-write handling, allowing a forced write path to treat a read-only mapping as writable without proving that the required COW state was still valid.
+
+Patch behavior:
+The patch introduces a distinct internal FOLL_COW state and permits forced following of a non-writable PTE only when a COW cycle has occurred and the PTE is dirty. This replaces the previous ambiguous mutation of FOLL_WRITE with an explicit state invariant.
+
+Give a minimal regression-test plan. Return only 2–3 observable checks; do not reconstruct repository code or invent APIs.
+
+ASSISTANT:
+- Forced writes to read-only mappings require a completed valid COW state
+- Concurrent COW/write activity cannot reuse stale write permission state
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0014 | target_words=26
+USER:
+Based only on this source-reviewed defensive fix, what regression tests should be added?
+
+Root cause:
+The static-route fast path could accept request paths containing route metacharacters and invoke handlers without normal parameter extraction, leaving snapshot key parameters empty.
+
+Fix:
+The fast path is skipped when the request path contains route metacharacters, forcing normal parameterized matching. Snapshot handlers also reject an empty key, adding defense in depth at the data-access boundary.
+
+Answer with concise behavior-level assertions only.
+
+ASSISTANT:
+- Literal route-metacharacter paths must not enter the static fast path
+- Snapshot handlers reject empty keys
+- Normal parameterized snapshot routes continue to resolve correctly
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0015 | target_words=27
+USER:
+Design focused regression checks for the following verified patch. Keep the answer short and test observable behavior rather than writing a full source file.
+
+Problem:
+The HTTP/2 implementation did not enforce a bounded rate of reset frames, allowing a peer to repeatedly create and reset streams fast enough to consume server-side resources.
+
+Remediation:
+The patch adds a decoder/listener layer that counts reset frames over a configured time window and closes the connection when the allowed rate is exceeded. Builder integration and dedicated tests make the limit part of normal HTTP/2 decoder construction.
+
+ASSISTANT:
+- Connections exceeding the configured reset-frame rate are terminated
+- Reset counters roll over correctly between time windows
+- Ordinary reset traffic below the threshold remains accepted
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0016 | target_words=18
+USER:
+A defensive patch has this verified security invariant:
+The development-server endpoint passed a caller-controlled URL to an OS URL-opening facility without first restricting the URL to network schemes that are appropriate for the endpoint.
+
+Patch behavior:
+The input is parsed as a URL and processing stops unless the protocol is HTTP or HTTPS. Invalid URLs are rejected before the value reaches the OS-opening function, closing the unsafe protocol boundary shown by the patch.
+
+Give a minimal regression-test plan. Return only 2–3 observable checks; do not reconstruct repository code or invent APIs.
+
+ASSISTANT:
+- Reject malformed URL input
+- Reject non-HTTP/HTTPS URL schemes
+- Continue opening valid HTTP and HTTPS URLs
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0017 | target_words=28
+USER:
+Based only on this source-reviewed defensive fix, what regression tests should be added?
+
+Root cause:
+Authentication and role checks were coupled to a shared page header rather than being enforced immediately after bootstrap in each data-processing entry point. Direct requests could therefore reach sensitive page logic before the intended session gate.
+
+Fix:
+The patch creates a single log_in_required helper that performs both login and role checks and invokes it directly after bootstrap across sensitive entry points, including options.php, before request data is processed.
+
+Answer with concise behavior-level assertions only.
+
+ASSISTANT:
+- Direct requests to protected entry points require an active session
+- Role restrictions are enforced before processing POST/GET data
+- Authorized users retain access to permitted pages
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGF-0018 | target_words=29
+USER:
+Design focused regression checks for the following verified patch. Keep the answer short and test observable behavior rather than writing a full source file.
+
+Problem:
+Client-address derivation trusted a broad fixed set of proxy-style request headers; the patch makes proxy-header use configurable, restricts configured values to a known allowlist, and ensures REMOTE_ADDR remains included.
+
+Remediation:
+The patch centralizes the set of allowed proxy headers, makes use of proxy-derived client addresses configurable, intersects configured headers with a known allowlist, and always preserves REMOTE_ADDR. This narrows which request metadata can influence the authorization identity.
+
+ASSISTANT:
+- Unconfigured proxy headers must not override the client identity
+- REMOTE_ADDR remains available as the baseline client address
+- Configured proxy-header use is restricted to the known allowlist
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0001 | target_words=18
+USER:
+A defensive patch has this verified security invariant:
+The SVG sanitizer compared an expected attribute value with a DOM attribute value without normalizing surrounding whitespace. A crafted SVG animate attribute could therefore evade the intended attribute check and preserve a script-capable value.
+
+Patch behavior:
+The change trims the DOM attribute value before the case-insensitive comparison, so whitespace differences no longer bypass the sanitizer's attribute matching. The added washer test verifies that the crafted animate case is blocked.
+
+What regression behavior should be checked so this fix does not regress?
+
+ASSISTANT:
+- SVG animate attributes whose attributeName contains trailing whitespace
+- Sanitized output must block the unsafe animate element
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0002 | target_words=23
+USER:
+For this verified defensive fix, which regression behaviors are most important to check?
+
+Root cause:
+The SVG sanitizer did not consistently canonicalize attribute names and namespace-qualified values before deciding whether an animate target was safe. Namespace prefixes and whitespace could make semantically equivalent dangerous attributes compare differently.
+
+Fix:
+The patch lowercases, trims, and removes namespace prefixes before comparing attribute names and values. This makes the sanitizer evaluate the canonical attribute name rather than a parser-specific representation, and new tests cover namespace-qualified animate cases.
+
+Give the most important regression checks.
+
+ASSISTANT:
+- Namespace-qualified SVG animate attribute names
+- Whitespace and parser-normalization variants of SVG attributeName
+- Unsafe animate elements must be removed after canonicalization
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0003 | target_words=27
+USER:
+What regression behavior should be covered for the following verified defensive patch?
+
+Problem:
+SVG data-URI media types were inspected before whitespace normalization. Whitespace embedded in the media type could prevent the sanitizer from recognizing the content as SVG and applying the SVG-specific sanitization path.
+
+Remediation:
+The media-type portion is normalized by removing whitespace before SVG and base64 checks. This ensures equivalent media-type spellings follow the same SVG sanitization path. Added tests cover spaces, newlines, and tabs in the media type.
+
+ASSISTANT:
+- SVG data-URI media types containing spaces
+- SVG data-URI media types containing newlines or tabs
+- Normalized SVG data URIs must still pass through SVG sanitization
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0004 | target_words=24
+USER:
+A defensive patch has this verified security invariant:
+The GeoJSON retrieval path accepted locations without applying the same URL/location validation everywhere and the endpoint lacked an explicit superuser gate, allowing unsafe location handling outside the intended trust boundary.
+
+Patch behavior:
+The patch centralizes GeoJSON location validation, rejects invalid decoded locations before retrieval, and adds an explicit superuser check. The tests verify rejection of an invalid file-style location and denial to a non-admin user.
+
+What regression behavior should be checked so this fix does not regress?
+
+ASSISTANT:
+- Reject unsupported GeoJSON location schemes
+- Only authorized administrators can invoke the GeoJSON retrieval endpoint
+- Valid approved GeoJSON locations continue to work
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0005 | target_words=28
+USER:
+For this verified defensive fix, which regression behaviors are most important to check?
+
+Root cause:
+A plugin asset path influenced by the request could be cleaned and joined in a way that still allowed traversal outside the plugin directory. Security checks were being applied to a path representation that was not safely anchored to a root.
+
+Fix:
+The requested path is normalized relative to an explicit root, converted to a relative path, and joined to the absolute plugin directory. Signature checks use the normalized relative path. Tests exercise relative-path handling.
+
+Give the most important regression checks.
+
+ASSISTANT:
+- Traversal components cannot escape the plugin directory
+- Normalized relative plugin paths still resolve correctly
+- Signature checks use the same canonical path representation as file access
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0006 | target_words=24
+USER:
+What regression behavior should be covered for the following verified defensive patch?
+
+Problem:
+A public flow-build endpoint accepted caller-supplied flow data even though public execution should use the stored flow definition. This let an unauthenticated caller cross the intended public-flow trust boundary by changing executable flow content.
+
+Remediation:
+The public endpoint no longer accepts the supplied flow definition for execution and explicitly passes data=None, forcing execution to load the stored flow definition. A security test verifies that supplied data does not alter the public flow behavior.
+
+ASSISTANT:
+- Public flow execution ignores caller-supplied flow-definition data
+- Public flow execution uses the stored flow definition
+- Legitimate public flow execution remains functional
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0007 | target_words=22
+USER:
+A defensive patch has this verified security invariant:
+The terminal WebSocket route did not perform the authentication validation used by protected server routes, allowing a connection to reach terminal functionality before the user's identity was established.
+
+Patch behavior:
+The WebSocket handler now validates authentication when authentication is enabled and closes unauthorized connections before terminal setup. Tests verify both missing and incorrect credentials are rejected.
+
+What regression behavior should be checked so this fix does not regress?
+
+ASSISTANT:
+- Unauthenticated terminal WebSocket connections are rejected
+- Invalid terminal access tokens are rejected
+- Authorized terminal WebSocket connections continue to work
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0008 | target_words=23
+USER:
+For this verified defensive fix, which regression behaviors are most important to check?
+
+Root cause:
+The SSH server could process connection-protocol messages while the server-side SSH state was still unauthenticated. Messages reserved for post-authentication protocols therefore crossed the authentication state boundary too early.
+
+Fix:
+A server-side handler now detects any such connection message while authenticated=False and terminates the connection with a protocol error. The accompanying protocol test verifies that early connection messages cause disconnect rather than further processing.
+
+Give the most important regression checks.
+
+ASSISTANT:
+- Post-authentication SSH connection messages are rejected before authentication completes
+- Normal authenticated connection-protocol messages remain accepted
+- Protocol disconnect behavior is stable
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0009 | target_words=20
+USER:
+What regression behavior should be covered for the following verified defensive patch?
+
+Problem:
+The raw-mode echo path in n_tty_write accessed shared line-discipline output state without the output lock, allowing concurrent read/write activity to race and corrupt state.
+
+Remediation:
+The patch acquires the line discipline output mutex around the echo operation in the affected raw-mode path, serializing access to the shared output state that previously raced.
+
+ASSISTANT:
+- Concurrent raw-mode echo/read/write operations must not corrupt line-discipline state
+- The affected path remains functional under repeated concurrency stress
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0010 | target_words=24
+USER:
+A defensive patch has this verified security invariant:
+VP8 encoder allocations are established using the initial threading configuration, but runtime configuration changes could later alter the thread count without rebuilding the corresponding allocation layout.
+
+Patch behavior:
+Once the encoder has been initialized, the patch preserves the original multi-threaded setting instead of allowing a thread-count transition that the existing allocation lifecycle cannot safely accommodate. The related test gating is updated accordingly.
+
+What regression behavior should be checked so this fix does not regress?
+
+ASSISTANT:
+- Changing encoder configuration after initialization must not alter unsupported VP8 thread-count state
+- Resolution changes with a stable VP8 thread configuration remain safe
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0011 | target_words=21
+USER:
+For this verified defensive fix, which regression behaviors are most important to check?
+
+Root cause:
+ALSA control element lookup and callback use were not protected for the full lifetime needed by the affected read path, allowing the control object to be removed concurrently and then used after free.
+
+Fix:
+The patch moves acquisition of controls_rwsem into the element-read operation and funnels error exits through a common unlock path, keeping lookup and subsequent access within the same protected critical section.
+
+Give the most important regression checks.
+
+ASSISTANT:
+- Concurrent removal and element-read operations must not access a freed control object
+- All error paths release controls_rwsem exactly once
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0012 | target_words=25
+USER:
+What regression behavior should be covered for the following verified defensive patch?
+
+Problem:
+Repository file-update operations could traverse a path hierarchy containing symbolic links, so a repository-relative file operation could ultimately touch a location outside the intended repository work tree.
+
+Remediation:
+The patch walks each component of both old and new tree paths and rejects the update if any component is a symlink before performing the file update. This enforces a no-symlink invariant at the filesystem boundary.
+
+ASSISTANT:
+- Reject updates when any path component is a symlink
+- Check both source and destination tree names
+- Ordinary in-repository file updates remain functional
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0013 | target_words=22
+USER:
+A defensive patch has this verified security invariant:
+The get_user_pages write path reused FOLL_WRITE state in a racy way around copy-on-write handling, allowing a forced write path to treat a read-only mapping as writable without proving that the required COW state was still valid.
+
+Patch behavior:
+The patch introduces a distinct internal FOLL_COW state and permits forced following of a non-writable PTE only when a COW cycle has occurred and the PTE is dirty. This replaces the previous ambiguous mutation of FOLL_WRITE with an explicit state invariant.
+
+What regression behavior should be checked so this fix does not regress?
+
+ASSISTANT:
+- Forced writes to read-only mappings require a completed valid COW state
+- Concurrent COW/write activity cannot reuse stale write permission state
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0014 | target_words=26
+USER:
+For this verified defensive fix, which regression behaviors are most important to check?
+
+Root cause:
+The static-route fast path could accept request paths containing route metacharacters and invoke handlers without normal parameter extraction, leaving snapshot key parameters empty.
+
+Fix:
+The fast path is skipped when the request path contains route metacharacters, forcing normal parameterized matching. Snapshot handlers also reject an empty key, adding defense in depth at the data-access boundary.
+
+Give the most important regression checks.
+
+ASSISTANT:
+- Literal route-metacharacter paths must not enter the static fast path
+- Snapshot handlers reject empty keys
+- Normal parameterized snapshot routes continue to resolve correctly
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0015 | target_words=27
+USER:
+What regression behavior should be covered for the following verified defensive patch?
+
+Problem:
+The HTTP/2 implementation did not enforce a bounded rate of reset frames, allowing a peer to repeatedly create and reset streams fast enough to consume server-side resources.
+
+Remediation:
+The patch adds a decoder/listener layer that counts reset frames over a configured time window and closes the connection when the allowed rate is exceeded. Builder integration and dedicated tests make the limit part of normal HTTP/2 decoder construction.
+
+ASSISTANT:
+- Connections exceeding the configured reset-frame rate are terminated
+- Reset counters roll over correctly between time windows
+- Ordinary reset traffic below the threshold remains accepted
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0016 | target_words=18
+USER:
+A defensive patch has this verified security invariant:
+The development-server endpoint passed a caller-controlled URL to an OS URL-opening facility without first restricting the URL to network schemes that are appropriate for the endpoint.
+
+Patch behavior:
+The input is parsed as a URL and processing stops unless the protocol is HTTP or HTTPS. Invalid URLs are rejected before the value reaches the OS-opening function, closing the unsafe protocol boundary shown by the patch.
+
+What regression behavior should be checked so this fix does not regress?
+
+ASSISTANT:
+- Reject malformed URL input
+- Reject non-HTTP/HTTPS URL schemes
+- Continue opening valid HTTP and HTTPS URLs
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0017 | target_words=28
+USER:
+For this verified defensive fix, which regression behaviors are most important to check?
+
+Root cause:
+Authentication and role checks were coupled to a shared page header rather than being enforced immediately after bootstrap in each data-processing entry point. Direct requests could therefore reach sensitive page logic before the intended session gate.
+
+Fix:
+The patch creates a single log_in_required helper that performs both login and role checks and invokes it directly after bootstrap across sensitive entry points, including options.php, before request data is processed.
+
+Give the most important regression checks.
+
+ASSISTANT:
+- Direct requests to protected entry points require an active session
+- Role restrictions are enforced before processing POST/GET data
+- Authorized users retain access to permitted pages
+
+----------------------------------------------------------------------------------------------------
+FR-CY-REGG-0018 | target_words=29
+USER:
+What regression behavior should be covered for the following verified defensive patch?
+
+Problem:
+Client-address derivation trusted a broad fixed set of proxy-style request headers; the patch makes proxy-header use configurable, restricts configured values to a known allowlist, and ensures REMOTE_ADDR remains included.
+
+Remediation:
+The patch centralizes the set of allowed proxy headers, makes use of proxy-derived client addresses configurable, intersects configured headers with a known allowlist, and always preserves REMOTE_ADDR. This narrows which request metadata can influence the authorization identity.
+
+ASSISTANT:
+- Unconfigured proxy headers must not override the client identity
+- REMOTE_ADDR remains available as the baseline client address
+- Configured proxy-header use is restricted to the known allowlist
+
+====================================================================================================
+PATCH_REPAIR — TARGET GROUP CONCENTRATION
+count=75
+target_group_count=2 ids=['FR-CY-SFT-0129', 'FR-CY-PATCHSTOP-G-0009']
+TARGET_NORM=assert(hdr != null); webpsafefree(hdr->huffman_image_); vp8lhuffmantablesdeallocate(&hdr->huffman_tables_); vp8lhtreegroupsfree(hdr->htree_groups_); vp8lcolorcacheclear(&hdr->color_cache_); vp8lcolorcacheclear(&hdr->saved_color_cache_);
+
+target_group_count=2 ids=['FR-CY-SFT-0122', 'FR-CY-PATCHSTOP-G-0011']
+TARGET_NORM=cacti_log("login: guest user '" . $user['username'] . "' in use", false, 'auth'); } $client_addr = get_client_addr(); db_execute_prepared( 'insert ignore into user_log
+
+target_group_count=2 ids=['FR-CY-SFT-0114', 'FR-CY-SFT-0113']
+TARGET_NORM=*/ $allowed_levels = array(9, 8); require_once 'bootstrap.php'; log_in_required($allowed_levels); $active_nav = 'groups';
+
+target_group_count=2 ids=['FR-CY-SFT-0112', 'FR-CY-SFT-0111']
+TARGET_NORM=*/ $allowed_levels = array(9); require_once 'bootstrap.php'; log_in_required($allowed_levels); $active_nav = 'users';
+
+target_group_count=2 ids=['FR-CY-SFT-0098', 'FR-CY-PATCHSTOP-G-0004']
+TARGET_NORM=private boolean autoackpingframe = true; private int maxqueuedcontrolframes = http2codecutil.default_max_queued_control_frames; private int maxconsecutiveemptyframes = 2; private int maxrstframesperwindow = 200; private int secondsperwindow = 30; /** * sets the {@link http2settings} to use for the initial connection settings exchange.
+
+target_group_count=2 ids=['FR-CY-SFT-0095', 'FR-CY-PATCHSTOP-G-0012']
+TARGET_NORM=r->status = p->forced_responsecode; } return rule_rc_nosub; } /* now adjust api's knowledge about r->filename and r->args */
+
+target_group_count=2 ids=['FR-CY-SFT-0083', 'FR-CY-PATCHSTOP-G-0007']
+TARGET_NORM=// get /api/snapshots/:key func getdashboardsnapshot(c *models.reqcontext) response.response { key := c.params(":key") if len(key) == 0 { return response.error(404, "snapshot not found", nil) } query := &models.getdashboardsnapshotquery{key: key} err := bus.dispatch(query)
+
+target_group_count=2 ids=['FR-CY-SFT-0078', 'FR-CY-PATCHSTOP-G-0008']
+TARGET_NORM=} if ((flags & foll_numa) && pte_protnone(pte)) goto no_page; if ((flags & foll_write) && !can_follow_write_pte(pte, flags)) { pte_unmap_unlock(ptep, ptl); return null; }
+
+target_group_count=2 ids=['FR-CY-SFT-0074', 'FR-CY-PATCHSTOP-G-0010']
+TARGET_NORM=return !f.isdir() } // isdir returns true if given path is a directory following any symlinks, and // returns false when it's a file or does not exist. func isdir(dir string) bool { f, e := os.stat(dir) if e != nil {
+
+target_group_count=2 ids=['FR-CY-SFT-0069', 'FR-CY-PATCHSTOP-G-0006']
+TARGET_NORM=/* $openbsd: smtp_session.c,v 1.422 2020/01/28 21:35:00 gilles exp $ */ /* * copyright (c) 2008 gilles chehade <gilles@poolp.org>
+
+target_group_count=2 ids=['FR-CY-SFT-0067', 'FR-CY-PATCHSTOP-G-0005']
+TARGET_NORM=ret = kctl->get(kctl, control); snd_power_unref(card); if (ret < 0) goto unlock; if (!snd_ctl_skip_validation(&info) && sanity_check_elem_value(card, control, &info, pattern) < 0) { dev_err(card->dev,
+
+target_group_count=2 ids=['FR-CY-SFT-0028', 'FR-CY-PATCHSTOP-G-0002']
+TARGET_NORM=flow_id: uuid of the public flow to build background_tasks: background tasks manager inputs: optional input values for the flow files: optional files to include stop_component_id: optional id of component to stop at start_component_id: optional id of component to start from
+
+target_group_count=2 ids=['FR-CY-SFT-0017', 'FR-CY-PATCHSTOP-G-0003']
+TARGET_NORM=(s/validate customgeojson geojson) (catch throwable e (throw (ex-info (tru "invalid custom geojson") {:status-code 400} e)))) (or (valid-geojson-urls? geojson) (throw (ex-info (invalid-location-msg) {:status-code 400})))) (defsetting custom-geojson
+
+target_group_count=2 ids=['FR-CY-SFT-0001', 'FR-CY-PATCHSTOP-G-0001']
+TARGET_NORM=foreach ($node->attributes as $name => $attr) { if (strtolower($name) === $attr_name) { if (strtolower($attr_value) === strtolower(trim($attr->nodevalue))) { return true; } }
+
+target_group_count=1 ids=['FR-CY-SFT-0128']
+TARGET_NORM=uint32_t* huffman_image_; int num_htree_groups_; htreegroup* htree_groups_; huffmantables huffman_tables_; } vp8lmetadata; typedef struct vp8ldecoder vp8ldecoder;
+
+target_group_count=1 ids=['FR-CY-SFT-0127']
+TARGET_NORM=if (dec == null) return 0; assert(dec->hdr_.huffman_tables_.root.start != null); assert(dec->hdr_.htree_groups_ != null); assert(dec->hdr_.num_htree_groups_ > 0);
+
+target_group_count=1 ids=['FR-CY-SFT-0126']
+TARGET_NORM=ok = 1; end: vp8lhuffmantablesdeallocate(&tables); if (!ok) return vp8lseterror(dec, vp8_status_bitstream_error); return ok; }
+
+target_group_count=1 ids=['FR-CY-SFT-0119']
+TARGET_NORM=(user_id, hostname, last_update, token) values (?, ?, now(), ?);', array($user['id'], get_client_addr(), $secret)); cacti_cookie_session_set($user['id'], $user['realm'], $nssecret); }
+
+target_group_count=1 ids=['FR-CY-SFT-0118']
+TARGET_NORM=(username, user_id, result, ip, time) values (?, ?, 2, ?, now())', array($user_info['username'], $user_info['id'], get_client_addr()) ); return $user_info['id'];
+
+target_group_count=1 ids=['FR-CY-SFT-0117']
+TARGET_NORM=); } $allowed_proxy_headers = array( 'x-forwarded-for', 'x-client-ip', 'x-real-ip', 'x-proxyuser-ip', 'cf-connecting-ip', 'true-client-ip', 'http_x_forwarded', 'http_x_forwarded_for', 'http_x_cluster_client_ip', 'http_forwarded_for', 'http_forwarded', 'http_client_ip', 'remote_addr', ); api_plugin_hook('config_arrays');
+
+target_group_count=1 ids=['FR-CY-SFT-0116']
+TARGET_NORM=exit; } /* should we allow proxy ip headers? */ $config['proxy_headers'] = $proxy_headers ?? null; /* set the poller_id */ if (isset($poller_id)) { $config['poller_id'] = $poller_id;
+
+target_group_count=1 ids=['FR-CY-SFT-0109']
+TARGET_NORM=def getresetstatus(request): try: userid = request.session['userid'] currentacl = aclmanager.loadedacl(userid) if currentacl['admin'] == 1: pass else: return aclmanager.loaderrorjson('filemanageradmin', 0) data = json.loads(request.body) statusfile = data['statusfile'] installstatus = processutilities.outputexecutioner("sudo cat " + statusfile) if installstatus.find("[200]") > -1: command = 'sudo rm -f ' + statusfile
+
+target_group_count=1 ids=['FR-CY-SFT-0108']
+TARGET_NORM=def getresetstatus(request): try: userid = request.session['userid'] currentacl = aclmanager.loadedacl(userid) if currentacl['admin'] == 1: pass else: return aclmanager.loaderrorjson('filemanageradmin', 0) data = json.loads(request.body) statusfile = data['statusfile'] installstatus = processutilities.outputexecutioner("sudo cat " + statusfile)
+
+target_group_count=1 ids=['FR-CY-SFT-0106']
+TARGET_NORM=const {url} = req.body as {url: string}; try { const parsedurl = new url(url); if (parsedurl.protocol !== 'http:' && parsedurl.protocol !== 'https:') { res.writehead(400); res.end('invalid url protocol'); return; } } catch (error) { res.writehead(400); res.end('invalid url format'); return; } await open(url); res.writehead(200);
+
+target_group_count=1 ids=['FR-CY-SFT-0104']
+TARGET_NORM=def upgrademysqlstatus(request): try: userid = request.session['userid'] currentacl = aclmanager.loadedacl(userid) if currentacl['admin'] == 1: pass else: return aclmanager.loaderrorjson('filemanageradmin', 0) data = json.loads(request.body) statusfile = data['statusfile'] installstatus = processutilities.outputexecutioner("sudo cat " + statusfile)
+
