@@ -52,7 +52,7 @@ describe('Phase A.12B.2C-5A.2 — Human Capability & Live-Runbook Repair Verific
   let originalFetch: typeof globalThis.fetch;
   let sentinelCallCount = 0;
 
-  const validTestSecret = 'super-secret-capability-key-min-16-bytes!';
+  const validTestSecret = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
   const validCommit = 'a1b2c3d4e5f67890123456789abcdef012345678';
   const validNonce = 'run-nonce-20260902-12345678';
   const fixedTimestamp = '2026-09-02T12:00:00Z';
@@ -128,7 +128,7 @@ describe('Phase A.12B.2C-5A.2 — Human Capability & Live-Runbook Repair Verific
       expect(result.reason).toContain('Capability secret is mandatory');
     });
 
-    it('rejects short capability secrets (< 32 chars)', () => {
+    it('rejects short capability secrets (< 64 hex chars)', () => {
       const envelopeWithShortSecret: CanaryHumanApprovalEnvelope = {
         approvedBy: 'auditor-primary@velnar.internal',
         approvalTimestamp: fixedTimestamp,
@@ -147,7 +147,7 @@ describe('Phase A.12B.2C-5A.2 — Human Capability & Live-Runbook Repair Verific
         allowSimulatedExpiryForTest: true,
       });
       expect(result.valid).toBe(false);
-      expect(result.reason).toContain('Capability secret is mandatory');
+      expect(result.reason).toContain('Capability secret must be exactly 64 hexadecimal characters');
     });
   });
 
@@ -245,7 +245,7 @@ describe('Phase A.12B.2C-5A.2 — Human Capability & Live-Runbook Repair Verific
         specificationVersion: CANARY_SPECIFICATION_VERSION,
         sourceCommitSha: validCommit,
         runNonce: validNonce,
-        capabilitySecret: 'completely-different-wrong-secret-key-16',
+        capabilitySecret: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
       };
 
       const result = validateHumanApprovalToken(envelopeWithWrongSecret, {

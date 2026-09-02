@@ -6,3 +6,4 @@
 export * from './canarySpecification';
 export * from './boundedCanaryRunner';
 export * from './auditExecutor';
+export * from './tokenGenerator';

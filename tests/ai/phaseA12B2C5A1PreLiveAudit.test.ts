@@ -237,7 +237,7 @@ describe('Phase A.12B.2C-5A.1 — Pre-Live Canary Safety & Adversarial Audit', (
   // 5. Human Approval Cryptographic Capability
   // =========================================================================
   describe('5. Human Approval Cryptographic Capability Audit', () => {
-    const defaultSecret = 'super-secret-capability-key-32-bytes!';
+    const defaultSecret = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
     const defaultCommit = 'a1b2c3d4e5f67890123456789abcdef012345678';
     const defaultNonce = 'run-nonce-20260902-12345678';
 
@@ -261,7 +261,7 @@ describe('Phase A.12B.2C-5A.1 — Pre-Live Canary Safety & Adversarial Audit', (
       expect(result.reason).toContain('Approval signature failed cryptographic capability verification');
     });
 
-    it('fails closed when capabilitySecret is missing, empty, or shorter than 16 characters', () => {
+    it('fails closed when capabilitySecret is missing, empty, or shorter than 64 hex characters', () => {
       const genuineToken = generateCanaryApprovalToken({
         approvedBy: 'security-lead@velnar.internal',
         targetPhase: 'A.12B.2C-5B',
@@ -296,7 +296,7 @@ describe('Phase A.12B.2C-5A.1 — Pre-Live Canary Safety & Adversarial Audit', (
         capabilitySecret: 'too-short',
       }, { now: () => new Date('2026-09-02T12:00:00Z'), allowSimulatedExpiryForTest: true });
       expect(resultShortSecret.valid).toBe(false);
-      expect(resultShortSecret.reason).toContain('Capability secret is mandatory');
+      expect(resultShortSecret.reason).toContain('Capability secret must be exactly 64 hexadecimal characters');
     });
 
     it('verifies parameter tampering detection (modifying budget, commit, or nonce invalidates signature)', () => {

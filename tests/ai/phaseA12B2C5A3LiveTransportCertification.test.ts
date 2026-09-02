@@ -130,12 +130,12 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
   });
 
   // =========================================================================
-  // 2. 32-Character Capability Secret Requirement & CLI Hardening
+  // 2. 64-Hex Capability Secret & CLI Hardening
   // =========================================================================
-  describe('2. 32-Character Capability Secret & CLI Hardening', () => {
-    it('rejects secrets with length < 32 characters fail-closed', () => {
-      const shortSecret = 'short-secret-under-32-chars!!'; // 29 chars
-      expect(shortSecret.length).toBeLessThan(32);
+  describe('2. 64-Hex Capability Secret & CLI Hardening', () => {
+    it('rejects secrets not matching 64 lowercase hex characters fail-closed', () => {
+      const shortSecret = 'short-secret-under-64-chars!!';
+      expect(shortSecret.length).toBeLessThan(64);
 
       expect(() => {
         generateCanaryApprovalToken({
@@ -150,7 +150,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
           runNonce: validNonce,
           capabilitySecret: shortSecret,
         });
-      }).toThrow(/at least 32 characters/);
+      }).toThrow(/capabilitySecret is mandatory and must be exactly 64 lowercase hexadecimal characters/);
 
       const validation = validateHumanApprovalToken({
         approvedBy: 'lead@velnar.internal',
@@ -169,7 +169,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
       });
 
       expect(validation.valid).toBe(false);
-      expect(validation.reason).toContain('at least 32 characters');
+      expect(validation.reason).toContain('Capability secret must be exactly 64 hexadecimal characters');
     });
 
     it('verifies that boundedCanaryRunner source code does not accept capability-secret via argv', () => {
@@ -537,16 +537,27 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
               completion_tokens: 150,
               prompt_cache_hit_tokens: 400,
               prompt_cache_miss_tokens: 100,
+              completion_tokens_details: {
+                reasoning_tokens: 50,
+              },
             },
           };
         } else {
           return {
             modelVersion: 'gemini-3.5-flash-lite',
-            output_text: validContent,
-            usageMetadata: {
-              promptTokenCount: 500,
-              candidatesTokenCount: 150,
-              thinkingTokenCount: 50,
+            service_tier: 'flex',
+            steps: [
+              {
+                type: 'model_output',
+                content: [{ type: 'text', text: validContent }],
+              },
+            ],
+            usage: {
+              total_input_tokens: 500,
+              total_output_tokens: 150,
+              total_thought_tokens: 50,
+              total_cached_tokens: 100,
+              non_cached_input_tokens: 400,
             },
           };
         }
@@ -638,6 +649,9 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
               completion_tokens: 100,
               prompt_cache_hit_tokens: 200,
               prompt_cache_miss_tokens: 100,
+              completion_tokens_details: {
+                reasoning_tokens: 20,
+              },
             },
           }), {
             status: 200,
@@ -646,11 +660,19 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         } else {
           return new Response(JSON.stringify({
             modelVersion: 'gemini-3.5-flash-lite',
-            output_text: validContent,
-            usageMetadata: {
-              promptTokenCount: 300,
-              candidatesTokenCount: 100,
-              thinkingTokenCount: 20,
+            service_tier: 'flex',
+            steps: [
+              {
+                type: 'model_output',
+                content: [{ type: 'text', text: validContent }],
+              },
+            ],
+            usage: {
+              total_input_tokens: 300,
+              total_output_tokens: 100,
+              total_thought_tokens: 20,
+              total_cached_tokens: 50,
+              non_cached_input_tokens: 250,
             },
           }), {
             status: 200,

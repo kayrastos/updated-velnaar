@@ -38,7 +38,7 @@ import {
   CanaryExecutionEvidencePackage,
   CanaryTransportAttemptRecord,
 } from './canarySpecification';
-import { EvaluationCostCalculator } from '../evaluation/evaluationCostCalculator';
+import { EvaluationCostCalculator, LiveCandidateConfig } from '../evaluation/evaluationCostCalculator';
 import { EvaluationSecurityGate } from '../evaluation/evaluationSecurity';
 import { EvaluationScorer } from '../evaluation/evaluationScorer';
 import { OutputValidator } from '../outputValidator';
@@ -414,8 +414,20 @@ export class BoundedCanaryRunner {
         const totalTokens = promptTokens + completionTokens;
 
         const estCostMicroUsd = candidate.providerId === 'deepseek'
-          ? Math.round((cacheHitTokens * 0.007 + cacheMissTokens * 0.22 + completionTokens * 0.66))
-          : Math.round((promptTokens * 0.15 + completionTokens * 1.25));
+          ? EvaluationCostCalculator.calculateDeepSeekCost({
+              cacheHitTokens,
+              cacheMissTokens,
+              completionTokens,
+              pricingWindow: 'OFF_PEAK',
+              usageSource: 'PROVIDER_REPORTED',
+            }).actualCostMicroUsd
+          : EvaluationCostCalculator.calculateGeminiCost({
+              promptTokens,
+              completionTokens,
+              thinkingTokens,
+              serviceTier: 'flex',
+              usageSource: 'PROVIDER_REPORTED',
+            }).actualCostMicroUsd;
 
         totalEstimatedCost += estCostMicroUsd;
         totalObservedCost += estCostMicroUsd;
@@ -817,26 +829,64 @@ export class BoundedCanaryRunner {
         return { success: false, status: 403, killSwitch };
       }
 
-      // Pre-outbound Cost Envelope Projection Check (Max 5000 microUSD single call bound)
-      // Projected single call worst-case cost (2048 prompt + 2048 completion tokens):
-      // DeepSeek: 2.048 * $0.14 + 2.048 * $0.28 = 0.860 USD = ~861 microUSD
-      // Gemini: 2.048 * $0.075 + 2.048 * $0.30 = 0.768 USD = ~768 microUSD
-      const projectedCallCostMicroUsd = params.candidate.providerId === 'deepseek' ? 861 : 768;
-      if (projectedCallCostMicroUsd > CANARY_COST_LIMITS.maxSingleInvocationMicroUsd) {
+      // Blocker 3: DeepSeek Dynamic Pricing Window Validation
+      const currentPricingWindow = params.candidate.providerId === 'deepseek'
+        ? EvaluationCostCalculator.getDeepSeekPricingWindow(now())
+        : 'OFF_PEAK';
+
+      if (params.candidate.providerId === 'deepseek' && params.candidate.pricingTier === 'offpeak' && currentPricingWindow === 'PEAK') {
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
           reason: 'COST_CEILING_BREACH',
-          message: `Projected call cost ${projectedCallCostMicroUsd} microUSD exceeds single call limit ${CANARY_COST_LIMITS.maxSingleInvocationMicroUsd}.`,
+          message: `DeepSeek live call blocked fail-closed prior to network issuance: current UTC time (${now().toISOString()}) falls within PEAK pricing window, violating candidate offpeak requirement.`,
+          terminatedFailClosed: true,
+        };
+        return { success: false, status: 403, killSwitch };
+      }
+
+      // Resolve Approved Synthetic Fixture and Build Real Prompt
+      const fixture = CANARY_SYNTHETIC_FIXTURES[params.taskType];
+      const fixtureHash = computeFixtureHash(fixture);
+      const promptDef = PromptRegistry.getPrompt(params.taskType);
+      const systemPrompt = promptDef.systemPrompt;
+      const userPrompt = promptDef.buildUserPrompt(fixture.requestEnvelope);
+
+      // Blocker 4: Conservative Token Upper Bound & Worst-Case Cost Projection via EvaluationCostCalculator
+      const estimatedInputTokens = EvaluationCostCalculator.calculateConservativeInputTokenUpperBound(systemPrompt, userPrompt);
+      const liveCandidateConfig: LiveCandidateConfig = {
+        candidateId: params.candidate.candidateId as any,
+        providerId: params.candidate.providerId,
+        requestedModelIdentifier: params.candidate.requestedModelIdentifier,
+        serviceProfile: params.candidate.candidateId === 'gemini-3.5-flash-lite-flex-low' ? 'FLEX_COST_OPTIMIZED' : 'OFF_PEAK_COST_OPTIMIZED',
+        thinkingEffort: 'low',
+        serviceTier: params.candidate.pricingTier === 'flex' ? 'flex' : 'standard',
+      };
+      const worstCaseInvocationCostMicroUsd = EvaluationCostCalculator.calculateWorstCaseInvocationCostMicroUsd(
+        liveCandidateConfig,
+        currentPricingWindow,
+        estimatedInputTokens,
+        2048
+      );
+
+      if (worstCaseInvocationCostMicroUsd > CANARY_COST_LIMITS.maxSingleInvocationMicroUsd) {
+        const killSwitch: CanaryKillSwitchEvent = {
+          timestamp: now().toISOString(),
+          reason: 'COST_CEILING_BREACH',
+          message: `Worst-case invocation cost ${worstCaseInvocationCostMicroUsd} microUSD exceeds single call limit ${CANARY_COST_LIMITS.maxSingleInvocationMicroUsd} microUSD.`,
           terminatedFailClosed: true,
         };
         return { success: false, status: 402, killSwitch };
       }
 
-      if (totalObservedCostMicroUsd + projectedCallCostMicroUsd > effectiveCeilingMicroUsd) {
+      const remainingHumanBudgetMicroUsd = approvedBudgetMicroUsd - totalObservedCostMicroUsd;
+      const remainingSystemBudgetMicroUsd = CANARY_COST_LIMITS.hardCeilingMicroUsd - totalObservedCostMicroUsd;
+      const allowableRemainingBudget = Math.min(remainingHumanBudgetMicroUsd, remainingSystemBudgetMicroUsd);
+
+      if (worstCaseInvocationCostMicroUsd > allowableRemainingBudget) {
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
           reason: 'COST_CEILING_BREACH',
-          message: `Projected cost exceeds effective budget ceiling of ${effectiveCeilingMicroUsd} microUSD.`,
+          message: `Worst-case invocation cost ${worstCaseInvocationCostMicroUsd} microUSD exceeds allowable remaining budget of ${allowableRemainingBudget} microUSD (human remaining: ${remainingHumanBudgetMicroUsd}, system hard ceiling remaining: ${remainingSystemBudgetMicroUsd}).`,
           terminatedFailClosed: true,
         };
         return { success: false, status: 402, killSwitch };
@@ -850,13 +900,6 @@ export class BoundedCanaryRunner {
 
       // Real Provider Credentials (Strictly no fake default keys)
       const apiKey = params.candidate.providerId === 'deepseek' ? deepSeekKey! : geminiKey!;
-
-      // Resolve Approved Synthetic Fixture and Build Real Prompt
-      const fixture = CANARY_SYNTHETIC_FIXTURES[params.taskType];
-      const fixtureHash = computeFixtureHash(fixture);
-      const promptDef = PromptRegistry.getPrompt(params.taskType);
-      const systemPrompt = promptDef.systemPrompt;
-      const userPrompt = promptDef.buildUserPrompt(fixture.requestEnvelope);
 
       let requestPayloadStr = '';
       const headers: Record<string, string> = {
@@ -1142,41 +1185,507 @@ export class BoundedCanaryRunner {
         ? (responseJson.system_fingerprint || null)
         : (responseJson.modelVersion || null);
 
-      // Extract Text Content
-      let content = '';
-      if (params.candidate.providerId === 'deepseek') {
-        content = responseJson.choices?.[0]?.message?.content || '';
-      } else {
-        if (Array.isArray(responseJson.steps)) {
-          const step = responseJson.steps.find((s: any) => s.type === 'model_output' || s.type === 'output');
-          content = step?.output || step?.content || '';
-        } else if (typeof responseJson.output_text === 'string') {
-          content = responseJson.output_text;
-        } else if (typeof responseJson.content === 'string') {
-          content = responseJson.content;
-        } else if (responseJson.candidates?.[0]?.content?.parts?.[0]?.text) {
-          content = responseJson.candidates[0].content.parts[0].text;
+      // Blocker 2: Gemini Flex Provenance Enforcement
+      let providerReportedServiceTier: string | null = null;
+      if (params.candidate.providerId === 'gemini') {
+        if (responseJson.service_tier !== undefined) {
+          if (typeof responseJson.service_tier === 'string') {
+            providerReportedServiceTier = responseJson.service_tier;
+            if (responseJson.service_tier !== 'flex') {
+              attemptRecords.push({
+                attemptIndex: totalTransportAttempts,
+                logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+                fixtureId: fixture.id,
+                fixtureHash,
+                providerId: params.candidate.providerId,
+                candidateId: params.candidate.candidateId,
+                taskType: params.taskType,
+                retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+                fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+                timestamp: now().toISOString(),
+                endpointUrl,
+                httpStatus: 200,
+                statusClass: '2xx',
+                latencyMs,
+                requestPayloadHash,
+                responsePayloadHash,
+              });
+
+              const killSwitch: CanaryKillSwitchEvent = {
+                timestamp: now().toISOString(),
+                reason: 'PROVENANCE_MISMATCH',
+                message: `Gemini response service_tier '${responseJson.service_tier}' does not match certified requested tier 'flex'.`,
+                terminatedFailClosed: true,
+              };
+              return { success: false, status: 200, killSwitch };
+            }
+          } else {
+            attemptRecords.push({
+              attemptIndex: totalTransportAttempts,
+              logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+              fixtureId: fixture.id,
+              fixtureHash,
+              providerId: params.candidate.providerId,
+              candidateId: params.candidate.candidateId,
+              taskType: params.taskType,
+              retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+              fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+              timestamp: now().toISOString(),
+              endpointUrl,
+              httpStatus: 200,
+              statusClass: '2xx',
+              latencyMs,
+              requestPayloadHash,
+              responsePayloadHash,
+            });
+
+            const killSwitch: CanaryKillSwitchEvent = {
+              timestamp: now().toISOString(),
+              reason: 'PROVENANCE_MISMATCH',
+              message: `Gemini response contains invalid non-string service_tier field.`,
+              terminatedFailClosed: true,
+            };
+            return { success: false, status: 200, killSwitch };
+          }
         }
       }
 
-      // Extract Usage Telemetry
+      // Extract Text Content and Usage Telemetry
+      let content = '';
       let promptTokens = 0;
       let completionTokens = 0;
       let thinkingTokens = 0;
       let cacheHitTokens = 0;
       let cacheMissTokens = 0;
+      let cacheStatus: 'VERIFIED' | 'NOT_VERIFIED' = 'NOT_VERIFIED';
 
       if (params.candidate.providerId === 'deepseek') {
-        promptTokens = responseJson.usage?.prompt_tokens ?? 0;
-        completionTokens = responseJson.usage?.completion_tokens ?? 0;
-        cacheHitTokens = responseJson.usage?.prompt_cache_hit_tokens ?? 0;
-        cacheMissTokens = responseJson.usage?.prompt_cache_miss_tokens ?? promptTokens;
-        thinkingTokens = responseJson.usage?.completion_tokens_details?.reasoning_tokens ?? 0;
+        content = responseJson.choices?.[0]?.message?.content || '';
+        if (!content || content.trim().length === 0) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'MALFORMED_USAGE_TELEMETRY',
+            message: `DeepSeek response choices[0].message.content is empty or missing.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        const usage = responseJson.usage;
+        if (!usage || typeof usage !== 'object') {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'MALFORMED_USAGE_TELEMETRY',
+            message: `DeepSeek response missing usage telemetry object.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        promptTokens = usage.prompt_tokens;
+        completionTokens = usage.completion_tokens;
+        cacheHitTokens = usage.prompt_cache_hit_tokens;
+        cacheMissTokens = usage.prompt_cache_miss_tokens;
+        const reasoningTokens = usage.completion_tokens_details?.reasoning_tokens;
+
+        if (typeof promptTokens !== 'number' || !Number.isInteger(promptTokens) || promptTokens <= 0 ||
+            typeof completionTokens !== 'number' || !Number.isInteger(completionTokens) || completionTokens <= 0) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'MALFORMED_USAGE_TELEMETRY',
+            message: `DeepSeek response missing or invalid token counts: prompt_tokens=${promptTokens}, completion_tokens=${completionTokens}.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        if (typeof cacheHitTokens !== 'number' || !Number.isInteger(cacheHitTokens) || cacheHitTokens < 0 ||
+            typeof cacheMissTokens !== 'number' || !Number.isInteger(cacheMissTokens) || cacheMissTokens < 0) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'MALFORMED_USAGE_TELEMETRY',
+            message: `DeepSeek response missing or invalid cache token telemetry: hit=${cacheHitTokens}, miss=${cacheMissTokens}.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        // Blocker 6: DeepSeek Reasoning Telemetry
+        if (typeof reasoningTokens !== 'number' || !Number.isInteger(reasoningTokens) || reasoningTokens < 0) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'REASONING_TOKEN_INCONSISTENCY',
+            message: `DeepSeek missing or invalid reasoning_tokens telemetry: ${reasoningTokens}.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        if (reasoningTokens > (params.candidate.reasoningBudgetTokens ?? 2048)) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'REASONING_TOKEN_INCONSISTENCY',
+            message: `DeepSeek reasoning_tokens (${reasoningTokens}) exceeds certified reasoningBudgetTokens bound (${params.candidate.reasoningBudgetTokens ?? 2048}).`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+        thinkingTokens = reasoningTokens;
+
+        // Blocker 5: DeepSeek Cache Telemetry Arithmetic Integrity
+        const isCacheIntegrityValid = EvaluationCostCalculator.validateDeepSeekTokenIntegrity(promptTokens, cacheHitTokens, cacheMissTokens);
+        if (!isCacheIntegrityValid) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'CACHE_ARITHMETIC_INCONSISTENCY',
+            message: `DeepSeek cache telemetry arithmetic inconsistency: prompt_tokens (${promptTokens}) !== prompt_cache_hit_tokens (${cacheHitTokens}) + prompt_cache_miss_tokens (${cacheMissTokens}).`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+        cacheStatus = 'VERIFIED';
       } else {
-        promptTokens = responseJson.usageMetadata?.promptTokenCount ?? responseJson.usage?.prompt_tokens ?? 0;
-        completionTokens = responseJson.usageMetadata?.candidatesTokenCount ?? responseJson.usage?.completion_tokens ?? 0;
-        thinkingTokens = responseJson.usageMetadata?.thinkingTokenCount ?? 0;
-        cacheMissTokens = promptTokens;
+        // Blocker 1: Gemini Official Raw REST parsing
+        if (!Array.isArray(responseJson.steps) || responseJson.steps.length === 0) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'MALFORMED_USAGE_TELEMETRY',
+            message: `Gemini raw REST response missing required 'steps' array.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        const modelOutputSteps = responseJson.steps.filter((s: any) => s && s.type === 'model_output');
+        if (modelOutputSteps.length === 0) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'MALFORMED_USAGE_TELEMETRY',
+            message: `Gemini raw REST response missing step with type 'model_output'.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        const textBlocks: string[] = [];
+        for (const step of modelOutputSteps) {
+          if (Array.isArray(step.content)) {
+            for (const item of step.content) {
+              if (item && item.type === 'text' && typeof item.text === 'string') {
+                textBlocks.push(item.text);
+              }
+            }
+          } else if (typeof step.output === 'string') {
+            textBlocks.push(step.output);
+          }
+        }
+
+        content = textBlocks.join('');
+        if (!content || content.trim().length === 0) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'MALFORMED_USAGE_TELEMETRY',
+            message: `Gemini raw REST response content is empty or malformed.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        const usage = responseJson.usage;
+        if (!usage || typeof usage !== 'object') {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'MALFORMED_USAGE_TELEMETRY',
+            message: `Gemini raw REST response missing usage telemetry object.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        promptTokens = usage.total_input_tokens;
+        completionTokens = usage.total_output_tokens;
+        thinkingTokens = usage.total_thought_tokens;
+        const cachedTokens = usage.total_cached_tokens;
+
+        if (typeof promptTokens !== 'number' || !Number.isInteger(promptTokens) || promptTokens <= 0 ||
+            typeof completionTokens !== 'number' || !Number.isInteger(completionTokens) || completionTokens <= 0) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'MALFORMED_USAGE_TELEMETRY',
+            message: `Gemini raw REST response missing or invalid token counts: total_input_tokens=${promptTokens}, total_output_tokens=${completionTokens}.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        // Blocker 6: Gemini Reasoning Telemetry
+        if (typeof thinkingTokens !== 'number' || !Number.isInteger(thinkingTokens) || thinkingTokens < 0) {
+          attemptRecords.push({
+            attemptIndex: totalTransportAttempts,
+            logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
+            fixtureId: fixture.id,
+            fixtureHash,
+            providerId: params.candidate.providerId,
+            candidateId: params.candidate.candidateId,
+            taskType: params.taskType,
+            retryState: params.isRetry ? 'SAME_PROVIDER_503_RETRY' : 'NONE',
+            fallbackState: params.isFallback ? 'DEEPSEEK_TO_GEMINI_FALLBACK' : 'NONE',
+            timestamp: now().toISOString(),
+            endpointUrl,
+            httpStatus: 200,
+            statusClass: '2xx',
+            latencyMs,
+            requestPayloadHash,
+            responsePayloadHash,
+          });
+
+          const killSwitch: CanaryKillSwitchEvent = {
+            timestamp: now().toISOString(),
+            reason: 'REASONING_TOKEN_INCONSISTENCY',
+            message: `Gemini raw REST response missing or invalid total_thought_tokens: ${thinkingTokens}.`,
+            terminatedFailClosed: true,
+          };
+          return { success: false, status: 200, killSwitch };
+        }
+
+        // Blocker 7: Gemini Honest Cache Status
+        cacheHitTokens = typeof cachedTokens === 'number' && Number.isInteger(cachedTokens) && cachedTokens >= 0 ? cachedTokens : 0;
+        cacheMissTokens = promptTokens - cacheHitTokens;
+
+        const nonCachedTokens = usage.non_cached_input_tokens ?? usage.cache_miss_tokens;
+        if (typeof cachedTokens === 'number' && typeof nonCachedTokens === 'number' && promptTokens === cachedTokens + nonCachedTokens) {
+          cacheStatus = 'VERIFIED';
+        } else {
+          cacheStatus = 'NOT_VERIFIED';
+        }
       }
 
       if (promptTokens <= 0 || completionTokens <= 0) {
@@ -1216,7 +1725,7 @@ export class BoundedCanaryRunner {
             cacheHitTokens,
             cacheMissTokens,
             completionTokens,
-            pricingWindow: 'OFF_PEAK',
+            pricingWindow: currentPricingWindow,
             usageSource: 'PROVIDER_REPORTED',
           });
           observedCostMicroUsd = costResult.actualCostMicroUsd;
@@ -1385,7 +1894,9 @@ export class BoundedCanaryRunner {
         returnedModelIdentifier,
         certificationBaselineModelVersion,
         providerReportedModelVersion,
-        serviceTier: params.candidate.pricingTier === 'flex' ? 'flex' : undefined,
+        serviceTier: providerReportedServiceTier === 'flex' ? 'flex' : (params.candidate.pricingTier === 'flex' ? 'flex' : undefined),
+        requestedServiceTier: params.candidate.providerId === 'gemini' ? 'flex' : undefined,
+        providerReportedServiceTier: params.candidate.providerId === 'gemini' ? providerReportedServiceTier : null,
         endpointUrl,
         requestPayloadHash,
         responsePayloadHash,
@@ -1396,9 +1907,9 @@ export class BoundedCanaryRunner {
         cacheMissTokens,
         totalTokens: promptTokens + completionTokens,
         usageSource: 'PROVIDER_REPORTED',
-        cacheStatus: 'VERIFIED',
-        pricingWindow: params.candidate.pricingTier === 'offpeak' ? 'OFF_PEAK' : 'FLEX_STANDARD',
-        estimatedCostMicroUsd: observedCostMicroUsd,
+        cacheStatus,
+        pricingWindow: params.candidate.providerId === 'deepseek' ? currentPricingWindow : 'FLEX_STANDARD',
+        estimatedCostMicroUsd: worstCaseInvocationCostMicroUsd,
         observedCostMicroUsd,
         latencyMs,
         attemptCount: params.attemptCount,

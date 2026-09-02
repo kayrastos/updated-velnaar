@@ -188,7 +188,7 @@ describe('Phase A.12B.2C-5A — Bounded Canary Readiness & Safety Invariants', (
       specificationVersion: CANARY_SPECIFICATION_VERSION,
       sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
       runNonce: 'nonce-readiness-test-12345678',
-      capabilitySecret: 'secret-key-min-32-chars-for-tests!',
+      capabilitySecret: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
     };
     expect(validateHumanApprovalToken(malformedToken).valid).toBe(false);
 
@@ -203,7 +203,7 @@ describe('Phase A.12B.2C-5A — Bounded Canary Readiness & Safety Invariants', (
       specificationVersion: CANARY_SPECIFICATION_VERSION,
       sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
       runNonce: 'nonce-readiness-test-12345678',
-      capabilitySecret: 'secret-key-min-32-chars-for-tests!',
+      capabilitySecret: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
     });
     const validEnvelope: CanaryHumanApprovalEnvelope = {
       approvedBy: 'auditor-primary@velnar.internal',
@@ -215,7 +215,7 @@ describe('Phase A.12B.2C-5A — Bounded Canary Readiness & Safety Invariants', (
       specificationVersion: CANARY_SPECIFICATION_VERSION,
       sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
       runNonce: 'nonce-readiness-test-12345678',
-      capabilitySecret: 'secret-key-min-32-chars-for-tests!',
+      capabilitySecret: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
     };
     expect(validateHumanApprovalToken(validEnvelope, { now: () => new Date('2026-09-02T12:00:00Z'), allowSimulatedExpiryForTest: true }).valid).toBe(true);
   });

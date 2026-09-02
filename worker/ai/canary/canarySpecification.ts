@@ -344,12 +344,15 @@ export interface GenerateApprovalTokenParams {
 
 /**
  * Generates a cryptographically bound human approval token using HMAC-SHA256.
- * Requires a mandatory capabilitySecret (minimum 32 characters / 256 bits).
+ * Requires a mandatory capabilitySecret (exact 64 lowercase hexadecimal characters representing 256 bits of entropy).
  * Token format: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE>
  */
 export function generateCanaryApprovalToken(params: GenerateApprovalTokenParams): string {
-  if (!params.capabilitySecret || typeof params.capabilitySecret !== 'string' || params.capabilitySecret.trim().length < 32) {
-    throw new Error('generateCanaryApprovalToken: capabilitySecret is mandatory and must be a secret string of at least 32 characters (256-bit entropy).');
+  if (!params.capabilitySecret || typeof params.capabilitySecret !== 'string') {
+    throw new Error('generateCanaryApprovalToken: capabilitySecret is mandatory (fail-closed).');
+  }
+  if (!isValidCapabilitySecret(params.capabilitySecret)) {
+    throw new Error('generateCanaryApprovalToken: capabilitySecret is mandatory and must be exactly 64 lowercase hexadecimal characters representing 256 bits of entropy (openssl rand -hex 32).');
   }
 
   const budgetMicroUsd = params.maxBudgetMicroUsd !== undefined
@@ -433,17 +436,13 @@ export function validateHumanApprovalToken(
     return { valid: false, reason: 'runNonce is missing or invalid.' };
   }
 
-  // Capability Secret is strictly MANDATORY (minimum 32 characters / 256 bits, or exactly 64-hex when required)
+  // Capability Secret is strictly MANDATORY (exact 64 lowercase hexadecimal characters representing 256 bits of entropy)
   const capabilitySecret = approval.capabilitySecret || options?.capabilitySecret;
   if (!capabilitySecret || typeof capabilitySecret !== 'string') {
     return { valid: false, reason: 'Capability secret is mandatory for human approval verification (fail-closed).' };
   }
-  if (options?.require64HexSecret) {
-    if (!isValidCapabilitySecret(capabilitySecret)) {
-      return { valid: false, reason: 'Capability secret must be exactly 64 hexadecimal characters representing 256 bits of entropy (fail-closed).' };
-    }
-  } else if (capabilitySecret.trim().length < 32) {
-    return { valid: false, reason: 'Capability secret is mandatory for human approval verification and must be at least 32 characters (256-bit entropy, fail-closed).' };
+  if (!isValidCapabilitySecret(capabilitySecret)) {
+    return { valid: false, reason: 'Capability secret must be exactly 64 hexadecimal characters representing 256 bits of entropy (fail-closed).' };
   }
 
   // Token Format: Exactly 64 hexadecimal characters for SHA-256 HMAC (256 bits)
@@ -555,6 +554,8 @@ export interface CanaryInvocationEvidenceRecord {
   certificationBaselineModelVersion?: string;
   providerReportedModelVersion?: string | null;
   serviceTier?: string;
+  requestedServiceTier?: string;
+  providerReportedServiceTier?: string | null;
   endpointUrl: string;
   requestPayloadHash: string;
   responsePayloadHash: string;

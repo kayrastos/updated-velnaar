@@ -1,15 +1,16 @@
 # VELNAR AI — Phase A.12B.2C-5B Live Canary Execution Runbook
 
-**Document Version**: `1.2.0`  
+**Document Version**: `1.3.0`  
 **Specification Version**: `a12b2c5-v1.1`  
 **Target Execution Phase**: Phase A.12B.2C-5B (Future Explicit Human-Approved Phase)  
-**Current Phase Status**: **Phase A.12B.2C-5A.3 (Real Live-Canary Transport & Execution-Gate Certified — 5B Eligible)**  
+**Current Phase Status**: `PROVIDER_REST_PARITY_PASS_5B_ELIGIBLE_PENDING_HUMAN_AUTHORIZATION`  
 
 > ⚠️ **CRITICAL OPERATIONAL DIRECTIVE**  
-> **DO NOT EXECUTE THIS RUNBOOK IN PHASE A.12B.2C-5A, A.12B.2C-5A.1, A.12B.2C-5A.2, OR A.12B.2C-5A.3.**  
+> **DO NOT EXECUTE THIS RUNBOOK IN PHASE A.12B.2C-5A, A.12B.2C-5A.1, A.12B.2C-5A.2, A.12B.2C-5A.3, OR A.12B.2C-5A.4.1.**  
 > Live canary execution is strictly prohibited until explicit human authorization is granted for Phase A.12B.2C-5B.  
 > Production routing remains `DORMANT` (`enforcementAllowed === false`).  
-> Hardcoded, public, or deterministic capability token bypasses are strictly prohibited and eliminated.
+> Hardcoded, public, or deterministic capability token bypasses are strictly prohibited and eliminated.  
+> THIS PHASE REMAINS 100% OFFLINE WITH ZERO REAL PROVIDER CALLS.
 
 ---
 
@@ -32,11 +33,21 @@ Live canary execution requires a cryptographically strong, secret-backed Human A
 
 ### 1.2 Capability Secret & Token Generation Procedure (Offline / Air-Gapped)
 
-The security operator generates the token using an offline command with an out-of-band `VELNAR_CANARY_CAPABILITY_SECRET` ($\ge 32$ characters, 256-bit entropy).
+The security operator generates the capability secret and token using the offline utility (`npm run generate-canary-token`) or `openssl`:
+- **Capability Secret**: Exactly 32 cryptographically random bytes encoded as **64 lowercase hexadecimal characters** (`^[0-9a-f]{64}$`).
+- **Secret Transmission**: Passed strictly via the `VELNAR_CANARY_CAPABILITY_SECRET` environment variable (never via CLI `--arguments`).
 
 ```bash
-# Operator exports approval environment (do NOT pass capability secret on CLI argv)
-export VELNAR_CANARY_CAPABILITY_SECRET="<out-of-band-cryptographic-secret-min-32-chars-256-bits>"
+# Option A: Generate a new 64-hex capability secret offline:
+export VELNAR_CANARY_CAPABILITY_SECRET="$(openssl rand -hex 32)"
+
+# Option B: Use the built-in offline token generator utility:
+npm run generate-canary-token -- \
+  --approved-by="security-lead@velnar.internal" \
+  --max-budget-micro-usd=50000 \
+  --target-phase="A.12B.2C-5B"
+
+# Operator environment setup for manual generation:
 export GIT_COMMIT_SHA="$(git rev-parse HEAD)"
 export VELNAR_CANARY_RUN_NONCE="$(openssl rand -hex 16)"
 export APPROVAL_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"

@@ -14,6 +14,8 @@ import {
   PricingWindow,
   UsageSource,
 } from './evaluationLiveTypes';
+
+export type { LiveCandidateConfig };
 import { PromptRegistry } from '../promptRegistry';
 import { PreparedEvaluationCase } from './types';
 
