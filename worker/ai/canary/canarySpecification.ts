@@ -17,7 +17,26 @@ import {
   isCertifiedA12B2CTaskType,
 } from '../providers/certifiedProviderTypes';
 
-export const CANARY_SPECIFICATION_VERSION = 'a12b2c5-v1.0';
+export const CANARY_SPECIFICATION_VERSION = 'a12b2c5-v1.1';
+
+/**
+ * Baseline information and certified targets for Canary providers.
+ */
+export const CERTIFIED_PROVIDER_BASELINES = {
+  deepseek: {
+    modelId: 'deepseek-v4-flash',
+    documentedVersionTarget: 'DeepSeek-V4-Flash-0731',
+    endpoint: 'https://api.deepseek.com/v1/chat/completions',
+    certifiedPricingTier: 'offpeak',
+  },
+  gemini: {
+    modelId: 'gemini-3.5-flash-lite',
+    documentedVersionTarget: 'gemini-3.5-flash-lite',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/interactions',
+    certifiedServiceTier: 'flex',
+    thinkingLevel: 'low',
+  },
+} as const;
 
 /**
  * 1. Scope: Allowed Certified Candidates
@@ -223,7 +242,8 @@ export interface CanaryHumanApprovalEnvelope {
   approvalTimestamp: string;
   targetPhase: 'A.12B.2C-5B';
   approvalToken: string;
-  maxBudgetUsd: number;
+  maxBudgetMicroUsd?: number; // Integer microUSD (e.g. 50000)
+  maxBudgetUsd?: number;      // Optional float for display/backward compatibility
   environmentTarget: 'CONTROLLED_CANARY';
   specificationVersion: string;
   sourceCommitSha: string;
@@ -279,7 +299,8 @@ export interface GenerateApprovalTokenParams {
   targetPhase: 'A.12B.2C-5B';
   environmentTarget: 'CONTROLLED_CANARY';
   dateYyyyMmDd: string;
-  maxBudgetUsd: number;
+  maxBudgetMicroUsd?: number;
+  maxBudgetUsd?: number;
   approvalTimestamp: string;
   specificationVersion: string;
   sourceCommitSha: string;
@@ -289,12 +310,24 @@ export interface GenerateApprovalTokenParams {
 
 /**
  * Generates a cryptographically bound human approval token using HMAC-SHA256.
- * Requires a mandatory capabilitySecret. Public deterministic fallbacks are prohibited.
+ * Requires a mandatory capabilitySecret (minimum 32 characters / 256 bits).
  * Token format: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE>
  */
 export function generateCanaryApprovalToken(params: GenerateApprovalTokenParams): string {
-  if (!params.capabilitySecret || typeof params.capabilitySecret !== 'string' || params.capabilitySecret.trim().length < 16) {
-    throw new Error('generateCanaryApprovalToken: capabilitySecret is mandatory and must be a secret string of at least 16 characters.');
+  if (!params.capabilitySecret || typeof params.capabilitySecret !== 'string' || params.capabilitySecret.trim().length < 32) {
+    throw new Error('generateCanaryApprovalToken: capabilitySecret is mandatory and must be a secret string of at least 32 characters (256-bit entropy).');
+  }
+
+  const budgetMicroUsd = params.maxBudgetMicroUsd !== undefined
+    ? params.maxBudgetMicroUsd
+    : (typeof params.maxBudgetUsd === 'number' && Number.isFinite(params.maxBudgetUsd) ? Math.round(params.maxBudgetUsd * 1_000_000) : NaN);
+
+  if (!Number.isInteger(budgetMicroUsd) || budgetMicroUsd <= 0 || budgetMicroUsd > 50000) {
+    throw new Error(`generateCanaryApprovalToken: maxBudgetMicroUsd must be an integer between 1 and 50000 microUSD (got ${budgetMicroUsd}).`);
+  }
+
+  if (!params.sourceCommitSha || !/^[0-9a-f]{40}$/i.test(params.sourceCommitSha.trim())) {
+    throw new Error(`generateCanaryApprovalToken: sourceCommitSha must be an exact 40-character hexadecimal git commit SHA.`);
   }
 
   const canonicalPayload = [
@@ -302,16 +335,17 @@ export function generateCanaryApprovalToken(params: GenerateApprovalTokenParams)
     params.targetPhase,
     params.environmentTarget,
     params.dateYyyyMmDd.trim(),
-    params.maxBudgetUsd.toFixed(2),
+    budgetMicroUsd.toString(),
     params.approvalTimestamp.trim(),
     params.specificationVersion.trim(),
-    params.sourceCommitSha.trim(),
+    params.sourceCommitSha.trim().toLowerCase(),
     params.runNonce.trim(),
   ].join(':');
 
   const signature = crypto.createHmac('sha256', params.capabilitySecret.trim())
     .update(canonicalPayload)
-    .digest('hex');
+    .digest('hex')
+    .toLowerCase();
 
   return `VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_${params.dateYyyyMmDd}_${signature}`;
 }
@@ -345,26 +379,30 @@ export function validateHumanApprovalToken(
     return { valid: false, reason: 'ApprovedBy identifier is invalid or missing.' };
   }
 
-  if (typeof approval.maxBudgetUsd !== 'number' || !Number.isFinite(approval.maxBudgetUsd) || approval.maxBudgetUsd <= 0 || approval.maxBudgetUsd > 0.05) {
-    return { valid: false, reason: `maxBudgetUsd must be a finite number <= allowable canary ceiling of $0.05 (got $${approval.maxBudgetUsd}).` };
+  const budgetMicroUsd = approval.maxBudgetMicroUsd !== undefined
+    ? approval.maxBudgetMicroUsd
+    : (typeof approval.maxBudgetUsd === 'number' && Number.isFinite(approval.maxBudgetUsd) ? Math.round(approval.maxBudgetUsd * 1_000_000) : NaN);
+
+  if (!Number.isInteger(budgetMicroUsd) || budgetMicroUsd <= 0 || budgetMicroUsd > 50000) {
+    return { valid: false, reason: `maxBudgetMicroUsd must be an integer <= allowable canary ceiling of 50000 microUSD (got ${budgetMicroUsd}).` };
   }
 
   if (!approval.specificationVersion || approval.specificationVersion.trim() !== CANARY_SPECIFICATION_VERSION) {
     return { valid: false, reason: `Specification version must match '${CANARY_SPECIFICATION_VERSION}', received: '${approval.specificationVersion}'.` };
   }
 
-  if (!approval.sourceCommitSha || typeof approval.sourceCommitSha !== 'string' || approval.sourceCommitSha.trim().length < 7) {
-    return { valid: false, reason: 'sourceCommitSha is missing or invalid.' };
+  if (!approval.sourceCommitSha || typeof approval.sourceCommitSha !== 'string' || !/^[0-9a-f]{40}$/i.test(approval.sourceCommitSha.trim())) {
+    return { valid: false, reason: 'sourceCommitSha must be an exact 40-character hexadecimal git commit SHA.' };
   }
 
   if (!approval.runNonce || typeof approval.runNonce !== 'string' || approval.runNonce.trim().length < 8) {
     return { valid: false, reason: 'runNonce is missing or invalid.' };
   }
 
-  // Capability Secret is strictly MANDATORY
+  // Capability Secret is strictly MANDATORY (minimum 32 characters / 256 bits)
   const capabilitySecret = approval.capabilitySecret || options?.capabilitySecret;
-  if (!capabilitySecret || typeof capabilitySecret !== 'string' || capabilitySecret.trim().length < 16) {
-    return { valid: false, reason: 'Capability secret is mandatory for human approval verification and must be at least 16 characters (fail-closed).' };
+  if (!capabilitySecret || typeof capabilitySecret !== 'string' || capabilitySecret.trim().length < 32) {
+    return { valid: false, reason: 'Capability secret is mandatory for human approval verification and must be at least 32 characters (256-bit entropy, fail-closed).' };
   }
 
   // Token Format: Exactly 64 hexadecimal characters for SHA-256 HMAC (256 bits)
@@ -414,10 +452,10 @@ export function validateHumanApprovalToken(
     approval.targetPhase,
     approval.environmentTarget,
     tokenDateStr,
-    approval.maxBudgetUsd.toFixed(2),
+    budgetMicroUsd.toString(),
     approval.approvalTimestamp.trim(),
     approval.specificationVersion.trim(),
-    approval.sourceCommitSha.trim(),
+    approval.sourceCommitSha.trim().toLowerCase(),
     approval.runNonce.trim(),
   ].join(':');
 

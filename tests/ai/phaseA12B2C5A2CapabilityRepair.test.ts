@@ -128,7 +128,7 @@ describe('Phase A.12B.2C-5A.2 — Human Capability & Live-Runbook Repair Verific
       expect(result.reason).toContain('Capability secret is mandatory');
     });
 
-    it('rejects short capability secrets (< 16 chars)', () => {
+    it('rejects short capability secrets (< 32 chars)', () => {
       const envelopeWithShortSecret: CanaryHumanApprovalEnvelope = {
         approvedBy: 'auditor-primary@velnar.internal',
         approvalTimestamp: fixedTimestamp,
