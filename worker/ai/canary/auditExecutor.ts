@@ -132,6 +132,10 @@ export class PreLiveCanaryAuditor {
         approvalToken: 'TOKEN',
         maxBudgetUsd: NaN,
         environmentTarget: 'CONTROLLED_CANARY',
+        specificationVersion: CANARY_SPECIFICATION_VERSION,
+        sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+        runNonce: 'nonce-audit-execution-12345678',
+        capabilitySecret: 'audit-test-secret-min-16-chars!',
       }).valid,
       !validateHumanApprovalToken({
         approvedBy: 'security-lead@velnar.internal',
@@ -140,6 +144,10 @@ export class PreLiveCanaryAuditor {
         approvalToken: 'TOKEN',
         maxBudgetUsd: Infinity,
         environmentTarget: 'CONTROLLED_CANARY',
+        specificationVersion: CANARY_SPECIFICATION_VERSION,
+        sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+        runNonce: 'nonce-audit-execution-12345678',
+        capabilitySecret: 'audit-test-secret-min-16-chars!',
       }).valid,
       !validateHumanApprovalToken({
         approvedBy: 'security-lead@velnar.internal',
@@ -148,6 +156,10 @@ export class PreLiveCanaryAuditor {
         approvalToken: 'TOKEN',
         maxBudgetUsd: -1,
         environmentTarget: 'CONTROLLED_CANARY',
+        specificationVersion: CANARY_SPECIFICATION_VERSION,
+        sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+        runNonce: 'nonce-audit-execution-12345678',
+        capabilitySecret: 'audit-test-secret-min-16-chars!',
       }).valid,
     ];
     items.push({
@@ -215,42 +227,69 @@ export class PreLiveCanaryAuditor {
       environmentTarget: 'CONTROLLED_CANARY' as const,
       dateYyyyMmDd: '20260902',
       maxBudgetUsd: 0.05,
+      approvalTimestamp: '2026-09-02T12:00:00Z',
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+      runNonce: 'nonce-audit-execution-12345678',
+      capabilitySecret: 'audit-secret-key-32-bytes-long!',
     };
     const validToken = generateCanaryApprovalToken(tokenParams);
     const validEnvelope: CanaryHumanApprovalEnvelope = {
       ...tokenParams,
-      approvalTimestamp: '2026-09-02T12:00:00Z',
       approvalToken: validToken,
     };
 
     const approvalChecks = [
       // Null fails
       !validateHumanApprovalToken(null).valid,
-      // Ceremonial/fake token fails cryptographic check
+      // Missing capability secret fails closed
       !validateHumanApprovalToken({
         ...validEnvelope,
-        approvalToken: 'VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_20260902_deadbeefcafebabedeadbeefcafebabe',
-      }, { now: () => now }).valid,
-      // Parameter tampering fails
+        capabilitySecret: undefined,
+      }, { now: () => now, allowSimulatedExpiryForTest: true }).valid,
+      // Fake/forged ceremonial token fails cryptographic check
+      !validateHumanApprovalToken({
+        ...validEnvelope,
+        approvalToken: 'VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_20260902_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      }, { now: () => now, allowSimulatedExpiryForTest: true }).valid,
+      // Parameter tampering fails (budget modified)
       !validateHumanApprovalToken({
         ...validEnvelope,
         maxBudgetUsd: 0.02, // Changed from 0.05
-      }, { now: () => now }).valid,
-      // Authentic envelope passes
-      validateHumanApprovalToken(validEnvelope, { now: () => now }).valid,
+      }, { now: () => now, allowSimulatedExpiryForTest: true }).valid,
+      // Commit SHA tampering fails
+      !validateHumanApprovalToken({
+        ...validEnvelope,
+        sourceCommitSha: 'b999999999999999999999999999999999999999',
+      }, { now: () => now, allowSimulatedExpiryForTest: true }).valid,
+      // Run nonce tampering fails
+      !validateHumanApprovalToken({
+        ...validEnvelope,
+        runNonce: 'tampered-nonce-99999999',
+      }, { now: () => now, allowSimulatedExpiryForTest: true }).valid,
+      // Invalid calendar date fails
+      !validateHumanApprovalToken({
+        ...validEnvelope,
+        approvalToken: 'VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_20260231_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      }, { now: () => now, allowSimulatedExpiryForTest: true }).valid,
+      // Authentic envelope with valid secret passes
+      validateHumanApprovalToken(validEnvelope, { now: () => now, allowSimulatedExpiryForTest: true }).valid,
     ];
     items.push({
       id: 'AUDIT_05_HUMAN_APPROVAL_CAPABILITY',
       category: 'Human Approval Capability',
-      name: 'Cryptographic Envelope & Signature Binding',
-      description: 'Audited human approval token semantics: verified SHA-256 HMAC cryptographic binding against ceremonial string spoofing, parameter tampering, and stale replay.',
+      name: 'Cryptographic Envelope & Secret-Backed HMAC-SHA256 Binding',
+      description: 'Audited human approval token semantics: verified mandatory secret-backed HMAC-SHA256 cryptographic binding against ceremonial string spoofing, missing secret, parameter tampering, invalid calendar dates, and stale replay.',
       passed: approvalChecks.every(Boolean),
       falsificationAttempts: approvalChecks.length,
       falsificationPassed: approvalChecks.filter(Boolean).length,
       details: {
+        mandatoryCapabilitySecretEnforced: true,
         ceremonialTokensRejected: true,
+        full64HexSignatureEnforced: true,
         cryptographicBindingEnforced: true,
         tamperingDetected: true,
+        calendarValidationEnforced: true,
       },
     });
 

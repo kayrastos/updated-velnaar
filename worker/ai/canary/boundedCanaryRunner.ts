@@ -43,8 +43,10 @@ export interface CanaryRunnerOptions {
   phase?: 'A.12B.2C-5A' | 'A.12B.2C-5B';
   dryRun?: boolean;
   humanApproval?: CanaryHumanApprovalEnvelope | null;
+  capabilitySecret?: string;
   customFetch?: typeof fetch;
   now?: () => Date;
+  abortSignal?: AbortSignal;
 }
 
 export interface CanaryReadinessCheckResult {
@@ -123,6 +125,7 @@ export class BoundedCanaryRunner {
 
     // Check 6: Invocation limits
     const limitsOk = CANARY_INVOCATION_LIMITS.maxTotalInvocations === 14 &&
+      CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider === 7 &&
       CANARY_INVOCATION_LIMITS.maxSameProviderRetries === 1 &&
       CANARY_INVOCATION_LIMITS.maxCrossProviderFallbacks === 1;
     if (!limitsOk) {
@@ -138,7 +141,7 @@ export class BoundedCanaryRunner {
       reasons.push('Kill switch criteria invalid.');
     }
 
-    // Check 8: Approval Gate Enforcement
+    // Check 8: Approval Gate Enforcement (null token fails closed)
     const approvalCheck = validateHumanApprovalToken(null);
     const approvalEnforced = !approvalCheck.valid;
     if (!approvalEnforced) {
@@ -167,16 +170,33 @@ export class BoundedCanaryRunner {
   }
 
   /**
-   * Executes a simulated or dry-run canary suite strictly under Phase A.12B.2C-5A constraints.
-   * If invoked with live intent without Phase A.12B.2C-5B approval, fails closed immediately.
+   * Executes a simulated or dry-run canary suite strictly under Phase A.12B.2C-5A/5B constraints.
+   * If invoked with live intent without Phase A.12B.2C-5B approval and capability secret, fails closed immediately.
    */
   public static async executeDryRunPlan(options: CanaryRunnerOptions = {}): Promise<CanaryExecutionEvidencePackage> {
     const phase = options.phase ?? 'A.12B.2C-5A';
     const isDryRun = options.dryRun ?? true;
     const now = options.now ?? (() => new Date());
+    const abortSignal = options.abortSignal;
 
     const killSwitchEvents: CanaryKillSwitchEvent[] = [];
     const invocations: CanaryInvocationEvidenceRecord[] = [];
+
+    // Redacted human approval envelope for evidence (zero secret leakage)
+    const sanitizedApproval: CanaryHumanApprovalEnvelope | null = options.humanApproval
+      ? {
+          approvedBy: options.humanApproval.approvedBy,
+          approvalTimestamp: options.humanApproval.approvalTimestamp,
+          targetPhase: options.humanApproval.targetPhase,
+          approvalToken: options.humanApproval.approvalToken,
+          maxBudgetUsd: options.humanApproval.maxBudgetUsd,
+          environmentTarget: options.humanApproval.environmentTarget,
+          specificationVersion: options.humanApproval.specificationVersion,
+          sourceCommitSha: options.humanApproval.sourceCommitSha,
+          runNonce: options.humanApproval.runNonce,
+          capabilitySecret: undefined, // Redacted
+        }
+      : null;
 
     // Rule 1: Phase A.12B.2C-5A cannot execute live calls
     if (phase === 'A.12B.2C-5A' && !isDryRun) {
@@ -211,9 +231,16 @@ export class BoundedCanaryRunner {
       };
     }
 
-    // Rule 2: If Phase A.12B.2C-5B is requested, validate approval envelope
+    // Rule 2: If Phase A.12B.2C-5B is requested, validate approval envelope with mandatory secret
     if (phase === 'A.12B.2C-5B') {
-      const approvalValidation = validateHumanApprovalToken(options.humanApproval, { now, allowSimulatedExpiryForTest: isDryRun });
+      const approvalValidation = validateHumanApprovalToken(
+        options.humanApproval,
+        {
+          capabilitySecret: options.capabilitySecret || options.humanApproval?.capabilitySecret,
+          now,
+          allowSimulatedExpiryForTest: isDryRun,
+        }
+      );
       if (!approvalValidation.valid) {
         killSwitchEvents.push({
           timestamp: now().toISOString(),
@@ -225,9 +252,9 @@ export class BoundedCanaryRunner {
         return {
           phase: 'A.12B.2C-5B',
           specificationVersion: CANARY_SPECIFICATION_VERSION,
-          executionMode: 'LIVE_CONTROLLED_CANARY',
+          executionMode: isDryRun ? 'DRY_RUN_READINESS_VERIFICATION' : 'LIVE_CONTROLLED_CANARY',
           timestamp: now().toISOString(),
-          humanApproval: options.humanApproval ?? null,
+          humanApproval: sanitizedApproval,
           overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
           summaryCounts: {
             totalPlannedInvocations: 14,
@@ -246,15 +273,85 @@ export class BoundedCanaryRunner {
       }
     }
 
+    // Check early abort signal
+    if (abortSignal?.aborted) {
+      killSwitchEvents.push({
+        timestamp: now().toISOString(),
+        reason: 'UNEXPECTED_EXCEPTION',
+        message: 'Execution aborted prior to start by termination signal (SIGINT/SIGTERM/Abort).',
+        terminatedFailClosed: true,
+      });
+
+      return {
+        phase,
+        specificationVersion: CANARY_SPECIFICATION_VERSION,
+        executionMode: 'DRY_RUN_READINESS_VERIFICATION',
+        timestamp: now().toISOString(),
+        humanApproval: sanitizedApproval,
+        overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
+        summaryCounts: {
+          totalPlannedInvocations: 14,
+          executedInvocations: 0,
+          passedInvocations: 0,
+          failedInvocations: 0,
+          killSwitchEventsCount: 1,
+          totalObservedCostMicroUsd: 0,
+          totalEstimatedCostMicroUsd: 0,
+          aggregateSemanticScore: 0,
+        },
+        invocations: [],
+        killSwitchEvents,
+        productionRoutingEnforcementAllowed: false,
+      };
+    }
+
     // Execute dry-run planned invocation matrix across 7 certified tasks * 2 candidates
     let invocationIdx = 0;
     let totalEstimatedCost = 0;
     let totalObservedCost = 0;
     let scoreSum = 0;
 
+    const providerCounts: Record<CertifiedProviderId, number> = {
+      deepseek: 0,
+      gemini: 0,
+    };
+
     for (const candidate of CERTIFIED_CANARY_CANDIDATES) {
       for (const taskType of CERTIFIED_A12B2C_TASK_TYPES) {
+        // Abort signal check on each iteration
+        if (abortSignal?.aborted) {
+          killSwitchEvents.push({
+            timestamp: now().toISOString(),
+            reason: 'UNEXPECTED_EXCEPTION',
+            message: 'Execution interrupted mid-flight by termination signal.',
+            terminatedFailClosed: true,
+          });
+          break;
+        }
+
+        // Limit checks before issuing call
+        if (invocations.length >= CANARY_INVOCATION_LIMITS.maxTotalInvocations) {
+          killSwitchEvents.push({
+            timestamp: now().toISOString(),
+            reason: 'INVOCATION_LIMIT_BREACH',
+            message: `Total invocation limit ${CANARY_INVOCATION_LIMITS.maxTotalInvocations} reached.`,
+            terminatedFailClosed: true,
+          });
+          break;
+        }
+
+        if (providerCounts[candidate.providerId] >= CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider) {
+          killSwitchEvents.push({
+            timestamp: now().toISOString(),
+            reason: 'INVOCATION_LIMIT_BREACH',
+            message: `Provider invocation limit ${CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider} reached for ${candidate.providerId}.`,
+            terminatedFailClosed: true,
+          });
+          break;
+        }
+
         invocationIdx++;
+        providerCounts[candidate.providerId]++;
 
         // Preflight Task & Classification Check
         if (!isCertifiedA12B2CTaskType(taskType)) {
@@ -365,11 +462,11 @@ export class BoundedCanaryRunner {
       : 'CANARY_READY_AWAITING_HUMAN_APPROVAL';
 
     return {
-      phase: 'A.12B.2C-5A',
+      phase: phase as 'A.12B.2C-5A' | 'A.12B.2C-5B',
       specificationVersion: CANARY_SPECIFICATION_VERSION,
       executionMode: 'DRY_RUN_READINESS_VERIFICATION',
       timestamp: now().toISOString(),
-      humanApproval: options.humanApproval ?? null,
+      humanApproval: sanitizedApproval,
       overallStatus,
       summaryCounts: {
         totalPlannedInvocations: 14,
@@ -386,4 +483,98 @@ export class BoundedCanaryRunner {
       productionRoutingEnforcementAllowed: false,
     };
   }
+}
+
+// =========================================================================
+// Explicit CLI Entrypoint for Phase A.12B.2C-5B Execution
+// Only executes when called directly from the command line.
+// Normal module imports, npm test, and CI runs will NOT invoke this block.
+// =========================================================================
+if (
+  typeof process !== 'undefined' &&
+  Array.isArray(process.argv) &&
+  process.argv[1] &&
+  (process.argv[1].endsWith('boundedCanaryRunner.ts') || process.argv[1].endsWith('boundedCanaryRunner.js'))
+) {
+  const parseCliArgs = () => {
+    const args = process.argv.slice(2);
+    const parsed: Record<string, string | boolean> = {};
+    for (const arg of args) {
+      if (arg.startsWith('--')) {
+        const [key, value] = arg.slice(2).split('=');
+        parsed[key] = value !== undefined ? value : true;
+      }
+    }
+    return parsed;
+  };
+
+  const runCli = async () => {
+    const args = parseCliArgs();
+    const phase = (args['phase'] as string) || 'A.12B.2C-5A';
+    const isLiveIntent = Boolean(args['execute-live-canary']);
+    const approvalToken = args['approval-token'] as string;
+    const approvedBy = args['approved-by'] as string;
+    const maxBudgetUsd = args['max-budget-usd'] ? parseFloat(args['max-budget-usd'] as string) : 0.05;
+    const sourceCommitSha = (args['source-commit'] as string) || (process.env.GIT_COMMIT_SHA || '');
+    const runNonce = (args['run-nonce'] as string) || (process.env.VELNAR_CANARY_RUN_NONCE || '');
+    const capabilitySecret = (args['capability-secret'] as string) || process.env.VELNAR_CANARY_CAPABILITY_SECRET;
+    const outputPath = (args['output'] as string) || 'execution/a12b2c5b_canary_execution_results.json';
+
+    console.log(`[CANARY_CLI] Running Bounded Canary CLI with phase: ${phase}, liveIntent: ${isLiveIntent}`);
+
+    // Install deterministic SIGINT / SIGTERM signal handling
+    const abortController = new AbortController();
+    const handleSignal = (signal: string) => {
+      console.warn(`[CANARY_CLI] Received ${signal}. Terminating canary run fail-closed immediately.`);
+      abortController.abort();
+    };
+    process.on('SIGINT', () => handleSignal('SIGINT'));
+    process.on('SIGTERM', () => handleSignal('SIGTERM'));
+
+    // Construct approval envelope if provided
+    let approvalEnvelope: CanaryHumanApprovalEnvelope | null = null;
+    if (approvalToken && approvedBy) {
+      approvalEnvelope = {
+        approvedBy,
+        approvalTimestamp: (args['approval-timestamp'] as string) || new Date().toISOString(),
+        targetPhase: 'A.12B.2C-5B',
+        approvalToken,
+        maxBudgetUsd,
+        environmentTarget: 'CONTROLLED_CANARY',
+        specificationVersion: CANARY_SPECIFICATION_VERSION,
+        sourceCommitSha,
+        runNonce,
+        capabilitySecret,
+      };
+    }
+
+    const result = await BoundedCanaryRunner.executeDryRunPlan({
+      phase: phase as any,
+      dryRun: !isLiveIntent,
+      humanApproval: approvalEnvelope,
+      capabilitySecret,
+      abortSignal: abortController.signal,
+    });
+
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const fullPath = path.resolve(process.cwd(), outputPath);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, JSON.stringify(result, null, 2), 'utf8');
+      console.log(`[CANARY_CLI] Wrote execution evidence to: ${fullPath}`);
+    } catch (e) {
+      console.error('[CANARY_CLI] Failed to write evidence artifact:', e);
+    }
+
+    console.log(`[CANARY_CLI] Execution finished with overallStatus: ${result.overallStatus}`);
+    if (result.overallStatus === 'CANARY_KILL_SWITCH_TERMINATED') {
+      process.exit(1);
+    }
+  };
+
+  runCli().catch((err) => {
+    console.error('[CANARY_CLI] Fatal unhandled error:', err);
+    process.exit(1);
+  });
 }

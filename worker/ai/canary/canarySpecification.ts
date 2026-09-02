@@ -225,41 +225,102 @@ export interface CanaryHumanApprovalEnvelope {
   approvalToken: string;
   maxBudgetUsd: number;
   environmentTarget: 'CONTROLLED_CANARY';
+  specificationVersion: string;
+  sourceCommitSha: string;
+  runNonce: string;
   capabilitySecret?: string;
 }
 
 export interface HumanApprovalValidationOptions {
   capabilitySecret?: string;
   now?: () => Date;
+  maxAgeSeconds?: number;
   allowSimulatedExpiryForTest?: boolean;
 }
 
-/**
- * Generates a cryptographically bound human approval token.
- * Token format: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<SIGNATURE>
- */
-export function generateCanaryApprovalToken(params: {
+export function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+}
+
+export function isValidCalendarDate(dateStrOrYear: string | number, maybeMonth?: number, maybeDay?: number): boolean {
+  let year: number;
+  let month: number;
+  let day: number;
+
+  if (typeof dateStrOrYear === 'string') {
+    if (!/^\d{8}$/.test(dateStrOrYear)) return false;
+    year = parseInt(dateStrOrYear.slice(0, 4), 10);
+    month = parseInt(dateStrOrYear.slice(4, 6), 10);
+    day = parseInt(dateStrOrYear.slice(6, 8), 10);
+  } else {
+    year = dateStrOrYear;
+    month = maybeMonth ?? 0;
+    day = maybeDay ?? 0;
+  }
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  if (year < 2024 || year > 2099) return false;
+  if (month < 1 || month > 12) return false;
+  if (day < 1) return false;
+  const daysInMonth = [31, (isLeapYear(year) ? 29 : 28), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (day > daysInMonth[month - 1]) return false;
+  return true;
+}
+
+export function computeCanaryHmacSignature(payload: string, secret: string): string {
+  return crypto.createHmac('sha256', secret.trim())
+    .update(payload, 'utf8')
+    .digest('hex')
+    .toLowerCase();
+}
+
+export interface GenerateApprovalTokenParams {
   approvedBy: string;
   targetPhase: 'A.12B.2C-5B';
   environmentTarget: 'CONTROLLED_CANARY';
   dateYyyyMmDd: string;
   maxBudgetUsd: number;
-  capabilitySecret?: string;
-}): string {
-  const canonicalPayload = `${params.approvedBy.trim()}:${params.targetPhase}:${params.environmentTarget}:${params.dateYyyyMmDd}:${params.maxBudgetUsd.toFixed(2)}`;
-  let signature: string;
-  if (params.capabilitySecret) {
-    signature = crypto.createHmac('sha256', params.capabilitySecret).update(canonicalPayload).digest('hex');
-  } else {
-    signature = crypto.createHash('sha256').update(canonicalPayload + ':VELNAR_CANARY_HUMAN_CAPABILITY_V1').digest('hex');
+  approvalTimestamp: string;
+  specificationVersion: string;
+  sourceCommitSha: string;
+  runNonce: string;
+  capabilitySecret: string;
+}
+
+/**
+ * Generates a cryptographically bound human approval token using HMAC-SHA256.
+ * Requires a mandatory capabilitySecret. Public deterministic fallbacks are prohibited.
+ * Token format: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE>
+ */
+export function generateCanaryApprovalToken(params: GenerateApprovalTokenParams): string {
+  if (!params.capabilitySecret || typeof params.capabilitySecret !== 'string' || params.capabilitySecret.trim().length < 16) {
+    throw new Error('generateCanaryApprovalToken: capabilitySecret is mandatory and must be a secret string of at least 16 characters.');
   }
+
+  const canonicalPayload = [
+    params.approvedBy.trim(),
+    params.targetPhase,
+    params.environmentTarget,
+    params.dateYyyyMmDd.trim(),
+    params.maxBudgetUsd.toFixed(2),
+    params.approvalTimestamp.trim(),
+    params.specificationVersion.trim(),
+    params.sourceCommitSha.trim(),
+    params.runNonce.trim(),
+  ].join(':');
+
+  const signature = crypto.createHmac('sha256', params.capabilitySecret.trim())
+    .update(canonicalPayload)
+    .digest('hex');
+
   return `VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_${params.dateYyyyMmDd}_${signature}`;
 }
 
 /**
  * Validates the human approval token against cryptographic bindings.
- * Token must follow exact pattern: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<SIGNATURE>
- * Requires valid date (expiry window), exact phase, exact environment, budget within bounds, and matching cryptographic signature.
+ * Token must follow exact pattern: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE>
+ * Requires valid calendar date, exact phase, exact environment, budget within bounds, valid ISO timestamp,
+ * matching specification version, commit SHA, execution run nonce, and full 64-hex HMAC signature.
  */
 export function validateHumanApprovalToken(
   approval?: CanaryHumanApprovalEnvelope | null,
@@ -280,7 +341,7 @@ export function validateHumanApprovalToken(
     return { valid: false, reason: `Environment target must be 'CONTROLLED_CANARY', received: '${approval.environmentTarget}'.` };
   }
 
-  if (!approval.approvedBy || approval.approvedBy.trim().length < 3) {
+  if (!approval.approvedBy || typeof approval.approvedBy !== 'string' || approval.approvedBy.trim().length < 3) {
     return { valid: false, reason: 'ApprovedBy identifier is invalid or missing.' };
   }
 
@@ -288,49 +349,90 @@ export function validateHumanApprovalToken(
     return { valid: false, reason: `maxBudgetUsd must be a finite number <= allowable canary ceiling of $0.05 (got $${approval.maxBudgetUsd}).` };
   }
 
-  const tokenPattern = /^VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_(\d{8})_([A-Fa-f0-9]{16,64})$/;
+  if (!approval.specificationVersion || approval.specificationVersion.trim() !== CANARY_SPECIFICATION_VERSION) {
+    return { valid: false, reason: `Specification version must match '${CANARY_SPECIFICATION_VERSION}', received: '${approval.specificationVersion}'.` };
+  }
+
+  if (!approval.sourceCommitSha || typeof approval.sourceCommitSha !== 'string' || approval.sourceCommitSha.trim().length < 7) {
+    return { valid: false, reason: 'sourceCommitSha is missing or invalid.' };
+  }
+
+  if (!approval.runNonce || typeof approval.runNonce !== 'string' || approval.runNonce.trim().length < 8) {
+    return { valid: false, reason: 'runNonce is missing or invalid.' };
+  }
+
+  // Capability Secret is strictly MANDATORY
+  const capabilitySecret = approval.capabilitySecret || options?.capabilitySecret;
+  if (!capabilitySecret || typeof capabilitySecret !== 'string' || capabilitySecret.trim().length < 16) {
+    return { valid: false, reason: 'Capability secret is mandatory for human approval verification and must be at least 16 characters (fail-closed).' };
+  }
+
+  // Token Format: Exactly 64 hexadecimal characters for SHA-256 HMAC (256 bits)
+  const tokenPattern = /^VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_(\d{8})_([A-Fa-f0-9]{64})$/;
   const match = approval.approvalToken ? approval.approvalToken.match(tokenPattern) : null;
   if (!match) {
-    return { valid: false, reason: 'Approval token does not match required format VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<SIGNATURE>.' };
+    return { valid: false, reason: 'Approval token does not match required format VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE>.' };
   }
 
   const [, tokenDateStr, tokenSignature] = match;
 
-  // Validate date format and range (YYYYMMDD)
+  // Strict Calendar Date Validation (YYYYMMDD)
   const year = parseInt(tokenDateStr.slice(0, 4), 10);
   const month = parseInt(tokenDateStr.slice(4, 6), 10);
   const day = parseInt(tokenDateStr.slice(6, 8), 10);
-  if (year < 2026 || month < 1 || month > 12 || day < 1 || day > 31) {
+  if (!isValidCalendarDate(year, month, day)) {
     return { valid: false, reason: `Approval token contains invalid calendar date '${tokenDateStr}'.` };
   }
 
-  // Date expiry check (if now provided)
+  // Timestamp format & date alignment validation
+  if (!approval.approvalTimestamp || typeof approval.approvalTimestamp !== 'string') {
+    return { valid: false, reason: 'approvalTimestamp is missing or invalid.' };
+  }
+
+  const parsedTimestamp = new Date(approval.approvalTimestamp);
+  if (isNaN(parsedTimestamp.getTime())) {
+    return { valid: false, reason: `approvalTimestamp '${approval.approvalTimestamp}' is not a valid ISO date.` };
+  }
+
+  const isoDateStr = parsedTimestamp.toISOString().slice(0, 10).replace(/-/g, '');
+  if (isoDateStr !== tokenDateStr) {
+    return { valid: false, reason: `approvalTimestamp date '${isoDateStr}' does not match token date '${tokenDateStr}'.` };
+  }
+
+  // Short operational expiry window (default: 3600 seconds / 1 hour)
   const now = options?.now ? options.now() : new Date();
-  const tokenDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 59));
-  const diffDays = (now.getTime() - tokenDate.getTime()) / (1000 * 60 * 60 * 24);
-  if (!options?.allowSimulatedExpiryForTest && (diffDays > 7 || diffDays < -1)) {
-    return { valid: false, reason: `Approval token date '${tokenDateStr}' has expired or is invalid for current operational window.` };
+  const diffSeconds = (now.getTime() - parsedTimestamp.getTime()) / 1000;
+  const maxAgeSeconds = options?.maxAgeSeconds ?? 3600;
+
+  if (!options?.allowSimulatedExpiryForTest && (diffSeconds > maxAgeSeconds || diffSeconds < -60)) {
+    return { valid: false, reason: `Approval token has expired or is outside active operational window (age: ${Math.round(diffSeconds)}s, max: ${maxAgeSeconds}s).` };
   }
 
-  // Cryptographic capability verification
-  const capabilitySecret = approval.capabilitySecret || options?.capabilitySecret;
-  const canonicalPayload = `${approval.approvedBy.trim()}:${approval.targetPhase}:${approval.environmentTarget}:${tokenDateStr}:${approval.maxBudgetUsd.toFixed(2)}`;
-  
-  let expectedSignature: string;
-  if (capabilitySecret) {
-    expectedSignature = crypto.createHmac('sha256', capabilitySecret).update(canonicalPayload).digest('hex');
-  } else {
-    expectedSignature = crypto.createHash('sha256').update(canonicalPayload + ':VELNAR_CANARY_HUMAN_CAPABILITY_V1').digest('hex');
-  }
+  // Cryptographic capability HMAC-SHA256 verification
+  const canonicalPayload = [
+    approval.approvedBy.trim(),
+    approval.targetPhase,
+    approval.environmentTarget,
+    tokenDateStr,
+    approval.maxBudgetUsd.toFixed(2),
+    approval.approvalTimestamp.trim(),
+    approval.specificationVersion.trim(),
+    approval.sourceCommitSha.trim(),
+    approval.runNonce.trim(),
+  ].join(':');
 
-  // Check constant-time equality or prefix match if truncated hex
+  const expectedSignature = crypto.createHmac('sha256', capabilitySecret.trim())
+    .update(canonicalPayload)
+    .digest('hex');
+
+  // Full 32-byte constant-time comparison
   const sigBuf = Buffer.from(tokenSignature.toLowerCase(), 'hex');
-  const expBuf = Buffer.from(expectedSignature.toLowerCase().slice(0, tokenSignature.length), 'hex');
+  const expBuf = Buffer.from(expectedSignature.toLowerCase(), 'hex');
 
-  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+  if (sigBuf.length !== 32 || expBuf.length !== 32 || !crypto.timingSafeEqual(sigBuf, expBuf)) {
     return {
       valid: false,
-      reason: 'Approval signature failed cryptographic capability verification (tampered, forged, or mismatched envelope parameters).',
+      reason: 'Approval signature failed cryptographic capability verification (tampered parameters, forged signature, or mismatched capability secret).',
     };
   }
 

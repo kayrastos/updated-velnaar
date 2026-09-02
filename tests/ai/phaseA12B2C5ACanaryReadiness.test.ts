@@ -137,9 +137,13 @@ describe('Phase A.12B.2C-5A — Bounded Canary Readiness & Safety Invariants', (
       approvedBy: 'security-lead@velnar.internal',
       approvalTimestamp: '2026-09-02T12:00:00Z',
       targetPhase: 'A.12B.2C-5A' as any,
-      approvalToken: 'VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_20260902_abcdef0123456789abcdef',
+      approvalToken: 'VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_20260902_abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
       maxBudgetUsd: 0.05,
       environmentTarget: 'CONTROLLED_CANARY',
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+      runNonce: 'nonce-readiness-test-12345678',
+      capabilitySecret: 'secret-key-min-16-chars!',
     };
     expect(validateHumanApprovalToken(wrongPhase).valid).toBe(false);
 
@@ -148,9 +152,13 @@ describe('Phase A.12B.2C-5A — Bounded Canary Readiness & Safety Invariants', (
       approvedBy: 'security-lead@velnar.internal',
       approvalTimestamp: '2026-09-02T12:00:00Z',
       targetPhase: 'A.12B.2C-5B',
-      approvalToken: 'VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_20260902_abcdef0123456789abcdef',
+      approvalToken: 'VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_20260902_abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
       maxBudgetUsd: 0.05,
       environmentTarget: 'PRODUCTION' as any,
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+      runNonce: 'nonce-readiness-test-12345678',
+      capabilitySecret: 'secret-key-min-16-chars!',
     };
     expect(validateHumanApprovalToken(wrongEnv).valid).toBe(false);
 
@@ -159,9 +167,13 @@ describe('Phase A.12B.2C-5A — Bounded Canary Readiness & Safety Invariants', (
       approvedBy: 'security-lead@velnar.internal',
       approvalTimestamp: '2026-09-02T12:00:00Z',
       targetPhase: 'A.12B.2C-5B',
-      approvalToken: 'VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_20260902_abcdef0123456789abcdef',
+      approvalToken: 'VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_20260902_abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
       maxBudgetUsd: 10.0,
       environmentTarget: 'CONTROLLED_CANARY',
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+      runNonce: 'nonce-readiness-test-12345678',
+      capabilitySecret: 'secret-key-min-16-chars!',
     };
     expect(validateHumanApprovalToken(excessiveBudget).valid).toBe(false);
 
@@ -173,6 +185,10 @@ describe('Phase A.12B.2C-5A — Bounded Canary Readiness & Safety Invariants', (
       approvalToken: 'MALFORMED_UNAUTHORIZED_TOKEN',
       maxBudgetUsd: 0.05,
       environmentTarget: 'CONTROLLED_CANARY',
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+      runNonce: 'nonce-readiness-test-12345678',
+      capabilitySecret: 'secret-key-min-16-chars!',
     };
     expect(validateHumanApprovalToken(malformedToken).valid).toBe(false);
 
@@ -183,6 +199,11 @@ describe('Phase A.12B.2C-5A — Bounded Canary Readiness & Safety Invariants', (
       environmentTarget: 'CONTROLLED_CANARY',
       dateYyyyMmDd: '20260902',
       maxBudgetUsd: 0.05,
+      approvalTimestamp: '2026-09-02T12:00:00Z',
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+      runNonce: 'nonce-readiness-test-12345678',
+      capabilitySecret: 'secret-key-min-16-chars!',
     });
     const validEnvelope: CanaryHumanApprovalEnvelope = {
       approvedBy: 'auditor-primary@velnar.internal',
@@ -191,8 +212,12 @@ describe('Phase A.12B.2C-5A — Bounded Canary Readiness & Safety Invariants', (
       approvalToken: token,
       maxBudgetUsd: 0.05,
       environmentTarget: 'CONTROLLED_CANARY',
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      sourceCommitSha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+      runNonce: 'nonce-readiness-test-12345678',
+      capabilitySecret: 'secret-key-min-16-chars!',
     };
-    expect(validateHumanApprovalToken(validEnvelope, { now: () => new Date('2026-09-02T12:00:00Z') }).valid).toBe(true);
+    expect(validateHumanApprovalToken(validEnvelope, { now: () => new Date('2026-09-02T12:00:00Z'), allowSimulatedExpiryForTest: true }).valid).toBe(true);
   });
 
   it('verifies that Phase A.12B.2C-5A dry-run plan executes cleanly with 0 network calls and produces valid evidence', async () => {
