@@ -1,0 +1,46 @@
+{
+  "phase": "A.12B.2C-4",
+  "auditTimestamp": "2026-09-02T14:49:43.199Z",
+  "finalAuditStatus": "A.12B.2C-4 = AUDIT_PASS_CANARY_GATE_ELIGIBLE",
+  "summary": {
+    "totalFindings": 1,
+    "blockers": 0,
+    "majors": 0,
+    "minors": 0,
+    "infos": 1
+  },
+  "verifications": {
+    "canonicalArtifactIntegrity": true,
+    "canonicalInvocationCount": 132,
+    "deepseekProvenanceCount": 66,
+    "geminiProvenanceCount": 66,
+    "totalProvenancePassCount": 132,
+    "provenanceMismatchCount": 0,
+    "realNetworkCalls": 0,
+    "unexpectedNetworkAttempts": 0,
+    "blockedCaseFetches": 0,
+    "routingMismatches": 0,
+    "requestContractParityPassed": true,
+    "fallbackContractPassed": true,
+    "fallbackSequencingPassed": true,
+    "privacyReplayPassed": true,
+    "pricingScheduleReplayPassed": true,
+    "dormantIsolationGuaranteed": true,
+    "aiRouterUntouchedByCertifiedAdapters": true
+  },
+  "findings": [
+    {
+      "id": "AUDIT-RAW-REPLAY-LIMITATION-INFO",
+      "category": "REPRODUCIBILITY",
+      "severity": "INFO",
+      "description": "exactSemanticReplayCount = 0 is expected and honest because canonical artifact preserves parsedOutput JSON rather than raw unformatted provider response strings. Normalized score matching achieved 127/127 for valid schema outputs.",
+      "evidence": {
+        "exactSemanticReplayCount": 0,
+        "normalizedScoreMatchCount": 127,
+        "notReplayableFromPreservedEvidenceCount": 5,
+        "rawReplayLimitationAcknowledged": true
+      },
+      "status": "ACCEPTED"
+    }
+  ]
+}
