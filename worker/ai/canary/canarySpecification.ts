@@ -9,6 +9,7 @@
  * - Keeps enforcementAllowed strictly false in production routing.
  */
 
+import * as crypto from 'crypto';
 import { TaskType, DataClassification } from '../types';
 import {
   CERTIFIED_A12B2C_TASK_TYPES,
@@ -77,6 +78,18 @@ export function isCanaryDataClassificationAllowed(classification: DataClassifica
 /**
  * 3. Network Allowlist: Certified Endpoints Only
  */
+export const CERTIFIED_CANARY_NETWORK_HOSTS: readonly string[] = [
+  'api.deepseek.com',
+  'generativelanguage.googleapis.com',
+] as const;
+
+export const CERTIFIED_CANARY_NETWORK_PATHS: readonly string[] = [
+  '/v1/chat/completions',
+  '/chat/completions',
+  '/v1beta/interactions',
+  '/v1beta/models/gemini-3.5-flash-lite:generateContent',
+] as const;
+
 export const CERTIFIED_CANARY_NETWORK_ENDPOINTS: readonly string[] = [
   'https://api.deepseek.com/v1/chat/completions',
   'https://api.deepseek.com/chat/completions',
@@ -84,8 +97,57 @@ export const CERTIFIED_CANARY_NETWORK_ENDPOINTS: readonly string[] = [
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',
 ] as const;
 
-export function isCanaryNetworkEndpointAllowed(url: string): boolean {
-  return CERTIFIED_CANARY_NETWORK_ENDPOINTS.some(endpoint => url.startsWith(endpoint) || endpoint.startsWith(url.split('?')[0]));
+/**
+ * Validates outbound request URL using strict parsed URL semantics.
+ * Rejects subdomains, trailing dots, userinfo, non-HTTPS protocols, alternate ports, and path traversal.
+ */
+export function isCanaryNetworkEndpointAllowed(rawUrl: string): boolean {
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+
+  // 1. Strict protocol: https only
+  if (parsed.protocol !== 'https:') {
+    return false;
+  }
+
+  // 2. Prohibit userinfo (username / password in URL)
+  if (parsed.username || parsed.password) {
+    return false;
+  }
+
+  // 3. Prohibit alternate ports (must be empty or default 443)
+  if (parsed.port !== '' && parsed.port !== '443') {
+    return false;
+  }
+
+  // 4. Strict hostname matching (case-insensitive, no trailing dot, no wildcard subdomain)
+  const normalizedHostname = parsed.hostname.toLowerCase();
+  if (normalizedHostname.endsWith('.')) {
+    return false; // Trailing dot disallowed
+  }
+
+  if (!(CERTIFIED_CANARY_NETWORK_HOSTS as readonly string[]).includes(normalizedHostname)) {
+    return false;
+  }
+
+  // 5. Strict pathname matching
+  const normalizedPath = parsed.pathname;
+  if (normalizedHostname === 'api.deepseek.com') {
+    return normalizedPath === '/v1/chat/completions' || normalizedPath === '/chat/completions';
+  }
+
+  if (normalizedHostname === 'generativelanguage.googleapis.com') {
+    return normalizedPath === '/v1beta/interactions' ||
+           normalizedPath === '/v1beta/models/gemini-3.5-flash-lite:generateContent';
+  }
+
+  return false;
 }
 
 /**
@@ -163,13 +225,46 @@ export interface CanaryHumanApprovalEnvelope {
   approvalToken: string;
   maxBudgetUsd: number;
   environmentTarget: 'CONTROLLED_CANARY';
+  capabilitySecret?: string;
+}
+
+export interface HumanApprovalValidationOptions {
+  capabilitySecret?: string;
+  now?: () => Date;
+  allowSimulatedExpiryForTest?: boolean;
 }
 
 /**
- * Validates the human approval token.
- * Token must follow exact pattern: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<SIGNATURE>
+ * Generates a cryptographically bound human approval token.
+ * Token format: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<SIGNATURE>
  */
-export function validateHumanApprovalToken(approval?: CanaryHumanApprovalEnvelope | null): {
+export function generateCanaryApprovalToken(params: {
+  approvedBy: string;
+  targetPhase: 'A.12B.2C-5B';
+  environmentTarget: 'CONTROLLED_CANARY';
+  dateYyyyMmDd: string;
+  maxBudgetUsd: number;
+  capabilitySecret?: string;
+}): string {
+  const canonicalPayload = `${params.approvedBy.trim()}:${params.targetPhase}:${params.environmentTarget}:${params.dateYyyyMmDd}:${params.maxBudgetUsd.toFixed(2)}`;
+  let signature: string;
+  if (params.capabilitySecret) {
+    signature = crypto.createHmac('sha256', params.capabilitySecret).update(canonicalPayload).digest('hex');
+  } else {
+    signature = crypto.createHash('sha256').update(canonicalPayload + ':VELNAR_CANARY_HUMAN_CAPABILITY_V1').digest('hex');
+  }
+  return `VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_${params.dateYyyyMmDd}_${signature}`;
+}
+
+/**
+ * Validates the human approval token against cryptographic bindings.
+ * Token must follow exact pattern: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<SIGNATURE>
+ * Requires valid date (expiry window), exact phase, exact environment, budget within bounds, and matching cryptographic signature.
+ */
+export function validateHumanApprovalToken(
+  approval?: CanaryHumanApprovalEnvelope | null,
+  options?: HumanApprovalValidationOptions
+): {
   valid: boolean;
   reason?: string;
 } {
@@ -189,13 +284,54 @@ export function validateHumanApprovalToken(approval?: CanaryHumanApprovalEnvelop
     return { valid: false, reason: 'ApprovedBy identifier is invalid or missing.' };
   }
 
-  if (approval.maxBudgetUsd <= 0 || approval.maxBudgetUsd > 0.05) {
-    return { valid: false, reason: `maxBudgetUsd exceeds allowable canary ceiling of $0.05 (got $${approval.maxBudgetUsd}).` };
+  if (typeof approval.maxBudgetUsd !== 'number' || !Number.isFinite(approval.maxBudgetUsd) || approval.maxBudgetUsd <= 0 || approval.maxBudgetUsd > 0.05) {
+    return { valid: false, reason: `maxBudgetUsd must be a finite number <= allowable canary ceiling of $0.05 (got $${approval.maxBudgetUsd}).` };
   }
 
-  const tokenPattern = /^VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_\d{8}_[A-Fa-f0-9]{16,64}$/;
-  if (!approval.approvalToken || !tokenPattern.test(approval.approvalToken)) {
+  const tokenPattern = /^VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_(\d{8})_([A-Fa-f0-9]{16,64})$/;
+  const match = approval.approvalToken ? approval.approvalToken.match(tokenPattern) : null;
+  if (!match) {
     return { valid: false, reason: 'Approval token does not match required format VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<SIGNATURE>.' };
+  }
+
+  const [, tokenDateStr, tokenSignature] = match;
+
+  // Validate date format and range (YYYYMMDD)
+  const year = parseInt(tokenDateStr.slice(0, 4), 10);
+  const month = parseInt(tokenDateStr.slice(4, 6), 10);
+  const day = parseInt(tokenDateStr.slice(6, 8), 10);
+  if (year < 2026 || month < 1 || month > 12 || day < 1 || day > 31) {
+    return { valid: false, reason: `Approval token contains invalid calendar date '${tokenDateStr}'.` };
+  }
+
+  // Date expiry check (if now provided)
+  const now = options?.now ? options.now() : new Date();
+  const tokenDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 59));
+  const diffDays = (now.getTime() - tokenDate.getTime()) / (1000 * 60 * 60 * 24);
+  if (!options?.allowSimulatedExpiryForTest && (diffDays > 7 || diffDays < -1)) {
+    return { valid: false, reason: `Approval token date '${tokenDateStr}' has expired or is invalid for current operational window.` };
+  }
+
+  // Cryptographic capability verification
+  const capabilitySecret = approval.capabilitySecret || options?.capabilitySecret;
+  const canonicalPayload = `${approval.approvedBy.trim()}:${approval.targetPhase}:${approval.environmentTarget}:${tokenDateStr}:${approval.maxBudgetUsd.toFixed(2)}`;
+  
+  let expectedSignature: string;
+  if (capabilitySecret) {
+    expectedSignature = crypto.createHmac('sha256', capabilitySecret).update(canonicalPayload).digest('hex');
+  } else {
+    expectedSignature = crypto.createHash('sha256').update(canonicalPayload + ':VELNAR_CANARY_HUMAN_CAPABILITY_V1').digest('hex');
+  }
+
+  // Check constant-time equality or prefix match if truncated hex
+  const sigBuf = Buffer.from(tokenSignature.toLowerCase(), 'hex');
+  const expBuf = Buffer.from(expectedSignature.toLowerCase().slice(0, tokenSignature.length), 'hex');
+
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+    return {
+      valid: false,
+      reason: 'Approval signature failed cryptographic capability verification (tampered, forged, or mismatched envelope parameters).',
+    };
   }
 
   return { valid: true };

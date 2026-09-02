@@ -213,7 +213,7 @@ export class BoundedCanaryRunner {
 
     // Rule 2: If Phase A.12B.2C-5B is requested, validate approval envelope
     if (phase === 'A.12B.2C-5B') {
-      const approvalValidation = validateHumanApprovalToken(options.humanApproval);
+      const approvalValidation = validateHumanApprovalToken(options.humanApproval, { now, allowSimulatedExpiryForTest: isDryRun });
       if (!approvalValidation.valid) {
         killSwitchEvents.push({
           timestamp: now().toISOString(),
