@@ -46,8 +46,51 @@ describe('Phase A.12B.2C-5A.4.1 — Evidence-to-Source Consistency & Anti-Drift 
   });
 
   const evidenceFilePath = path.resolve(process.cwd(), 'execution/a12b2c5a4_1_provider_rest_parity_results.json');
+  const vitestSummaryFilePath = path.resolve(process.cwd(), 'execution/a12b2c5a4_1_vitest_summary.json');
 
-  it('verifies evidence JSON file exists and has valid structure', () => {
+  function assertVitestSummaryMatchesProviderParity(vitestSummary: any, parityResults: any): void {
+    // 1. testFilesPassed / passedTestFiles
+    if (vitestSummary.passedTestFiles !== parityResults.verificationSummary.testFilesPassed) {
+      throw new Error(
+        `TEST_FILES_MISMATCH: vitestSummary.passedTestFiles (${vitestSummary.passedTestFiles}) !== parityResults.verificationSummary.testFilesPassed (${parityResults.verificationSummary.testFilesPassed})`
+      );
+    }
+
+    // 2. totalTestsPassed / passedTests
+    if (vitestSummary.passedTests !== parityResults.verificationSummary.totalTestsPassed) {
+      throw new Error(
+        `TOTAL_TESTS_MISMATCH: vitestSummary.passedTests (${vitestSummary.passedTests}) !== parityResults.verificationSummary.totalTestsPassed (${parityResults.verificationSummary.totalTestsPassed})`
+      );
+    }
+
+    // 3. failedTests
+    if (vitestSummary.failedTests !== parityResults.verificationSummary.failedTests) {
+      throw new Error(
+        `FAILED_TESTS_MISMATCH: vitestSummary.failedTests (${vitestSummary.failedTests}) !== parityResults.verificationSummary.failedTests (${parityResults.verificationSummary.failedTests})`
+      );
+    }
+    if (vitestSummary.failedTests !== 0 || parityResults.verificationSummary.failedTests !== 0) {
+      throw new Error(
+        `NONZERO_FAILED_TESTS: failed tests detected (vitest=${vitestSummary.failedTests}, parity=${parityResults.verificationSummary.failedTests})`
+      );
+    }
+
+    // 4. network calls = 0
+    if (vitestSummary.networkCallsDetected !== 0 || parityResults.totalLiveNetworkCallsExecuted !== 0) {
+      throw new Error(
+        `NETWORK_CALLS_VIOLATION: network calls detected (vitest=${vitestSummary.networkCallsDetected}, parity=${parityResults.totalLiveNetworkCallsExecuted})`
+      );
+    }
+
+    // 5. enforcementAllowed = false
+    if (vitestSummary.enforcementAllowed !== false || parityResults.productionRoutingEnforcementAllowed !== false) {
+      throw new Error(
+        `ENFORCEMENT_ALLOWED_VIOLATION: enforcementAllowed must be false (vitest=${vitestSummary.enforcementAllowed}, parity=${parityResults.productionRoutingEnforcementAllowed})`
+      );
+    }
+  }
+
+  it('verifies evidence JSON and vitest summary files exist, have valid structure, and strictly agree', () => {
     expect(fs.existsSync(evidenceFilePath)).toBe(true);
     const raw = fs.readFileSync(evidenceFilePath, 'utf-8');
     const json = JSON.parse(raw);
@@ -56,6 +99,32 @@ describe('Phase A.12B.2C-5A.4.1 — Evidence-to-Source Consistency & Anti-Drift 
     expect(json.totalLiveNetworkCallsExecuted).toBe(0);
     expect(json.productionRoutingEnforcementAllowed).toBe(false);
     expect(json.humanAuthorizationStatus).toBe('NOT_YET_GRANTED');
+
+    expect(fs.existsSync(vitestSummaryFilePath)).toBe(true);
+    const vitestRaw = fs.readFileSync(vitestSummaryFilePath, 'utf-8');
+    const vitestJson = JSON.parse(vitestRaw);
+    expect(vitestJson.phase).toBe('A.12B.2C-5A.4.1');
+    expect(vitestJson.allGatesPassing).toBe(true);
+    expect(vitestJson.productionRoutingActive).toBe(false);
+
+    // Assert strict agreement across all required verification metrics
+    expect(() => assertVitestSummaryMatchesProviderParity(vitestJson, json)).not.toThrow();
+
+    // Explicit field-level equality assertions
+    expect(vitestJson.passedTestFiles).toBe(json.verificationSummary.testFilesPassed);
+    expect(vitestJson.passedTests).toBe(json.verificationSummary.totalTestsPassed);
+    expect(vitestJson.failedTests).toBe(json.verificationSummary.failedTests);
+    expect(vitestJson.failedTests).toBe(0);
+    expect(json.verificationSummary.failedTests).toBe(0);
+    expect(vitestJson.networkCallsDetected).toBe(0);
+    expect(json.totalLiveNetworkCallsExecuted).toBe(0);
+    expect(vitestJson.enforcementAllowed).toBe(false);
+    expect(json.productionRoutingEnforcementAllowed).toBe(false);
+
+    // Verify each certified task has enforcementAllowed === false
+    for (const [taskName, status] of Object.entries(json.enforcementAllowedStatus as Record<string, { enforcementAllowed: boolean }>)) {
+      expect(status.enforcementAllowed).toBe(false);
+    }
   });
 
   it('proves DeepSeek sealed evidence strictly agrees with CERTIFIED_CANARY_CANDIDATES', () => {
@@ -187,10 +256,11 @@ describe('Phase A.12B.2C-5A.4.1 — Evidence-to-Source Consistency & Anti-Drift 
     expect(json.canaryInvocationLimits.timeoutMsPerInvocation).toBe(CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation);
   });
 
-  it('fails immediately if a simulated drift in pricing occurs between executable source and evidence', () => {
+  it('fails immediately if a simulated drift in pricing or vitest summary occurs between executable source and evidence', () => {
     const json = JSON.parse(fs.readFileSync(evidenceFilePath, 'utf-8'));
+    const vitestJson = JSON.parse(fs.readFileSync(vitestSummaryFilePath, 'utf-8'));
     
-    // Test that an assertion function catches drift
+    // Test that an assertion function catches pricing drift
     function verifyConsistency(evidence: any) {
       if (evidence.providerTargets.deepseek.certifiedCandidate !== 'deepseek-v4-flash-offpeak-low') {
         throw new Error('CANDIDATE_DRIFT_DETECTED');
@@ -206,6 +276,43 @@ describe('Phase A.12B.2C-5A.4.1 — Evidence-to-Source Consistency & Anti-Drift 
     const drifted = JSON.parse(JSON.stringify(json));
     drifted.providerTargets.deepseek.pricingSnapshot.OFF_PEAK.outputPerMillionTokens = 1.10;
     expect(() => verifyConsistency(drifted)).toThrow('PRICING_DRIFT_DETECTED');
+
+    // Anti-Drift: vitest_summary.json vs provider_rest_parity_results.json
+    // Valid canonical state must not throw:
+    expect(() => assertVitestSummaryMatchesProviderParity(vitestJson, json)).not.toThrow();
+
+    // 1. Disagreement on passedTestFiles / testFilesPassed
+    const driftedFiles = JSON.parse(JSON.stringify(vitestJson));
+    driftedFiles.passedTestFiles = 38;
+    expect(() => assertVitestSummaryMatchesProviderParity(driftedFiles, json)).toThrow('TEST_FILES_MISMATCH');
+
+    // 2. Disagreement on passedTests / totalTestsPassed
+    const driftedTests = JSON.parse(JSON.stringify(vitestJson));
+    driftedTests.passedTests = 697;
+    expect(() => assertVitestSummaryMatchesProviderParity(driftedTests, json)).toThrow('TOTAL_TESTS_MISMATCH');
+
+    // 3. Disagreement on failedTests
+    const driftedFailed = JSON.parse(JSON.stringify(vitestJson));
+    driftedFailed.failedTests = 1;
+    expect(() => assertVitestSummaryMatchesProviderParity(driftedFailed, json)).toThrow('FAILED_TESTS_MISMATCH');
+
+    // 4. Disagreement on network calls = 0
+    const driftedNetwork = JSON.parse(JSON.stringify(vitestJson));
+    driftedNetwork.networkCallsDetected = 1;
+    expect(() => assertVitestSummaryMatchesProviderParity(driftedNetwork, json)).toThrow('NETWORK_CALLS_VIOLATION');
+
+    const driftedParityNetwork = JSON.parse(JSON.stringify(json));
+    driftedParityNetwork.totalLiveNetworkCallsExecuted = 1;
+    expect(() => assertVitestSummaryMatchesProviderParity(vitestJson, driftedParityNetwork)).toThrow('NETWORK_CALLS_VIOLATION');
+
+    // 5. Disagreement on enforcementAllowed = false
+    const driftedEnforcement = JSON.parse(JSON.stringify(vitestJson));
+    driftedEnforcement.enforcementAllowed = true;
+    expect(() => assertVitestSummaryMatchesProviderParity(driftedEnforcement, json)).toThrow('ENFORCEMENT_ALLOWED_VIOLATION');
+
+    const driftedParityEnforcement = JSON.parse(JSON.stringify(json));
+    driftedParityEnforcement.productionRoutingEnforcementAllowed = true;
+    expect(() => assertVitestSummaryMatchesProviderParity(vitestJson, driftedParityEnforcement)).toThrow('ENFORCEMENT_ALLOWED_VIOLATION');
   });
 
   it('strictly confirmed 0 live network calls made during offline suite', () => {
