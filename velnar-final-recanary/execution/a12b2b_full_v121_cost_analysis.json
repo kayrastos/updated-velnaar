@@ -1,0 +1,31 @@
+{
+  "deepseek": {
+    "officialOffPeakWindowVerified": true,
+    "pricingCatalogVersion": "2026-08-31-v1",
+    "offPeakCacheHitRateMicroUsdPer1M": 7000,
+    "offPeakCacheMissRateMicroUsdPer1M": 220000,
+    "offPeakOutputRateMicroUsdPer1M": 660000,
+    "totalCacheHitTokens": 29696,
+    "totalCacheMissTokens": 5120,
+    "cacheHitRatioBps": 8529,
+    "actualOffPeakCostMicroUsd": 22951,
+    "coldCacheOffPeakCostMicroUsd": 29275,
+    "coldCachePeakCostMicroUsd": 58544,
+    "realizedCacheSavingBps": 2160,
+    "realizedOffPeakSavingBps": 4999,
+    "combinedRealizedSavingBps": 6080,
+    "specificDiscountedTokenSegment": "DeepSeek ~98% discount rate applies strictly to off-peak cache-hit input ($0.007/1M) vs peak cache-miss input ($0.44/1M)."
+  },
+  "gemini": {
+    "flexTierConfirmed": true,
+    "pricingCatalogVersion": "2026-08-31-v1",
+    "flexInputRateMicroUsdPer1M": 150000,
+    "flexOutputRateMicroUsdPer1M": 1250000,
+    "standardInputRateMicroUsdPer1M": 300000,
+    "standardOutputRateMicroUsdPer1M": 2500000,
+    "actualFlexCostMicroUsd": 22540,
+    "normalizedStandardCostMicroUsd": 45068,
+    "realizedFlexSavingBps": 4999,
+    "cacheStatus": "VERIFIED"
+  }
+}

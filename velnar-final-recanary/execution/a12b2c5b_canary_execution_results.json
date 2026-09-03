@@ -1,0 +1,43 @@
+{
+  "phase": "A.12B.2C-5B",
+  "specificationVersion": "a12b2c5-v1.1",
+  "executionMode": "LIVE_CONTROLLED_CANARY",
+  "timestamp": "2026-09-02T20:27:08.771Z",
+  "humanApproval": {
+    "approvedBy": "security-lead@velnar.internal",
+    "approvalTimestamp": "2026-09-02T20:27:07.746Z",
+    "targetPhase": "A.12B.2C-5B",
+    "approvalToken": "VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_20260902_4626a5caba569ce45247579ee2c119356e5b8a40d1133331063dd53be5857bb9",
+    "maxBudgetMicroUsd": 50000,
+    "maxBudgetUsd": 0.05,
+    "environmentTarget": "CONTROLLED_CANARY",
+    "specificationVersion": "a12b2c5-v1.1",
+    "sourceCommitSha": "0de3c2d639be6234ff2e8a3b2603be82c9bf6b2a",
+    "runNonce": "bd8045b9ebaae414dc1bfc45e1f03907"
+  },
+  "overallStatus": "CANARY_KILL_SWITCH_TERMINATED",
+  "logicalCaseCount": 0,
+  "transportAttemptCount": 0,
+  "completedRequiredMatrixCases": 0,
+  "summaryCounts": {
+    "totalPlannedInvocations": 14,
+    "executedInvocations": 0,
+    "passedInvocations": 0,
+    "failedInvocations": 0,
+    "killSwitchEventsCount": 1,
+    "totalObservedCostMicroUsd": 0,
+    "totalEstimatedCostMicroUsd": 0,
+    "aggregateSemanticScore": 0
+  },
+  "attemptRecords": [],
+  "invocations": [],
+  "killSwitchEvents": [
+    {
+      "timestamp": "2026-09-02T20:27:08.771Z",
+      "reason": "HUMAN_APPROVAL_INVALID",
+      "message": "Git verification failed (git command failed or repository unreadable): Command failed: git rev-parse HEAD. Fail-closed with 0 calls.",
+      "terminatedFailClosed": true
+    }
+  ],
+  "productionRoutingEnforcementAllowed": false
+}

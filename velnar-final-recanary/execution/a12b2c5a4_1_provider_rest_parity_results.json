@@ -1,0 +1,151 @@
+{
+  "phase": "A.12B.2C-5A.4.1",
+  "auditTimestamp": "2026-09-02T16:40:21.000Z",
+  "status": "PROVIDER_REST_PARITY_VERIFIED_OPERATOR_CONTRACT_SEALED",
+  "offlineVerificationComplete": true,
+  "totalLiveNetworkCallsExecuted": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "humanAuthorizationStatus": "NOT_YET_GRANTED",
+  "technicalEligibilityStatus": "ELIGIBLE",
+  "providerTargets": {
+    "deepseek": {
+      "providerId": "deepseek",
+      "modelId": "deepseek-v4-flash",
+      "certifiedCandidate": "deepseek-v4-flash-offpeak-low",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "certifiedPricingTier": "offpeak",
+      "reasoningEffort": "low",
+      "reasoningBudgetTokens": 2048,
+      "method": "POST",
+      "requiredServiceTier": null,
+      "responseSchemaKeysChecked": [
+        "choices",
+        "choices[0].message.content",
+        "usage.prompt_tokens",
+        "usage.completion_tokens",
+        "usage.prompt_cache_hit_tokens",
+        "usage.prompt_cache_miss_tokens",
+        "usage.completion_tokens_details.reasoning_tokens"
+      ],
+      "pricingSnapshot": {
+        "OFF_PEAK": {
+          "cacheHitPerMillionTokens": 0.007,
+          "cacheHitRateMicroUsd": 0.007,
+          "cacheMissPerMillionTokens": 0.22,
+          "cacheMissRateMicroUsd": 0.22,
+          "outputPerMillionTokens": 0.66,
+          "outputRateMicroUsd": 0.66
+        },
+        "PEAK": {
+          "cacheHitPerMillionTokens": 0.014,
+          "cacheHitRateMicroUsd": 0.014,
+          "cacheMissPerMillionTokens": 0.44,
+          "cacheMissRateMicroUsd": 0.44,
+          "outputPerMillionTokens": 1.32,
+          "outputRateMicroUsd": 1.32
+        }
+      },
+      "pricingRatesChecked": {
+        "cacheHitPerMillionTokens": 0.007,
+        "cacheHitRateMicroUsd": 0.007,
+        "cacheMissPerMillionTokens": 0.22,
+        "cacheMissRateMicroUsd": 0.22,
+        "outputPerMillionTokens": 0.66,
+        "outputRateMicroUsd": 0.66,
+        "reasoningTokenRateMicroUsd": 0.66
+      },
+      "arithmeticCacheValidationEquation": {
+        "formula": "prompt_tokens === prompt_cache_hit_tokens + prompt_cache_miss_tokens",
+        "inconsistencyHandling": "CACHE_ARITHMETIC_INCONSISTENCY (fail-closed)"
+      }
+    },
+    "gemini": {
+      "providerId": "gemini",
+      "modelId": "gemini-3.5-flash-lite",
+      "certifiedCandidate": "gemini-3.5-flash-lite-flex-low",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/interactions",
+      "method": "POST",
+      "requiredServiceTier": "flex",
+      "thinkingLevel": "low",
+      "responseSchemaKeysChecked": [
+        "model",
+        "service_tier",
+        "steps",
+        "steps[].type == 'model_output'",
+        "steps[].content[].type == 'text'",
+        "steps[].content[].text",
+        "usage.total_input_tokens",
+        "usage.total_output_tokens",
+        "usage.total_thought_tokens",
+        "usage.total_cached_tokens",
+        "usage.total_tokens",
+        "usage.non_cached_input_tokens"
+      ],
+      "provenanceContract": {
+        "requiredCondition": "responseJson.service_tier === 'flex'",
+        "missingNullOrMismatchHandling": "PROVENANCE_MISMATCH (immediate fail-closed kill switch)",
+        "evidenceContract": "preserve requestedServiceTier and providerReportedServiceTier separately with zero silent tier substitution"
+      },
+      "pricingRatesChecked": {
+        "flexInputCachedPerMillionTokens": 0.0375,
+        "flexInputNonCachedPerMillionTokens": 0.15,
+        "flexOutputPerMillionTokens": 1.25,
+        "standardInputPerMillionTokens": 0.30,
+        "standardOutputPerMillionTokens": 2.50
+      },
+      "arithmeticCacheValidationEquation": {
+        "formula": "total_input_tokens === total_cached_tokens + non_cached_input_tokens",
+        "verificationRequirement": "CacheStatus marked VERIFIED strictly when formula holds"
+      }
+    }
+  },
+  "canaryCostLimits": {
+    "maxEstimatedCostMicroUsd": 25000,
+    "hardCeilingMicroUsd": 50000,
+    "maxSingleInvocationMicroUsd": 5000
+  },
+  "canaryInvocationLimits": {
+    "maxTotalInvocations": 14,
+    "maxInvocationsPerProvider": 7,
+    "maxSameProviderRetries": 1,
+    "maxCrossProviderFallbacks": 1,
+    "maxConcurrentInvocations": 1,
+    "timeoutMsPerInvocation": 15000
+  },
+  "tokenGeneratorContract": {
+    "cliInvocationPattern": "npm run generate-canary-token -- --approved-by=\"<IDENTITY>\" --max-budget-micro-usd=50000 --target-phase=\"A.12B.2C-5B\"",
+    "parsedArguments": [
+      "--approved-by",
+      "--max-budget-micro-usd",
+      "--target-phase",
+      "--source-commit-sha",
+      "--allow-dirty-git"
+    ],
+    "unauthorizedArgumentHandling": "Reject fail-closed with exit code 1",
+    "canonicalApprovedByIdentity": "security-lead@velnar.internal",
+    "capabilitySecretConstraint": {
+      "regex": "^[0-9a-f]{64}$",
+      "entropyBits": 256,
+      "sourceChannel": "VELNAR_CANARY_CAPABILITY_SECRET environment variable strictly (never CLI args)",
+      "silentSubstitutionOrCasing": "Rejected fail-closed; lowercase hex only",
+      "redactionPolicy": "REDACTED_FROM_OUTPUT: never exposed in envelope, CLI output, or evidence artifacts"
+    }
+  },
+  "enforcementAllowedStatus": {
+    "LEAD_INTENT_CLASSIFICATION": { "enforcementAllowed": false },
+    "LEAK_EXPLANATION": { "enforcementAllowed": false },
+    "GROWTH_ACTION_DRAFT": { "enforcementAllowed": false },
+    "BUSINESS_TWIN_SUMMARY": { "enforcementAllowed": false },
+    "FUNNEL_DIAGNOSTIC_EXPLANATION": { "enforcementAllowed": false },
+    "SEO_CONTENT_SUGGESTION": { "enforcementAllowed": false },
+    "ANOMALY_TRIAGE": { "enforcementAllowed": false }
+  },
+  "verificationSummary": {
+    "testFilesPassed": 39,
+    "totalTestsPassed": 708,
+    "failedTests": 0,
+    "typeCheckPassed": true,
+    "lintPassed": true,
+    "buildPassed": true
+  }
+}
