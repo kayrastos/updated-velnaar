@@ -64,6 +64,11 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
   const fixedTimestamp = '2026-09-02T14:00:00Z';
   const fixedDate = '20260902';
 
+  const deterministicOfflineProviderEnv = Object.freeze({
+    DEEPSEEK_API_KEY: 'offline-test-deepseek-placeholder',
+    GEMINI_API_KEY: 'offline-test-gemini-placeholder',
+  });
+
   beforeEach(() => {
     sentinelCallCount = 0;
     originalFetch = globalThis.fetch;
@@ -433,6 +438,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         },
         capabilitySecret: validTestSecret32,
         customFetch: redirectFetch as any,
+        env: deterministicOfflineProviderEnv,
         sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
         now: () => new Date(fixedTimestamp),
       });
@@ -486,6 +492,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         },
         capabilitySecret: validTestSecret32,
         customFetch: substitutedModelFetch as any,
+        env: deterministicOfflineProviderEnv,
         sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
         now: () => new Date(fixedTimestamp),
       });
@@ -589,6 +596,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         },
         capabilitySecret: validTestSecret32,
         customFetch: mockCertifiedFetch as any,
+        env: deterministicOfflineProviderEnv,
         sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
         now: () => new Date(fixedTimestamp),
       });
@@ -698,6 +706,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         },
         capabilitySecret: validTestSecret32,
         customFetch: retryFetch as any,
+        env: deterministicOfflineProviderEnv,
         sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
         now: () => new Date(fixedTimestamp),
       });
@@ -803,6 +812,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         },
         capabilitySecret: validTestSecret32,
         customFetch: mockFetch as any,
+        env: deterministicOfflineProviderEnv,
         sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
         now: () => new Date(fixedTimestamp),
       });
@@ -861,6 +871,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         },
         capabilitySecret: validTestSecret32,
         customFetch: mockFetch as any,
+        env: deterministicOfflineProviderEnv,
         sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
         now: () => new Date(fixedTimestamp),
       });
@@ -917,6 +928,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         },
         capabilitySecret: validTestSecret32,
         customFetch: mockFetch as any,
+        env: deterministicOfflineProviderEnv,
         sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
         now: () => new Date(fixedTimestamp),
       });
@@ -1000,6 +1012,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         },
         capabilitySecret: validTestSecret32,
         customFetch: mockFetch as any,
+        env: deterministicOfflineProviderEnv,
         sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
         now: () => new Date(fixedTimestamp),
       });
@@ -1012,6 +1025,149 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         expect(inv.providerReportedServiceTier).toBe('flex');
         expect(inv.serviceTier).toBe('flex');
       }
+    });
+  });
+
+  // =========================================================================
+  // 10. Offline Test Hermeticity & Provider Credential Preflight Invariants
+  // =========================================================================
+  describe('10. Offline Test Hermeticity & Provider Credential Preflight Invariants', () => {
+    const fixedTimestamp = '2026-09-02T12:00:00.000Z';
+    const validCommit = '1a2b3c4d5e6f7890123456789abcdef012345678';
+    const validNonce = '11223344556677889900aabbccddeeff';
+    const validTestSecret32 = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
+    function buildApprovalToken(): string {
+      return generateCanaryApprovalToken({
+        approvedBy: 'security-lead@velnar.internal',
+        targetPhase: 'A.12B.2C-5B',
+        environmentTarget: 'CONTROLLED_CANARY',
+        dateYyyyMmDd: '20260902',
+        maxBudgetMicroUsd: 50000,
+        approvalTimestamp: fixedTimestamp,
+        specificationVersion: CANARY_SPECIFICATION_VERSION,
+        sourceCommitSha: validCommit,
+        runNonce: validNonce,
+        capabilitySecret: validTestSecret32,
+      });
+    }
+
+    it('reaches mocked transport with deterministic test env, preserving zero global fetch calls, zero credential leakage, and dormant routing', async () => {
+      const token = buildApprovalToken();
+      let customFetchCallCount = 0;
+
+      const mockFetch = vi.fn(async (url: string) => {
+        customFetchCallCount++;
+        if (url.includes('deepseek.com')) {
+          return new Response(JSON.stringify({
+            model: 'deepseek-v4-flash',
+            choices: [{ message: { content: '{"intentScore": 85, "intentStage": "high_intent", "keyIndicators": ["pricing"]}' } }],
+            usage: {
+              prompt_tokens: 500,
+              completion_tokens: 150,
+              prompt_cache_hit_tokens: 400,
+              prompt_cache_miss_tokens: 100,
+              completion_tokens_details: { reasoning_tokens: 50 },
+            },
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        } else {
+          return new Response(JSON.stringify({
+            model: 'gemini-3.5-flash-lite',
+            service_tier: 'flex',
+            steps: [{ type: 'model_output', content: [{ type: 'text', text: '{"intentScore": 85, "intentStage": "high_intent", "keyIndicators": ["pricing"]}' }] }],
+            usage: {
+              total_input_tokens: 500,
+              total_output_tokens: 150,
+              total_thought_tokens: 50,
+              total_cached_tokens: 100,
+              total_tokens: 650,
+              non_cached_input_tokens: 400,
+            },
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+      });
+
+      const result = await BoundedCanaryRunner.executeLiveCanary({
+        phase: 'A.12B.2C-5B',
+        humanApproval: {
+          approvedBy: 'security-lead@velnar.internal',
+          approvalTimestamp: fixedTimestamp,
+          targetPhase: 'A.12B.2C-5B',
+          approvalToken: token,
+          maxBudgetMicroUsd: 50000,
+          environmentTarget: 'CONTROLLED_CANARY',
+          specificationVersion: CANARY_SPECIFICATION_VERSION,
+          sourceCommitSha: validCommit,
+          runNonce: validNonce,
+        },
+        capabilitySecret: validTestSecret32,
+        customFetch: mockFetch as any,
+        env: deterministicOfflineProviderEnv,
+        sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
+        now: () => new Date(fixedTimestamp),
+      });
+
+      // A: reaches mocked transport
+      expect(customFetchCallCount).toBeGreaterThan(0);
+      expect(mockFetch).toHaveBeenCalled();
+
+      // C: global fetch sentinel remains at exactly 0 unauthorized calls
+      expect(sentinelCallCount).toBe(0);
+
+      // D: fake test credentials never appear in returned evidence
+      const serialized = JSON.stringify(result);
+      expect(serialized.includes(deterministicOfflineProviderEnv.DEEPSEEK_API_KEY)).toBe(false);
+      expect(serialized.includes(deterministicOfflineProviderEnv.GEMINI_API_KEY)).toBe(false);
+
+      // E: productionRoutingEnforcementAllowed remains false
+      expect(result.productionRoutingEnforcementAllowed).toBe(false);
+    });
+
+    it('terminates fail-closed with UNAUTHORIZED_ENVIRONMENT when provider env is absent', async () => {
+      const token = buildApprovalToken();
+      let customFetchCallCount = 0;
+
+      const mockFetch = vi.fn(async () => {
+        customFetchCallCount++;
+        return new Response('{}', { status: 200 });
+      });
+
+      const result = await BoundedCanaryRunner.executeLiveCanary({
+        phase: 'A.12B.2C-5B',
+        humanApproval: {
+          approvedBy: 'security-lead@velnar.internal',
+          approvalTimestamp: fixedTimestamp,
+          targetPhase: 'A.12B.2C-5B',
+          approvalToken: token,
+          maxBudgetMicroUsd: 50000,
+          environmentTarget: 'CONTROLLED_CANARY',
+          specificationVersion: CANARY_SPECIFICATION_VERSION,
+          sourceCommitSha: validCommit,
+          runNonce: validNonce,
+        },
+        capabilitySecret: validTestSecret32,
+        customFetch: mockFetch as any,
+        env: {}, // Explicit empty env without provider credentials
+        sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
+        now: () => new Date(fixedTimestamp),
+      });
+
+      // B: fails closed with UNAUTHORIZED_ENVIRONMENT
+      expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+      expect(result.killSwitchEvents.length).toBeGreaterThan(0);
+      expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+      expect(result.summaryCounts.executedInvocations).toBe(0);
+      expect(result.transportAttemptCount).toBe(0);
+
+      // Gate 6 preflight terminated before mocked transport was touched
+      expect(customFetchCallCount).toBe(0);
+      expect(mockFetch).not.toHaveBeenCalled();
+
+      // C: global fetch sentinel remains at exactly 0 unauthorized calls
+      expect(sentinelCallCount).toBe(0);
+
+      // E: productionRoutingEnforcementAllowed remains false
+      expect(result.productionRoutingEnforcementAllowed).toBe(false);
     });
   });
 });

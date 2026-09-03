@@ -1,0 +1,30 @@
+{
+  "phase": "A.12B.2C-5C",
+  "repairType": "OFFLINE_TEST_HERMETICITY_REPAIR",
+  "baseCommit": "6353426f5936a3e9e151f0ba9d57e56b66922a59",
+  "observedRegression": {
+    "failedTests": 8,
+    "reason": "UNAUTHORIZED_ENVIRONMENT",
+    "cause": "Mocked customFetch tests omitted deterministic test-only provider env, causing Gate 6 credential preflight failure in clean environments"
+  },
+  "modifiedFiles": [
+    "tests/ai/phaseA12B2C5A3LiveTransportCertification.test.ts"
+  ],
+  "invariantsPreserved": [
+    "boundedCanaryRunner unmodified",
+    "production credential gate remains strict",
+    "zero real provider calls",
+    "no global process.env mutation",
+    "productionRoutingEnforcementAllowed remains false"
+  ],
+  "verification": {
+    "cleanEnvironmentTestsPassed": true,
+    "allFilesPassed": true,
+    "testFilesCount": 40,
+    "totalTestsCount": 726,
+    "typecheck": "PASSED",
+    "lint": "PASSED",
+    "build": "PASSED"
+  },
+  "timestamp": "2026-09-03T17:34:15.000Z"
+}
