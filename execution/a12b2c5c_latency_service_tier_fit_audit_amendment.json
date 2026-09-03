@@ -1,0 +1,120 @@
+{
+  "phase": "A.12B.2C-5C",
+  "artifactType": "LATENCY_SERVICE_TIER_FIT_AUDIT_OFFICIAL_DOC_AMENDMENT",
+  "baseCommit": "c389b2a63d2ab869b6cf5d3dff91de2a36fb760c",
+  "baseTree": "b1e2ffb4f1962d104eb1fe638e851294f6db9f95",
+  "supersedesStatementsOnly": true,
+  "originalAuditImmutable": true,
+  "canonicalLiveEvidenceSummary": {
+    "finalRecanaryStatus": "CANARY_KILL_SWITCH_TERMINATED",
+    "transportAttempts": 11,
+    "completedRequiredMatrixCases": 10,
+    "passedInvocations": 10,
+    "killSwitchEvents": 1,
+    "timeoutProvider": "gemini",
+    "timeoutCandidate": "gemini-3.5-flash-lite-flex-low",
+    "timeoutTask": "BUSINESS_TWIN_SUMMARY",
+    "timeoutMs": 15001,
+    "hardLimitMs": 15000,
+    "priorGeminiFlexNearTimeoutMs": 14535,
+    "priorGeminiFlexNearTimeoutTask": "LEAK_EXPLANATION"
+  },
+  "correctedOfficialTierFacts": {
+    "flex": {
+      "pricing": "approximately 50% discount vs Standard",
+      "latency": "Minutes (official target: 1–15 minutes)",
+      "reliability": "Best-effort, Sheddable",
+      "interface": "Synchronous",
+      "intendedUse": "latency-tolerant/non-urgent sequential workflows, background-style tasks, non-production evals/data enrichment",
+      "clientTimeoutGuidance": "official Flex documentation recommends long timeout windows, approximately 10 minutes or more where appropriate",
+      "architecturalWrapperNote": "Gemini Flex provider API is synchronous. If VELNAR places Flex behind an asynchronous queue/background worker, that is a VELNAR architectural wrapper, not a provider API property."
+    },
+    "standard": {
+      "pricing": "Full price",
+      "latency": "Seconds to minutes",
+      "reliability": "High / Medium-high",
+      "interface": "Synchronous",
+      "intendedUse": "general application workflows / most interactive day-to-day applications",
+      "unsupportedClaimsRemoved": "Removed unsupported claims of typical 2–5 second latency, guaranteed sub-15-second behavior, and official 10–30 second timeout recommendations."
+    },
+    "priority": {
+      "pricing": "approximately 75–100% above Standard",
+      "latency": "Seconds",
+      "reliability": "High / Non-sheddable",
+      "interface": "Synchronous",
+      "intendedUse": "production user-facing / business-critical workloads",
+      "overflowBehavior": "requests exceeding Priority dynamic limits may gracefully downgrade server-side to Standard processing rather than failing immediately",
+      "clientMonitoringRequirement": "clients should monitor provider-reported service tier / downgrade behavior"
+    }
+  },
+  "corrections": [
+    {
+      "originalClaim": "Standard typical 2-5s latency",
+      "status": "REMOVED_AS_UNSUPPORTED",
+      "replacement": "Seconds to minutes"
+    },
+    {
+      "originalClaim": "Standard 10-30s official timeout guidance",
+      "status": "REMOVED_AS_UNSUPPORTED",
+      "replacement": "Removed unsupported timeout recommendation; official documentation does not prescribe 10-30s"
+    },
+    {
+      "originalClaim": "Flex asynchronous provider interface",
+      "status": "CLARIFIED",
+      "replacement": "Flex API is synchronous; VELNAR may wrap it asynchronously"
+    },
+    {
+      "originalClaim": "Interactive replacement forfeits all Flex savings",
+      "status": "CORRECTED",
+      "replacement": "Flex remains available for background/economy workloads"
+    },
+    {
+      "originalClaim": "Unverified traffic volume and cost projections (e.g. fallback <1% volume, cost <0.5%)",
+      "status": "REMOVED_AS_UNSUPPORTED",
+      "replacement": "Removed unsupported projections not grounded in canonical VELNAR traffic evidence"
+    }
+  ],
+  "clarifiedOptionEvaluations": {
+    "optionA": {
+      "name": "Keep Flex interactive and revise global timeout",
+      "conclusion": "REJECTED. Accommodating Flex (official latency 1-15 minutes) in synchronous interactive fallback severely degrades UX, exposes users to sheddable queueing spikes, and unnecessarily weakens DeepSeek fail-closed interactive protection."
+    },
+    "optionB": {
+      "name": "Remove Flex from interactive fallback only",
+      "conclusion": "PARTIALLY_FEASIBLE_AS_INTERACTIVE_REMEDY. Solves the immediate interactive 15s SLO mismatch. Removing Flex from the interactive fallback lane does NOT forfeit Flex savings from VELNAR, as Flex remains available for background workloads. However, Option B alone does not specify the complete dual-lane architecture or background execution model."
+    },
+    "optionC": {
+      "name": "Split interactive and background tiers",
+      "conclusion": "STRONGLY_RECOMMENDED. Formally establishes dual-lane architecture with strict separation of SLOs, routing roles, and execution models."
+    }
+  },
+  "canonicalDecisionPreserved": true,
+  "recommendedDecisionCode": "C_SPLIT_INTERACTIVE_AND_BACKGROUND_TIERS",
+  "recommendedArchitecture": {
+    "interactiveLane": {
+      "workloadType": "Strict latency-sensitive workloads",
+      "hardTimeoutCeilingMs": 15000,
+      "primaryCandidate": "deepseek-v4-flash-offpeak-low",
+      "flexProhibition": "Gemini Flex MUST NOT be treated as a transparent synchronous interactive fallback",
+      "fallbackRequirement": "Interactive fallback must be separately certified; Gemini Standard and Gemini Priority are benchmarking candidates, not automatic replacements"
+    },
+    "backgroundEconomyLane": {
+      "workloadType": "Latency-tolerant workloads only",
+      "candidate": "gemini-3.5-flash-lite-flex-low",
+      "strategicValue": "Retains strategic ~50% cost discount",
+      "providerApiInterface": "Synchronous",
+      "architecturalWrapper": "VELNAR should wrap Flex in an asynchronous queue / background worker for product architecture where appropriate",
+      "timeoutSpecification": "Provider-specific timeout / job deadline independently defined (e.g. 10-15 minutes) compatible with official 1-15 minute latency guidance; strictly never subject to 15s interactive SLO"
+    }
+  },
+  "futureCertificationRequirements": {
+    "interactiveFallbackRequiresSeparateCertification": true,
+    "geminiStandardAndPriorityAreBenchmarkCandidatesOnly": true,
+    "priorityDowngradeMustBeObserved": true,
+    "priorityCertificationPolicy": "Because Priority may gracefully downgrade server-side to Standard during peak traffic, future certification must verify requested tier vs provider-reported actual tier, capture downgrade telemetry, evaluate price attribution, measure post-downgrade latency against interactive SLO, and forbid automatic provenance PASS without explicit downgrade policy validation.",
+    "flexBackgroundTimeoutRequiresSeparateSpecification": true,
+    "flexAsyncWorkerArchitectureRequired": true
+  },
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false
+}
