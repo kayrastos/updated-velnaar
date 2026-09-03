@@ -39,6 +39,7 @@ import {
   CanaryInvocationEvidenceRecord,
   CanaryExecutionEvidencePackage,
   CanaryTransportAttemptRecord,
+  CanaryExecutionLane,
 } from './canarySpecification';
 import { EvaluationCostCalculator, LiveCandidateConfig } from '../evaluation/evaluationCostCalculator';
 import { EvaluationSecurityGate } from '../evaluation/evaluationSecurity';
@@ -76,7 +77,7 @@ export interface CanaryReadinessCheckResult {
 }
 
 export interface CanaryLiveRunnerOptions {
-  phase?: 'A.12B.2C-5B';
+  phase?: 'A.12B.2C-5B' | 'A.12B.2C-5D';
   humanApproval: CanaryHumanApprovalEnvelope;
   capabilitySecret?: string;
   customFetch?: typeof fetch;
@@ -84,6 +85,9 @@ export interface CanaryLiveRunnerOptions {
   abortSignal?: AbortSignal;
   sourceRevisionResolver?: () => { commitSha: string; isClean: boolean };
   env?: Record<string, string | undefined>;
+  executionLane?: CanaryExecutionLane;
+  lane?: CanaryExecutionLane;
+  isV12LiveAttempt?: boolean;
 }
 
 export class BoundedCanaryRunner {
@@ -562,12 +566,13 @@ export class BoundedCanaryRunner {
           specificationVersion: options.humanApproval.specificationVersion,
           sourceCommitSha: options.humanApproval.sourceCommitSha,
           runNonce: options.humanApproval.runNonce,
+          executionLane: options.humanApproval.executionLane ?? options.executionLane,
           capabilitySecret: undefined, // Redacted
         }
       : null;
 
     const buildFailClosedPackage = (): CanaryExecutionEvidencePackage => ({
-      phase: 'A.12B.2C-5B',
+      phase: (options.phase as any) ?? 'A.12B.2C-5D',
       specificationVersion: CANARY_SPECIFICATION_VERSION,
       executionMode: 'LIVE_CONTROLLED_CANARY',
       timestamp: now().toISOString(),
@@ -593,12 +598,33 @@ export class BoundedCanaryRunner {
       productionRoutingEnforcementAllowed: false,
     });
 
-    // Gate 1: Phase must be strictly and explicitly 'A.12B.2C-5B'
-    if (!options.phase || options.phase !== 'A.12B.2C-5B') {
+    // Gate 0: Dual-Lane v1.2 Live Execution Fail-Closed Block
+    // If live execution is attempted under v1.2 (or if lane-specific execution is invoked before certification):
+    // MUST fail-closed immediately with 0 provider calls, 0 network attempts, 0 microUSD incurred.
+    const isV12LiveAttempt =
+      options.phase === 'A.12B.2C-5D' ||
+      options.executionLane !== undefined ||
+      options.lane !== undefined ||
+      options.humanApproval?.targetPhase === 'A.12B.2C-5D' ||
+      options.humanApproval?.executionLane !== undefined ||
+      options.isV12LiveAttempt === true;
+
+    if (isV12LiveAttempt) {
       killSwitchEvents.push({
         timestamp: now().toISOString(),
         reason: 'UNAUTHORIZED_ENVIRONMENT',
-        message: `Live canary execution requires explicit phase 'A.12B.2C-5B', received '${options.phase || 'none'}'. Zero calls permitted.`,
+        message: 'Dual-lane v1.2 live execution is blocked pending lane-specific certification.',
+        terminatedFailClosed: true,
+      });
+      return buildFailClosedPackage();
+    }
+
+    // Gate 1: Phase must be strictly and explicitly 'A.12B.2C-5B' (or 'A.12B.2C-5D')
+    if (!options.phase || (options.phase !== 'A.12B.2C-5B' && (options.phase as string) !== 'A.12B.2C-5D')) {
+      killSwitchEvents.push({
+        timestamp: now().toISOString(),
+        reason: 'UNAUTHORIZED_ENVIRONMENT',
+        message: `Live canary execution requires explicit phase ('A.12B.2C-5B' or 'A.12B.2C-5D'), received '${options.phase || 'none'}'. Zero calls permitted.`,
         terminatedFailClosed: true,
       });
       return buildFailClosedPackage();
@@ -2309,9 +2335,9 @@ if (
     let result: CanaryExecutionEvidencePackage;
 
     if (isLiveIntent) {
-      // Blocker 8: Explicitly enforce --phase=A.12B.2C-5B requirement
-      if (phase !== 'A.12B.2C-5B') {
-        console.error(`[CANARY_CLI] Error: --execute-live-canary strictly requires --phase=A.12B.2C-5B (received: '${phase || 'none'}'). Zero calls permitted.`);
+      // Blocker 8: Explicitly enforce valid phase requirement
+      if (phase !== 'A.12B.2C-5B' && phase !== 'A.12B.2C-5D') {
+        console.error(`[CANARY_CLI] Error: --execute-live-canary strictly requires valid phase ('A.12B.2C-5B' or 'A.12B.2C-5D') (received: '${phase || 'none'}'). Zero calls permitted.`);
         process.exit(1);
       }
 

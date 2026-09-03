@@ -87,8 +87,8 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
   // 1. Specification Version Reconciliation & Regression Defense
   // =========================================================================
   describe('1. Specification Version Alignment', () => {
-    it('verifies CANARY_SPECIFICATION_VERSION is strictly a12b2c5-v1.1', () => {
-      expect(CANARY_SPECIFICATION_VERSION).toBe('a12b2c5-v1.1');
+    it('verifies CANARY_SPECIFICATION_VERSION is strictly a12b2c5-v1.2', () => {
+      expect(CANARY_SPECIFICATION_VERSION).toBe('a12b2c5-v1.2');
     });
 
     it('verifies CANARY_EXECUTION_RUNBOOK.md matches a12b2c5-v1.1 exactly', () => {

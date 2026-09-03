@@ -21,7 +21,219 @@ import {
 } from '../evaluation/evaluationDataset';
 import { EvaluationCase } from '../evaluation/types';
 
-export const CANARY_SPECIFICATION_VERSION = 'a12b2c5-v1.1';
+export const CANARY_SPECIFICATION_VERSION = 'a12b2c5-v1.2';
+
+/**
+ * Execution Lanes for Canary Specification v1.2
+ * ARCHITECTURAL DECISION: C_SPLIT_INTERACTIVE_AND_BACKGROUND_TIERS
+ */
+export type CanaryExecutionLane = 'INTERACTIVE' | 'BACKGROUND_ECONOMY';
+
+export interface CanaryInteractiveLaneSpec {
+  readonly lane: 'INTERACTIVE';
+  readonly workloadType: 'SYNCHRONOUS_USER_FACING';
+  readonly hardLifecycleTimeoutMs: 15000;
+  readonly flexAllowed: false;
+  readonly primaryCandidateId: 'deepseek-v4-flash-offpeak-low';
+  readonly certifiedFallbackCandidateId: null;
+  readonly fallbackCertificationStatus: 'PENDING';
+  readonly liveCertificationStatus: 'INCOMPLETE';
+}
+
+export interface CanaryBackgroundEconomyLaneSpec {
+  readonly lane: 'BACKGROUND_ECONOMY';
+  readonly workloadType: 'LATENCY_TOLERANT_NON_URGENT';
+  readonly providerInterface: 'SYNCHRONOUS';
+  readonly productExecutionModel: 'ASYNC_WORKER_QUEUE_WRAPPER';
+  readonly candidateId: 'gemini-3.5-flash-lite-flex-low';
+  readonly providerTier: 'flex';
+  readonly liveCertificationStatus: 'INCOMPLETE';
+  readonly operationalJobDeadlineMs: null;
+  readonly backgroundExecutionDeadlineStatus: 'PENDING_LANE_CERTIFICATION';
+}
+
+export interface ProviderOfficialLatencyMetadata {
+  readonly providerId: string;
+  readonly serviceTier: string;
+  readonly providerInterface: 'SYNCHRONOUS';
+  readonly reliabilityClass: 'BEST_EFFORT_SHEDDABLE' | 'STANDARD_HIGH' | 'PRIORITY_NON_SHEDDABLE';
+  readonly officialTargetLatencyMinMs: number;
+  readonly officialTargetLatencyMaxMs: number;
+  readonly recommendedClientTimeoutFloorMs: number;
+  readonly pricingDiscountPercent?: number;
+  readonly pricingPremiumPercent?: number;
+}
+
+export const CANARY_FLEX_OFFICIAL_LATENCY_METADATA: ProviderOfficialLatencyMetadata = {
+  providerId: 'gemini',
+  serviceTier: 'flex',
+  providerInterface: 'SYNCHRONOUS',
+  reliabilityClass: 'BEST_EFFORT_SHEDDABLE',
+  officialTargetLatencyMinMs: 60000,
+  officialTargetLatencyMaxMs: 900000,
+  recommendedClientTimeoutFloorMs: 600000,
+  pricingDiscountPercent: 50,
+} as const;
+
+export const CANARY_INTERACTIVE_LANE_SPEC: CanaryInteractiveLaneSpec = {
+  lane: 'INTERACTIVE',
+  workloadType: 'SYNCHRONOUS_USER_FACING',
+  hardLifecycleTimeoutMs: 15000,
+  flexAllowed: false,
+  primaryCandidateId: 'deepseek-v4-flash-offpeak-low',
+  certifiedFallbackCandidateId: null,
+  fallbackCertificationStatus: 'PENDING',
+  liveCertificationStatus: 'INCOMPLETE',
+} as const;
+
+export const CANARY_BACKGROUND_ECONOMY_LANE_SPEC: CanaryBackgroundEconomyLaneSpec = {
+  lane: 'BACKGROUND_ECONOMY',
+  workloadType: 'LATENCY_TOLERANT_NON_URGENT',
+  providerInterface: 'SYNCHRONOUS',
+  productExecutionModel: 'ASYNC_WORKER_QUEUE_WRAPPER',
+  candidateId: 'gemini-3.5-flash-lite-flex-low',
+  providerTier: 'flex',
+  liveCertificationStatus: 'INCOMPLETE',
+  operationalJobDeadlineMs: null,
+  backgroundExecutionDeadlineStatus: 'PENDING_LANE_CERTIFICATION',
+} as const;
+
+export const CANARY_LANE_SPECIFICATIONS = {
+  INTERACTIVE: CANARY_INTERACTIVE_LANE_SPEC,
+  BACKGROUND_ECONOMY: CANARY_BACKGROUND_ECONOMY_LANE_SPEC,
+} as const;
+
+/**
+ * Deterministic helper to determine if a candidate is permitted in a given execution lane.
+ */
+export function isCandidateAllowedForLane(candidateId: string, lane: CanaryExecutionLane): boolean {
+  if (lane === 'INTERACTIVE') {
+    // DeepSeek is primary for interactive; Gemini Flex is strictly prohibited
+    if (candidateId === 'deepseek-v4-flash-offpeak-low') return true;
+    if (candidateId === 'gemini-3.5-flash-lite-flex-low') return false;
+    return false;
+  }
+  if (lane === 'BACKGROUND_ECONOMY') {
+    // Gemini Flex is candidate for background; DeepSeek not certified for background
+    if (candidateId === 'gemini-3.5-flash-lite-flex-low') return true;
+    if (candidateId === 'deepseek-v4-flash-offpeak-low') return false;
+    return false;
+  }
+  return false;
+}
+
+/**
+ * Benchmark-Only / Uncertified Candidates (Section 7)
+ * Strictly uncertified for live execution, fallbacks, or routing.
+ */
+export interface CanaryBenchmarkCandidate {
+  readonly candidateId: string;
+  readonly providerId: CertifiedProviderId;
+  readonly modelId: string;
+  readonly serviceTier: 'standard' | 'priority';
+  readonly status: 'BENCHMARK_CANDIDATE_UNCERTIFIED';
+  readonly networkCallsAllowed: false;
+  readonly fallbackAllowed: false;
+  readonly activeCandidateMatrixAllowed: false;
+  readonly officialPositioning: {
+    readonly latencyDescription: string;
+    readonly interface: 'SYNCHRONOUS';
+    readonly reliability: string;
+    readonly pricingTier: string;
+    readonly downgradeSemantics?: string;
+  };
+}
+
+export const CANARY_BENCHMARK_CANDIDATES: readonly CanaryBenchmarkCandidate[] = [
+  {
+    candidateId: 'gemini-3.5-flash-lite-standard-low',
+    providerId: 'gemini',
+    modelId: 'gemini-3.5-flash-lite',
+    serviceTier: 'standard',
+    status: 'BENCHMARK_CANDIDATE_UNCERTIFIED',
+    networkCallsAllowed: false,
+    fallbackAllowed: false,
+    activeCandidateMatrixAllowed: false,
+    officialPositioning: {
+      latencyDescription: 'seconds to minutes',
+      interface: 'SYNCHRONOUS',
+      reliability: 'high / medium-high',
+      pricingTier: 'full-price tier',
+    },
+  },
+  {
+    candidateId: 'gemini-3.5-flash-lite-priority-low',
+    providerId: 'gemini',
+    modelId: 'gemini-3.5-flash-lite',
+    serviceTier: 'priority',
+    status: 'BENCHMARK_CANDIDATE_UNCERTIFIED',
+    networkCallsAllowed: false,
+    fallbackAllowed: false,
+    activeCandidateMatrixAllowed: false,
+    officialPositioning: {
+      latencyDescription: 'seconds',
+      interface: 'SYNCHRONOUS',
+      reliability: 'high / non-sheddable',
+      pricingTier: 'premium (75-100% premium)',
+      downgradeSemantics: 'may gracefully downgrade server-side to Standard',
+    },
+  },
+] as const;
+
+export const CANARY_BENCHMARK_CANDIDATE_MAP = new Map<string, CanaryBenchmarkCandidate>(
+  CANARY_BENCHMARK_CANDIDATES.map(c => [c.candidateId, c])
+);
+
+/**
+ * Priority Downgrade Certification Contract (Section 8)
+ * Future certification requirement: requestedTier vs observed actualTier
+ */
+export interface PriorityDowngradeCertificationContract {
+  readonly requestedServiceTier: 'priority';
+  readonly possibleActualTiers: readonly ['priority', 'standard'];
+  readonly downgradeObservationRequired: true;
+  readonly exactProvenanceRequiresExactMatch: true; // A downgraded request does NOT count as Priority provenance
+  readonly requiredFutureMetrics: readonly [
+    'requested_service_tier',
+    'provider_reported_actual_tier',
+    'downgrade_detected',
+    'billing_tier',
+    'observed_latency_ms',
+    'interactive_slo_result',
+  ];
+}
+
+export const PRIORITY_DOWNGRADE_CERTIFICATION_CONTRACT: PriorityDowngradeCertificationContract = {
+  requestedServiceTier: 'priority',
+  possibleActualTiers: ['priority', 'standard'] as const,
+  downgradeObservationRequired: true,
+  exactProvenanceRequiresExactMatch: true,
+  requiredFutureMetrics: [
+    'requested_service_tier',
+    'provider_reported_actual_tier',
+    'downgrade_detected',
+    'billing_tier',
+    'observed_latency_ms',
+    'interactive_slo_result',
+  ] as const,
+};
+
+/**
+ * Legacy v1.1 14-Call Matrix Status (Section 9)
+ * DeepSeek 7 + Gemini Flex 7 is HISTORICAL ONLY.
+ * MUST NOT be interpreted as a valid interactive production or fallback matrix in v1.2.
+ */
+export const LEGACY_V11_CANARY_MATRIX = {
+  specificationVersion: 'a12b2c5-v1.1',
+  legacyV11MatrixHistoricalOnly: true,
+  totalInvocations: 14,
+  deepSeekInvocations: 7,
+  geminiFlexInvocations: 7,
+  validInteractiveFallbackPair: false,
+  status: 'HISTORICAL_ONLY',
+} as const;
+
+export const legacyV11MatrixHistoricalOnly: boolean = true;
 
 /**
  * Real 256-bit Entropy Capability Secret Validation (64 lowercase hexadecimal characters).
@@ -273,7 +485,7 @@ export const CANARY_SUCCESS_CRITERIA = {
 export interface CanaryHumanApprovalEnvelope {
   approvedBy: string;
   approvalTimestamp: string;
-  targetPhase: 'A.12B.2C-5B';
+  targetPhase: 'A.12B.2C-5B' | 'A.12B.2C-5D';
   approvalToken: string;
   maxBudgetMicroUsd?: number; // Integer microUSD (e.g. 50000)
   maxBudgetUsd?: number;      // Optional float for display/backward compatibility
@@ -282,6 +494,7 @@ export interface CanaryHumanApprovalEnvelope {
   sourceCommitSha: string;
   runNonce: string;
   capabilitySecret?: string;
+  executionLane?: CanaryExecutionLane;
 }
 
 export interface HumanApprovalValidationOptions {
@@ -330,7 +543,7 @@ export function computeCanaryHmacSignature(payload: string, secret: string): str
 
 export interface GenerateApprovalTokenParams {
   approvedBy: string;
-  targetPhase: 'A.12B.2C-5B';
+  targetPhase: 'A.12B.2C-5B' | 'A.12B.2C-5D';
   environmentTarget: 'CONTROLLED_CANARY';
   dateYyyyMmDd: string;
   maxBudgetMicroUsd?: number;
@@ -340,12 +553,13 @@ export interface GenerateApprovalTokenParams {
   sourceCommitSha: string;
   runNonce: string;
   capabilitySecret: string;
+  executionLane?: CanaryExecutionLane;
 }
 
 /**
  * Generates a cryptographically bound human approval token using HMAC-SHA256.
  * Requires a mandatory capabilitySecret (exact 64 lowercase hexadecimal characters representing 256 bits of entropy).
- * Token format: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE>
+ * Token format: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE> (or PHASE_A12B2C5D)
  */
 export function generateCanaryApprovalToken(params: GenerateApprovalTokenParams): string {
   if (!params.capabilitySecret || typeof params.capabilitySecret !== 'string') {
@@ -384,12 +598,13 @@ export function generateCanaryApprovalToken(params: GenerateApprovalTokenParams)
     .digest('hex')
     .toLowerCase();
 
-  return `VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_${params.dateYyyyMmDd}_${signature}`;
+  const phasePrefix = params.targetPhase === 'A.12B.2C-5D' ? 'A12B2C5D' : 'A12B2C5B';
+  return `VELNAR_CANARY_APPROVED_PHASE_${phasePrefix}_${params.dateYyyyMmDd}_${signature}`;
 }
 
 /**
  * Validates the human approval token against cryptographic bindings.
- * Token must follow exact pattern: VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE>
+ * Token must follow exact pattern: VELNAR_CANARY_APPROVED_PHASE_<PHASE>_<YYYYMMDD>_<64_HEX_SIGNATURE>
  * Requires valid calendar date, exact phase, exact environment, budget within bounds, valid ISO timestamp,
  * matching specification version, commit SHA, execution run nonce, and full 64-hex HMAC signature.
  */
@@ -404,8 +619,8 @@ export function validateHumanApprovalToken(
     return { valid: false, reason: 'Human approval envelope is missing (fail-closed).' };
   }
 
-  if (approval.targetPhase !== 'A.12B.2C-5B') {
-    return { valid: false, reason: `Target phase must be 'A.12B.2C-5B', received: '${approval.targetPhase}'.` };
+  if (approval.targetPhase !== 'A.12B.2C-5B' && (approval.targetPhase as string) !== 'A.12B.2C-5D') {
+    return { valid: false, reason: `Target phase must be 'A.12B.2C-5B' or 'A.12B.2C-5D', received: '${approval.targetPhase}'.` };
   }
 
   if (approval.environmentTarget !== 'CONTROLLED_CANARY') {
@@ -446,10 +661,10 @@ export function validateHumanApprovalToken(
   }
 
   // Token Format: Exactly 64 hexadecimal characters for SHA-256 HMAC (256 bits)
-  const tokenPattern = /^VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_(\d{8})_([A-Fa-f0-9]{64})$/;
+  const tokenPattern = /^VELNAR_CANARY_APPROVED_PHASE_(?:A12B2C5B|A12B2C5D)_(\d{8})_([A-Fa-f0-9]{64})$/;
   const match = approval.approvalToken ? approval.approvalToken.match(tokenPattern) : null;
   if (!match) {
-    return { valid: false, reason: 'Approval token does not match required format VELNAR_CANARY_APPROVED_PHASE_A12B2C5B_<YYYYMMDD>_<64_HEX_SIGNATURE>.' };
+    return { valid: false, reason: 'Approval token does not match required format VELNAR_CANARY_APPROVED_PHASE_<PHASE>_<YYYYMMDD>_<64_HEX_SIGNATURE>.' };
   }
 
   const [, tokenDateStr, tokenSignature] = match;
@@ -583,7 +798,7 @@ export interface CanaryInvocationEvidenceRecord {
 }
 
 export interface CanaryExecutionEvidencePackage {
-  phase: 'A.12B.2C-5A' | 'A.12B.2C-5B';
+  phase: 'A.12B.2C-5A' | 'A.12B.2C-5B' | 'A.12B.2C-5D';
   specificationVersion: string;
   executionMode: 'DRY_RUN_READINESS_VERIFICATION' | 'LIVE_CONTROLLED_CANARY';
   timestamp: string;

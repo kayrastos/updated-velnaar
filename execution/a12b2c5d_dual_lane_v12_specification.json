@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "phase": "A.12B.2C-5D",
+  "specificationVersion": "a12b2c5-v1.2",
+  "architecturalDecision": "C_SPLIT_INTERACTIVE_AND_BACKGROUND_TIERS",
+  "generatedAt": "2026-09-03T18:24:00.000Z",
+  "lanes": {
+    "INTERACTIVE": {
+      "lane": "INTERACTIVE",
+      "workloadType": "SYNCHRONOUS_USER_FACING",
+      "hardLifecycleTimeoutMs": 15000,
+      "flexAllowed": false,
+      "primaryCandidateId": "deepseek-v4-flash-offpeak-low",
+      "certifiedFallbackCandidateId": null,
+      "fallbackCertificationStatus": "PENDING",
+      "liveCertificationStatus": "INCOMPLETE",
+      "description": "User-facing interactive workflows requiring immediate synchronous response under strict 15s timeout ceiling. Gemini Flex is strictly prohibited."
+    },
+    "BACKGROUND_ECONOMY": {
+      "lane": "BACKGROUND_ECONOMY",
+      "workloadType": "LATENCY_TOLERANT_NON_URGENT",
+      "providerInterface": "SYNCHRONOUS",
+      "productExecutionModel": "ASYNC_WORKER_QUEUE_WRAPPER",
+      "candidateId": "gemini-3.5-flash-lite-flex-low",
+      "providerTier": "flex",
+      "liveCertificationStatus": "INCOMPLETE",
+      "operationalJobDeadlineMs": null,
+      "backgroundExecutionDeadlineStatus": "PENDING_LANE_CERTIFICATION",
+      "description": "Latency-tolerant background tasks using Gemini Flex via synchronous provider call wrapped in an asynchronous worker queue execution model."
+    }
+  },
+  "flexOfficialLatencyMetadata": {
+    "providerId": "gemini",
+    "modelId": "gemini-3.5-flash-lite",
+    "serviceTier": "flex",
+    "providerInterface": "SYNCHRONOUS",
+    "reliabilityClass": "BEST_EFFORT_SHEDDABLE",
+    "officialTargetLatencyMinMs": 60000,
+    "officialTargetLatencyMaxMs": 900000,
+    "recommendedClientTimeoutFloorMs": 600000,
+    "pricingDiscountPercent": 50,
+    "notes": "Google Cloud official docs specify Flex targets completion between 1 and 15 minutes. It is a synchronous HTTP call with 50% discount and best-effort sheddable capacity."
+  },
+  "benchmarkCandidates": [
+    {
+      "candidateId": "gemini-3.5-flash-lite-standard-low",
+      "providerId": "gemini",
+      "modelId": "gemini-3.5-flash-lite",
+      "serviceTier": "standard",
+      "status": "BENCHMARK_CANDIDATE_UNCERTIFIED",
+      "networkCallsAllowed": false,
+      "fallbackAllowed": false,
+      "activeCandidateMatrixAllowed": false,
+      "officialPositioning": {
+        "latencyDescription": "seconds to minutes",
+        "interface": "SYNCHRONOUS",
+        "reliability": "high / medium-high",
+        "pricingTier": "full-price tier"
+      }
+    },
+    {
+      "candidateId": "gemini-3.5-flash-lite-priority-low",
+      "providerId": "gemini",
+      "modelId": "gemini-3.5-flash-lite",
+      "serviceTier": "priority",
+      "status": "BENCHMARK_CANDIDATE_UNCERTIFIED",
+      "networkCallsAllowed": false,
+      "fallbackAllowed": false,
+      "activeCandidateMatrixAllowed": false,
+      "officialPositioning": {
+        "latencyDescription": "seconds",
+        "interface": "SYNCHRONOUS",
+        "reliability": "high / non-sheddable",
+        "pricingTier": "premium (75-100% premium)",
+        "downgradeSemantics": "may gracefully downgrade server-side to Standard"
+      }
+    }
+  ],
+  "priorityDowngradeCertificationContract": {
+    "requestedServiceTier": "priority",
+    "possibleActualTiers": [
+      "priority",
+      "standard"
+    ],
+    "downgradeObservationRequired": true,
+    "exactProvenanceRequiresExactMatch": true,
+    "requiredFutureMetrics": [
+      "requested_service_tier",
+      "provider_reported_actual_tier",
+      "downgrade_detected",
+      "billing_tier",
+      "observed_latency_ms",
+      "interactive_slo_result"
+    ],
+    "notes": "If a Priority request is downgraded to Standard, it MUST NOT count as Priority provenance. The downgrade must be tracked explicitly."
+  },
+  "legacyV11Matrix": {
+    "specificationVersion": "a12b2c5-v1.1",
+    "legacyV11MatrixHistoricalOnly": true,
+    "totalInvocations": 14,
+    "deepSeekInvocations": 7,
+    "geminiFlexInvocations": 7,
+    "validInteractiveFallbackPair": false,
+    "status": "HISTORICAL_ONLY"
+  },
+  "legacyV11MatrixHistoricalOnly": true,
+  "failClosedImplementationStatus": "VERIFIED",
+  "zeroNetworkDispatches": "VERIFIED",
+  "productionRoutingEnforcementAllowed": false,
+  "verificationSuite": {
+    "testFile": "tests/ai/phaseA12B2C5DDualLaneSpecification.test.ts",
+    "testCount": 22,
+    "passedCount": 22,
+    "failedCount": 0,
+    "totalSuiteTestCount": 748,
+    "totalSuitePassedCount": 748
+  }
+}
