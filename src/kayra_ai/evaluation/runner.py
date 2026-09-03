@@ -23,6 +23,7 @@ from kayra_ai.runtime.config import (
     load_runtime_config,
     normalize_lm_studio_native_api_root,
     normalize_api_root,
+    validate_model_manifest_path,
 )
 from kayra_ai.runtime.contracts import GenerationResponse, ProfileExecutionState, ProfileName
 from kayra_ai.runtime.errors import MalformedResponseFailure, PrivacyPolicyFailure, RuntimeFailure
@@ -246,7 +247,10 @@ def _selected_model_artifact(
     if configured.model_manifest is None or configured.native_v1 is None:
         raise EvaluationFailure("LM Studio native v1 model manifest yapılandırması eksik.")
 
-    manifest_path = Path(configured.model_manifest)
+    try:
+        manifest_path = validate_model_manifest_path(configured.model_manifest)
+    except ValueError as exc:
+        raise EvaluationFailure(f"Model artifact manifest yolu geçersiz: {exc}") from None
     try:
         artifact = load_model_artifact(manifest_path)
     except ModelArtifactValidationError as exc:
@@ -255,14 +259,8 @@ def _selected_model_artifact(
     artifact_file = artifact.files[0]
     expected = configured.native_v1
     if (
-        artifact.id != _STAGE2_ARTIFACT_ID
-        or artifact.repository != _STAGE2_ARTIFACT_REPOSITORY
-        or artifact.commit != _STAGE2_ARTIFACT_COMMIT
-        or artifact.license != _STAGE2_ARTIFACT_LICENSE
-        or artifact_file.filename != _STAGE2_ARTIFACT_FILENAME
-        or artifact_file.sha256 != _STAGE2_ARTIFACT_SHA256
-        or artifact.schema_version != "1.0"
-        or artifact.format.casefold() != expected.model_format
+        artifact.schema_version != "1.0"
+        or artifact.format.casefold() != expected.model_format.casefold()
         or artifact.quantization != expected.quantization
         or artifact_file.size_bytes != expected.size_bytes
         or artifact.context_length != expected.context_length
@@ -271,6 +269,43 @@ def _selected_model_artifact(
             "Runtime native v1 beklentileri model artifact manifestiyle uyuşmuyor."
         )
     return artifact, manifest_bytes
+
+
+def validate_run_result_against_manifest(
+    result: RunResult,
+    artifact: ModelArtifact | None,
+    expected_native: LMStudioNativeV1Config | None = None,
+) -> None:
+    """Validate that RunResult artifact evidence matches the exact run-scoped manifest."""
+    if artifact is None:
+        return
+    artifact_file = artifact.files[0]
+    if result.model.artifact_sha256 != artifact_file.sha256:
+        raise ValueError(
+            f"RunResult artifact SHA-256 ({result.model.artifact_sha256}) "
+            f"seçilen model manifesti ({artifact_file.sha256}) ile uyuşmuyor"
+        )
+    if result.generation.context_length != artifact.context_length:
+        raise ValueError(
+            f"RunResult context_length ({result.generation.context_length}) "
+            f"model manifesti ({artifact.context_length}) ile uyuşmuyor"
+        )
+    if expected_native is not None:
+        if artifact.format.casefold() != expected_native.model_format.casefold():
+            raise ValueError(
+                f"Model formatı ({artifact.format}) native_v1 beklentisiyle "
+                f"({expected_native.model_format}) uyuşmuyor"
+            )
+        if artifact.quantization != expected_native.quantization:
+            raise ValueError(
+                f"Quantization ({artifact.quantization}) native_v1 beklentisiyle "
+                f"({expected_native.quantization}) uyuşmuyor"
+            )
+        if artifact_file.size_bytes != expected_native.size_bytes:
+            raise ValueError(
+                f"Size bytes ({artifact_file.size_bytes}) native_v1 beklentisiyle "
+                f"({expected_native.size_bytes}) uyuşmuyor"
+            )
 
 
 def _mode_resolution(
@@ -733,6 +768,16 @@ def run_evaluation(
                 created_at=now(),
                 elapsed_ms=elapsed_ms,
                 failure=None,
+            )
+        if native_lm_studio and model_artifact is not None and result.success:
+            configured_backend = config.backends.get(selected_backend)
+            expected_native = (
+                configured_backend.native_v1
+                if isinstance(configured_backend, LMStudioBackendConfig)
+                else None
+            )
+            validate_run_result_against_manifest(
+                result, model_artifact, expected_native
             )
         results.append(result)
 

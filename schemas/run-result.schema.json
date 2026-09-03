@@ -293,9 +293,7 @@
           },
           "model": {
             "properties": {
-              "artifact_sha256": {
-                "const": "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0"
-              }
+              "artifact_sha256": { "$ref": "#/$defs/sha256" }
             },
             "required": ["artifact_sha256"]
           },

@@ -176,7 +176,7 @@
       "properties": {
         "model_format": { "const": "gguf" },
         "quantization": { "const": "Q4_K_M" },
-        "size_bytes": { "enum": [9001752960, 5629108576] },
+        "size_bytes": { "type": "integer", "minimum": 1 },
         "context_length": { "const": 4096 },
         "parallel": { "const": 1 },
         "offload_kv_cache_to_gpu": { "const": false }
@@ -209,11 +209,8 @@
                 "required": ["model_manifest", "native_v1"],
                 "properties": {
                   "model_manifest": {
-                    "enum": [
-                      "configs/models/qwen3-14b-q4_k_m.yaml",
-                      "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml",
-                      "configs/models/fulgor-ray-v1-q4_k_m.yaml"
-                    ]
+                    "type": "string",
+                    "pattern": "^configs/models/.+\\.ya?ml$"
                   }
                 }
               },

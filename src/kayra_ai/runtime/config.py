@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import re
 from collections.abc import Mapping
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Annotated, Literal
 from urllib.parse import urlsplit, urlunsplit
 
@@ -83,10 +84,76 @@ class MockBackendConfig(StrictModel):
 class LMStudioNativeV1Config(StrictModel):
     model_format: Literal["gguf"]
     quantization: Literal["Q4_K_M"]
-    size_bytes: Literal[9001752960, 5629108576]
+    size_bytes: int = Field(..., gt=0)
     context_length: Literal[4096]
     parallel: Literal[1]
     offload_kv_cache_to_gpu: Literal[False]
+
+
+def validate_model_manifest_path(
+    path_value: str,
+    repository_root: Path | None = None,
+) -> Path:
+    """Harden model_manifest path resolution.
+
+    Ensures the path:
+    - is relative (rejects POSIX, Windows, and UNC absolute paths)
+    - has no '..' traversal components
+    - has a valid .yaml or .yml extension
+    - canonically resolves strictly inside <repository_root>/configs/models/
+    - points to an existing file
+    """
+    if not isinstance(path_value, str) or not path_value.strip():
+        raise ValueError("model_manifest yolu boş olamaz")
+
+    clean_val = path_value.strip()
+
+    # 1. Cross-platform absolute path check (POSIX, Windows drive, and UNC)
+    if (
+        PurePosixPath(clean_val).is_absolute()
+        or PureWindowsPath(clean_val).is_absolute()
+        or bool(re.match(r"^[A-Za-z]:", clean_val))
+        or clean_val.startswith(("\\\\", "//"))
+    ):
+        raise ValueError(f"model_manifest mutlak yol olamaz: {path_value}")
+
+    # 2. Reject '..' traversal across Windows and POSIX separators
+    normalized_for_parts = clean_val.replace("\\", "/")
+    parts = PurePosixPath(normalized_for_parts).parts
+    if ".." in parts:
+        raise ValueError(f"model_manifest üst dizin geçişi ('..') içeremez: {path_value}")
+
+    # 3. Reject malformed extensions (must be .yaml or .yml)
+    suffix = PurePosixPath(normalized_for_parts).suffix.lower()
+    if suffix not in {".yaml", ".yml"}:
+        raise ValueError(
+            f"model_manifest geçerli bir YAML uzantısına sahip olmalı (.yaml veya .yml): {path_value}"
+        )
+
+    # 4. Must specify configs/models as root parts
+    if len(parts) < 3 or parts[0] != "configs" or parts[1] != "models":
+        raise ValueError(
+            f"model_manifest 'configs/models/' altında bulunmalı: {path_value}"
+        )
+
+    # 5. Canonical resolution underneath repository root
+    root = (
+        repository_root.resolve()
+        if repository_root is not None
+        else Path(__file__).resolve().parents[3]
+    )
+    allowed_models_dir = (root / "configs" / "models").resolve()
+    candidate = (root / Path(normalized_for_parts)).resolve()
+
+    if candidate != allowed_models_dir and not candidate.is_relative_to(allowed_models_dir):
+        raise ValueError(
+            f"model_manifest izin verilen configs/models dizini dışına çıkamaz: {path_value}"
+        )
+
+    if not candidate.is_file():
+        raise ValueError(f"model_manifest dosyası bulunamadı: {path_value}")
+
+    return candidate
 
 
 class LMStudioBackendConfig(StrictModel):
@@ -97,11 +164,7 @@ class LMStudioBackendConfig(StrictModel):
     model_revision_env: str | None = Field(default=None, pattern=ENV_NAME_PATTERN)
     api_key_env: str | None = Field(default=None, pattern=ENV_NAME_PATTERN)
     api_mode: Literal["openai_compatible", "native_v1"] = "openai_compatible"
-    model_manifest: Literal[
-        "configs/models/qwen3-14b-q4_k_m.yaml",
-        "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml",
-        "configs/models/fulgor-ray-v1-q4_k_m.yaml",
-    ] | None = None
+    model_manifest: str | None = Field(default=None, pattern=r"^configs/models/.+\.ya?ml$")
     native_v1: LMStudioNativeV1Config | None = None
 
     @model_validator(mode="after")
@@ -112,10 +175,37 @@ class LMStudioBackendConfig(StrictModel):
             if self.native_v1 is None:
                 raise ValueError("native_v1 LM Studio backend için native_v1 beklentileri gerekli")
             if self.model_manifest is not None and self.native_v1 is not None:
-                expected_size = NATIVE_MODEL_SIZES[self.model_manifest]
-                if self.native_v1.size_bytes != expected_size:
+                manifest_file = validate_model_manifest_path(self.model_manifest)
+                from kayra_ai.validation.model_artifact import (
+                    ModelArtifactValidationError,
+                    load_model_artifact,
+                )
+
+                try:
+                    artifact = load_model_artifact(manifest_file)
+                except ModelArtifactValidationError as exc:
+                    raise ValueError(f"model_manifest doğrulaması başarısız: {exc}") from exc
+
+                artifact_file = artifact.files[0]
+                if artifact_file.size_bytes != self.native_v1.size_bytes:
                     raise ValueError(
-                        "model_manifest ile native_v1 size_bytes birbiriyle eşleşmeli"
+                        f"model_manifest size_bytes ({artifact_file.size_bytes}) ile "
+                        f"native_v1 size_bytes ({self.native_v1.size_bytes}) birbiriyle eşleşmeli"
+                    )
+                if artifact.format.casefold() != self.native_v1.model_format.casefold():
+                    raise ValueError(
+                        f"model_manifest formatı ({artifact.format}) ile "
+                        f"native_v1 model_format ({self.native_v1.model_format}) birbiriyle eşleşmeli"
+                    )
+                if artifact.quantization != self.native_v1.quantization:
+                    raise ValueError(
+                        f"model_manifest quantization ({artifact.quantization}) ile "
+                        f"native_v1 quantization ({self.native_v1.quantization}) birbiriyle eşleşmeli"
+                    )
+                if artifact.context_length != self.native_v1.context_length:
+                    raise ValueError(
+                        f"model_manifest context_length ({artifact.context_length}) ile "
+                        f"native_v1 context_length ({self.native_v1.context_length}) birbiriyle eşleşmeli"
                     )
         elif self.native_v1 is not None or self.model_manifest is not None:
             raise ValueError(

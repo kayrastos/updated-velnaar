@@ -533,7 +533,8 @@ class RunResult(StrictModel):
                     self.runtime.name != "lm_studio"
                     or self.generation.context_length != 4096
                     or self.generation.stream
-                    or self.model.artifact_sha256 != PINNED_STAGE2_ARTIFACT_SHA256
+                    or not self.model.artifact_sha256
+                    or not re.fullmatch(SHA256_PATTERN, self.model.artifact_sha256)
                     or self.usage.source != "lm_studio_native_v1"
                     or self.timing.first_token_ms_source != "lm_studio_native_v1"
                     or self.timing.generation_ms_source != "unavailable"
@@ -580,6 +581,26 @@ class RunResult(StrictModel):
             if self.usage.completion_tokens is None:
                 raise ValueError("tokens_per_second için completion_tokens gerekli")
         return self
+
+    def validate_against_manifest(
+        self,
+        manifest_sha256: str,
+        manifest_context_length: int | None = None,
+    ) -> None:
+        """Explicitly validate that RunResult artifact evidence matches the run-scoped manifest."""
+        if not self.model.artifact_sha256 or self.model.artifact_sha256 != manifest_sha256:
+            raise ValueError(
+                f"RunResult artifact SHA-256 ({self.model.artifact_sha256}) "
+                f"seçilen model manifesti ({manifest_sha256}) ile uyuşmuyor"
+            )
+        if (
+            manifest_context_length is not None
+            and self.generation.context_length != manifest_context_length
+        ):
+            raise ValueError(
+                f"RunResult context_length ({self.generation.context_length}) "
+                f"model manifesti ({manifest_context_length}) ile uyuşmuyor"
+            )
 
 
 class ProfileSummary(StrictModel):

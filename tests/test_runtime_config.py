@@ -29,6 +29,7 @@ from kayra_ai.runtime.config import (
     normalize_api_root,
     normalize_lm_studio_native_api_root,
     resolve_backend_config,
+    validate_model_manifest_path,
 )
 from kayra_ai.runtime.errors import ConfigurationFailure, PrivacyPolicyFailure
 from kayra_ai.runtime.preflight import run_preflight
@@ -406,6 +407,118 @@ class RuntimeConfigTests(unittest.TestCase):
             environ=environment,
         )
         self.assertEqual("http://192.168.1.50:1234/v1", resolved.api_root)
+
+    def test_manifest_path_rejects_parent_traversal(self) -> None:
+        for bad in (
+            "configs/models/../models/fulgor-ray-v1-q4_k_m.yaml",
+            "configs/models/../../passwords.yaml",
+            "configs/../configs/models/fulgor-ray-v1-q4_k_m.yaml",
+        ):
+            with self.subTest(path=bad):
+                with self.assertRaises(ValueError) as caught:
+                    validate_model_manifest_path(bad, repository_root=ROOT)
+                self.assertIn("üst dizin geçişi", str(caught.exception))
+
+    def test_manifest_path_rejects_absolute_paths(self) -> None:
+        for bad in (
+            "/configs/models/model.yaml",
+            "C:/configs/models/model.yaml",
+            "C:\\configs\\models\\model.yaml",
+            "\\\\server\\share\\model.yaml",
+            "\\\\127.0.0.1\\share\\configs\\models\\model.yaml",
+        ):
+            with self.subTest(path=bad):
+                with self.assertRaises(ValueError) as caught:
+                    validate_model_manifest_path(bad, repository_root=ROOT)
+                self.assertIn("mutlak yol", str(caught.exception))
+
+    def test_manifest_path_rejects_escaping_configs_models(self) -> None:
+        for bad in ("configs/other/model.yaml", "data/models/model.yaml"):
+            with self.subTest(path=bad):
+                with self.assertRaises(ValueError) as caught:
+                    validate_model_manifest_path(bad, repository_root=ROOT)
+                self.assertIn("configs/models/", str(caught.exception))
+
+    def test_manifest_path_rejects_malformed_extensions(self) -> None:
+        for bad in (
+            "configs/models/model.json",
+            "configs/models/model.txt",
+            "configs/models/model",
+        ):
+            with self.subTest(path=bad):
+                with self.assertRaises(ValueError) as caught:
+                    validate_model_manifest_path(bad, repository_root=ROOT)
+                self.assertIn(".yaml veya .yml", str(caught.exception))
+
+    def test_manifest_path_rejects_nonexistent_file(self) -> None:
+        with self.assertRaises(ValueError) as caught:
+            validate_model_manifest_path(
+                "configs/models/nonexistent_model_123.yaml", repository_root=ROOT
+            )
+        self.assertIn("bulunamadı", str(caught.exception))
+
+    def test_arbitrary_valid_manifest_under_configs_models_is_accepted(self) -> None:
+        manifest_content = {
+            "schema_version": "1.0",
+            "id": "candidate-custom-model-q4",
+            "repository": "candidate/custom-model",
+            "commit": "a" * 40,
+            "license": "Apache-2.0",
+            "format": "GGUF",
+            "quantization": "Q4_K_M",
+            "context_length": 4096,
+            "files": [
+                {
+                    "filename": "Custom-Model.gguf",
+                    "size_bytes": 12345678,
+                    "sha256": "c" * 64,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            models_dir = temp_root / "configs" / "models"
+            models_dir.mkdir(parents=True)
+            manifest_file = models_dir / "candidate_model.yaml"
+            manifest_file.write_text(yaml.safe_dump(manifest_content), encoding="utf-8")
+
+            resolved = validate_model_manifest_path(
+                "configs/models/candidate_model.yaml", repository_root=temp_root
+            )
+            self.assertEqual(manifest_file.resolve(), resolved)
+
+    def test_native_config_rejects_mismatched_size_format_quantization(self) -> None:
+        base = {
+            "kind": "lm_studio",
+            "enabled": True,
+            "base_url_env": "TEST_BASE_URL",
+            "model_id_env": "TEST_MODEL_ID",
+            "api_mode": "native_v1",
+            "model_manifest": "configs/models/fulgor-ray-v1-q4_k_m.yaml",
+            "native_v1": {
+                "model_format": "gguf",
+                "quantization": "Q4_K_M",
+                "size_bytes": 5629108576,
+                "context_length": 4096,
+                "parallel": 1,
+                "offload_kv_cache_to_gpu": False,
+            },
+        }
+        # Valid config passes:
+        LMStudioBackendConfig.model_validate(base)
+
+        # Mismatched size:
+        mismatched_size = dict(base)
+        mismatched_size["native_v1"] = dict(base["native_v1"], size_bytes=9999999999)
+        with self.assertRaises(ValueError) as caught:
+            LMStudioBackendConfig.model_validate(mismatched_size)
+        self.assertIn("size_bytes", str(caught.exception))
+
+        # Mismatched quantization:
+        mismatched_quant = dict(base)
+        mismatched_quant["native_v1"] = dict(base["native_v1"], quantization="Q8_0")
+        with self.assertRaises(ValueError):
+            LMStudioBackendConfig.model_validate(mismatched_quant)
 
 
 if __name__ == "__main__":

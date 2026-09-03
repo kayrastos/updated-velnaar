@@ -351,7 +351,7 @@ class RunResultContractTests(unittest.TestCase):
         mutations = (
             ("context", (("generation.context_length", 2048),)),
             ("stream", (("generation.stream", True),)),
-            ("artifact", (("model.artifact_sha256", "0" * 64),)),
+            ("artifact", (("model.artifact_sha256", None),)),
             ("usage", (("usage.source", "backend_reported"),)),
             ("ttft", (("timing.first_token_ms_source", "mock_deterministic"),)),
             (
@@ -372,6 +372,18 @@ class RunResultContractTests(unittest.TestCase):
                     broken[container][field] = value
                 with self.assertRaises(ValueError):
                     RunResult.model_validate(broken)
+
+    def test_native_run_result_validates_against_explicit_manifest(self) -> None:
+        loaded = self.native_success()
+        result = RunResult.model_validate(loaded)
+        # Matching manifest passes:
+        result.validate_against_manifest(PINNED_STAGE2_ARTIFACT_SHA256, 4096)
+        # Mismatched manifest sha fails:
+        with self.assertRaises(ValueError):
+            result.validate_against_manifest("0" * 64, 4096)
+        # Mismatched context length fails:
+        with self.assertRaises(ValueError):
+            result.validate_against_manifest(PINNED_STAGE2_ARTIFACT_SHA256, 8192)
 
     def test_real_runtime_model_id_and_revision_are_one_way_sha256_identities(self) -> None:
         RunResult.model_validate(self.native_success())
@@ -507,15 +519,11 @@ class RunResultContractTests(unittest.TestCase):
                     RunResult.model_validate(record)
 
     def test_json_schema_contains_fail_closed_runtime_conditions(self) -> None:
-        self.assertEqual(
-            "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0",
-            PINNED_STAGE2_ARTIFACT_SHA256,
-        )
         schema = json.loads(
             (ROOT / "schemas" / "run-result.schema.json").read_text(encoding="utf-8")
         )
         serialized = json.dumps(schema, sort_keys=True)
-        self.assertIn(PINNED_STAGE2_ARTIFACT_SHA256, serialized)
+        self.assertIn(r"^[a-f0-9]{64}$", serialized)
         self.assertIn(r"^sha256:[a-f0-9]{64}$", serialized)
         self.assertIn('"const": "mock_deterministic"', serialized)
         self.assertIn('"const": "llama_cpp"', serialized)

@@ -32,20 +32,13 @@ class FulgorProfileCompatibilityTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        manifest_paths = schema["$defs"]["backends"]["properties"]["lm_studio"][
+        manifest_prop = schema["$defs"]["backends"]["properties"]["lm_studio"][
             "allOf"
-        ][2]["then"]["properties"]["model_manifest"]["enum"]
+        ][2]["then"]["properties"]["model_manifest"]
 
         self.assertEqual("1.0", artifact.schema_version)
         self.assertEqual("1.0", runtime.schema_version)
-        self.assertEqual(
-            [
-                "configs/models/qwen3-14b-q4_k_m.yaml",
-                "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml",
-                "configs/models/fulgor-ray-v1-q4_k_m.yaml",
-            ],
-            manifest_paths,
-        )
+        self.assertEqual(r"^configs/models/.+\.ya?ml$", manifest_prop.get("pattern"))
 
         arbitrary = runtime.model_dump(mode="python")
         arbitrary["backends"]["lm_studio"]["model_manifest"] = (
@@ -211,6 +204,19 @@ class FulgorProfileCompatibilityTests(unittest.TestCase):
         self.assertEqual(0, transport_factory_calls)
         socket_constructor.assert_not_called()
         create_connection.assert_not_called()
+
+    def test_historical_manifests_remain_valid_and_compatible(self) -> None:
+        for manifest_rel in (
+            "configs/models/qwen3-14b-q4_k_m.yaml",
+            "configs/models/qwen3_5_9b_kayra_v1_q4_k_m.yaml",
+            "configs/models/fulgor-ray-v1-q4_k_m.yaml",
+        ):
+            with self.subTest(manifest=manifest_rel):
+                artifact = load_model_artifact(ROOT / manifest_rel)
+                self.assertEqual("1.0", artifact.schema_version)
+                self.assertEqual("GGUF", artifact.format)
+                self.assertEqual("Q4_K_M", artifact.quantization)
+                self.assertEqual(64, len(artifact.files[0].sha256))
 
 
 if __name__ == "__main__":

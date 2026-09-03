@@ -15,7 +15,12 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from kayra_ai.evaluation.reporting import OutputCollisionError
-from kayra_ai.evaluation.runner import EvaluationFailure, load_eval_cases, run_evaluation
+from kayra_ai.evaluation.runner import (
+    EvaluationFailure,
+    load_eval_cases,
+    run_evaluation,
+    validate_run_result_against_manifest,
+)
 from kayra_ai.runtime.contracts import (
     BackendCapabilities,
     GenerationResponse,
@@ -435,22 +440,12 @@ class EvaluationPipelineTests(unittest.TestCase):
             )
             mismatches = (
                 (
-                    "repository",
-                    artifact.model_copy(update={"repository": "Other/Repository"}),
+                    "format",
+                    artifact.model_copy(update={"format": "safetensors"}),
                 ),
-                ("commit", artifact.model_copy(update={"commit": "0" * 40})),
-                ("license", artifact.model_copy(update={"license": "MIT"})),
                 (
-                    "filename",
-                    artifact.model_copy(
-                        update={
-                            "files": [
-                                artifact.files[0].model_copy(
-                                    update={"filename": "other-Q4_K_M.gguf"}
-                                )
-                            ]
-                        }
-                    ),
+                    "quantization",
+                    artifact.model_copy(update={"quantization": "Q8_0"}),
                 ),
                 (
                     "size",
@@ -461,14 +456,8 @@ class EvaluationPipelineTests(unittest.TestCase):
                     ),
                 ),
                 (
-                    "sha256",
-                    artifact.model_copy(
-                        update={
-                            "files": [
-                                artifact.files[0].model_copy(update={"sha256": "0" * 64})
-                            ]
-                        }
-                    ),
+                    "context_length",
+                    artifact.model_copy(update={"context_length": 2048}),
                 ),
             )
 
@@ -779,6 +768,54 @@ class EvaluationPipelineTests(unittest.TestCase):
         self.assertEqual(1, completed.summary.failure_count)
         self.assertEqual("privacy_policy", completed.results[0].error.type)
         self.assertEqual("not_retained", completed.results[0].response.retention)
+
+    def _valid_result_fixture(self, artifact_sha: str | None = None) -> RunResult:
+        text = (
+            (ROOT / "tests" / "fixtures" / "run_result_success.jsonl")
+            .read_text(encoding="utf-8")
+            .strip()
+        )
+        data = json.loads(text)
+        if artifact_sha is not None:
+            data["model"]["artifact_sha256"] = artifact_sha
+        return RunResult.model_validate(data)
+
+    def test_mismatched_artifact_sha_rejection(self) -> None:
+        artifact = load_model_artifact(
+            ROOT / "configs" / "models" / "fulgor-ray-v1-q4_k_m.yaml"
+        )
+        fake_result = self._valid_result_fixture(artifact_sha="0" * 64)
+        with self.assertRaises(ValueError) as caught:
+            validate_run_result_against_manifest(fake_result, artifact)
+        self.assertIn("artifact SHA-256", str(caught.exception))
+
+    def test_two_different_manifests_in_same_process_without_global_trust_leakage(self) -> None:
+        manifest_a = load_model_artifact(
+            ROOT / "configs" / "models" / "qwen3-14b-q4_k_m.yaml"
+        )
+        manifest_b = load_model_artifact(
+            ROOT / "configs" / "models" / "fulgor-ray-v1-q4_k_m.yaml"
+        )
+        self.assertNotEqual(manifest_a.files[0].sha256, manifest_b.files[0].sha256)
+
+        result_a = self._valid_result_fixture(artifact_sha=manifest_a.files[0].sha256)
+        result_b = self._valid_result_fixture(artifact_sha=manifest_b.files[0].sha256)
+
+        # Result A validates against Manifest A:
+        validate_run_result_against_manifest(result_a, manifest_a)
+
+        # Result A fails against Manifest B (no trust leakage):
+        with self.assertRaises(ValueError) as caught:
+            validate_run_result_against_manifest(result_a, manifest_b)
+        self.assertIn("artifact SHA-256", str(caught.exception))
+
+        # Result B validates against Manifest B:
+        validate_run_result_against_manifest(result_b, manifest_b)
+
+        # Result B fails against Manifest A (no trust leakage):
+        with self.assertRaises(ValueError) as caught:
+            validate_run_result_against_manifest(result_b, manifest_a)
+        self.assertIn("artifact SHA-256", str(caught.exception))
 
 
 if __name__ == "__main__":
