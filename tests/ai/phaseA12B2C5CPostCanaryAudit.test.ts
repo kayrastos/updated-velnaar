@@ -178,7 +178,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
 
       vi.useFakeTimers();
 
-      const canaryPromise = BoundedCanaryRunner.executeLiveCanary(createCommonCanaryOptions(slowBodyFetch));
+      const canaryPromise = BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(slowBodyFetch));
 
       // Advance timers by 15,001 ms to trip the invocation timeout
       await vi.advanceTimersByTimeAsync(15001);
@@ -217,7 +217,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary(createCommonCanaryOptions(fastFetch));
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(fastFetch));
 
       expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
       expect(result.killSwitchEvents.length).toBe(0);
@@ -240,7 +240,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         };
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary(createCommonCanaryOptions(rejectingBodyFetch));
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(rejectingBodyFetch));
 
       expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
       expect(result.killSwitchEvents.length).toBe(1);
@@ -273,7 +273,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary(createCommonCanaryOptions(singleCaseFetch));
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(singleCaseFetch));
 
       expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
       const deepseekInvocations = result.invocations.filter((inv) => inv.providerId === 'deepseek');
@@ -302,7 +302,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary(createCommonCanaryOptions(explicitMismatchedVersionFetch));
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(explicitMismatchedVersionFetch));
 
       expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
       expect(result.killSwitchEvents.length).toBe(1);
@@ -324,7 +324,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary(createCommonCanaryOptions(explicitSnakeMismatchedVersionFetch));
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(explicitSnakeMismatchedVersionFetch));
 
       expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
       expect(result.killSwitchEvents.length).toBe(1);
@@ -345,7 +345,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary(createCommonCanaryOptions(explicitMatchingVersionFetch));
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(explicitMatchingVersionFetch));
 
       expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
       expect(result.killSwitchEvents.length).toBe(0);
@@ -371,7 +371,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary(createCommonCanaryOptions(mockFetch));
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(mockFetch));
 
       expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
       const sumObserved = result.invocations.reduce((acc, inv) => acc + inv.observedCostMicroUsd, 0);
@@ -389,7 +389,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary(createCommonCanaryOptions(mockFetch));
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(mockFetch));
 
       expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
       const sumWorstCase = result.invocations.reduce((acc, inv) => acc + inv.estimatedCostMicroUsd, 0);

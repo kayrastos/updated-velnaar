@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "phase": "A.12B.2C-5D.1",
+  "repairType": "V12_GLOBAL_LIVE_BLOCK_COVERAGE_REPAIR",
+  "baseCommit": "6d5d9ce2610b964a7e3810cb2cf45922a68e6598",
+  "baseTree": "cc35017cbb6efc8e202da20d9d369976b58a565e",
+  "specificationVersion": "a12b2c5-v1.2",
+  "architecturalDecision": "C_SPLIT_INTERACTIVE_AND_BACKGROUND_TIERS",
+  "defectSummary": {
+    "defect": "Indicator-based v1.2 live attempt recognition in Gate 0 allowed un-laned requests (such as phase 5B legacy paths without executionLane) to bypass the dual-lane v1.2 live block despite CANARY_SPECIFICATION_VERSION being globally 'a12b2c5-v1.2'.",
+    "rootCause": "Gate 0 check only evaluated indicators like phase === 'A.12B.2C-5D', executionLane, or approval targetPhase === 'A.12B.2C-5D' rather than authoritatively checking the global specification version."
+  },
+  "remediation": {
+    "gate0Refactoring": "Implemented authoritative global specification version check in Gate 0: when CANARY_SPECIFICATION_VERSION === 'a12b2c5-v1.2', executeLiveCanary immediately fails closed with CANARY_KILL_SWITCH_TERMINATED and UNAUTHORIZED_ENVIRONMENT before inspecting credentials, approval envelope, or invoking any network.",
+    "transportPipelineIsolation": "Refactored executeLiveCanary to delegate core network transport to an isolated executeTransportPipeline method, and exposed executeIsolatedMockTransport for hermetic test execution with an explicit customFetch requirement, ensuring executeLiveCanary has zero bypasses."
+  },
+  "modifiedFiles": [
+    "worker/ai/canary/boundedCanaryRunner.ts",
+    "tests/ai/phaseA12B2C5DDualLaneSpecification.test.ts",
+    "tests/ai/phaseA12B2C5A3LiveTransportCertification.test.ts",
+    "tests/ai/phaseA12B2C5CPostCanaryAudit.test.ts"
+  ],
+  "securityInvariants": {
+    "zeroProviderCalls": true,
+    "zeroLiveCredentials": true,
+    "gate0FailClosedOrder": "Gate 0 evaluates before credential checks, approval envelope cryptographic checks, budget checks, or any network initiation",
+    "customFetchCallsInLiveFailClosed": 0,
+    "globalFetchCallsInLiveFailClosed": 0,
+    "transportAttemptCountInLiveFailClosed": 0,
+    "productionRoutingEnforcementAllowed": false
+  },
+  "coveredScenarios": [
+    "(A) Phase 5D + INTERACTIVE fails closed pre-network",
+    "(B) Phase 5D + BACKGROUND_ECONOMY fails closed pre-network",
+    "(C) Phase 5B + no lane fails closed pre-network (exact uncovered defect path)",
+    "(D) Phase 5B + INTERACTIVE fails closed pre-network",
+    "(E) Phase 5B + BACKGROUND_ECONOMY fails closed pre-network",
+    "(F) Cryptographically valid v1.2 approval token and envelope cannot bypass block",
+    "(G) Invalid, forged, or malformed approval envelope hits Gate 0 block first without altering fail-closed ordering",
+    "(H) Real-looking provider environment values are never inspected or required to reach block",
+    "(I) customFetch sentinel remains 0",
+    "(J) global fetch sentinel remains 0",
+    "(K) transportAttemptCount remains 0",
+    "(L) productionRoutingEnforcementAllowed remains false"
+  ],
+  "verification": {
+    "cleanEnvironmentTestsPassed": true,
+    "allFilesPassed": true,
+    "testFilesCount": 41,
+    "totalTestsCount": 758,
+    "typecheck": "PASSED",
+    "lint": "PASSED",
+    "build": "PASSED"
+  },
+  "timestamp": "2026-09-03T18:38:00.000Z"
+}

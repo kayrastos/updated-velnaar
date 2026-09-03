@@ -545,6 +545,104 @@ export class BoundedCanaryRunner {
    */
   public static async executeLiveCanary(options: CanaryLiveRunnerOptions): Promise<CanaryExecutionEvidencePackage> {
     const now = options.now ?? (() => new Date());
+    const killSwitchEvents: CanaryKillSwitchEvent[] = [];
+
+    // Redacted human approval envelope for evidence (zero secret leakage)
+    const sanitizedApproval: CanaryHumanApprovalEnvelope | null = options.humanApproval
+      ? {
+          approvedBy: options.humanApproval.approvedBy,
+          approvalTimestamp: options.humanApproval.approvalTimestamp,
+          targetPhase: options.humanApproval.targetPhase,
+          approvalToken: options.humanApproval.approvalToken,
+          maxBudgetMicroUsd: options.humanApproval.maxBudgetMicroUsd,
+          maxBudgetUsd: options.humanApproval.maxBudgetUsd,
+          environmentTarget: options.humanApproval.environmentTarget,
+          specificationVersion: options.humanApproval.specificationVersion,
+          sourceCommitSha: options.humanApproval.sourceCommitSha,
+          runNonce: options.humanApproval.runNonce,
+          executionLane: options.humanApproval.executionLane ?? options.executionLane,
+          capabilitySecret: undefined, // Redacted
+        }
+      : null;
+
+    const buildFailClosedPackage = (): CanaryExecutionEvidencePackage => ({
+      phase: (options.phase as any) ?? 'A.12B.2C-5D',
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      executionMode: 'LIVE_CONTROLLED_CANARY',
+      timestamp: now().toISOString(),
+      humanApproval: sanitizedApproval,
+      overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
+      logicalCaseCount: 0,
+      transportAttemptCount: 0,
+      completedRequiredMatrixCases: 0,
+      summaryCounts: {
+        totalPlannedInvocations: 14,
+        executedInvocations: 0,
+        passedInvocations: 0,
+        failedInvocations: 0,
+        killSwitchEventsCount: killSwitchEvents.length,
+        totalObservedCostMicroUsd: 0,
+        totalEstimatedCostMicroUsd: 0,
+        totalPreflightWorstCaseCostMicroUsd: 0,
+        aggregateSemanticScore: 0,
+      },
+      attemptRecords: [],
+      invocations: [],
+      killSwitchEvents,
+      productionRoutingEnforcementAllowed: false,
+    });
+
+    // Gate 0: Dual-Lane v1.2 Live Execution Fail-Closed Block
+    // ALL live execution under CURRENT v1.2 is unconditionally blocked until lane-specific certification is complete.
+    // Derived strictly from authoritative CURRENT specification state.
+    // MUST fail closed before:
+    // - source/network dispatch
+    // - provider credential evaluation
+    // - provider key requirement
+    // - customFetch invocation
+    // - global fetch invocation
+    // - transport attempt creation
+    // - invocation accounting
+    // - cost incurrence
+    // REGARDLESS of phase (5B or 5D), lane existence, approval validity, provider credentials, or customFetch.
+    if (
+      CANARY_SPECIFICATION_VERSION === 'a12b2c5-v1.2' ||
+      options.phase === 'A.12B.2C-5D' ||
+      options.executionLane !== undefined ||
+      options.lane !== undefined ||
+      options.humanApproval?.targetPhase === 'A.12B.2C-5D' ||
+      options.humanApproval?.executionLane !== undefined ||
+      options.isV12LiveAttempt === true
+    ) {
+      killSwitchEvents.push({
+        timestamp: now().toISOString(),
+        reason: 'UNAUTHORIZED_ENVIRONMENT',
+        message: 'Dual-lane v1.2 live execution is blocked pending lane-specific certification.',
+        terminatedFailClosed: true,
+      });
+      return buildFailClosedPackage();
+    }
+
+    return BoundedCanaryRunner.executeTransportPipeline(options);
+  }
+
+  /**
+   * ISOLATED MOCK TRANSPORT TEST HELPER ONLY.
+   * Pure offline test helper for historical transport mechanics (retries, timeouts, telemetry parsing).
+   * Strictly requires options.customFetch and CANNOT authorize executeLiveCanary.
+   */
+  public static async executeIsolatedMockTransport(options: CanaryLiveRunnerOptions): Promise<CanaryExecutionEvidencePackage> {
+    if (!options.customFetch) {
+      throw new Error('executeIsolatedMockTransport requires mock customFetch (no live network allowed)');
+    }
+    return BoundedCanaryRunner.executeTransportPipeline(options);
+  }
+
+  /**
+   * Internal transport pipeline implementation for canary execution.
+   */
+  private static async executeTransportPipeline(options: CanaryLiveRunnerOptions): Promise<CanaryExecutionEvidencePackage> {
+    const now = options.now ?? (() => new Date());
     const abortSignal = options.abortSignal;
     const fetchFn = options.customFetch ?? globalThis.fetch;
     const env = options.env ?? (typeof process !== 'undefined' ? process.env : {});
@@ -597,27 +695,6 @@ export class BoundedCanaryRunner {
       killSwitchEvents,
       productionRoutingEnforcementAllowed: false,
     });
-
-    // Gate 0: Dual-Lane v1.2 Live Execution Fail-Closed Block
-    // If live execution is attempted under v1.2 (or if lane-specific execution is invoked before certification):
-    // MUST fail-closed immediately with 0 provider calls, 0 network attempts, 0 microUSD incurred.
-    const isV12LiveAttempt =
-      options.phase === 'A.12B.2C-5D' ||
-      options.executionLane !== undefined ||
-      options.lane !== undefined ||
-      options.humanApproval?.targetPhase === 'A.12B.2C-5D' ||
-      options.humanApproval?.executionLane !== undefined ||
-      options.isV12LiveAttempt === true;
-
-    if (isV12LiveAttempt) {
-      killSwitchEvents.push({
-        timestamp: now().toISOString(),
-        reason: 'UNAUTHORIZED_ENVIRONMENT',
-        message: 'Dual-lane v1.2 live execution is blocked pending lane-specific certification.',
-        terminatedFailClosed: true,
-      });
-      return buildFailClosedPackage();
-    }
 
     // Gate 1: Phase must be strictly and explicitly 'A.12B.2C-5B' (or 'A.12B.2C-5D')
     if (!options.phase || (options.phase !== 'A.12B.2C-5B' && (options.phase as string) !== 'A.12B.2C-5D')) {

@@ -291,7 +291,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         capabilitySecret: validTestSecret32,
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'lead@velnar.internal',
@@ -305,6 +305,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
           runNonce: validNonce,
         },
         capabilitySecret: validTestSecret32,
+        customFetch: vi.fn() as any,
         sourceRevisionResolver: () => ({
           commitSha: '9999999999999999999999999999999999999999', // Mismatched SHA
           isClean: true,
@@ -332,7 +333,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         capabilitySecret: validTestSecret32,
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'lead@velnar.internal',
@@ -346,6 +347,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
           runNonce: validNonce,
         },
         capabilitySecret: validTestSecret32,
+        customFetch: vi.fn() as any,
         sourceRevisionResolver: () => ({
           commitSha: validCommit,
           isClean: false, // Dirty tree
@@ -423,7 +425,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'lead@velnar.internal',
@@ -477,7 +479,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'lead@velnar.internal',
@@ -581,7 +583,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'security-lead@velnar.internal',
@@ -691,7 +693,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         }
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'security-lead@velnar.internal',
@@ -797,7 +799,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         }
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'security-lead@velnar.internal',
@@ -856,7 +858,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         }
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'security-lead@velnar.internal',
@@ -913,7 +915,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         }
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'security-lead@velnar.internal',
@@ -997,7 +999,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'security-lead@velnar.internal',
@@ -1087,7 +1089,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         }
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'security-lead@velnar.internal',
@@ -1132,7 +1134,7 @@ describe('Phase A.12B.2C-5A.3 — Real Live-Canary Transport & Execution-Gate Ce
         return new Response('{}', { status: 200 });
       });
 
-      const result = await BoundedCanaryRunner.executeLiveCanary({
+      const result = await BoundedCanaryRunner.executeIsolatedMockTransport({
         phase: 'A.12B.2C-5B',
         humanApproval: {
           approvedBy: 'security-lead@velnar.internal',

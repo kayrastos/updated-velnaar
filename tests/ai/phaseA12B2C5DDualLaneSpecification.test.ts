@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -252,6 +252,7 @@ describe('Phase A.12B.2C-5D Dual-Lane v1.2 Specification Foundation', () => {
       'execution/a12b2c5c_latency_service_tier_fit_audit.json': 'bc94216b56ec2f25c343882c5a6e6d56432c1fde98410911b1a186f7fd0f6785',
       'execution/a12b2c5c_latency_service_tier_fit_audit_amendment.json': '582d62d72b9c93b8fdd46bbbc77b792d3c65d5fa2f328e16f6635dd285b756ca',
       'execution/a12b2c5b_final_recanary_03186e5_results.json': 'cd3318502d5849633b7f075f2849347fb223f6579b02d5f16cfa226e3b0a4795',
+      'execution/a12b2c5d_dual_lane_v12_specification.json': '0d1ac9a8eaabe131ec8c9685aacdff5a00caa5953c2a6558d8c96efabd8d7e6a',
     };
 
     for (const [relPath, expectedHash] of Object.entries(historicalFiles)) {
@@ -338,5 +339,306 @@ describe('Phase A.12B.2C-5D Dual-Lane v1.2 Specification Foundation', () => {
       expect(active.enforcementAllowed).toBe(false);
       expect(dormant.enforcementAllowed).toBe(false);
     }
+  });
+
+  // =========================================================================
+  // v1.2 Global Live-Block Coverage Regressions (A.12B.2C-5D.1)
+  // =========================================================================
+
+  // 23. REQUIRED REGRESSION (Section 5): Exact uncovered path (phase 5B under v1.2 specification) fails closed pre-network
+  it('23. REQUIRED REGRESSION: phase 5B without executionLane under v1.2 fails closed pre-network with 0 network calls', async () => {
+    let customFetchCalls = 0;
+    const sentinelCustomFetch = vi.fn(async () => {
+      customFetchCalls++;
+      throw new Error('SECURITY VIOLATION: Custom fetch sentinel invoked in fail-closed state!');
+    });
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    // Cryptographically valid v1.2 / 5B approval envelope
+    const token5B = generateCanaryApprovalToken({
+      approvedBy: 'security-lead@velnar.internal',
+      targetPhase: 'A.12B.2C-5B',
+      environmentTarget: 'CONTROLLED_CANARY',
+      dateYyyyMmDd: validDate,
+      maxBudgetMicroUsd: 50000,
+      approvalTimestamp: validTimestamp,
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      runNonce: validNonce,
+      capabilitySecret: validSecret,
+    });
+
+    const result = await BoundedCanaryRunner.executeLiveCanary({
+      phase: 'A.12B.2C-5B',
+      executionLane: undefined,
+      lane: undefined,
+      humanApproval: {
+        approvedBy: 'security-lead@velnar.internal',
+        approvalTimestamp: validTimestamp,
+        targetPhase: 'A.12B.2C-5B',
+        approvalToken: token5B,
+        maxBudgetMicroUsd: 50000,
+        environmentTarget: 'CONTROLLED_CANARY',
+        specificationVersion: CANARY_SPECIFICATION_VERSION,
+        sourceCommitSha: validCommit,
+        runNonce: validNonce,
+      },
+      capabilitySecret: validSecret,
+      customFetch: sentinelCustomFetch as any,
+      env: {
+        DEEPSEEK_API_KEY: 'placeholder-deepseek-key-12345',
+        GEMINI_API_KEY: 'placeholder-gemini-key-12345',
+      },
+      sourceRevisionResolver: () => ({ commitSha: validCommit, isClean: true }),
+      now: () => new Date(validTimestamp),
+    });
+
+    expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+    expect(result.killSwitchEvents.length).toBeGreaterThan(0);
+    expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+    expect(result.killSwitchEvents[0].message).toContain(
+      'Dual-lane v1.2 live execution is blocked pending lane-specific certification.'
+    );
+    expect(customFetchCalls).toBe(0);
+    expect(sentinelCustomFetch).not.toHaveBeenCalled();
+    expect(globalFetchSpy).not.toHaveBeenCalled();
+    expect(result.summaryCounts.executedInvocations).toBe(0);
+    expect(result.transportAttemptCount).toBe(0);
+    expect(result.summaryCounts.totalObservedCostMicroUsd).toBe(0);
+    expect(result.attemptRecords?.length ?? 0).toBe(0);
+    expect(result.invocations.length).toBe(0);
+    expect(result.productionRoutingEnforcementAllowed).toBe(false);
+
+    globalFetchSpy.mockRestore();
+  });
+
+  // 24. (A) Phase 5D + INTERACTIVE => blocked pre-network
+  it('24. (A) phase 5D + INTERACTIVE fails closed pre-network', async () => {
+    const sentinelFetch = vi.fn();
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const result = await BoundedCanaryRunner.executeLiveCanary({
+      phase: 'A.12B.2C-5D',
+      executionLane: 'INTERACTIVE',
+      humanApproval: validV12ApprovalEnvelope,
+      capabilitySecret: validSecret,
+      customFetch: sentinelFetch as any,
+    });
+
+    expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+    expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+    expect(result.killSwitchEvents[0].message).toContain('Dual-lane v1.2 live execution is blocked pending lane-specific certification');
+    expect(sentinelFetch).not.toHaveBeenCalled();
+    expect(globalFetchSpy).not.toHaveBeenCalled();
+    expect(result.summaryCounts.executedInvocations).toBe(0);
+    expect(result.transportAttemptCount).toBe(0);
+
+    globalFetchSpy.mockRestore();
+  });
+
+  // 25. (B) Phase 5D + BACKGROUND_ECONOMY => blocked pre-network
+  it('25. (B) phase 5D + BACKGROUND_ECONOMY fails closed pre-network', async () => {
+    const sentinelFetch = vi.fn();
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const result = await BoundedCanaryRunner.executeLiveCanary({
+      phase: 'A.12B.2C-5D',
+      executionLane: 'BACKGROUND_ECONOMY',
+      humanApproval: { ...validV12ApprovalEnvelope, executionLane: 'BACKGROUND_ECONOMY' },
+      capabilitySecret: validSecret,
+      customFetch: sentinelFetch as any,
+    });
+
+    expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+    expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+    expect(result.killSwitchEvents[0].message).toContain('Dual-lane v1.2 live execution is blocked pending lane-specific certification');
+    expect(sentinelFetch).not.toHaveBeenCalled();
+    expect(globalFetchSpy).not.toHaveBeenCalled();
+    expect(result.summaryCounts.executedInvocations).toBe(0);
+    expect(result.transportAttemptCount).toBe(0);
+
+    globalFetchSpy.mockRestore();
+  });
+
+  // 26. (C) Phase 5B + no lane => blocked pre-network
+  it('26. (C) phase 5B + no lane fails closed pre-network', async () => {
+    const sentinelFetch = vi.fn();
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const result = await BoundedCanaryRunner.executeLiveCanary({
+      phase: 'A.12B.2C-5B',
+      humanApproval: validV12ApprovalEnvelope,
+      capabilitySecret: validSecret,
+      customFetch: sentinelFetch as any,
+    });
+
+    expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+    expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+    expect(result.killSwitchEvents[0].message).toContain('Dual-lane v1.2 live execution is blocked pending lane-specific certification');
+    expect(sentinelFetch).not.toHaveBeenCalled();
+    expect(globalFetchSpy).not.toHaveBeenCalled();
+    expect(result.summaryCounts.executedInvocations).toBe(0);
+    expect(result.transportAttemptCount).toBe(0);
+
+    globalFetchSpy.mockRestore();
+  });
+
+  // 27. (D) Phase 5B + INTERACTIVE => blocked pre-network
+  it('27. (D) phase 5B + INTERACTIVE fails closed pre-network', async () => {
+    const sentinelFetch = vi.fn();
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const result = await BoundedCanaryRunner.executeLiveCanary({
+      phase: 'A.12B.2C-5B',
+      executionLane: 'INTERACTIVE',
+      humanApproval: { ...validV12ApprovalEnvelope, executionLane: 'INTERACTIVE' },
+      capabilitySecret: validSecret,
+      customFetch: sentinelFetch as any,
+    });
+
+    expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+    expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+    expect(result.killSwitchEvents[0].message).toContain('Dual-lane v1.2 live execution is blocked pending lane-specific certification');
+    expect(sentinelFetch).not.toHaveBeenCalled();
+    expect(globalFetchSpy).not.toHaveBeenCalled();
+    expect(result.summaryCounts.executedInvocations).toBe(0);
+    expect(result.transportAttemptCount).toBe(0);
+
+    globalFetchSpy.mockRestore();
+  });
+
+  // 28. (E) Phase 5B + BACKGROUND_ECONOMY => blocked pre-network
+  it('28. (E) phase 5B + BACKGROUND_ECONOMY fails closed pre-network', async () => {
+    const sentinelFetch = vi.fn();
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const result = await BoundedCanaryRunner.executeLiveCanary({
+      phase: 'A.12B.2C-5B',
+      executionLane: 'BACKGROUND_ECONOMY',
+      humanApproval: { ...validV12ApprovalEnvelope, executionLane: 'BACKGROUND_ECONOMY' },
+      capabilitySecret: validSecret,
+      customFetch: sentinelFetch as any,
+    });
+
+    expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+    expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+    expect(result.killSwitchEvents[0].message).toContain('Dual-lane v1.2 live execution is blocked pending lane-specific certification');
+    expect(sentinelFetch).not.toHaveBeenCalled();
+    expect(globalFetchSpy).not.toHaveBeenCalled();
+    expect(result.summaryCounts.executedInvocations).toBe(0);
+    expect(result.transportAttemptCount).toBe(0);
+
+    globalFetchSpy.mockRestore();
+  });
+
+  // 29. (F) Valid v1.2 approval cannot bypass block
+  it('29. (F) valid v1.2 approval token and envelope cannot bypass block', async () => {
+    const token = generateCanaryApprovalToken({
+      approvedBy: 'lead@velnar.internal',
+      targetPhase: 'A.12B.2C-5D',
+      environmentTarget: 'CONTROLLED_CANARY',
+      dateYyyyMmDd: validDate,
+      maxBudgetMicroUsd: 50000,
+      approvalTimestamp: validTimestamp,
+      specificationVersion: CANARY_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      runNonce: validNonce,
+      capabilitySecret: validSecret,
+      executionLane: 'INTERACTIVE',
+    });
+
+    const result = await BoundedCanaryRunner.executeLiveCanary({
+      phase: 'A.12B.2C-5D',
+      executionLane: 'INTERACTIVE',
+      humanApproval: {
+        approvedBy: 'lead@velnar.internal',
+        approvalTimestamp: validTimestamp,
+        targetPhase: 'A.12B.2C-5D',
+        approvalToken: token,
+        maxBudgetMicroUsd: 50000,
+        environmentTarget: 'CONTROLLED_CANARY',
+        specificationVersion: CANARY_SPECIFICATION_VERSION,
+        sourceCommitSha: validCommit,
+        runNonce: validNonce,
+        executionLane: 'INTERACTIVE',
+      },
+      capabilitySecret: validSecret,
+    });
+
+    expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+    expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+    expect(result.summaryCounts.executedInvocations).toBe(0);
+  });
+
+  // 30. (G) Invalid approval cannot bypass or alter block ordering
+  it('30. (G) invalid or malformed approval envelope hits Gate 0 block first without altering fail-closed ordering', async () => {
+    const malformedApprovals = [
+      undefined,
+      null,
+      {} as any,
+      { approvedBy: 'forger', approvalToken: 'forged_token' } as any,
+    ];
+
+    for (const badApproval of malformedApprovals) {
+      const result = await BoundedCanaryRunner.executeLiveCanary({
+        phase: 'A.12B.2C-5D',
+        humanApproval: badApproval,
+        capabilitySecret: validSecret,
+      });
+
+      // Gate 0 must terminate BEFORE Gate 1 human approval validation
+      expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+      expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+      expect(result.killSwitchEvents[0].message).toContain('Dual-lane v1.2 live execution is blocked pending lane-specific certification');
+      expect(result.summaryCounts.executedInvocations).toBe(0);
+    }
+  });
+
+  // 31. (H) Real-looking provider environment values are never inspected/required to reach block
+  it('31. (H) real-looking provider environment values are never inspected or required to reach block', async () => {
+    const envConfigurations = [
+      {}, // Empty env
+      { DEEPSEEK_API_KEY: 'test-deepseek-val', GEMINI_API_KEY: 'test-gemini-val' },
+      { RANDOM_VAR: 'test' },
+    ];
+
+    for (const env of envConfigurations) {
+      const result = await BoundedCanaryRunner.executeLiveCanary({
+        phase: 'A.12B.2C-5D',
+        executionLane: 'INTERACTIVE',
+        humanApproval: validV12ApprovalEnvelope,
+        capabilitySecret: validSecret,
+        env,
+      });
+
+      expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+      expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+      expect(result.killSwitchEvents[0].message).toContain('Dual-lane v1.2 live execution is blocked pending lane-specific certification');
+      expect(result.summaryCounts.executedInvocations).toBe(0);
+    }
+  });
+
+  // 32. (I, J, K, L) Sentinel invariants: customFetch=0, globalFetch=0, transportAttemptCount=0, productionRoutingEnforcementAllowed=false
+  it('32. (I, J, K, L) preserves zero customFetch, zero globalFetch, zero transportAttemptCount, and productionRoutingEnforcementAllowed===false', async () => {
+    const customFetchSentinel = vi.fn();
+    const globalFetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const result = await BoundedCanaryRunner.executeLiveCanary({
+      phase: 'A.12B.2C-5B',
+      humanApproval: validV12ApprovalEnvelope,
+      capabilitySecret: validSecret,
+      customFetch: customFetchSentinel as any,
+    });
+
+    // I: customFetch sentinel remains 0
+    expect(customFetchSentinel).toHaveBeenCalledTimes(0);
+    // J: global fetch sentinel remains 0
+    expect(globalFetchSpy).toHaveBeenCalledTimes(0);
+    // K: transportAttemptCount remains 0
+    expect(result.transportAttemptCount).toBe(0);
+    // L: productionRoutingEnforcementAllowed remains false
+    expect(result.productionRoutingEnforcementAllowed).toBe(false);
+
+    globalFetchSpy.mockRestore();
   });
 });
