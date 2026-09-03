@@ -1,0 +1,53 @@
+{
+  "phase": "A.12B.2C-5C",
+  "auditTimestamp": "2026-09-03T07:15:00.000Z",
+  "auditStatus": "POST_CANARY_AUDIT_PASS_FINAL_RECANARY_REQUIRED",
+  "historicalLiveExecutionCommit": "d130628a8ab7b4404908cd3ca2eb57ef98f9b019",
+  "authorizedHistoricalExecutionSourceCommit": "b3e179c581725d2ce9cf18c14f42553cc622239c",
+  "remediationBaseCommit": "72a8c4ed6bbe22999eb1c4509d21dffe3b0944f2",
+  "liveArtifact": "execution/a12b2c5b_canary_execution_attempt2_results.json",
+  "liveArtifactSha256": "1ef474e7bde9069a2e80acd2791725123b068027550fbb50dd267b8c102423a1",
+  "historicalVerification": {
+    "logicalCaseCount": 14,
+    "transportAttemptCount": 14,
+    "deepseekAttempts": 7,
+    "geminiAttempts": 7,
+    "retries": 0,
+    "fallbacks": 0,
+    "killSwitchEvents": 0,
+    "schemaValidCount": 14,
+    "passedInvocationCount": 14,
+    "geminiFlexProvenanceCount": 7,
+    "deepseekModelAliasProvenanceCount": 7,
+    "providerReportedUsageCount": 14,
+    "observedCostMicroUsd": 4595,
+    "reconstructedPreflightWorstCaseCostMicroUsd": 32967,
+    "aggregateSemanticScore": 0.9257,
+    "productionRoutingEnforcementAllowed": false
+  },
+  "deepSeekProvenance": {
+    "documentedVersionTarget": "DeepSeek-V4-Flash-0731",
+    "historicalProviderBackendFingerprint": "a26a7955944dc5c60445bff77fac9c8e",
+    "historicalProviderReportedModelVersion": "NOT_AVAILABLE_AS_DISTINCT_RUNTIME_VERSION",
+    "fingerprintSemantics": "DeepSeek system_fingerprint represents the backend infrastructure configuration fingerprint, not a model version identifier. DeepSeek API does not return a distinct runtime model version string in the standard chat completions payload."
+  },
+  "remediationVerification": {
+    "fullLifecycleTimeout": "PASS",
+    "deepSeekProvenanceSemantics": "PASS",
+    "costAccountingSeparation": "PASS",
+    "evidenceWriteFailureFatal": "PASS"
+  },
+  "immutabilityVerification": {
+    "attempt1Artifact": "execution/a12b2c5b_canary_execution_results.json",
+    "attempt1Sha256": "502e36cf8e5f8be81c3588f99b6140884f63780e0f5acc2263c7db4cc271795f",
+    "attempt2Artifact": "execution/a12b2c5b_canary_execution_attempt2_results.json",
+    "attempt2Sha256": "1ef474e7bde9069a2e80acd2791725123b068027550fbb50dd267b8c102423a1",
+    "historicalEvidenceUnchanged": true
+  },
+  "reCanaryDecision": {
+    "finalRecanaryRequired": true,
+    "reason": "the full-lifecycle 15 second timeout remediation materially changed the live transport enforcement path after the successful historical 5B run.",
+    "liveExecutionAllowedInPhase5C": false
+  },
+  "productionRoutingEnforcementAllowed": false
+}
