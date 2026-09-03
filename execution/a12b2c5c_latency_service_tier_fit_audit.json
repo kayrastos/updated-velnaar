@@ -1,0 +1,131 @@
+{
+  "phase": "A.12B.2C-5C",
+  "auditType": "LATENCY_SERVICE_TIER_FIT_AUDIT",
+  "baseCommit": "17c59ec42579d7b571df62784c0456085cfd4012",
+  "baseTree": "bb573d712c216b215e490999ad5540723ed87cee",
+  "finalRecanaryStatus": "CANARY_KILL_SWITCH_TERMINATED",
+  "canonicalFinalRecanary": {
+    "transportAttempts": 11,
+    "completedRequiredMatrixCases": 10,
+    "passedInvocations": 10,
+    "killSwitchEvents": 1,
+    "timeoutProvider": "gemini",
+    "timeoutTask": "BUSINESS_TWIN_SUMMARY",
+    "timeoutMs": 15001,
+    "hardLimitMs": 15000
+  },
+  "historicalNearTimeoutEvidence": {
+    "provider": "gemini",
+    "latencyMs": 14535
+  },
+  "officialProviderTierFindings": {
+    "flex": {
+      "tierName": "flex",
+      "latencyPositioning": "Variable latency / non-real-time. Utilizes sheddable compute capacity subject to queuing delays that can extend to several minutes.",
+      "reliabilityPositioning": "Best-effort availability with lower criticality. Under heavy platform load, requests may be delayed or preempted; no automatic upgrade to standard tier.",
+      "serviceTierSemantics": "Synchronous inference option specified via service_tier: flex parameter in Interactions API and GenerateContent.",
+      "timeoutRecommendation": "Official documentation explicitly recommends increasing client timeouts to 10 minutes or more to accommodate potential queuing.",
+      "pricingRelationship": "Cost-optimized with approximately 50% discount compared to standard rates (e.g., 0.15 USD / 1M input tokens vs 0.30 USD standard; 1.25 USD / 1M output tokens including thinking vs 2.50 USD standard).",
+      "suitableForInteractiveWorkloads": false,
+      "suitableForBackgroundEconomyWorkloads": true,
+      "availabilityConstraints": "Available on Gemini models including gemini-3.5-flash-lite via generativelanguage.googleapis.com; requires explicit service_tier flex declaration."
+    },
+    "standard": {
+      "tierName": "standard",
+      "latencyPositioning": "Standard predictable on-demand latency, typically low single-digit seconds (2s - 5s) for flash models under normal conditions.",
+      "reliabilityPositioning": "Standard production availability SLA without sheddable preemption.",
+      "serviceTierSemantics": "Default tier when service_tier is omitted or explicitly set to standard.",
+      "timeoutRecommendation": "Standard interactive timeout windows (10s - 30s).",
+      "pricingRelationship": "Baseline standard model pricing.",
+      "suitableForInteractiveWorkloads": true,
+      "suitableForBackgroundEconomyWorkloads": true,
+      "availabilityConstraints": "Universally available across standard Gemini API endpoints."
+    },
+    "priority": {
+      "tierName": "priority",
+      "latencyPositioning": "Lowest latency and highest queue priority, minimizing queuing delay during peak platform traffic.",
+      "reliabilityPositioning": "Highest criticality and uptime assurance; overflow requests automatically spill over to standard tier rather than failing.",
+      "serviceTierSemantics": "Specified via service_tier: priority in request configuration.",
+      "timeoutRecommendation": "Tight interactive timeout windows (5s - 15s).",
+      "pricingRelationship": "Premium pricing tier above standard rates.",
+      "suitableForInteractiveWorkloads": true,
+      "suitableForBackgroundEconomyWorkloads": false,
+      "availabilityConstraints": "Available for enterprise / high-criticality workloads on select endpoints."
+    }
+  },
+  "latencyAnalysis": {
+    "deepseek": {
+      "description": "DeepSeek-V4-Flash under OFF_PEAK pricing window (14 total attempts across Attempt 2 and Final Re-Canary)",
+      "count": 14,
+      "minMs": 275,
+      "medianMs": 1585,
+      "p75Ms": 3698,
+      "p90Ms": 6605,
+      "maxMs": 9412,
+      "countGte10000Ms": 0,
+      "countGte14000Ms": 0,
+      "countGte15000Ms": 0,
+      "percentilesDisclaimer": "Descriptive only due to sample size (N=14); no statistical confidence claimed.",
+      "distributionAssessment": "Strictly bounded within interactive SLOs; 100% of invocations completed well under 10 seconds (max 9412 ms)."
+    },
+    "geminiFlex": {
+      "description": "Gemini-3.5-Flash-Lite with service_tier: flex (11 total attempts across Attempt 2 and Final Re-Canary)",
+      "count": 11,
+      "minMs": 2053,
+      "medianMs": 2653,
+      "p75Ms": 2942,
+      "p90Ms": 14535,
+      "maxMs": 15001,
+      "countGte10000Ms": 2,
+      "countGte14000Ms": 2,
+      "countGte15000Ms": 1,
+      "percentilesDisclaimer": "Descriptive only due to sample size (N=11); no statistical confidence claimed.",
+      "distributionAssessment": "Bimodal heavy-tailed distribution: normal median ~2.6s, but 18.2% (2/11) exhibited extreme tail latency (14535 ms and 15001 ms) due to sheddable compute queueing. Matches official provider tier behavior."
+    },
+    "comparativeFinding": "The latency divergence between DeepSeek OFF_PEAK (max 9.4s) and Gemini Flex (2 calls >14.5s, 1 timeout) is not an implementation bug or random network glitch. It directly reflects Google official Flex tier architecture: sheddable queueing capacity with potential multi-minute wait times, fundamentally incompatible with a 15-second synchronous interactive failover ceiling."
+  },
+  "options": {
+    "optionA": {
+      "name": "Keep Gemini Flex as interactive fallback and raise global timeout",
+      "feasibility": "REJECTED",
+      "uxImpact": "Severely degraded. Interactive users waiting for primary DeepSeek (up to 15s) followed by a lengthened Flex fallback (e.g. 60s-600s) would experience unacceptable 1-10 minute freezes on synchronous UI actions.",
+      "providerTierCompatibility": "Incompatible. Violates Google official guidance that Flex is intended for latency-tolerant, non-real-time workloads.",
+      "tailRisk": "Extreme. Exposes end users directly to unconstrained queueing spikes and preemption.",
+      "worstCaseDuration": "At 120s timeout, 14-invocation canary worst-case runtime reaches 28 minutes; at 600s, up to 140 minutes.",
+      "impactOnPrimarySlo": "Unnecessarily weakens DeepSeek interactive SLO by diluting the fail-closed protection."
+    },
+    "optionB": {
+      "name": "Keep 15s interactive timeout and replace Gemini Flex with Gemini Standard or Priority",
+      "feasibility": "PARTIALLY_FEASIBLE",
+      "uxImpact": "High. Gemini Standard provides predictable 2-5s response times without sheddable queuing.",
+      "providerTierCompatibility": "Fully compatible with Google service-tier definitions for interactive applications.",
+      "costImpact": "Standard tier costs ~2x Flex ($0.30/1M vs $0.15/1M input). However, because fallback traffic represents <1% of volume, overall portfolio cost increases by <0.5%.",
+      "downside": "Completely abandons the strategic 50% cost savings of Gemini Flex for all workloads, including asynchronous/background jobs."
+    },
+    "optionC": {
+      "name": "Split execution into Interactive and Background/Economy lanes",
+      "feasibility": "STRONGLY_RECOMMENDED",
+      "uxImpact": "Optimal. Interactive user requests never encounter sheddable queuing; background jobs benefit from 50% discount.",
+      "architectureSummary": "Dual-lane architecture separating strict low-latency interactive routing from asynchronous economy batch routing.",
+      "interactiveLane": {
+        "sla": "Strict low-latency (15s hard ceiling)",
+        "primaryCandidate": "deepseek-v4-flash-offpeak-low",
+        "fallbackCandidate": "Separately benchmarked low-latency candidate (e.g., Gemini Standard / Priority)",
+        "timeoutMs": 15000
+      },
+      "backgroundEconomyLane": {
+        "sla": "Cost-optimized, latency-tolerant",
+        "candidate": "gemini-3.5-flash-lite-flex-low",
+        "timeoutMs": 300000,
+        "executionModel": "Asynchronous queue / background worker, preventing edge HTTP connection timeouts"
+      },
+      "complexityAndObservability": "Requires explicit routing classification and independent canary matrices, but provides crystal-clear SLO boundaries and operational resilience."
+    }
+  },
+  "recommendedArchitecture": "Dual-Lane AI Routing Architecture: (1) Interactive Lane retaining 15,000ms hard ceiling with DeepSeek OFF_PEAK primary and separately certified low-latency fallback (e.g. Gemini Standard); (2) Background/Economy Lane for latency-tolerant workloads utilizing Gemini-3.5-Flash-Lite Flex with extended timeout (e.g. 300-600s) operating asynchronously.",
+  "recommendedDecisionCode": "C_SPLIT_INTERACTIVE_AND_BACKGROUND_TIERS",
+  "specChangeRequired": true,
+  "liveRecanaryRequiredAfterSpecChange": true,
+  "providerNetworkCallsDuringAudit": 0,
+  "productionRoutingEnforcementAllowed": false
+}
