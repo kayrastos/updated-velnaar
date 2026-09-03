@@ -405,9 +405,61 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
   });
 
   // =========================================================================
-  // D. EVIDENCE WRITE FAILURE FATALITY
+  // D. EVIDENCE WRITE FAILURE FATALITY & POSITIVE ESM PERSISTENCE
   // =========================================================================
-  describe('D. Evidence Write Failure Fatality', () => {
+  describe('D. Evidence Write Failure Fatality & Positive ESM Persistence', () => {
+    it('successfully persists valid evidence package via ESM without CommonJS require', () => {
+      const tempDir = path.resolve(process.cwd(), `tmp/evidence_test_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+      const tempPath = path.join(tempDir, 'valid_evidence.json');
+
+      const mockResult: any = {
+        phase: 'A.12B.2C-5B',
+        overallStatus: 'CANARY_EXECUTION_PASSED',
+        productionRoutingEnforcementAllowed: false,
+        summaryCounts: {
+          totalObservedCostMicroUsd: 4595,
+        },
+      };
+
+      try {
+        writeEvidenceArtifact(tempPath, mockResult);
+
+        // 3. Assert the file actually exists
+        expect(fs.existsSync(tempPath)).toBe(true);
+
+        // 4. Read the file back from disk
+        const rawContent = fs.readFileSync(tempPath, 'utf8');
+
+        // 5. JSON.parse it
+        const parsed = JSON.parse(rawContent);
+
+        // 6. Assert the parsed result exactly contains the expected phase/status/productionRoutingEnforcementAllowed fields
+        expect(parsed.phase).toBe('A.12B.2C-5B');
+        expect(parsed.overallStatus).toBe('CANARY_EXECUTION_PASSED');
+        expect(parsed.productionRoutingEnforcementAllowed).toBe(false);
+
+        // 7. Verify productionRoutingEnforcementAllowed remains false
+        expect(parsed.productionRoutingEnforcementAllowed).toBe(false);
+      } finally {
+        // 8. Clean up the temporary file/directory
+        if (fs.existsSync(tempPath)) {
+          fs.unlinkSync(tempPath);
+        }
+        if (fs.existsSync(tempDir)) {
+          fs.rmdirSync(tempDir);
+        }
+      }
+    });
+
+    it('asserts boundedCanaryRunner source does NOT contain CommonJS require for fs or path', () => {
+      const runnerSourcePath = path.resolve(process.cwd(), 'worker/ai/canary/boundedCanaryRunner.ts');
+      const runnerSource = fs.readFileSync(runnerSourcePath, 'utf8');
+
+      expect(runnerSource.includes("require('fs')")).toBe(false);
+      expect(runnerSource.includes('require("fs")')).toBe(false);
+      expect(runnerSource.includes("require('path')")).toBe(false);
+      expect(runnerSource.includes('require("path")')).toBe(false);
+    });
     it('propagates deterministic filesystem write failure in writeEvidenceArtifact', () => {
       const mockResult: any = {
         phase: 'A.12B.2C-5B',

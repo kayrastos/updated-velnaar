@@ -1,0 +1,20 @@
+{
+  "phase": "A.12B.2C-5C",
+  "repairType": "EVIDENCE_PERSISTENCE_ESM_RUNTIME_REPAIR",
+  "baseCommit": "b478822ca78e36e1c5e1a8ce31d675c99ff45060",
+  "incidentStatus": "FINAL_RECANARY_FAILED_CLOSED_ARTIFACT_PERSISTENCE_FAILURE",
+  "incidentLiveCalls": 14,
+  "incidentEvidencePersisted": false,
+  "incidentEvidenceRecoverable": false,
+  "rootCause": "CommonJS require('fs') / require('path') used inside an ESM package runtime",
+  "repairVerification": {
+    "esmImports": "PASS",
+    "validPersistenceWrite": "PASS",
+    "invalidPersistenceFailureFatal": "PASS",
+    "runtimeEsmSmoke": "PASS",
+    "fullOfflineSuite": "PASS"
+  },
+  "providerNetworkCallsDuringRepair": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "notes": "The previous live run remains uncertified because its canonical artifact was not persisted. Zero fake or reconstructed live invocation artifacts were created."
+}

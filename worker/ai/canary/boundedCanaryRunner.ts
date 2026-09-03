@@ -11,6 +11,8 @@
  * - enforcementAllowed remains strictly false.
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as crypto from 'crypto';
 import { TaskType, DataClassification } from '../types';
 import {
@@ -2225,8 +2227,6 @@ export class BoundedCanaryRunner {
 }
 
 export function writeEvidenceArtifact(outputPath: string, result: CanaryExecutionEvidencePackage): void {
-  const fs = require('fs');
-  const path = require('path');
   const fullPath = path.resolve(process.cwd(), outputPath);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, JSON.stringify(result, null, 2), 'utf8');
