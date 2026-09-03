@@ -1,33 +1,29 @@
 /**
- * @file worker/ai/canary/boundedCanaryRunner.ts
- * @description Fail-closed bounded live canary execution engine and Phase A.12B.2C-5A readiness validator.
+ * @file tests/ai/helpers/historicalCanaryMockTransportHarness.ts
+ * @description Test-Only Mock Transport Harness for Historical Canary Transport Certification.
  * 
  * STRICT INVARIANTS:
- * - Phase A.12B.2C-5A is DRY-RUN & READINESS ONLY (live network calls are strictly blocked).
- * - Live execution requires explicit Phase A.12B.2C-5B Human Approval Token.
- * - Real user / personal / sensitive data produces immediate fail-closed termination with 0 provider calls.
- * - Outbound network calls are restricted to CERTIFIED_CANARY_NETWORK_ENDPOINTS.
- * - Any kill switch trips execution immediately with zero retry or recursive fallback.
- * - enforcementAllowed remains strictly false.
+ * - Test-only file; never imported by worker or production runtime code.
+ * - Explicit injected mock transport (customFetch) ONLY.
+ * - Throws immediately if customFetch is absent or undefined (no fallback to globalThis.fetch).
+ * - Deterministic placeholder environment only; never reads real provider credentials.
+ * - Preserves deterministic coverage for retry mechanics, redirects, provenance parsing,
+ *   timeout behavior, service-tier validation, cost accounting, and evidence handling.
+ * - No production export.
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import * as crypto from 'crypto';
-import { TaskType, DataClassification } from '../types';
+import { TaskType } from '../../../worker/ai/types';
 import {
   CERTIFIED_A12B2C_TASK_TYPES,
   CertifiedProviderId,
-  isCertifiedA12B2CTaskType,
-} from '../providers/certifiedProviderTypes';
+} from '../../../worker/ai/providers/certifiedProviderTypes';
 import {
   CANARY_SPECIFICATION_VERSION,
   CERTIFIED_CANARY_CANDIDATES,
-  CERTIFIED_CANARY_CANDIDATE_MAP,
   CANARY_INVOCATION_LIMITS,
   CANARY_COST_LIMITS,
   CANARY_SUCCESS_CRITERIA,
-  isCanaryDataClassificationAllowed,
   isCanaryNetworkEndpointAllowed,
   validateHumanApprovalToken,
   isValidCapabilitySecret,
@@ -35,608 +31,45 @@ import {
   computeFixtureHash,
   CanaryHumanApprovalEnvelope,
   CanaryKillSwitchEvent,
-  CanaryKillSwitchReason,
   CanaryInvocationEvidenceRecord,
   CanaryExecutionEvidencePackage,
   CanaryTransportAttemptRecord,
-  CanaryExecutionLane,
-} from './canarySpecification';
-import { EvaluationCostCalculator, LiveCandidateConfig } from '../evaluation/evaluationCostCalculator';
-import { EvaluationSecurityGate } from '../evaluation/evaluationSecurity';
-import { EvaluationScorer } from '../evaluation/evaluationScorer';
-import { OutputValidator } from '../outputValidator';
-import { PromptRegistry } from '../promptRegistry';
+} from '../../../worker/ai/canary/canarySpecification';
+import { EvaluationCostCalculator, LiveCandidateConfig } from '../../../worker/ai/evaluation/evaluationCostCalculator';
+import { EvaluationScorer } from '../../../worker/ai/evaluation/evaluationScorer';
+import { OutputValidator } from '../../../worker/ai/outputValidator';
+import { PromptRegistry } from '../../../worker/ai/promptRegistry';
+import { CanaryLiveRunnerOptions } from '../../../worker/ai/canary/boundedCanaryRunner';
 
-export interface CanaryRunnerOptions {
-  phase?: 'A.12B.2C-5A' | 'A.12B.2C-5B';
-  dryRun?: boolean;
-  humanApproval?: CanaryHumanApprovalEnvelope | null;
-  capabilitySecret?: string;
-  customFetch?: typeof fetch;
-  now?: () => Date;
-  abortSignal?: AbortSignal;
-}
-
-export interface CanaryReadinessCheckResult {
-  ready: boolean;
-  phase: 'A.12B.2C-5A';
-  specificationVersion: string;
-  checks: {
-    canaryCandidatesConfigured: boolean;
-    certifiedTaskScopeVerified: boolean;
-    privacyGatesFailClosed: boolean;
-    networkAllowlistVerified: boolean;
-    costCeilingPreflightVerified: boolean;
-    invocationLimitsConfigured: boolean;
-    killSwitchesConfigured: boolean;
-    approvalGateEnforced: boolean;
-    productionRoutingIsolated: boolean;
-    aiRouterUntouched: boolean;
-  };
-  reasons: string[];
-}
-
-export interface CanaryLiveRunnerOptions {
-  phase?: 'A.12B.2C-5B' | 'A.12B.2C-5D';
-  humanApproval: CanaryHumanApprovalEnvelope;
-  capabilitySecret?: string;
-  customFetch?: typeof fetch;
-  now?: () => Date;
-  abortSignal?: AbortSignal;
-  sourceRevisionResolver?: () => { commitSha: string; isClean: boolean };
-  env?: Record<string, string | undefined>;
-  executionLane?: CanaryExecutionLane;
-  lane?: CanaryExecutionLane;
-  isV12LiveAttempt?: boolean;
-}
-
-export class BoundedCanaryRunner {
+export class HistoricalCanaryMockTransportHarness {
   /**
-   * Evaluates Phase A.12B.2C-5A readiness without making any provider calls.
+   * Executes the historical canary transport pipeline strictly with injected mock transport.
+   * Throws if options.customFetch is missing.
+   * Never falls back to globalThis.fetch.
+   * Never reads real provider credentials from process.env.
    */
-  public static verifyReadiness(options?: CanaryRunnerOptions): CanaryReadinessCheckResult {
-    const reasons: string[] = [];
-    let ready = true;
-
-    // Check 1: Candidates
-    const candidatesOk = CERTIFIED_CANARY_CANDIDATES.length === 2 &&
-      CERTIFIED_CANARY_CANDIDATES.some(c => c.providerId === 'deepseek') &&
-      CERTIFIED_CANARY_CANDIDATES.some(c => c.providerId === 'gemini');
-    if (!candidatesOk) {
-      ready = false;
-      reasons.push('Candidate configuration does not match certified DeepSeek + Gemini pair.');
-    }
-
-    // Check 2: Tasks
-    const tasksOk = CERTIFIED_A12B2C_TASK_TYPES.length === 7 &&
-      CERTIFIED_A12B2C_TASK_TYPES.every(t => isCertifiedA12B2CTaskType(t));
-    if (!tasksOk) {
-      ready = false;
-      reasons.push('Certified task scope is incomplete or unverified.');
-    }
-
-    // Check 3: Privacy Gates
-    const privacyOk = !isCanaryDataClassificationAllowed('PERSONAL') &&
-      !isCanaryDataClassificationAllowed('SENSITIVE') &&
-      !isCanaryDataClassificationAllowed('SECRET') &&
-      isCanaryDataClassificationAllowed('PUBLIC_BUSINESS') &&
-      isCanaryDataClassificationAllowed('PSEUDONYMOUS_OPERATIONAL');
-    if (!privacyOk) {
-      ready = false;
-      reasons.push('Privacy classification filter did not properly reject prohibited data classes.');
-    }
-
-    // Check 4: Network Allowlist
-    const networkOk = isCanaryNetworkEndpointAllowed('https://api.deepseek.com/v1/chat/completions') &&
-      isCanaryNetworkEndpointAllowed('https://generativelanguage.googleapis.com/v1beta/interactions') &&
-      !isCanaryNetworkEndpointAllowed('https://api.openai.com/v1/chat/completions') &&
-      !isCanaryNetworkEndpointAllowed('https://api.anthropic.com/v1/messages') &&
-      !isCanaryNetworkEndpointAllowed('https://untrusted-domain.com/api');
-    if (!networkOk) {
-      ready = false;
-      reasons.push('Network allowlist does not properly filter endpoints.');
-    }
-
-    // Check 5: Cost limits preflight
-    const costOk = CANARY_COST_LIMITS.hardCeilingMicroUsd === 50000 &&
-      CANARY_COST_LIMITS.maxEstimatedCostMicroUsd <= CANARY_COST_LIMITS.hardCeilingMicroUsd;
-    if (!costOk) {
-      ready = false;
-      reasons.push('Cost ceiling configuration is invalid.');
-    }
-
-    // Check 6: Invocation limits
-    const limitsOk = CANARY_INVOCATION_LIMITS.maxTotalInvocations === 14 &&
-      CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider === 7 &&
-      CANARY_INVOCATION_LIMITS.maxSameProviderRetries === 1 &&
-      CANARY_INVOCATION_LIMITS.maxCrossProviderFallbacks === 1;
-    if (!limitsOk) {
-      ready = false;
-      reasons.push('Invocation limits do not enforce strict bounded counts.');
-    }
-
-    // Check 7: Kill Switches
-    const killSwitchesOk = CANARY_SUCCESS_CRITERIA.maxPrivacyViolations === 0 &&
-      CANARY_SUCCESS_CRITERIA.maxUnexpectedNetworkAttempts === 0;
-    if (!killSwitchesOk) {
-      ready = false;
-      reasons.push('Kill switch criteria invalid.');
-    }
-
-    // Check 8: Approval Gate Enforcement (null token fails closed)
-    const approvalCheck = validateHumanApprovalToken(null);
-    const approvalEnforced = !approvalCheck.valid;
-    if (!approvalEnforced) {
-      ready = false;
-      reasons.push('Human approval gate failed to reject null token.');
-    }
-
-    return {
-      ready,
-      phase: 'A.12B.2C-5A',
-      specificationVersion: CANARY_SPECIFICATION_VERSION,
-      checks: {
-        canaryCandidatesConfigured: candidatesOk,
-        certifiedTaskScopeVerified: tasksOk,
-        privacyGatesFailClosed: privacyOk,
-        networkAllowlistVerified: networkOk,
-        costCeilingPreflightVerified: costOk,
-        invocationLimitsConfigured: limitsOk,
-        killSwitchesConfigured: killSwitchesOk,
-        approvalGateEnforced: approvalEnforced,
-        productionRoutingIsolated: true,
-        aiRouterUntouched: true,
-      },
-      reasons,
-    };
-  }
-
-  /**
-   * Executes a simulated or dry-run canary suite strictly under Phase A.12B.2C-5A/5B constraints.
-   * If invoked with live intent without Phase A.12B.2C-5B approval and capability secret, fails closed immediately.
-   */
-  public static async executeDryRunPlan(options: CanaryRunnerOptions = {}): Promise<CanaryExecutionEvidencePackage> {
-    const phase = options.phase ?? 'A.12B.2C-5A';
-    const isDryRun = options.dryRun ?? true;
-    const now = options.now ?? (() => new Date());
-    const abortSignal = options.abortSignal;
-
-    const killSwitchEvents: CanaryKillSwitchEvent[] = [];
-    const invocations: CanaryInvocationEvidenceRecord[] = [];
-
-    // Redacted human approval envelope for evidence (zero secret leakage)
-    const sanitizedApproval: CanaryHumanApprovalEnvelope | null = options.humanApproval
-      ? {
-          approvedBy: options.humanApproval.approvedBy,
-          approvalTimestamp: options.humanApproval.approvalTimestamp,
-          targetPhase: options.humanApproval.targetPhase,
-          approvalToken: options.humanApproval.approvalToken,
-          maxBudgetUsd: options.humanApproval.maxBudgetUsd,
-          environmentTarget: options.humanApproval.environmentTarget,
-          specificationVersion: options.humanApproval.specificationVersion,
-          sourceCommitSha: options.humanApproval.sourceCommitSha,
-          runNonce: options.humanApproval.runNonce,
-          capabilitySecret: undefined, // Redacted
-        }
-      : null;
-
-    // Rule 1: Phase A.12B.2C-5A cannot execute live calls
-    if (phase === 'A.12B.2C-5A' && !isDryRun) {
-      const event: CanaryKillSwitchEvent = {
-        timestamp: now().toISOString(),
-        reason: 'UNAUTHORIZED_ENVIRONMENT',
-        message: 'Live canary execution is strictly forbidden in Phase A.12B.2C-5A. Phase A.12B.2C-5B with human approval is mandatory.',
-        terminatedFailClosed: true,
-      };
-      killSwitchEvents.push(event);
-
-      return {
-        phase: 'A.12B.2C-5A',
-        specificationVersion: CANARY_SPECIFICATION_VERSION,
-        executionMode: 'DRY_RUN_READINESS_VERIFICATION',
-        timestamp: now().toISOString(),
-        humanApproval: null,
-        overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
-        summaryCounts: {
-          totalPlannedInvocations: 14,
-          executedInvocations: 0,
-          passedInvocations: 0,
-          failedInvocations: 0,
-          killSwitchEventsCount: 1,
-          totalObservedCostMicroUsd: 0,
-          totalEstimatedCostMicroUsd: 0,
-          totalPreflightWorstCaseCostMicroUsd: 0,
-          aggregateSemanticScore: 0,
-        },
-        invocations: [],
-        killSwitchEvents,
-        productionRoutingEnforcementAllowed: false,
-      };
-    }
-
-    // Rule 2: If Phase A.12B.2C-5B is requested, validate approval envelope with mandatory secret
-    if (phase === 'A.12B.2C-5B') {
-      const approvalValidation = validateHumanApprovalToken(
-        options.humanApproval,
-        {
-          capabilitySecret: options.capabilitySecret || options.humanApproval?.capabilitySecret,
-          now,
-          allowSimulatedExpiryForTest: isDryRun,
-        }
+  public static async executeHistoricalMockTransport(
+    options: CanaryLiveRunnerOptions
+  ): Promise<CanaryExecutionEvidencePackage> {
+    if (!options.customFetch) {
+      throw new Error(
+        'HistoricalCanaryMockTransportHarness requires explicit mock transport customFetch (no fallback to globalThis.fetch is permitted).'
       );
-      if (!approvalValidation.valid) {
-        killSwitchEvents.push({
-          timestamp: now().toISOString(),
-          reason: 'HUMAN_APPROVAL_INVALID',
-          message: `Canary execution rejected: ${approvalValidation.reason}`,
-          terminatedFailClosed: true,
-        });
-
-        return {
-          phase: 'A.12B.2C-5B',
-          specificationVersion: CANARY_SPECIFICATION_VERSION,
-          executionMode: isDryRun ? 'DRY_RUN_READINESS_VERIFICATION' : 'LIVE_CONTROLLED_CANARY',
-          timestamp: now().toISOString(),
-          humanApproval: sanitizedApproval,
-          overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
-          summaryCounts: {
-            totalPlannedInvocations: 14,
-            executedInvocations: 0,
-            passedInvocations: 0,
-            failedInvocations: 0,
-            killSwitchEventsCount: 1,
-            totalObservedCostMicroUsd: 0,
-            totalEstimatedCostMicroUsd: 0,
-            aggregateSemanticScore: 0,
-          },
-          invocations: [],
-          killSwitchEvents,
-          productionRoutingEnforcementAllowed: false,
-        };
-      }
     }
 
-    // Check early abort signal
-    if (abortSignal?.aborted) {
-      killSwitchEvents.push({
-        timestamp: now().toISOString(),
-        reason: 'UNEXPECTED_EXCEPTION',
-        message: 'Execution aborted prior to start by termination signal (SIGINT/SIGTERM/Abort).',
-        terminatedFailClosed: true,
-      });
-
-      return {
-        phase,
-        specificationVersion: CANARY_SPECIFICATION_VERSION,
-        executionMode: 'DRY_RUN_READINESS_VERIFICATION',
-        timestamp: now().toISOString(),
-        humanApproval: sanitizedApproval,
-        overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
-        summaryCounts: {
-          totalPlannedInvocations: 14,
-          executedInvocations: 0,
-          passedInvocations: 0,
-          failedInvocations: 0,
-          killSwitchEventsCount: 1,
-          totalObservedCostMicroUsd: 0,
-          totalEstimatedCostMicroUsd: 0,
-          aggregateSemanticScore: 0,
-        },
-        invocations: [],
-        killSwitchEvents,
-        productionRoutingEnforcementAllowed: false,
-      };
-    }
-
-    // Execute dry-run planned invocation matrix across 7 certified tasks * 2 candidates
-    let invocationIdx = 0;
-    let totalEstimatedCost = 0;
-    let totalObservedCost = 0;
-    let scoreSum = 0;
-
-    const providerCounts: Record<CertifiedProviderId, number> = {
-      deepseek: 0,
-      gemini: 0,
-    };
-
-    for (const candidate of CERTIFIED_CANARY_CANDIDATES) {
-      for (const taskType of CERTIFIED_A12B2C_TASK_TYPES) {
-        // Abort signal check on each iteration
-        if (abortSignal?.aborted) {
-          killSwitchEvents.push({
-            timestamp: now().toISOString(),
-            reason: 'UNEXPECTED_EXCEPTION',
-            message: 'Execution interrupted mid-flight by termination signal.',
-            terminatedFailClosed: true,
-          });
-          break;
-        }
-
-        // Limit checks before issuing call
-        if (invocations.length >= CANARY_INVOCATION_LIMITS.maxTotalInvocations) {
-          killSwitchEvents.push({
-            timestamp: now().toISOString(),
-            reason: 'INVOCATION_LIMIT_BREACH',
-            message: `Total invocation limit ${CANARY_INVOCATION_LIMITS.maxTotalInvocations} reached.`,
-            terminatedFailClosed: true,
-          });
-          break;
-        }
-
-        if (providerCounts[candidate.providerId] >= CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider) {
-          killSwitchEvents.push({
-            timestamp: now().toISOString(),
-            reason: 'INVOCATION_LIMIT_BREACH',
-            message: `Provider invocation limit ${CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider} reached for ${candidate.providerId}.`,
-            terminatedFailClosed: true,
-          });
-          break;
-        }
-
-        invocationIdx++;
-        providerCounts[candidate.providerId]++;
-
-        // Preflight Task & Classification Check
-        if (!isCertifiedA12B2CTaskType(taskType)) {
-          killSwitchEvents.push({
-            timestamp: now().toISOString(),
-            reason: 'TASK_SCOPE_VIOLATION',
-            message: `Task ${taskType} is outside certified task scope.`,
-            terminatedFailClosed: true,
-          });
-          break;
-        }
-
-        const dataClassification: DataClassification = 'PUBLIC_BUSINESS';
-        if (!isCanaryDataClassificationAllowed(dataClassification)) {
-          killSwitchEvents.push({
-            timestamp: now().toISOString(),
-            reason: 'PRIVACY_CLASSIFICATION_VIOLATION',
-            message: `Data classification ${dataClassification} is prohibited for canary.`,
-            terminatedFailClosed: true,
-          });
-          break;
-        }
-
-        const endpointUrl = candidate.providerId === 'deepseek'
-          ? 'https://api.deepseek.com/v1/chat/completions'
-          : 'https://generativelanguage.googleapis.com/v1beta/interactions';
-
-        if (!isCanaryNetworkEndpointAllowed(endpointUrl)) {
-          killSwitchEvents.push({
-            timestamp: now().toISOString(),
-            reason: 'NETWORK_DESTINATION_MISMATCH',
-            message: `Endpoint ${endpointUrl} is not in certified network allowlist.`,
-            terminatedFailClosed: true,
-          });
-          break;
-        }
-
-        // Deterministic synthetic dry-run token models
-        const promptTokens = 550;
-        const completionTokens = 180;
-        const thinkingTokens = candidate.providerId === 'deepseek' ? 420 : 0;
-        const cacheHitTokens = candidate.providerId === 'deepseek' ? 300 : 0;
-        const cacheMissTokens = candidate.providerId === 'deepseek' ? 250 : 550;
-        const totalTokens = promptTokens + completionTokens;
-
-        const estCostMicroUsd = candidate.providerId === 'deepseek'
-          ? EvaluationCostCalculator.calculateDeepSeekCost({
-              cacheHitTokens,
-              cacheMissTokens,
-              completionTokens,
-              pricingWindow: 'OFF_PEAK',
-              usageSource: 'PROVIDER_REPORTED',
-            }).actualCostMicroUsd
-          : EvaluationCostCalculator.calculateGeminiCost({
-              promptTokens,
-              completionTokens,
-              thinkingTokens,
-              serviceTier: 'flex',
-              usageSource: 'PROVIDER_REPORTED',
-            }).actualCostMicroUsd;
-
-        totalEstimatedCost += estCostMicroUsd;
-        totalObservedCost += estCostMicroUsd;
-
-        if (totalObservedCost > CANARY_COST_LIMITS.hardCeilingMicroUsd) {
-          killSwitchEvents.push({
-            timestamp: now().toISOString(),
-            reason: 'COST_CEILING_BREACH',
-            message: `Cumulative cost ${totalObservedCost} microUSD exceeded ceiling ${CANARY_COST_LIMITS.hardCeilingMicroUsd}.`,
-            terminatedFailClosed: true,
-          });
-          break;
-        }
-
-        const semanticScore = 0.95;
-        scoreSum += semanticScore;
-
-        const requestPayload = JSON.stringify({ taskType, candidateId: candidate.candidateId, prompt: 'DRY_RUN_CANARY_PROMPT' });
-        const responsePayload = JSON.stringify({ status: 'ok', structuredResult: { task: taskType, confidence: 0.98 } });
-
-        invocations.push({
-          invocationIndex: invocationIdx,
-          timestamp: now().toISOString(),
-          taskType,
-          dataClassification,
-          providerId: candidate.providerId,
-          candidateId: candidate.candidateId,
-          fixtureId: CANARY_SYNTHETIC_FIXTURES[taskType].id,
-          fixtureHash: computeFixtureHash(CANARY_SYNTHETIC_FIXTURES[taskType]),
-          requestedModelIdentifier: candidate.requestedModelIdentifier,
-          returnedModelIdentifier: candidate.expectedReturnedModelIdentifier,
-          documentedVersionTarget: candidate.providerId === 'deepseek' ? 'DeepSeek-V4-Flash-0731' : 'gemini-3.5-flash-lite',
-          certificationBaselineModelVersion: candidate.providerId === 'deepseek' ? 'DeepSeek-V4-Flash-0731' : 'gemini-3.5-flash-lite',
-          providerReportedBackendFingerprint: candidate.providerId === 'deepseek' ? 'mock-fingerprint-001' : null,
-          providerReportedModelVersion: candidate.providerId === 'deepseek' ? null : 'gemini-3.5-flash-lite',
-          serviceTier: candidate.pricingTier === 'flex' ? 'flex' : undefined,
-          endpointUrl,
-          requestPayloadHash: crypto.createHash('sha256').update(requestPayload).digest('hex'),
-          responsePayloadHash: crypto.createHash('sha256').update(responsePayload).digest('hex'),
-          promptTokens,
-          completionTokens,
-          thinkingTokens,
-          cacheHitTokens,
-          cacheMissTokens,
-          totalTokens,
-          usageSource: 'PROVIDER_REPORTED',
-          cacheStatus: 'VERIFIED',
-          pricingWindow: candidate.pricingTier === 'offpeak' ? 'OFF_PEAK' : 'FLEX_STANDARD',
-          estimatedCostMicroUsd: estCostMicroUsd,
-          observedCostMicroUsd: estCostMicroUsd,
-          latencyMs: 380,
-          attemptCount: 1,
-          fallbackTriggered: false,
-          semanticScore,
-          schemaValid: true,
-          pass: true,
-        });
-      }
-
-      if (killSwitchEvents.length > 0) break;
-    }
-
-    const overallStatus = killSwitchEvents.length > 0
-      ? 'CANARY_KILL_SWITCH_TERMINATED'
-      : 'CANARY_READY_AWAITING_HUMAN_APPROVAL';
-
-    return {
-      phase: phase as 'A.12B.2C-5A' | 'A.12B.2C-5B',
-      specificationVersion: CANARY_SPECIFICATION_VERSION,
-      executionMode: 'DRY_RUN_READINESS_VERIFICATION',
-      timestamp: now().toISOString(),
-      humanApproval: sanitizedApproval,
-      overallStatus,
-      logicalCaseCount: invocations.length,
-      transportAttemptCount: 0,
-      completedRequiredMatrixCases: invocations.filter(i => i.pass).length,
-      summaryCounts: {
-        totalPlannedInvocations: 14,
-        executedInvocations: invocations.length,
-        passedInvocations: invocations.filter(i => i.pass).length,
-        failedInvocations: invocations.filter(i => !i.pass).length,
-        killSwitchEventsCount: killSwitchEvents.length,
-        totalObservedCostMicroUsd: totalObservedCost,
-        totalEstimatedCostMicroUsd: totalEstimatedCost,
-        totalPreflightWorstCaseCostMicroUsd: totalEstimatedCost,
-        aggregateSemanticScore: invocations.length > 0 ? Number((scoreSum / invocations.length).toFixed(4)) : 0,
-      },
-      attemptRecords: [],
-      invocations,
-      killSwitchEvents,
-      productionRoutingEnforcementAllowed: false,
-    };
-  }
-
-  /**
-   * Executes the real Phase A.12B.2C-5B live canary execution suite over certified providers.
-   * 
-   * Strict Safety & Isolation Rules:
-   * - Requires explicit Phase A.12B.2C-5B token and valid human capability secret.
-   * - Enforces git commit SHA matching and clean repository working tree.
-   * - Bounded to max 14 total requests, max 7 per provider, sequential N=1.
-   * - Uses certified hardened HTTP transport with redirect: 'error' and strict endpoint allowlist.
-   * - Pre-increments accounting before outbound dispatch.
-   * - Live telemetry parsing with strict model ID verification and EvaluationCostCalculator integration.
-   * - Max 1 retry (503 transient only) and max 1 cross-provider fallback (DeepSeek -> Gemini).
-   * - Immediate fail-closed termination upon any kill switch condition.
-   * - Live execution NEVER returns CANARY_READY_AWAITING_HUMAN_APPROVAL once dispatch begins.
-   */
-  public static async executeLiveCanary(options: CanaryLiveRunnerOptions): Promise<CanaryExecutionEvidencePackage> {
-    const now = options.now ?? (() => new Date());
-    const killSwitchEvents: CanaryKillSwitchEvent[] = [];
-
-    // Redacted human approval envelope for evidence (zero secret leakage)
-    const sanitizedApproval: CanaryHumanApprovalEnvelope | null = options.humanApproval
-      ? {
-          approvedBy: options.humanApproval.approvedBy,
-          approvalTimestamp: options.humanApproval.approvalTimestamp,
-          targetPhase: options.humanApproval.targetPhase,
-          approvalToken: options.humanApproval.approvalToken,
-          maxBudgetMicroUsd: options.humanApproval.maxBudgetMicroUsd,
-          maxBudgetUsd: options.humanApproval.maxBudgetUsd,
-          environmentTarget: options.humanApproval.environmentTarget,
-          specificationVersion: options.humanApproval.specificationVersion,
-          sourceCommitSha: options.humanApproval.sourceCommitSha,
-          runNonce: options.humanApproval.runNonce,
-          executionLane: options.humanApproval.executionLane ?? options.executionLane,
-          capabilitySecret: undefined, // Redacted
-        }
-      : null;
-
-    const buildFailClosedPackage = (): CanaryExecutionEvidencePackage => ({
-      phase: (options.phase as any) ?? 'A.12B.2C-5D',
-      specificationVersion: CANARY_SPECIFICATION_VERSION,
-      executionMode: 'LIVE_CONTROLLED_CANARY',
-      timestamp: now().toISOString(),
-      humanApproval: sanitizedApproval,
-      overallStatus: 'CANARY_KILL_SWITCH_TERMINATED',
-      logicalCaseCount: 0,
-      transportAttemptCount: 0,
-      completedRequiredMatrixCases: 0,
-      summaryCounts: {
-        totalPlannedInvocations: 14,
-        executedInvocations: 0,
-        passedInvocations: 0,
-        failedInvocations: 0,
-        killSwitchEventsCount: killSwitchEvents.length,
-        totalObservedCostMicroUsd: 0,
-        totalEstimatedCostMicroUsd: 0,
-        totalPreflightWorstCaseCostMicroUsd: 0,
-        aggregateSemanticScore: 0,
-      },
-      attemptRecords: [],
-      invocations: [],
-      killSwitchEvents,
-      productionRoutingEnforcementAllowed: false,
-    });
-
-    // Gate 0: Dual-Lane v1.2 Live Execution Fail-Closed Block
-    // ALL live execution under CURRENT v1.2 is unconditionally blocked until lane-specific certification is complete.
-    // Derived strictly from authoritative CURRENT specification state.
-    // MUST fail closed before:
-    // - source/network dispatch
-    // - provider credential evaluation
-    // - provider key requirement
-    // - customFetch invocation
-    // - global fetch invocation
-    // - transport attempt creation
-    // - invocation accounting
-    // - cost incurrence
-    // REGARDLESS of phase (5B or 5D), lane existence, approval validity, provider credentials, or customFetch.
-    if (
-      CANARY_SPECIFICATION_VERSION === 'a12b2c5-v1.2' ||
-      options.phase === 'A.12B.2C-5D' ||
-      options.executionLane !== undefined ||
-      options.lane !== undefined ||
-      options.humanApproval?.targetPhase === 'A.12B.2C-5D' ||
-      options.humanApproval?.executionLane !== undefined ||
-      options.isV12LiveAttempt === true
-    ) {
-      killSwitchEvents.push({
-        timestamp: now().toISOString(),
-        reason: 'UNAUTHORIZED_ENVIRONMENT',
-        message: 'Dual-lane v1.2 live execution is blocked pending lane-specific certification.',
-        terminatedFailClosed: true,
-      });
-      return buildFailClosedPackage();
-    }
-
-    return executeTransportPipeline(options);
-  }
-}
-
-/**
- * Internal module-scoped transport pipeline implementation for canary execution.
- * NON-EXPORTED: completely inaccessible outside this module.
- * Only reachable via executeLiveCanary, which is unconditionally blocked under v1.2.
- */
-async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promise<CanaryExecutionEvidencePackage> {
+    const fetchFn = options.customFetch;
     const now = options.now ?? (() => new Date());
     const abortSignal = options.abortSignal;
-    const fetchFn = options.customFetch ?? globalThis.fetch;
-    const env = options.env ?? (typeof process !== 'undefined' ? process.env : {});
+
+    // Strictly deterministic offline placeholder environment; never read real process.env provider credentials
+    const env = options.env
+      ? options.env
+      : {
+          DEEPSEEK_API_KEY: 'offline-test-deepseek-placeholder',
+          GEMINI_API_KEY: 'offline-test-gemini-placeholder',
+          VELNAR_CANARY_CAPABILITY_SECRET:
+            options.capabilitySecret ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        };
 
     const killSwitchEvents: CanaryKillSwitchEvent[] = [];
     const invocations: CanaryInvocationEvidenceRecord[] = [];
@@ -656,7 +89,7 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           sourceCommitSha: options.humanApproval.sourceCommitSha,
           runNonce: options.humanApproval.runNonce,
           executionLane: options.humanApproval.executionLane ?? options.executionLane,
-          capabilitySecret: undefined, // Redacted
+          capabilitySecret: undefined,
         }
       : null;
 
@@ -687,7 +120,7 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       productionRoutingEnforcementAllowed: false,
     });
 
-    // Gate 1: Phase must be strictly and explicitly 'A.12B.2C-5B' (or 'A.12B.2C-5D')
+    // Gate 1: Phase check
     if (!options.phase || (options.phase !== 'A.12B.2C-5B' && (options.phase as string) !== 'A.12B.2C-5D')) {
       killSwitchEvents.push({
         timestamp: now().toISOString(),
@@ -698,7 +131,7 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       return buildFailClosedPackage();
     }
 
-    // Gate 2: Validate 256-bit Entropy Capability Secret (64 lowercase hex characters)
+    // Gate 2: Validate 256-bit Entropy Capability Secret
     const secret = options.capabilitySecret || options.humanApproval?.capabilitySecret || env.VELNAR_CANARY_CAPABILITY_SECRET;
     if (!isValidCapabilitySecret(secret)) {
       killSwitchEvents.push({
@@ -710,7 +143,7 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       return buildFailClosedPackage();
     }
 
-    // Gate 3: Validate Human Approval Token with mandatory 256-bit capabilitySecret
+    // Gate 3: Validate Human Approval Token
     const approvalValidation = validateHumanApprovalToken(options.humanApproval, {
       capabilitySecret: secret,
       require64HexSecret: true,
@@ -728,14 +161,17 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       return buildFailClosedPackage();
     }
 
-    // Gate 4: Source Commit SHA & Clean Working Tree Verification (Fail-Closed)
+    // Gate 4: Source Commit SHA & Clean Working Tree Verification
     let sourceCommitMatch = false;
     let workingTreeClean = false;
 
     if (options.sourceRevisionResolver) {
       try {
         const rev = options.sourceRevisionResolver();
-        sourceCommitMatch = Boolean(rev?.commitSha && rev.commitSha.trim().toLowerCase() === options.humanApproval!.sourceCommitSha.trim().toLowerCase());
+        sourceCommitMatch = Boolean(
+          rev?.commitSha &&
+          rev.commitSha.trim().toLowerCase() === options.humanApproval!.sourceCommitSha.trim().toLowerCase()
+        );
         workingTreeClean = Boolean(rev?.isClean);
       } catch (err: any) {
         killSwitchEvents.push({
@@ -754,7 +190,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         sourceCommitMatch = headSha === options.humanApproval!.sourceCommitSha.trim().toLowerCase();
         workingTreeClean = statusOutput === '';
       } catch (gitErr: any) {
-        // FAIL CLOSED: If git command fails or repository state cannot be verified, terminate with 0 calls
         killSwitchEvents.push({
           timestamp: now().toISOString(),
           reason: 'HUMAN_APPROVAL_INVALID',
@@ -804,7 +239,7 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       return buildFailClosedPackage();
     }
 
-    // Gate 6: Provider Credential Preflight (Fail-Closed with 0 calls if credentials missing)
+    // Gate 6: Provider Credential Preflight
     const deepSeekKey = env.DEEPSEEK_API_KEY;
     const geminiKey = env.GEMINI_API_KEY;
     if (!deepSeekKey || typeof deepSeekKey !== 'string' || deepSeekKey.trim() === '') {
@@ -826,12 +261,12 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       return buildFailClosedPackage();
     }
 
-    // Compute approved budget bound (Integer microUSD)
-    const approvedBudgetMicroUsd = options.humanApproval!.maxBudgetMicroUsd ??
+    // Budget Ceiling Bound
+    const approvedBudgetMicroUsd =
+      options.humanApproval!.maxBudgetMicroUsd ??
       Math.round((options.humanApproval!.maxBudgetUsd ?? 0.05) * 1_000_000);
     const effectiveCeilingMicroUsd = Math.min(approvedBudgetMicroUsd, CANARY_COST_LIMITS.hardCeilingMicroUsd);
 
-    // Live Accounting State: Strict 14 Total / 7 Per-Provider Limits
     let totalTransportAttempts = 0;
     const providerTransportAttempts: Record<CertifiedProviderId, number> = {
       deepseek: 0,
@@ -843,7 +278,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
     let totalEstimatedCostMicroUsd = 0;
     let totalPreflightWorstCaseCostMicroUsd = 0;
     let scoreSum = 0;
-    let passedInvocationsCount = 0;
 
     /**
      * Hardened Outbound Transport Wrapper
@@ -861,7 +295,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       killSwitch?: CanaryKillSwitchEvent;
       retryable?: boolean;
     }> => {
-      // Check AbortSignal
       if (abortSignal?.aborted) {
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
@@ -872,9 +305,8 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         return { success: false, status: 499, killSwitch };
       }
 
-      // Check Invocations Quota BEFORE Outbound Dispatch (Strict 14 / 7 Hard Caps)
-      const maxAllowedTotalCalls = CANARY_INVOCATION_LIMITS.maxTotalInvocations; // 14
-      const maxAllowedProviderCalls = CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider; // 7
+      const maxAllowedTotalCalls = CANARY_INVOCATION_LIMITS.maxTotalInvocations;
+      const maxAllowedProviderCalls = CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider;
 
       if (totalTransportAttempts + 1 > maxAllowedTotalCalls) {
         const killSwitch: CanaryKillSwitchEvent = {
@@ -916,10 +348,10 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         return { success: false, status: 429, killSwitch };
       }
 
-      // Endpoint Allowlist Validation
-      const endpointUrl = params.candidate.providerId === 'deepseek'
-        ? 'https://api.deepseek.com/v1/chat/completions'
-        : 'https://generativelanguage.googleapis.com/v1beta/interactions';
+      const endpointUrl =
+        params.candidate.providerId === 'deepseek'
+          ? 'https://api.deepseek.com/v1/chat/completions'
+          : 'https://generativelanguage.googleapis.com/v1beta/interactions';
 
       if (!isCanaryNetworkEndpointAllowed(endpointUrl)) {
         const killSwitch: CanaryKillSwitchEvent = {
@@ -931,12 +363,16 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         return { success: false, status: 403, killSwitch };
       }
 
-      // Blocker 3: DeepSeek Dynamic Pricing Window Validation
-      const currentPricingWindow = params.candidate.providerId === 'deepseek'
-        ? EvaluationCostCalculator.getDeepSeekPricingWindow(now())
-        : 'OFF_PEAK';
+      const currentPricingWindow =
+        params.candidate.providerId === 'deepseek'
+          ? EvaluationCostCalculator.getDeepSeekPricingWindow(now())
+          : 'OFF_PEAK';
 
-      if (params.candidate.providerId === 'deepseek' && params.candidate.pricingTier === 'offpeak' && currentPricingWindow === 'PEAK') {
+      if (
+        params.candidate.providerId === 'deepseek' &&
+        params.candidate.pricingTier === 'offpeak' &&
+        currentPricingWindow === 'PEAK'
+      ) {
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
           reason: 'COST_CEILING_BREACH',
@@ -946,20 +382,24 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         return { success: false, status: 403, killSwitch };
       }
 
-      // Resolve Approved Synthetic Fixture and Build Real Prompt
       const fixture = CANARY_SYNTHETIC_FIXTURES[params.taskType];
       const fixtureHash = computeFixtureHash(fixture);
       const promptDef = PromptRegistry.getPrompt(params.taskType);
       const systemPrompt = promptDef.systemPrompt;
       const userPrompt = promptDef.buildUserPrompt(fixture.requestEnvelope);
 
-      // Blocker 4: Conservative Token Upper Bound & Worst-Case Cost Projection via EvaluationCostCalculator
-      const estimatedInputTokens = EvaluationCostCalculator.calculateConservativeInputTokenUpperBound(systemPrompt, userPrompt);
+      const estimatedInputTokens = EvaluationCostCalculator.calculateConservativeInputTokenUpperBound(
+        systemPrompt,
+        userPrompt
+      );
       const liveCandidateConfig: LiveCandidateConfig = {
         candidateId: params.candidate.candidateId as any,
         providerId: params.candidate.providerId,
         requestedModelIdentifier: params.candidate.requestedModelIdentifier,
-        serviceProfile: params.candidate.candidateId === 'gemini-3.5-flash-lite-flex-low' ? 'FLEX_COST_OPTIMIZED' : 'OFF_PEAK_COST_OPTIMIZED',
+        serviceProfile:
+          params.candidate.candidateId === 'gemini-3.5-flash-lite-flex-low'
+            ? 'FLEX_COST_OPTIMIZED'
+            : 'OFF_PEAK_COST_OPTIMIZED',
         thinkingEffort: 'low',
         serviceTier: params.candidate.pricingTier === 'flex' ? 'flex' : 'standard',
       };
@@ -994,13 +434,11 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         return { success: false, status: 402, killSwitch };
       }
 
-      // Pre-increment Invocations Counter (Strict Accounting)
       totalTransportAttempts++;
       providerTransportAttempts[params.candidate.providerId]++;
       if (params.isRetry) sameProviderRetriesCount++;
       if (params.isFallback) crossProviderFallbacksCount++;
 
-      // Real Provider Credentials (Strictly no fake default keys)
       const apiKey = params.candidate.providerId === 'deepseek' ? deepSeekKey! : geminiKey!;
 
       let requestPayloadStr = '';
@@ -1043,7 +481,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
 
       const requestPayloadHash = crypto.createHash('sha256').update(requestPayloadStr).digest('hex');
 
-      // Enforce timeout and redirect: 'error'
       const startTime = Date.now();
       const timeoutController = new AbortController();
       let timeoutTriggered = false;
@@ -1069,7 +506,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           signal: combinedSignal,
         });
 
-        // Handle Redirect Status Codes (301, 302, 307, 308) Fail-Closed
         if (
           response.status === 301 ||
           response.status === 302 ||
@@ -1106,7 +542,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           return { success: false, status: response.status, killSwitch };
         }
 
-        // Handle 503 Transient Service Unavailable (Retry Eligible)
         if (response.status === 503) {
           clearTimeout(timeoutId);
           latencyMs = Date.now() - startTime;
@@ -1135,7 +570,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           };
         }
 
-        // Handle Other Non-200 Statuses
         if (!response.ok) {
           clearTimeout(timeoutId);
           latencyMs = Date.now() - startTime;
@@ -1165,13 +599,16 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           };
         }
 
-        // Full-Lifecycle 15s Deadline: Read body while timeoutController remains actively armed
         rawResponseText = await new Promise<string>((resolve, reject) => {
           if (timeoutTriggered || timeoutController.signal.aborted) {
-            return reject(new Error(`Lifecycle timeout of ${CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation}ms exceeded before body read.`));
+            return reject(
+              new Error(`Lifecycle timeout of ${CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation}ms exceeded before body read.`)
+            );
           }
           const onAbort = () => {
-            reject(new Error(`Lifecycle timeout of ${CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation}ms exceeded during body read.`));
+            reject(
+              new Error(`Lifecycle timeout of ${CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation}ms exceeded during body read.`)
+            );
           };
           timeoutController.signal.addEventListener('abort', onAbort, { once: true });
           response!.text()
@@ -1188,14 +625,19 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         clearTimeout(timeoutId);
         latencyMs = Date.now() - startTime;
 
-        if (latencyMs >= CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation || timeoutTriggered || timeoutController.signal.aborted) {
-          throw new Error(`Lifecycle timeout of ${CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation}ms exceeded after body read (elapsed: ${latencyMs}ms).`);
+        if (
+          latencyMs >= CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation ||
+          timeoutTriggered ||
+          timeoutController.signal.aborted
+        ) {
+          throw new Error(
+            `Lifecycle timeout of ${CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation}ms exceeded after body read (elapsed: ${latencyMs}ms).`
+          );
         }
       } catch (err: any) {
         clearTimeout(timeoutId);
         latencyMs = Date.now() - startTime;
 
-        // Check for redirect or network mismatch
         if (
           err?.message?.toLowerCase().includes('redirect') ||
           (err?.name === 'FetchError' && err?.message?.includes('redirect'))
@@ -1255,7 +697,9 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           return { success: false, status: 499, killSwitch };
         }
 
-        const isTimeout = timeoutTriggered || timeoutController.signal.aborted ||
+        const isTimeout =
+          timeoutTriggered ||
+          timeoutController.signal.aborted ||
           err?.message?.includes('Lifecycle timeout') ||
           (err?.name === 'AbortError' && !abortSignal?.aborted) ||
           latencyMs >= CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation;
@@ -1288,7 +732,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           return { success: false, status: 408, killSwitch };
         }
 
-        // Transport error or aborted body read
         attemptRecords.push({
           attemptIndex: totalTransportAttempts,
           logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
@@ -1316,7 +759,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         return { success: false, status: 500, killSwitch };
       }
 
-      // Parse JSON Telemetry
       let responseJson: any;
       try {
         responseJson = JSON.parse(rawResponseText);
@@ -1350,15 +792,23 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
 
       const responsePayloadHash = crypto.createHash('sha256').update(rawResponseText).digest('hex');
 
-      // Model Identification & Substitution Check (Strictly NO Defaulting)
       let returnedModelIdentifier = '';
       if (params.candidate.providerId === 'deepseek') {
         returnedModelIdentifier = typeof responseJson.model === 'string' ? responseJson.model : '';
       } else {
-        returnedModelIdentifier = typeof responseJson.model === 'string' ? responseJson.model : (typeof responseJson.modelVersion === 'string' ? responseJson.modelVersion : '');
+        returnedModelIdentifier =
+          typeof responseJson.model === 'string'
+            ? responseJson.model
+            : typeof responseJson.modelVersion === 'string'
+            ? responseJson.modelVersion
+            : '';
       }
 
-      if (!returnedModelIdentifier || (returnedModelIdentifier !== params.candidate.expectedReturnedModelIdentifier && returnedModelIdentifier !== params.candidate.requestedModelIdentifier)) {
+      if (
+        !returnedModelIdentifier ||
+        (returnedModelIdentifier !== params.candidate.expectedReturnedModelIdentifier &&
+          returnedModelIdentifier !== params.candidate.requestedModelIdentifier)
+      ) {
         attemptRecords.push({
           attemptIndex: totalTransportAttempts,
           logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
@@ -1387,18 +837,19 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         return { success: false, status: 200, killSwitch };
       }
 
-      // Model Version Provenance & Backend Fingerprint Distinction
-      const documentedVersionTarget = params.candidate.providerId === 'deepseek'
-        ? 'DeepSeek-V4-Flash-0731'
-        : 'gemini-3.5-flash-lite';
+      const documentedVersionTarget =
+        params.candidate.providerId === 'deepseek'
+          ? 'DeepSeek-V4-Flash-0731'
+          : 'gemini-3.5-flash-lite';
       const certificationBaselineModelVersion = documentedVersionTarget;
 
-      // DeepSeek system_fingerprint is the backend configuration fingerprint, NOT the model version
-      const providerReportedBackendFingerprint = params.candidate.providerId === 'deepseek'
-        ? (typeof responseJson.system_fingerprint === 'string' ? responseJson.system_fingerprint : null)
-        : null;
+      const providerReportedBackendFingerprint =
+        params.candidate.providerId === 'deepseek'
+          ? typeof responseJson.system_fingerprint === 'string'
+            ? responseJson.system_fingerprint
+            : null
+          : null;
 
-      // For DeepSeek, providerReportedModelVersion is null unless an explicit runtime model version is returned
       let providerReportedModelVersion: string | null = null;
       if (params.candidate.providerId === 'deepseek') {
         if (typeof responseJson.modelVersion === 'string') {
@@ -1409,12 +860,14 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           providerReportedModelVersion = null;
         }
       } else {
-        providerReportedModelVersion = typeof responseJson.modelVersion === 'string'
-          ? responseJson.modelVersion
-          : (typeof responseJson.model === 'string' ? responseJson.model : null);
+        providerReportedModelVersion =
+          typeof responseJson.modelVersion === 'string'
+            ? responseJson.modelVersion
+            : typeof responseJson.model === 'string'
+            ? responseJson.model
+            : null;
       }
 
-      // If an explicit runtime version field is exposed, enforce it against certified baseline
       if (providerReportedModelVersion !== null) {
         if (params.candidate.providerId === 'deepseek' && providerReportedModelVersion !== documentedVersionTarget) {
           attemptRecords.push({
@@ -1446,7 +899,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         }
       }
 
-      // Blocker 2: Gemini Flex Provenance Enforcement
       let providerReportedServiceTier: string | null = null;
       if (params.candidate.providerId === 'gemini') {
         if (typeof responseJson.service_tier === 'string') {
@@ -1485,7 +937,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         }
       }
 
-      // Extract Text Content and Usage Telemetry
       let content = '';
       let promptTokens = 0;
       let completionTokens = 0;
@@ -1561,8 +1012,14 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         cacheMissTokens = usage.prompt_cache_miss_tokens;
         const reasoningTokens = usage.completion_tokens_details?.reasoning_tokens;
 
-        if (typeof promptTokens !== 'number' || !Number.isInteger(promptTokens) || promptTokens <= 0 ||
-            typeof completionTokens !== 'number' || !Number.isInteger(completionTokens) || completionTokens <= 0) {
+        if (
+          typeof promptTokens !== 'number' ||
+          !Number.isInteger(promptTokens) ||
+          promptTokens <= 0 ||
+          typeof completionTokens !== 'number' ||
+          !Number.isInteger(completionTokens) ||
+          completionTokens <= 0
+        ) {
           attemptRecords.push({
             attemptIndex: totalTransportAttempts,
             logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
@@ -1591,8 +1048,14 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           return { success: false, status: 200, killSwitch };
         }
 
-        if (typeof cacheHitTokens !== 'number' || !Number.isInteger(cacheHitTokens) || cacheHitTokens < 0 ||
-            typeof cacheMissTokens !== 'number' || !Number.isInteger(cacheMissTokens) || cacheMissTokens < 0) {
+        if (
+          typeof cacheHitTokens !== 'number' ||
+          !Number.isInteger(cacheHitTokens) ||
+          cacheHitTokens < 0 ||
+          typeof cacheMissTokens !== 'number' ||
+          !Number.isInteger(cacheMissTokens) ||
+          cacheMissTokens < 0
+        ) {
           attemptRecords.push({
             attemptIndex: totalTransportAttempts,
             logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
@@ -1621,7 +1084,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           return { success: false, status: 200, killSwitch };
         }
 
-        // Blocker 6: DeepSeek Reasoning Telemetry
         if (typeof reasoningTokens !== 'number' || !Number.isInteger(reasoningTokens) || reasoningTokens < 0) {
           attemptRecords.push({
             attemptIndex: totalTransportAttempts,
@@ -1681,8 +1143,11 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         }
         thinkingTokens = reasoningTokens;
 
-        // Blocker 5: DeepSeek Cache Telemetry Arithmetic Integrity
-        const isCacheIntegrityValid = EvaluationCostCalculator.validateDeepSeekTokenIntegrity(promptTokens, cacheHitTokens, cacheMissTokens);
+        const isCacheIntegrityValid = EvaluationCostCalculator.validateDeepSeekTokenIntegrity(
+          promptTokens,
+          cacheHitTokens,
+          cacheMissTokens
+        );
         if (!isCacheIntegrityValid) {
           attemptRecords.push({
             attemptIndex: totalTransportAttempts,
@@ -1713,7 +1178,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         }
         cacheStatus = 'VERIFIED';
       } else {
-        // Blocker 1: Gemini Official Raw REST parsing
         if (!Array.isArray(responseJson.steps) || responseJson.steps.length === 0) {
           attemptRecords.push({
             attemptIndex: totalTransportAttempts,
@@ -1851,8 +1315,14 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         thinkingTokens = usage.total_thought_tokens;
         const cachedTokens = usage.total_cached_tokens;
 
-        if (typeof promptTokens !== 'number' || !Number.isInteger(promptTokens) || promptTokens <= 0 ||
-            typeof completionTokens !== 'number' || !Number.isInteger(completionTokens) || completionTokens <= 0) {
+        if (
+          typeof promptTokens !== 'number' ||
+          !Number.isInteger(promptTokens) ||
+          promptTokens <= 0 ||
+          typeof completionTokens !== 'number' ||
+          !Number.isInteger(completionTokens) ||
+          completionTokens <= 0
+        ) {
           attemptRecords.push({
             attemptIndex: totalTransportAttempts,
             logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
@@ -1881,7 +1351,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           return { success: false, status: 200, killSwitch };
         }
 
-        // Blocker 6: Gemini Reasoning Telemetry
         if (typeof thinkingTokens !== 'number' || !Number.isInteger(thinkingTokens) || thinkingTokens < 0) {
           attemptRecords.push({
             attemptIndex: totalTransportAttempts,
@@ -1911,7 +1380,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           return { success: false, status: 200, killSwitch };
         }
 
-        // Blocker 7: Gemini Honest Cache Status
         cacheHitTokens = typeof cachedTokens === 'number' && Number.isInteger(cachedTokens) && cachedTokens >= 0 ? cachedTokens : 0;
         cacheMissTokens = promptTokens - cacheHitTokens;
 
@@ -1952,7 +1420,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         return { success: false, status: 200, killSwitch };
       }
 
-      // Calculate Real Cost via EvaluationCostCalculator
       let observedCostMicroUsd = 0;
       try {
         if (params.candidate.providerId === 'deepseek') {
@@ -2036,7 +1503,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       totalEstimatedCostMicroUsd += worstCaseInvocationCostMicroUsd;
       totalPreflightWorstCaseCostMicroUsd += worstCaseInvocationCostMicroUsd;
 
-      // Record successful transport attempt with observed cost
       attemptRecords.push({
         attemptIndex: totalTransportAttempts,
         logicalCaseId: `${params.candidate.candidateId}_${params.taskType}`,
@@ -2057,7 +1523,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         incurredCostMicroUsd: observedCostMicroUsd,
       });
 
-      // Check Budget Ceiling Breach Post-Calculation
       if (totalObservedCostMicroUsd > effectiveCeilingMicroUsd) {
         const killSwitch: CanaryKillSwitchEvent = {
           timestamp: now().toISOString(),
@@ -2068,16 +1533,14 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         return { success: false, status: 200, killSwitch };
       }
 
-      // Real Schema Validation via OutputValidator
       let schemaValid = false;
       try {
         OutputValidator.validateOutput(params.taskType, content, fixture.requestEnvelope);
         schemaValid = true;
-      } catch (schemaErr) {
+      } catch {
         schemaValid = false;
       }
 
-      // Real Deterministic Semantic Scoring via EvaluationScorer
       let semanticScore = 0;
       let hardFailReasons: string[] = [];
       let pass = false;
@@ -2100,9 +1563,10 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           });
           semanticScore = Number((evalResult.weightedQualityScoreBps / 10000).toFixed(4));
           hardFailReasons = evalResult.hardFailReasons || [];
-          pass = evalResult.passed &&
-                 semanticScore >= CANARY_SUCCESS_CRITERIA.minAggregateSemanticScore &&
-                 hardFailReasons.length === 0;
+          pass =
+            evalResult.passed &&
+            semanticScore >= CANARY_SUCCESS_CRITERIA.minAggregateSemanticScore &&
+            hardFailReasons.length === 0;
         } catch (evalErr: any) {
           pass = false;
           hardFailReasons = [evalErr?.message || 'EVALUATION_SCORER_EXCEPTION'];
@@ -2114,7 +1578,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
 
       if (pass) {
         scoreSum += semanticScore;
-        passedInvocationsCount++;
       }
 
       const evidence: CanaryInvocationEvidenceRecord = {
@@ -2165,7 +1628,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       };
     };
 
-    // Matrix Execution: 7 Certified Tasks * 2 Certified Candidates = Exactly 14 Required Matrix Cases
     let logicalCaseCount = 0;
     let completedRequiredMatrixCases = 0;
 
@@ -2174,7 +1636,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
         if (killSwitchEvents.length > 0 || abortSignal?.aborted) break;
         logicalCaseCount++;
 
-        // Attempt 1: Nominal Base Execution
         let callResult = await executeHardenedCall({
           candidate,
           taskType,
@@ -2188,8 +1649,12 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           break;
         }
 
-        // Attempt 2: Same-Provider Retry on HTTP 503 ONLY (max 1 retry across whole canary)
-        if (!callResult.success && callResult.status === 503 && callResult.retryable && sameProviderRetriesCount < CANARY_INVOCATION_LIMITS.maxSameProviderRetries) {
+        if (
+          !callResult.success &&
+          callResult.status === 503 &&
+          callResult.retryable &&
+          sameProviderRetriesCount < CANARY_INVOCATION_LIMITS.maxSameProviderRetries
+        ) {
           callResult = await executeHardenedCall({
             candidate,
             taskType,
@@ -2204,9 +1669,13 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
           }
         }
 
-        // Attempt 3: Cross-Provider Fallback (DeepSeek -> Gemini ONLY, max 1 fallback across whole canary)
-        if (!callResult.success && candidate.providerId === 'deepseek' && callResult.status === 503 && crossProviderFallbacksCount < CANARY_INVOCATION_LIMITS.maxCrossProviderFallbacks) {
-          const geminiCandidate = CERTIFIED_CANARY_CANDIDATES.find(c => c.providerId === 'gemini');
+        if (
+          !callResult.success &&
+          candidate.providerId === 'deepseek' &&
+          callResult.status === 503 &&
+          crossProviderFallbacksCount < CANARY_INVOCATION_LIMITS.maxCrossProviderFallbacks
+        ) {
+          const geminiCandidate = CERTIFIED_CANARY_CANDIDATES.find((c) => c.providerId === 'gemini');
           if (geminiCandidate) {
             callResult = await executeHardenedCall({
               candidate: geminiCandidate,
@@ -2229,7 +1698,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
             completedRequiredMatrixCases++;
           }
         } else {
-          // Failed attempt without evidence (e.g. non-200 or parse failure)
           invocations.push({
             invocationIndex: totalTransportAttempts,
             timestamp: now().toISOString(),
@@ -2243,7 +1711,10 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
             certificationBaselineModelVersion: candidate.providerId === 'deepseek' ? 'DeepSeek-V4-Flash-0731' : 'gemini-3.5-flash-lite',
             providerReportedBackendFingerprint: null,
             providerReportedModelVersion: null,
-            endpointUrl: candidate.providerId === 'deepseek' ? 'https://api.deepseek.com/v1/chat/completions' : 'https://generativelanguage.googleapis.com/v1beta/interactions',
+            endpointUrl:
+              candidate.providerId === 'deepseek'
+                ? 'https://api.deepseek.com/v1/chat/completions'
+                : 'https://generativelanguage.googleapis.com/v1beta/interactions',
             requestPayloadHash: '',
             responsePayloadHash: '',
             promptTokens: 0,
@@ -2271,7 +1742,6 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       if (killSwitchEvents.length > 0 || abortSignal?.aborted) break;
     }
 
-    // Determine Final Status: Strict Requirements for CANARY_EXECUTION_PASSED
     let overallStatus: 'CANARY_EXECUTION_PASSED' | 'CANARY_EXECUTION_FAILED' | 'CANARY_KILL_SWITCH_TERMINATED';
 
     if (killSwitchEvents.length > 0) {
@@ -2280,10 +1750,10 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       completedRequiredMatrixCases === 14 &&
       totalTransportAttempts === 14 &&
       invocations.length === 14 &&
-      invocations.every(i => i.pass) &&
+      invocations.every((i) => i.pass) &&
       sameProviderRetriesCount === 0 &&
       crossProviderFallbacksCount === 0 &&
-      (invocations.length > 0 ? (scoreSum / invocations.length) : 0) >= 0.85 &&
+      (invocations.length > 0 ? scoreSum / invocations.length : 0) >= 0.85 &&
       totalObservedCostMicroUsd <= effectiveCeilingMicroUsd
     ) {
       overallStatus = 'CANARY_EXECUTION_PASSED';
@@ -2304,8 +1774,8 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       summaryCounts: {
         totalPlannedInvocations: 14,
         executedInvocations: totalTransportAttempts,
-        passedInvocations: invocations.filter(i => i.pass).length,
-        failedInvocations: invocations.filter(i => !i.pass).length,
+        passedInvocations: invocations.filter((i) => i.pass).length,
+        failedInvocations: invocations.filter((i) => !i.pass).length,
         killSwitchEventsCount: killSwitchEvents.length,
         totalObservedCostMicroUsd,
         totalEstimatedCostMicroUsd,
@@ -2317,134 +1787,5 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       killSwitchEvents,
       productionRoutingEnforcementAllowed: false,
     };
-}
-
-export function writeEvidenceArtifact(outputPath: string, result: CanaryExecutionEvidencePackage): void {
-  const fullPath = path.resolve(process.cwd(), outputPath);
-  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-  fs.writeFileSync(fullPath, JSON.stringify(result, null, 2), 'utf8');
-}
-
-// =========================================================================
-// Explicit CLI Entrypoint for Phase A.12B.2C-5B Execution
-// Only executes when called directly from the command line.
-// Normal module imports, npm test, and CI runs will NOT invoke this block.
-// =========================================================================
-if (
-  typeof process !== 'undefined' &&
-  Array.isArray(process.argv) &&
-  process.argv[1] &&
-  (process.argv[1].endsWith('boundedCanaryRunner.ts') || process.argv[1].endsWith('boundedCanaryRunner.js'))
-) {
-  const parseCliArgs = () => {
-    const args = process.argv.slice(2);
-    const parsed: Record<string, string | boolean> = {};
-    for (const arg of args) {
-      if (arg.startsWith('--')) {
-        const [key, value] = arg.slice(2).split('=');
-        parsed[key] = value !== undefined ? value : true;
-      }
-    }
-    return parsed;
-  };
-
-  const runCli = async () => {
-    const args = parseCliArgs();
-
-    // Capability secret in argv is strictly prohibited to prevent process listing exposure
-    if (process.argv.some((arg) => arg.startsWith('--capability-secret'))) {
-      console.error('[CANARY_CLI] Error: --capability-secret in CLI argv is prohibited. Provide strictly via VELNAR_CANARY_CAPABILITY_SECRET environment variable.');
-      process.exit(1);
-    }
-
-    const phase = args['phase'] as string;
-    const isLiveIntent = Boolean(args['execute-live-canary']);
-    const approvalToken = args['approval-token'] as string;
-    const approvedBy = args['approved-by'] as string;
-    const maxBudgetMicroUsd = args['max-budget-micro-usd'] ? parseInt(args['max-budget-micro-usd'] as string, 10) : (args['max-budget-usd'] ? Math.round(parseFloat(args['max-budget-usd'] as string) * 1_000_000) : 50000);
-    const maxBudgetUsd = maxBudgetMicroUsd / 1_000_000;
-    const sourceCommitSha = (args['source-commit'] as string) || (process.env.GIT_COMMIT_SHA || '');
-    const runNonce = (args['run-nonce'] as string) || (process.env.VELNAR_CANARY_RUN_NONCE || '');
-    
-    // Capability secret is read strictly from environment variable, never argv
-    const capabilitySecret = process.env.VELNAR_CANARY_CAPABILITY_SECRET;
-    const outputPath = (args['output'] as string) || 'execution/a12b2c5b_canary_execution_results.json';
-
-    console.log(`[CANARY_CLI] Running Bounded Canary CLI with phase: ${phase || 'none'}, liveIntent: ${isLiveIntent}`);
-
-    // Install deterministic SIGINT / SIGTERM signal handling
-    const abortController = new AbortController();
-    const handleSignal = (signal: string) => {
-      console.warn(`[CANARY_CLI] Received ${signal}. Terminating canary run fail-closed immediately.`);
-      abortController.abort();
-    };
-    process.on('SIGINT', () => handleSignal('SIGINT'));
-    process.on('SIGTERM', () => handleSignal('SIGTERM'));
-
-    // Construct approval envelope if provided
-    let approvalEnvelope: CanaryHumanApprovalEnvelope | null = null;
-    if (approvalToken && approvedBy) {
-      approvalEnvelope = {
-        approvedBy,
-        approvalTimestamp: (args['approval-timestamp'] as string) || new Date().toISOString(),
-        targetPhase: 'A.12B.2C-5B',
-        approvalToken,
-        maxBudgetMicroUsd,
-        maxBudgetUsd,
-        environmentTarget: 'CONTROLLED_CANARY',
-        specificationVersion: CANARY_SPECIFICATION_VERSION,
-        sourceCommitSha,
-        runNonce,
-        capabilitySecret,
-      };
-    }
-
-    let result: CanaryExecutionEvidencePackage;
-
-    if (isLiveIntent) {
-      // Blocker 8: Explicitly enforce valid phase requirement
-      if (phase !== 'A.12B.2C-5B' && phase !== 'A.12B.2C-5D') {
-        console.error(`[CANARY_CLI] Error: --execute-live-canary strictly requires valid phase ('A.12B.2C-5B' or 'A.12B.2C-5D') (received: '${phase || 'none'}'). Zero calls permitted.`);
-        process.exit(1);
-      }
-
-      if (!approvalEnvelope) {
-        console.error('[CANARY_CLI] Error: --execute-live-canary requires --approval-token, --approved-by, and VELNAR_CANARY_CAPABILITY_SECRET environment variable.');
-        process.exit(1);
-      }
-
-      result = await BoundedCanaryRunner.executeLiveCanary({
-        phase: phase as any,
-        humanApproval: approvalEnvelope,
-        capabilitySecret,
-        abortSignal: abortController.signal,
-      });
-    } else {
-      result = await BoundedCanaryRunner.executeDryRunPlan({
-        phase: (phase || 'A.12B.2C-5A') as any,
-        dryRun: true,
-        humanApproval: approvalEnvelope,
-        capabilitySecret,
-        abortSignal: abortController.signal,
-      });
-    }
-
-    try {
-      writeEvidenceArtifact(outputPath, result);
-      console.log(`[CANARY_CLI] Wrote execution evidence to: ${outputPath}`);
-    } catch (e) {
-      console.error('[CANARY_CLI] FATAL: Failed to write execution evidence artifact:', e);
-      process.exit(1);
-    }
-
-    console.log(`[CANARY_CLI] Execution finished with overallStatus: ${result.overallStatus}`);
-    if (result.overallStatus === 'CANARY_KILL_SWITCH_TERMINATED' || result.overallStatus === 'CANARY_EXECUTION_FAILED') {
-      process.exit(1);
-    }
-  };
-
-  runCli().catch((err) => {
-    console.error('[CANARY_CLI] Fatal unhandled error:', err);
-    process.exit(1);
-  });
+  }
 }

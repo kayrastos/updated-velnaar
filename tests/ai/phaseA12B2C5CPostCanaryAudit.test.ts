@@ -28,6 +28,9 @@ import {
   BoundedCanaryRunner,
   writeEvidenceArtifact,
 } from '../../worker/ai/canary/boundedCanaryRunner';
+import {
+  HistoricalCanaryMockTransportHarness,
+} from './helpers/historicalCanaryMockTransportHarness';
 import { generateStrongOutput } from '../../worker/ai/evaluation/evaluationFixtures';
 import { TaskType } from '../../worker/ai/types';
 
@@ -178,7 +181,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
 
       vi.useFakeTimers();
 
-      const canaryPromise = BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(slowBodyFetch));
+      const canaryPromise = HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport(createCommonCanaryOptions(slowBodyFetch));
 
       // Advance timers by 15,001 ms to trip the invocation timeout
       await vi.advanceTimersByTimeAsync(15001);
@@ -217,7 +220,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(fastFetch));
+      const result = await HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport(createCommonCanaryOptions(fastFetch));
 
       expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
       expect(result.killSwitchEvents.length).toBe(0);
@@ -240,7 +243,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         };
       });
 
-      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(rejectingBodyFetch));
+      const result = await HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport(createCommonCanaryOptions(rejectingBodyFetch));
 
       expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
       expect(result.killSwitchEvents.length).toBe(1);
@@ -273,7 +276,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(singleCaseFetch));
+      const result = await HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport(createCommonCanaryOptions(singleCaseFetch));
 
       expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
       const deepseekInvocations = result.invocations.filter((inv) => inv.providerId === 'deepseek');
@@ -302,7 +305,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(explicitMismatchedVersionFetch));
+      const result = await HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport(createCommonCanaryOptions(explicitMismatchedVersionFetch));
 
       expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
       expect(result.killSwitchEvents.length).toBe(1);
@@ -324,7 +327,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(explicitSnakeMismatchedVersionFetch));
+      const result = await HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport(createCommonCanaryOptions(explicitSnakeMismatchedVersionFetch));
 
       expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
       expect(result.killSwitchEvents.length).toBe(1);
@@ -345,7 +348,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(explicitMatchingVersionFetch));
+      const result = await HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport(createCommonCanaryOptions(explicitMatchingVersionFetch));
 
       expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
       expect(result.killSwitchEvents.length).toBe(0);
@@ -371,7 +374,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(mockFetch));
+      const result = await HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport(createCommonCanaryOptions(mockFetch));
 
       expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
       const sumObserved = result.invocations.reduce((acc, inv) => acc + inv.observedCostMicroUsd, 0);
@@ -389,7 +392,7 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
         });
       });
 
-      const result = await BoundedCanaryRunner.executeIsolatedMockTransport(createCommonCanaryOptions(mockFetch));
+      const result = await HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport(createCommonCanaryOptions(mockFetch));
 
       expect(result.overallStatus).toBe('CANARY_EXECUTION_PASSED');
       const sumWorstCase = result.invocations.reduce((acc, inv) => acc + inv.estimatedCostMicroUsd, 0);

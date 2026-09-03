@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "phase": "A.12B.2C-5D.2",
+  "repairType": "PUBLIC_MOCK_TRANSPORT_SURFACE_REPAIR",
+  "baseCommit": "edd53528631637cd72a881ffc46f9a3727fbc452",
+  "baseTree": "516c73b7fd567d6ab85e146cd56efffee7dce253",
+  "specificationVersion": "a12b2c5-v1.2",
+  "architecturalDecision": "C_SPLIT_INTERACTIVE_AND_BACKGROUND_TIERS",
+  "defectSummary": {
+    "defect": "BoundedCanaryRunner previously exposed a public static method executeIsolatedMockTransport that bypassed v1.2 Gate 0 enforcement by delegating directly to executeTransportPipeline without verifying live canary blocking.",
+    "rootCause": "While v1.2 Gate 0 in executeLiveCanary unconditionally blocked live execution, executeIsolatedMockTransport remained part of the public static API surface of BoundedCanaryRunner, allowing callers to execute mock transports directly."
+  },
+  "remediation": {
+    "surfaceElimination": "Completely removed executeIsolatedMockTransport from BoundedCanaryRunner public static API surface. BoundedCanaryRunner now exposes only verifyReadiness, executeDryRunPlan, and executeLiveCanary.",
+    "moduleScoping": "Re-scoped executeTransportPipeline as a non-exported module-scoped function within boundedCanaryRunner.ts, entirely inaccessible outside the module and unreachable at runtime due to Gate 0 blocking executeLiveCanary under v1.2.",
+    "testHarnessIsolation": "Relocated historical offline mock transport execution to tests/ai/helpers/historicalCanaryMockTransportHarness.ts. The harness is test-only, strictly requires customFetch (throws if absent, no fallback to globalThis.fetch), and operates strictly on placeholder offline credentials."
+  },
+  "modifiedFiles": [
+    "worker/ai/canary/boundedCanaryRunner.ts",
+    "tests/ai/helpers/historicalCanaryMockTransportHarness.ts",
+    "tests/ai/phaseA12B2C5A3LiveTransportCertification.test.ts",
+    "tests/ai/phaseA12B2C5CPostCanaryAudit.test.ts",
+    "tests/ai/phaseA12B2C5DDualLaneSpecification.test.ts"
+  ],
+  "securityInvariants": {
+    "zeroProviderCalls": true,
+    "zeroLiveCredentials": true,
+    "executeIsolatedMockTransportInPublicApi": false,
+    "executeTransportPipelineInPublicApi": false,
+    "customFetchFallbackToGlobalFetch": false,
+    "gate0LiveBlockActive": true,
+    "productionRoutingEnforcementAllowed": false
+  },
+  "coveredScenarios": [
+    "BoundedCanaryRunner does not expose executeIsolatedMockTransport in its public API",
+    "BoundedCanaryRunner does not expose executeTransportPipeline in its public API",
+    "BoundedCanaryRunner public API only exposes verifyReadiness, executeDryRunPlan, and executeLiveCanary",
+    "HistoricalCanaryMockTransportHarness requires explicit mock transport customFetch and throws if absent",
+    "HistoricalCanaryMockTransportHarness never calls global fetch",
+    "BoundedCanaryRunner.executeLiveCanary with customFetch fails closed at Gate 0 under v1.2 with 0 network calls",
+    "All historical transport mechanics (retries, timeouts, telemetry parsing, redirect rejection) preserved in test harness",
+    "productionRoutingEnforcementAllowed remains false across all pathways"
+  ],
+  "verification": {
+    "cleanEnvironmentTestsPassed": true,
+    "allFilesPassed": true,
+    "testFilesCount": 41,
+    "totalTestsCount": 764,
+    "typecheck": "PASSED",
+    "lint": "PASSED",
+    "build": "PASSED"
+  },
+  "timestamp": "2026-09-03T18:55:00.000Z"
+}

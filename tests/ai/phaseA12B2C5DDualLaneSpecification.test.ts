@@ -20,6 +20,7 @@ import {
   CanaryHumanApprovalEnvelope,
 } from '../../worker/ai/canary/canarySpecification';
 import { BoundedCanaryRunner } from '../../worker/ai/canary/boundedCanaryRunner';
+import { HistoricalCanaryMockTransportHarness } from './helpers/historicalCanaryMockTransportHarness';
 import { resolveRoutingPolicyDecision } from '../../worker/ai/routingPolicy';
 import { TaskType } from '../../worker/ai/types';
 
@@ -640,5 +641,86 @@ describe('Phase A.12B.2C-5D Dual-Lane v1.2 Specification Foundation', () => {
     expect(result.productionRoutingEnforcementAllowed).toBe(false);
 
     globalFetchSpy.mockRestore();
+  });
+
+  describe('Phase A.12B.2C-5D.2 Public Mock-Transport Bypass Surface Repair', () => {
+    it('33. BoundedCanaryRunner does not expose executeIsolatedMockTransport in its public API', () => {
+      expect('executeIsolatedMockTransport' in BoundedCanaryRunner).toBe(false);
+      expect((BoundedCanaryRunner as any).executeIsolatedMockTransport).toBeUndefined();
+    });
+
+    it('34. BoundedCanaryRunner does not expose internal executeTransportPipeline in its public API', () => {
+      expect('executeTransportPipeline' in BoundedCanaryRunner).toBe(false);
+      expect((BoundedCanaryRunner as any).executeTransportPipeline).toBeUndefined();
+    });
+
+    it('35. BoundedCanaryRunner public API only exposes authorized methods (verifyReadiness, executeDryRunPlan, executeLiveCanary)', () => {
+      const publicProperties = Object.getOwnPropertyNames(BoundedCanaryRunner).filter(
+        (name) => !['length', 'name', 'prototype'].includes(name)
+      );
+      expect(publicProperties.sort()).toEqual(['executeDryRunPlan', 'executeLiveCanary', 'verifyReadiness'].sort());
+      expect(typeof BoundedCanaryRunner.verifyReadiness).toBe('function');
+      expect(typeof BoundedCanaryRunner.executeDryRunPlan).toBe('function');
+      expect(typeof BoundedCanaryRunner.executeLiveCanary).toBe('function');
+    });
+
+    it('36. HistoricalCanaryMockTransportHarness rejects execution if customFetch is missing', async () => {
+      await expect(
+        HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport({
+          phase: 'A.12B.2C-5B',
+        } as any)
+      ).rejects.toThrow('requires explicit mock transport customFetch');
+    });
+
+    it('37. HistoricalCanaryMockTransportHarness never calls global fetch', async () => {
+      const globalFetchSpy = vi.spyOn(globalThis, 'fetch');
+      const mockCustomFetch = vi.fn().mockImplementation(async () => {
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: '{"status":"ok"}' } }],
+          usage: {
+            prompt_tokens: 10,
+            completion_tokens: 10,
+            prompt_cache_hit_tokens: 5,
+            prompt_cache_miss_tokens: 5,
+            completion_tokens_details: { reasoning_tokens: 0 },
+          },
+          model: 'deepseek-v4-flash',
+          modelVersion: 'DeepSeek-V4-Flash-0731',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      });
+
+      // Attempt call without approval -> fails at approval gate without calling customFetch or globalFetch
+      const result = await HistoricalCanaryMockTransportHarness.executeHistoricalMockTransport({
+        phase: 'A.12B.2C-5B',
+        customFetch: mockCustomFetch as any,
+      } as any);
+
+      expect(globalFetchSpy).toHaveBeenCalledTimes(0);
+      expect(result.productionRoutingEnforcementAllowed).toBe(false);
+      globalFetchSpy.mockRestore();
+    });
+
+    it('38. BoundedCanaryRunner.executeLiveCanary with injected customFetch still fails closed at Gate 0 under v1.2', async () => {
+      const customFetchMock = vi.fn();
+      const globalFetchSpy = vi.spyOn(globalThis, 'fetch');
+
+      const result = await BoundedCanaryRunner.executeLiveCanary({
+        phase: 'A.12B.2C-5D',
+        executionLane: 'INTERACTIVE',
+        humanApproval: validV12ApprovalEnvelope,
+        capabilitySecret: validSecret,
+        customFetch: customFetchMock as any,
+      });
+
+      expect(result.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+      expect(result.killSwitchEvents[0].reason).toBe('UNAUTHORIZED_ENVIRONMENT');
+      expect(result.killSwitchEvents[0].message).toContain('Dual-lane v1.2 live execution is blocked pending lane-specific certification');
+      expect(customFetchMock).toHaveBeenCalledTimes(0);
+      expect(globalFetchSpy).toHaveBeenCalledTimes(0);
+      expect(result.transportAttemptCount).toBe(0);
+      expect(result.productionRoutingEnforcementAllowed).toBe(false);
+
+      globalFetchSpy.mockRestore();
+    });
   });
 });
