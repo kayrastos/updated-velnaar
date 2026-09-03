@@ -15,3 +15,7 @@ coverage/
 !execution/a12b2b_full_v121.log
 .env*
 !.env.example
+
+# Prevent accidental nested re-canary worktrees
+/velnar-final-recanary/
+/velnar-final-recanary-*/
