@@ -39,7 +39,20 @@ import {
   CROSS_PROVIDER_FALLBACKS,
   AUTOMATIC_RERUNS,
   QUALITY_GATES,
+  CANONICAL_COST_PREFLIGHT,
 } from './deepSeekSingleProviderCertificationSpecification';
+
+import {
+  CERTIFIED_A12B2C_TASK_TYPES,
+  CERTIFIED_A12B2C_TASK_TYPE_SET,
+} from '../providers/certifiedProviderTypes';
+import { TaskType } from '../types';
+
+export {
+  CERTIFIED_A12B2C_TASK_TYPES,
+  CERTIFIED_A12B2C_TASK_TYPE_SET,
+  CANONICAL_COST_PREFLIGHT,
+};
 
 // ============================================================================
 // 1. STATE DEFINITIONS
@@ -125,7 +138,7 @@ export interface WindowAuthorizationEvidence {
 
 export interface InvocationRecordSummary {
   readonly taskId: string;
-  readonly taskType: string;
+  readonly taskType: TaskType;
   readonly success: boolean;
   readonly latencyMs: number;
   readonly modelRequested: string;
@@ -367,12 +380,26 @@ export function validateRunnerReadinessEvidence(
     errors.push('Cost preflight arithmetic is missing or unavailable.');
   }
 
+  const expectedCostBound =
+    evidence.pricingWindow === 'OFF_PEAK'
+      ? CANONICAL_COST_PREFLIGHT.offPeakSevenCallWorstCaseMicroUsd
+      : evidence.pricingWindow === 'PEAK'
+        ? CANONICAL_COST_PREFLIGHT.peakSevenCallWorstCaseMicroUsd
+        : null;
+
   if (
     typeof evidence.windowSpecificCostBoundMicroUsd !== 'number' ||
-    !Number.isFinite(evidence.windowSpecificCostBoundMicroUsd) ||
+    !Number.isInteger(evidence.windowSpecificCostBoundMicroUsd) ||
     evidence.windowSpecificCostBoundMicroUsd <= 0
   ) {
     errors.push('windowSpecificCostBoundMicroUsd must be a positive integer value.');
+  } else if (
+    expectedCostBound !== null &&
+    evidence.windowSpecificCostBoundMicroUsd !== expectedCostBound
+  ) {
+    errors.push(
+      `Invalid windowSpecificCostBoundMicroUsd: ${evidence.windowSpecificCostBoundMicroUsd}. Expected exact sealed cost bound ${expectedCostBound} for ${evidence.pricingWindow}.`
+    );
   }
 
   if (evidence.productionRoutingEnforcementAllowed !== false) {
@@ -678,32 +705,86 @@ export function validateCertificationEvidence(
     );
   }
 
-  if (!evidence.invocationRecords || evidence.invocationRecords.length !== REQUIRED_CANONICAL_INVOCATION_COUNT) {
+  const records = evidence.invocationRecords ?? [];
+
+  if (records.length !== REQUIRED_CANONICAL_INVOCATION_COUNT) {
     errors.push(
-      `invocationRecords must contain exactly ${REQUIRED_CANONICAL_INVOCATION_COUNT} items (got ${evidence.invocationRecords?.length ?? 0}).`
+      `invocationRecords must contain exactly ${REQUIRED_CANONICAL_INVOCATION_COUNT} items (got ${records.length}).`
     );
-  } else {
-    for (let i = 0; i < evidence.invocationRecords.length; i++) {
-      const rec = evidence.invocationRecords[i];
-      if (!rec.success) {
-        errors.push(`Invocation record ${i} (${rec.taskId}) failed.`);
+  }
+
+  const seenCanonicalTasks = new Set<TaskType>();
+  const duplicateTasks: string[] = [];
+  const unknownTasks: string[] = [];
+
+  for (let i = 0; i < records.length; i++) {
+    const rec = records[i];
+    const task = rec?.taskType as TaskType;
+
+    if (!task || !CERTIFIED_A12B2C_TASK_TYPE_SET.has(task)) {
+      unknownTasks.push(String(task ?? `record_${i}_undefined`));
+    } else {
+      if (seenCanonicalTasks.has(task)) {
+        duplicateTasks.push(task);
       }
-      if (rec.latencyMs >= MAX_INVOCATION_LATENCY_MS) {
-        errors.push(`Invocation record ${i} latency (${rec.latencyMs} ms) breached timeout.`);
-      }
-      if (!rec.schemaValid) {
-        errors.push(`Invocation record ${i} schema is invalid.`);
-      }
-      if (!rec.providerReportedUsage) {
-        errors.push(`Invocation record ${i} missing provider-reported usage telemetry.`);
-      }
-      if (rec.privacyViolation) {
-        errors.push(`Invocation record ${i} reported privacy violation.`);
-      }
-      if (rec.modelRequested !== CERTIFICATION_MODEL || rec.modelReturned !== CERTIFICATION_MODEL) {
-        errors.push(`Invocation record ${i} model mismatch.`);
-      }
+      seenCanonicalTasks.add(task);
     }
+
+    if (!rec.success) {
+      errors.push(`Invocation record ${i} (${rec.taskId}) failed.`);
+    }
+    if (rec.latencyMs >= MAX_INVOCATION_LATENCY_MS) {
+      errors.push(`Invocation record ${i} latency (${rec.latencyMs} ms) breached timeout.`);
+    }
+    if (!rec.schemaValid) {
+      errors.push(`Invocation record ${i} schema is invalid.`);
+    }
+    if (!rec.providerReportedUsage) {
+      errors.push(`Invocation record ${i} missing provider-reported usage telemetry.`);
+    }
+    if (rec.privacyViolation) {
+      errors.push(`Invocation record ${i} reported privacy violation.`);
+    }
+    if (rec.modelRequested !== CERTIFICATION_MODEL || rec.modelReturned !== CERTIFICATION_MODEL) {
+      errors.push(`Invocation record ${i} model mismatch.`);
+    }
+  }
+
+  if (unknownTasks.length > 0) {
+    errors.push(
+      `Unknown non-canonical taskTypes detected: [${unknownTasks.join(', ')}]. Expected only canonical CERTIFIED_A12B2C_TASK_TYPES.`
+    );
+  }
+
+  if (duplicateTasks.length > 0) {
+    errors.push(
+      `Duplicate canonical taskTypes detected: [${duplicateTasks.join(', ')}]. Exactly one record per canonical task required.`
+    );
+  }
+
+  const missingCanonicalTasks = CERTIFIED_A12B2C_TASK_TYPES.filter(
+    (t) => !seenCanonicalTasks.has(t)
+  );
+  if (missingCanonicalTasks.length > 0) {
+    errors.push(
+      `Missing canonical taskTypes: [${missingCanonicalTasks.join(', ')}]. All ${REQUIRED_CANONICAL_INVOCATION_COUNT} canonical tasks must be present.`
+    );
+  }
+
+  const passingCanonicalRecordsCount = records.filter(
+    (r) => r.success && CERTIFIED_A12B2C_TASK_TYPE_SET.has(r.taskType as TaskType)
+  ).length;
+
+  if (evidence.taskPassCount !== passingCanonicalRecordsCount) {
+    errors.push(
+      `taskPassCount (${evidence.taskPassCount}) does not correspond to passing canonical records count (${passingCanonicalRecordsCount}).`
+    );
+  }
+
+  if (evidence.completedRequiredMatrixCases !== seenCanonicalTasks.size) {
+    errors.push(
+      `completedRequiredMatrixCases (${evidence.completedRequiredMatrixCases}) does not correspond to unique canonical matrix cases executed (${seenCanonicalTasks.size}).`
+    );
   }
 
   // Validate binding against authorization if supplied

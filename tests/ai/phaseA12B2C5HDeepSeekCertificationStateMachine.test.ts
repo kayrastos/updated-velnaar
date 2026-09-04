@@ -34,7 +34,12 @@ import {
   REASONING_EFFORT,
   MAX_TOKENS,
   INTERACTIVE_TIMEOUT_MS,
+  CANONICAL_COST_PREFLIGHT,
 } from '../../worker/ai/canary/deepSeekSingleProviderCertificationSpecification';
+import {
+  CERTIFIED_A12B2C_TASK_TYPES,
+} from '../../worker/ai/providers/certifiedProviderTypes';
+import { TaskType } from '../../worker/ai/types';
 import {
   INITIAL_CERTIFICATION_STATE,
   createInitialCertificationState,
@@ -57,7 +62,7 @@ import {
 describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () => {
   let globalFetchSpy: ReturnType<typeof vi.spyOn>;
 
-  const validCommit = '6caeaf80c1faae3a320241e800da873697210041';
+  const validCommit = '9b5325ae92d65e781e66647f31fbf9dce7261ec1';
   const validTree = '8d1247027fd5c05481f97d090d2bbc3eb2342eee';
   const validOffPeakNonce = 'nonce-offpeak-test-9921';
   const validPeakNonce = 'nonce-peak-test-8812';
@@ -76,7 +81,7 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
     crossProviderFallback: 0,
     automaticRerun: 0,
     costPreflightAvailable: true,
-    windowSpecificCostBoundMicroUsd: 15400,
+    windowSpecificCostBoundMicroUsd: CANONICAL_COST_PREFLIGHT.offPeakSevenCallWorstCaseMicroUsd,
     productionRoutingEnforcementAllowed: false,
     globalLiveExecutionEnabled: false,
     deterministicOfflineTestsPass: true,
@@ -113,19 +118,9 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
   };
 
   const createCleanInvocations = (pricingWindow: 'OFF_PEAK' | 'PEAK'): InvocationRecordSummary[] => {
-    const tasks = [
-      'HEALTH_ASSESSMENT',
-      'ROUTING_ANALYSIS',
-      'COST_PROJECTION',
-      'METRIC_COMPILATION',
-      'ANOMALY_DETECTION',
-      'EXECUTIVE_SUMMARY',
-      'AUDIT_VERIFICATION',
-    ];
-
-    return tasks.map((task, idx) => ({
+    return CERTIFIED_A12B2C_TASK_TYPES.map((taskType, idx) => ({
       taskId: `task-${pricingWindow.toLowerCase()}-${idx + 1}`,
-      taskType: task,
+      taskType,
       success: true,
       latencyMs: 1200 + idx * 100,
       modelRequested: CERTIFICATION_MODEL,
@@ -620,5 +615,204 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
   // 40 providerNetworkCalls = 0
   it('40. providerNetworkCalls = 0', () => {
     expect(globalFetchSpy).toHaveBeenCalledTimes(0);
+  });
+
+  // 41. (A) 7 arbitrary non-canonical task names => certification invalid
+  it('41. adversarial A: 7 arbitrary non-canonical task names => certification invalid', () => {
+    const clean = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const arbitraryTasks = [
+      'HEALTH_ASSESSMENT',
+      'ROUTING_ANALYSIS',
+      'COST_PROJECTION',
+      'METRIC_COMPILATION',
+      'ANOMALY_DETECTION',
+      'EXECUTIVE_SUMMARY',
+      'AUDIT_VERIFICATION',
+    ];
+    const brokenRecords = arbitraryTasks.map((t, idx) => ({
+      ...clean.invocationRecords[idx],
+      taskType: t as unknown as TaskType,
+    }));
+    const broken = {
+      ...clean,
+      invocationRecords: brokenRecords,
+    };
+    const result = validateCertificationEvidence(broken, { boundAuthorization: validOffPeakAuth });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('Unknown non-canonical taskTypes detected'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('Missing canonical taskTypes'))).toBe(true);
+  });
+
+  // 42. (B) 6 canonical + 1 duplicate => invalid
+  it('42. adversarial B: 6 canonical + 1 duplicate => invalid', () => {
+    const clean = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const brokenRecords = clean.invocationRecords.map((r, idx) =>
+      idx === 6 ? { ...r, taskType: clean.invocationRecords[0].taskType } : r
+    );
+    const broken = {
+      ...clean,
+      invocationRecords: brokenRecords,
+    };
+    const result = validateCertificationEvidence(broken, { boundAuthorization: validOffPeakAuth });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('Duplicate canonical taskTypes detected'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('Missing canonical taskTypes'))).toBe(true);
+  });
+
+  // 43. (C) 6 canonical + 1 unknown replacement => invalid
+  it('43. adversarial C: 6 canonical + 1 unknown replacement => invalid', () => {
+    const clean = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const brokenRecords = clean.invocationRecords.map((r, idx) =>
+      idx === 6 ? { ...r, taskType: 'CUSTOM_UNKNOWN_TASK' as unknown as TaskType } : r
+    );
+    const broken = {
+      ...clean,
+      invocationRecords: brokenRecords,
+    };
+    const result = validateCertificationEvidence(broken, { boundAuthorization: validOffPeakAuth });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('Unknown non-canonical taskTypes detected'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('Missing canonical taskTypes'))).toBe(true);
+  });
+
+  // 44. (D) 8 records including all canonical + one extra => invalid
+  it('44. adversarial D: 8 records including all canonical + one extra => invalid', () => {
+    const clean = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const extraRecord: InvocationRecordSummary = {
+      taskId: 'task-extra-8',
+      taskType: CERTIFIED_A12B2C_TASK_TYPES[0],
+      success: true,
+      latencyMs: 1200,
+      modelRequested: CERTIFICATION_MODEL,
+      modelReturned: CERTIFICATION_MODEL,
+      schemaValid: true,
+      providerReportedUsage: true,
+      observedCostMicroUsd: 1200,
+      semanticScore: 0.92,
+      privacyViolation: false,
+    };
+    const broken = {
+      ...clean,
+      executedInvocations: 8,
+      passedInvocations: 8,
+      taskPassCount: 8,
+      invocationRecords: [...clean.invocationRecords, extraRecord],
+    };
+    const result = validateCertificationEvidence(broken, { boundAuthorization: validOffPeakAuth });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('invocationRecords must contain exactly 7 items'))).toBe(true);
+  });
+
+  // 45. (E) exact canonical seven once each => valid
+  it('45. canonical E: exact canonical seven once each => valid', () => {
+    const clean = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    expect(clean.invocationRecords.length).toBe(7);
+    const uniqueTasks = new Set(clean.invocationRecords.map((r) => r.taskType));
+    expect(uniqueTasks.size).toBe(7);
+    for (const canonicalTask of CERTIFIED_A12B2C_TASK_TYPES) {
+      expect(uniqueTasks.has(canonicalTask)).toBe(true);
+    }
+    const result = validateCertificationEvidence(clean, { boundAuthorization: validOffPeakAuth });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  // 46. (F) OFF_PEAK readiness bound = 12783 => valid
+  it('46. cost bound F: OFF_PEAK readiness bound = 12783 => valid', () => {
+    const offPeak = {
+      ...validOffPeakReadiness,
+      pricingWindow: 'OFF_PEAK' as const,
+      windowSpecificCostBoundMicroUsd: 12783,
+    };
+    expect(offPeak.windowSpecificCostBoundMicroUsd).toBe(
+      CANONICAL_COST_PREFLIGHT.offPeakSevenCallWorstCaseMicroUsd
+    );
+    const result = validateRunnerReadinessEvidence(offPeak);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  // 47. (G) OFF_PEAK bound = 12782 => invalid
+  it('47. cost bound G: OFF_PEAK bound = 12782 => invalid', () => {
+    const invalid = {
+      ...validOffPeakReadiness,
+      pricingWindow: 'OFF_PEAK' as const,
+      windowSpecificCostBoundMicroUsd: 12782,
+    };
+    const result = validateRunnerReadinessEvidence(invalid);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('Invalid windowSpecificCostBoundMicroUsd'))).toBe(true);
+  });
+
+  // 48. (H) OFF_PEAK bound = 12784 => invalid
+  it('48. cost bound H: OFF_PEAK bound = 12784 => invalid', () => {
+    const invalid = {
+      ...validOffPeakReadiness,
+      pricingWindow: 'OFF_PEAK' as const,
+      windowSpecificCostBoundMicroUsd: 12784,
+    };
+    const result = validateRunnerReadinessEvidence(invalid);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('Invalid windowSpecificCostBoundMicroUsd'))).toBe(true);
+  });
+
+  // 49. (I) PEAK bound = 25566 => valid
+  it('49. cost bound I: PEAK bound = 25566 => valid', () => {
+    const peak = {
+      ...validOffPeakReadiness,
+      pricingWindow: 'PEAK' as const,
+      windowSpecificCostBoundMicroUsd: 25566,
+    };
+    expect(peak.windowSpecificCostBoundMicroUsd).toBe(
+      CANONICAL_COST_PREFLIGHT.peakSevenCallWorstCaseMicroUsd
+    );
+    const result = validateRunnerReadinessEvidence(peak);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  // 50. (J) PEAK bound = 25565 => invalid
+  it('50. cost bound J: PEAK bound = 25565 => invalid', () => {
+    const invalid = {
+      ...validOffPeakReadiness,
+      pricingWindow: 'PEAK' as const,
+      windowSpecificCostBoundMicroUsd: 25565,
+    };
+    const result = validateRunnerReadinessEvidence(invalid);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('Invalid windowSpecificCostBoundMicroUsd'))).toBe(true);
+  });
+
+  // 51. (K) PEAK bound = 25567 => invalid
+  it('51. cost bound K: PEAK bound = 25567 => invalid', () => {
+    const invalid = {
+      ...validOffPeakReadiness,
+      pricingWindow: 'PEAK' as const,
+      windowSpecificCostBoundMicroUsd: 25567,
+    };
+    const result = validateRunnerReadinessEvidence(invalid);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('Invalid windowSpecificCostBoundMicroUsd'))).toBe(true);
+  });
+
+  // 52. Bound = 1 fails for both OFF_PEAK and PEAK
+  it('52. cost bound = 1 fails for both OFF_PEAK and PEAK', () => {
+    const invalidOffPeak = {
+      ...validOffPeakReadiness,
+      pricingWindow: 'OFF_PEAK' as const,
+      windowSpecificCostBoundMicroUsd: 1,
+    };
+    const resultOffPeak = validateRunnerReadinessEvidence(invalidOffPeak);
+    expect(resultOffPeak.valid).toBe(false);
+    expect(resultOffPeak.errors.some((e) => e.includes('Invalid windowSpecificCostBoundMicroUsd'))).toBe(true);
+
+    const invalidPeak = {
+      ...validOffPeakReadiness,
+      pricingWindow: 'PEAK' as const,
+      windowSpecificCostBoundMicroUsd: 1,
+    };
+    const resultPeak = validateRunnerReadinessEvidence(invalidPeak);
+    expect(resultPeak.valid).toBe(false);
+    expect(resultPeak.errors.some((e) => e.includes('Invalid windowSpecificCostBoundMicroUsd'))).toBe(true);
   });
 });
