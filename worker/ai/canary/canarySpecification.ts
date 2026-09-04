@@ -23,6 +23,39 @@ import { EvaluationCase } from '../evaluation/types';
 
 export const CANARY_SPECIFICATION_VERSION = 'a12b2c5-v1.2';
 
+// ============================================================================
+// AUTHORITATIVE LIVE EXECUTION POLICY (PHASE A.12B.2C-5G)
+// ============================================================================
+
+/**
+ * Authoritative fail-closed policy flag for live canary execution.
+ * 
+ * INVARIANT: Must remain strictly `false` pending explicit future certification.
+ * Version-independent: Does NOT derive enablement from specification version strings
+ * or caller-controlled indicators (phase, lane, approval, environment).
+ */
+export const CANARY_LIVE_EXECUTION_ENABLED = false as const;
+
+export const CANARY_LIVE_EXECUTION_STATE =
+  'BLOCKED_PENDING_CERTIFICATION' as const;
+
+export const CANARY_AUTHORITATIVE_LIVE_POLICY = {
+  liveExecutionEnabled: CANARY_LIVE_EXECUTION_ENABLED,
+  liveExecutionState: CANARY_LIVE_EXECUTION_STATE,
+  defaultDisabled: true,
+  environmentControlled: false,
+  requestControlled: false,
+  approvalControlled: false,
+  phaseControlled: false,
+  laneControlled: false,
+  specificationVersionControlled: false,
+  runtimeMutable: false,
+  processEnvOverride: false,
+  cliOverride: false,
+  testOnlyBypass: false,
+  providerCredentialDependency: false,
+} as const;
+
 /**
  * Execution Lanes for Canary Specification v1.2
  * ARCHITECTURAL DECISION: C_SPLIT_INTERACTIVE_AND_BACKGROUND_TIERS

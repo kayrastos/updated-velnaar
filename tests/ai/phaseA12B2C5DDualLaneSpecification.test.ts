@@ -242,7 +242,10 @@ describe('Phase A.12B.2C-5D Dual-Lane v1.2 Specification Foundation', () => {
       capabilitySecret: validSecret,
     });
     expect(result.killSwitchEvents.length).toBeGreaterThan(0);
-    expect(result.killSwitchEvents[0].message).toBe(
+    expect(result.killSwitchEvents[0].message).toContain(
+      'Live canary execution is blocked by authoritative certification policy.'
+    );
+    expect(result.killSwitchEvents[0].message).toContain(
       'Dual-lane v1.2 live execution is blocked pending lane-specific certification.'
     );
   });
@@ -304,7 +307,7 @@ describe('Phase A.12B.2C-5D Dual-Lane v1.2 Specification Foundation', () => {
         capabilitySecret: validSecret,
         executionLane: 'BACKGROUND_ECONOMY',
       },
-      { capabilitySecret: validSecret }
+      { capabilitySecret: validSecret, now: () => new Date(validTimestamp), allowSimulatedExpiryForTest: true }
     );
 
     expect(validationResult.valid).toBe(true);

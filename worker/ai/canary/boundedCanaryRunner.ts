@@ -22,6 +22,7 @@ import {
 } from '../providers/certifiedProviderTypes';
 import {
   CANARY_SPECIFICATION_VERSION,
+  CANARY_LIVE_EXECUTION_ENABLED,
   CERTIFIED_CANARY_CANDIDATES,
   CERTIFIED_CANARY_CANDIDATE_MAP,
   CANARY_INVOCATION_LIMITS,
@@ -592,9 +593,9 @@ export class BoundedCanaryRunner {
       productionRoutingEnforcementAllowed: false,
     });
 
-    // Gate 0: Dual-Lane v1.2 Live Execution Fail-Closed Block
-    // ALL live execution under CURRENT v1.2 is unconditionally blocked until lane-specific certification is complete.
-    // Derived strictly from authoritative CURRENT specification state.
+    // Gate 0: Authoritative Version-Independent Live Execution Fail-Closed Block
+    // Live canary execution is blocked by authoritative certification policy.
+    // Invariant: MUST NOT derive enablement from specification version or caller-controlled phase/lane/env fields.
     // MUST fail closed before:
     // - source/network dispatch
     // - provider credential evaluation
@@ -604,20 +605,12 @@ export class BoundedCanaryRunner {
     // - transport attempt creation
     // - invocation accounting
     // - cost incurrence
-    // REGARDLESS of phase (5B or 5D), lane existence, approval validity, provider credentials, or customFetch.
-    if (
-      CANARY_SPECIFICATION_VERSION === 'a12b2c5-v1.2' ||
-      options.phase === 'A.12B.2C-5D' ||
-      options.executionLane !== undefined ||
-      options.lane !== undefined ||
-      options.humanApproval?.targetPhase === 'A.12B.2C-5D' ||
-      options.humanApproval?.executionLane !== undefined ||
-      options.isV12LiveAttempt === true
-    ) {
+    // REGARDLESS of phase, lane existence, approval validity, provider credentials, or customFetch.
+    if (!CANARY_LIVE_EXECUTION_ENABLED) {
       killSwitchEvents.push({
         timestamp: now().toISOString(),
         reason: 'UNAUTHORIZED_ENVIRONMENT',
-        message: 'Dual-lane v1.2 live execution is blocked pending lane-specific certification.',
+        message: 'Live canary execution is blocked by authoritative certification policy. Dual-lane v1.2 live execution is blocked pending lane-specific certification.',
         terminatedFailClosed: true,
       });
       return buildFailClosedPackage();
