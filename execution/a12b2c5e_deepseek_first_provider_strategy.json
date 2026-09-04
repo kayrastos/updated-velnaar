@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "phase": "A.12B.2C-5E",
+  "strategyId": "DEEPSEEK_FIRST_SINGLE_PROVIDER_V1",
+  "baseCommit": "adfcdd678463d119fd627d9a51f0fb0bbb8c51e2",
+  "baseTree": "6b0178932aad6601ba02d7a14bf2d321aaddc7b4",
+  "currentTechnicalSpec": "a12b2c5-v1.2",
+  "sealedAt": "2026-09-04T04:30:00.000Z",
+  "strategicDecision": {
+    "strategy": "DEEPSEEK_FIRST_SINGLE_PROVIDER_V1",
+    "activePreferredProvider": "deepseek",
+    "activePreferredModel": "deepseek-v4-flash",
+    "documentedVersion": "DeepSeek-V4-Flash-0731",
+    "baseUrl": "https://api.deepseek.com",
+    "openAiEndpoint": "https://api.deepseek.com/v1/chat/completions",
+    "thinkingSupported": true,
+    "velnarCurrentEffort": "low",
+    "velnarOutputBound": 2048,
+    "concurrencyLimit": 2500,
+    "interactiveTimeoutMs": 15000,
+    "crossProviderFallbackEnabled": false
+  },
+  "geminiStatus": {
+    "status": "DORMANT_UNSELECTED_PROVIDER",
+    "activePrimary": false,
+    "activeFallback": false,
+    "requiredCanaryPair": false,
+    "currentBenchmarkTarget": false,
+    "productionRoutingTarget": false,
+    "preservationPurpose": [
+      "historical_reproducibility",
+      "dormant_cold_standby_knowledge",
+      "future_model_comparison_if_justified"
+    ]
+  },
+  "reEvaluationPolicy": {
+    "defaultPosition": "KEEP_DEEPSEEK_UNTIL_EVIDENCE_JUSTIFIES_RE_EVALUATION",
+    "authorizedTriggers": [
+      "MATERIALLY_STRONGER_MODEL_RELEASED",
+      "DEEPSEEK_QUALITY_REGRESSION",
+      "DEEPSEEK_RELIABILITY_UNACCEPTABLE",
+      "DEEPSEEK_AVAILABILITY_DEGRADATION",
+      "PRICING_MATERIALLY_WORSE",
+      "UNSATISFIED_WORKLOAD_REQUIREMENT",
+      "REGULATORY_GEOGRAPHIC_CUSTOMER_REQUIREMENT",
+      "CLEAR_STRATEGIC_ADVANTAGE_DEMONSTRATED"
+    ]
+  },
+  "pricing": {
+    "model": "deepseek-v4-flash",
+    "offPeak": {
+      "cacheHitInputUsdPerMillion": 0.007,
+      "cacheMissInputUsdPerMillion": 0.22,
+      "outputUsdPerMillion": 0.66
+    },
+    "peak": {
+      "cacheHitInputUsdPerMillion": 0.014,
+      "cacheMissInputUsdPerMillion": 0.44,
+      "outputUsdPerMillion": 1.32
+    },
+    "peakMultiplierVsOffPeak": 2.0,
+    "peakWindows": {
+      "daysUtc": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday"
+      ],
+      "intervalsUtc": [
+        {
+          "startHour": 1,
+          "endHour": 4,
+          "description": "01:00-04:00 UTC"
+        },
+        {
+          "startHour": 6,
+          "endHour": 10,
+          "description": "06:00-10:00 UTC"
+        }
+      ],
+      "allOtherTimes": "OFF_PEAK"
+    }
+  },
+  "interactivePolicy": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "thinking": "low",
+    "hardLifecycleTimeoutMs": 15000,
+    "primaryProviderCount": 1,
+    "crossProviderFallback": "NONE",
+    "geminiFallback": "DISABLED",
+    "offPeak": {
+      "candidate": "deepseek-v4-flash-offpeak-low",
+      "certificationStatus": "EXISTING_EVIDENCE_REQUIRES_SINGLE_PROVIDER_RESEAL"
+    },
+    "peak": {
+      "candidate": "deepseek-v4-flash-peak-low",
+      "certificationStatus": "PEAK_WINDOW_CERTIFICATION_REQUIRED",
+      "inheritsOffPeakCertification": false
+    }
+  },
+  "backgroundEconomyPolicy": {
+    "provider": "deepseek",
+    "preferredWindow": "OFF_PEAK",
+    "peakBehavior": "DEFER_WHEN_SAFE",
+    "geminiFlexBackgroundLane": "DISABLED"
+  },
+  "outagePolicy": {
+    "secondProviderFallback": false,
+    "interactive": "FAIL_CLOSED",
+    "background": "QUEUE_JOB"
+  },
+  "rateLimitPolicy": {
+    "concurrencyLimit": 2500,
+    "crossProviderFallback": false
+  },
+  "historicalSupersession": {
+    "historicalDecision": "C_SPLIT_INTERACTIVE_AND_BACKGROUND_TIERS",
+    "status": "PRESERVED_HISTORICAL_EVIDENCE",
+    "legacy14CallMatrixStatus": "HISTORICAL_ONLY"
+  },
+  "futureCertificationPlan": {
+    "humanAuthorizationStatus": "NOT_GRANTED",
+    "liveAuthorizationGranted": false,
+    "stepA": {
+      "id": "DEEPSEEK_OFF_PEAK_SINGLE_PROVIDER_RESEAL",
+      "provider": "deepseek",
+      "window": "OFF_PEAK",
+      "canonicalTaskCount": 7,
+      "plannedDirectCalls": 7,
+      "expectedCrossProviderFallback": 0,
+      "humanAuthorizationRequired": true,
+      "authorizationGranted": false
+    },
+    "stepB": {
+      "id": "DEEPSEEK_PEAK_SINGLE_PROVIDER_CERTIFICATION",
+      "provider": "deepseek",
+      "window": "PEAK",
+      "canonicalTaskCount": 7,
+      "plannedDirectCalls": 7,
+      "expectedCrossProviderFallback": 0,
+      "humanAuthorizationRequired": true,
+      "authorizationGranted": false
+    }
+  },
+  "securityInvariants": {
+    "zeroProviderCalls": true,
+    "zeroProviderCredentials": true,
+    "liveCanaryExecuted": false,
+    "humanApprovalTokenGenerated": false,
+    "providerNetworkCalls": 0,
+    "productionRoutingEnforcementAllowed": false
+  }
+}
