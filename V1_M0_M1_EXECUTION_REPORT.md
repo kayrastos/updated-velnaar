@@ -1,10 +1,176 @@
 # VELNAR V1-M0/M1 execution report
 
-Implementation validation: PASS (2026-09-04, Europe/Istanbul).
-Delivery status: BLOCKED pending Git author name/email. Git rejected the local
-commit with `Author identity unknown`; all 18 reviewed files remain staged and no
-feature commit was created. No identity was invented or Git configuration changed.
-No V1-M2 work started.
+Human-review repair validation: PASS (2026-09-04, Europe/Istanbul).
+Both reported human-review blockers are closed by this repair, subject to second
+human review. Delivery status: repaired M0/M1 working tree ready for that review;
+repair changes are uncommitted, and HEAD remains the reviewed feature commit
+`1435edf73bded7f4503463163c0f4bd37700b72c` on
+`feat/v1-canonical-security-contracts`.
+V1-M2 has not started. No push, merge, deployment or live provider call occurred
+during this repair. No existing AI/provider/routing/canary/platform-security runtime
+behavior, dependency declaration, lockfile or Git identity setting was changed.
+
+## Delivery chronology (historical author block, not current status)
+
+1. Original M0/M1 implementation and validation completed. The first commit attempt
+   failed with `Author identity unknown`, leaving the 18 original reviewed files
+   staged. That was the correct delivery blocker at that time.
+2. After the user supplied repository-local author identity, feature commit
+   `1435edf73bded7f4503463163c0f4bd37700b72c` was subsequently created with message
+   `feat(intelligence): establish V1 canonical security contracts`. Its existence,
+   branch and clean starting worktree were verified for this repair. Missing author
+   identity is no longer a blocker; saying no feature commit exists would be false.
+3. Human review identified a missing exact candidate-semantic binding and the stale
+   execution report. This repair addresses those two findings only.
+4. Required candidate-content bindings now close the same-ID/same-snapshot replay
+   gap, and this report records the actual chronology and new validation evidence.
+   No new commit was created or staged by this repair; second human review is next.
+
+## Human-review repair: exact files changed
+
+New file:
+
+- `tests/intelligence/candidateSemanticBinding.test.ts` (34 new tests).
+
+Modified files:
+
+- `worker/intelligence/contracts/types.ts`: mandatory candidateBinding on request,
+  evidence and result wire types.
+- `worker/intelligence/contracts/validators.ts`: deterministic complete-candidate
+  binding helper and independent equality checks at every chain boundary.
+- `worker/intelligence/contracts/index.ts`: exports computeCandidateBinding.
+- `tests/intelligence/fixtures.ts`: exact candidate binding on synthetic messages.
+- `tests/intelligence/stateMachine.test.ts`: UNREACHABLE test rebinds its changed
+  candidate and rehashes evidence so it still exercises the reachability gate;
+  its rejection assertion now names that gate explicitly.
+- `tests/intelligence/tenantBinding.test.ts`: Commit B replay test rebinds the
+  candidate/request/result so it continues testing rejection of Commit A evidence.
+- `docs/v1/CONTRACT_PROTOCOL.md`: complete canonical representation, integrity-only
+  semantics, required field behavior, compatibility, size and sensitivity limits.
+- `V1_M0_M1_EXECUTION_REPORT.md`: chronology, repair evidence and actual results.
+
+No state-machine implementation change was needed: its existing BEGIN/COMPLETE
+boundaries call the strengthened validators. No files under `worker/ai`,
+`worker/security`, platform runtime or benchmark metadata changed during this repair.
+
+## Human-review repair design and evidence
+
+`candidateBinding` is the exact domain-prefixed canonical text of the complete
+validated FindingCandidate, not candidateId and not a hash of selected fields.
+Its representation is `velnar-intelligence-contract-v1:FindingCandidate`, one LF,
+then recursively UTF-16-key-sorted ECMAScript JSON, preserving arrays and all
+optional-field presence. Every accepted field is covered, including tenant/code
+state, source/sink/context, sensor identity and evidence, reachability and timestamps.
+No whitelist projection or caller-selected omission is used. Insertion order of
+object keys is not semantic; sensor ordering and metadata edits are conservative
+identity changes requiring a newly bound chain.
+
+The binding is independently recomputed from the validated candidate at request,
+evidence and result boundaries. Merely making the three wire labels agree does not
+suffice. Evidence SHA256 includes the binding, so relabeling an old artifact keeps
+neither its valid hash nor its authority to complete a different pending candidate.
+The helper validates expected tenant and returns an immutable string; validators
+continue to detach/deeply freeze outputs before asynchronous evidence hashing.
+
+This is an integrity identifier, NOT producer authentication/signing or proof of
+real execution. It is deliberately canonical text rather than a compact digest:
+no runtime dependency, bespoke SHA256 implementation, or asynchronous request API
+was needed. A party able to fabricate/relabel and rehash an entire consistent
+transcript still requires future authenticated producer enforcement, as already
+documented for M1. Model output gains no authority from this helper.
+
+### Exact new tests and invariant mapping
+
+The new file has 34 executed tests. All 23 tests in the following parameterized
+case use the exact title template:
+
+`Candidate A proof cannot verify Candidate B with same IDs/commit but different %s`
+
+Its 23 `%s` values are: `source path`, `source symbol`, `source line`,
+`source column`, `source semantic ID`, `sink path`, `sink symbol`, `sink semantic ID`,
+`entrypoint`, `route context`, `sensor identity`, `sensor type`, `sensor rule`,
+`sensor summary`, `sensor source`, `sensor sink`, `sensor evidence fingerprint`,
+`sensor array content`, `reachability`, `candidate timestamp`, `snapshot ref`,
+`snapshot provider`, `snapshot timestamp`.
+
+Each case asserts unchanged tenant/candidateId/repository/snapshot/commit/class,
+rejects BEGIN with A's binding, then creates a legitimate pending request for B and
+rejects A's evidence at COMPLETE. Even changing request/result/artifact binding to
+B cannot reuse A's original evidence hash; the failure leaves the workflow pending.
+
+| Exact additional test title | Count | Invariant / adversarial evidence |
+| --- | ---: | --- |
+| `rejects missing, malformed or tampered %s binding` (`request`, `evidence`, `result`) | 3 | Seven bad/missing values per boundary, including model prose, digest-shaped substitute and noncanonical trailing whitespace; all fail closed |
+| `matches independent canonical encoding and ignores recursive object key insertion order` | 1 | Independent canonical encoder agrees; reordered keys bind identically; independent Node SHA256 proves evidenceHash covers candidateBinding |
+| `binds sensor ordering and optional field presence without normalization` | 1 | Array reorder and absent route metadata change identity |
+| `validates the candidate and required expected tenant before computing its binding` | 1 | Invalid/foreign expected tenant, accessor-backed fields and VERIFIED-as-candidate rejected; getter is never invoked |
+| `preserves the exact-candidate three-state path and prohibits direct completion` | 1 | Exact candidate follows CANDIDATE -> PENDING_VERIFICATION -> VERIFIED; direct COMPLETE still fails |
+| `retains Commit A to Commit B replay protection after rebinding the new request/result` | 1 | Actual pending Commit B rejects Commit A evidence with commitSha mismatch |
+| `retains tenant isolation even for an internally consistent newly bound foreign chain` | 1 | Fully coherent and rehashed foreign-tenant chain still fails caller tenant boundary |
+| `detaches and deeply freezes candidate-bound outputs before the async evidence hash boundary` | 1 | Mutating candidate, request, evidence and result after validation starts cannot change validated outputs or nested frozen objects |
+| `rejects hash creation against a different candidate instead of laundering an old artifact` | 1 | Public evidence-hash helper itself rejects old binding under a new candidate |
+
+Existing 162 focused tests are retained, including tenant mismatch matrices,
+same-commit/foreign-repository checks, no model/cast/serialized state authority,
+mandatory evidence, UNREACHABLE and resource/profile/time enforcement. Two existing
+tests were adapted to retain their original distinct security coverage, not removed
+or bypassed. New 34 + original 162 = 196 focused tests.
+
+### Actual repair validation results (all offline)
+
+All commands ran with the unchanged existing process guard:
+
+```powershell
+$env:NODE_OPTIONS = '--require=C:/Users/kayra/Downloads/velnar-v1-contracts/tests/intelligence/offlineGuard.cjs'
+npm.cmd test -- tests/intelligence --reporter=json --outputFile=node_modules/.cache/v1-human-review-focused.json
+npm.cmd test -- --reporter=json --outputFile=node_modules/.cache/v1-human-review-full.json
+npm.cmd run typecheck
+npm.cmd run lint
+npm.cmd run build
+```
+
+| Validation | Actual result | Exit / failures |
+| --- | --- | --- |
+| Focused V1 intelligence suite | 5 files; 196 passed; 0 skipped/pending | Exit 0; 0 failures |
+| Complete test suite | 46 files; 960 passed; 0 skipped/pending | Exit 0; 0 failures |
+| Typecheck | `tsc --noEmit` | Exit 0 |
+| Lint | Repository script is `tsc --noEmit`, not a separate ESLint pass | Exit 0 |
+| Production build | Vite 6.4.3; 1702 modules; built in 5.28s | Exit 0 |
+
+Focused counts: candidateSemanticBinding 34; contracts 103; tenantBinding 25;
+stateMachine 21; sqlInjectionBenchmarkContract 13. Full total is original 926 + 34
+= 960. JSON captures are ignored local validation artifacts under node_modules,
+not new tracked source files. No dependency installation or network access was
+needed. Typecheck and lint completed successfully even though they initially
+returned running-process handles.
+
+Production outputs: `dist/index.html` 1.93 kB (gzip 0.89 kB),
+`dist/assets/index-_68ELEki.css` 46.20 kB (gzip 8.37 kB),
+`dist/assets/index-CL2n2YV7.js` 469.70 kB (gzip 122.06 kB). The filenames and sizes
+match the original build; no existing application runtime was changed.
+
+### Remaining repair limitations / closure decision
+
+- Binding is exact-content integrity, not authentication. Fabricated complete
+  transcripts, authenticated producers, durable replay ledgers and actual execution
+  remain outside M0/M1; no production verification claim is made.
+- Canonical text repeats candidate metadata and is not a redacted digest. Account
+  for bounded payload overhead, avoid logging it, and treat even metadata-only
+  edits/array reordering as a new reviewed identity.
+- The added field intentionally rejects old unbound pre-review wire messages.
+  There is no compatibility fallback that could reopen the finding replay gap.
+- Original dependency-lock portability and process-only offline-guard limitations
+  below remain unchanged. No new dependency or trust authority was introduced.
+
+Blocker 1 (candidate semantic evidence binding): CLOSED by exact-content binding
+and the above passing adversarial regressions, within the documented M1 integrity
+boundary. Blocker 2 (stale report): CLOSED by the verified chronology and current
+repair results. Second human review is still required. V1-M2 remains NOT STARTED.
+
+## Original M0/M1 delivery record (historical context below)
+
+The remaining sections record the original implementation and validation, not the
+current repair's file list, test counts, dependency/network activity or commit status.
 
 ## Baseline and isolation
 

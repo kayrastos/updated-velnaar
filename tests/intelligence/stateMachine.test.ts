@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createVerificationState, transitionVerificationState, isFindingVerification, computeEvidenceHash,
+import { createVerificationState, transitionVerificationState, isFindingVerification, computeEvidenceHash, computeCandidateBinding,
   validateVerificationResult, type FindingVerification } from '../../worker/intelligence/contracts';
 import { candidate, fixture, ORG } from './fixtures';
 const error = 'INTELLIGENCE_PROTOCOL_ERROR:';
@@ -71,8 +71,10 @@ describe('controlled verification state machine', () => {
   });
   it('rejects VERIFIED when deterministic reachability explicitly says UNREACHABLE', async () => {
     const { c, q, e, r } = await fixture(); c.reachabilityState = 'UNREACHABLE';
+    q.candidateBinding = e.candidateBinding = r.candidateBinding = computeCandidateBinding(c, ORG);
+    const { evidenceHash: _old, ...body } = e; e.evidenceHash = await computeEvidenceHash(body, q, c, ORG);
     const pending = await transitionVerificationState(createVerificationState(c, ORG), { type: 'BEGIN', request: q });
-    await expect(transitionVerificationState(pending, { type: 'COMPLETE', result: r, evidence: e })).rejects.toThrow(error);
+    await expect(transitionVerificationState(pending, { type: 'COMPLETE', result: r, evidence: e })).rejects.toThrow('unreachable candidate cannot be verified');
   });
   it('RESOLVED closes only a verified workflow; no resurrection or silent new-commit proof', async () => {
     const { c, q, e, r } = await fixture(); const initial = createVerificationState(c, ORG);

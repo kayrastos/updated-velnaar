@@ -1,4 +1,4 @@
-import { CONTRACT_VERSION, computeEvidenceHash, type CodeSnapshotRef, type FindingCandidate,
+import { CONTRACT_VERSION, computeEvidenceHash, computeCandidateBinding, type CodeSnapshotRef, type FindingCandidate,
   type VerificationRequest, type EvidenceArtifact, type VerificationResult } from '../../worker/intelligence/contracts';
 
 export type Mutable<T> = { -readonly [K in keyof T]: T[K] extends object ? Mutable<T[K]> : T[K] };
@@ -21,6 +21,7 @@ export function candidate(): Mutable<FindingCandidate> {
 }
 export function request(): Mutable<VerificationRequest> {
   return { contractVersion: CONTRACT_VERSION, requestId: 'request_a', organizationId: ORG, candidateId: 'candidate_a',
+    candidateBinding: computeCandidateBinding(candidate(), ORG),
     snapshotId: 'snapshot_a', commitSha: 'a'.repeat(40), vulnerabilityClass: 'SQL_INJECTION',
     verificationProfile: { profileId: 'sqli-fixture', version: 1 },
     environmentRequirements: { environmentType: 'ISOLATED_TEST', runtime: 'NODE', runtimeVersion: '24.18.0' },
@@ -32,6 +33,7 @@ export async function fixture() {
   const c = candidate(); const q = request();
   const body: Mutable<Omit<EvidenceArtifact, 'evidenceHash'>> = {
     contractVersion: CONTRACT_VERSION, evidenceId: 'evidence_a', organizationId: ORG, candidateId: c.candidateId, requestId: q.requestId,
+    candidateBinding: q.candidateBinding,
     repositoryId: c.snapshot.repositoryId, snapshotId: c.snapshot.snapshotId, commitSha: c.snapshot.commitSha,
     vulnerabilityClass: c.vulnerabilityClass, verificationProfile: { ...q.verificationProfile },
     environmentIdentity: { ...q.environmentRequirements, environmentId: 'environment_a', imageDigest: HASH },
@@ -44,6 +46,7 @@ export async function fixture() {
   const e: Mutable<EvidenceArtifact> = { ...body, evidenceHash: await computeEvidenceHash(body, q, c, ORG) };
   const r: Mutable<VerificationResult> = {
     contractVersion: CONTRACT_VERSION, requestId: q.requestId, candidateId: c.candidateId, organizationId: ORG,
+    candidateBinding: q.candidateBinding,
     snapshotId: c.snapshot.snapshotId, commitSha: c.snapshot.commitSha, vulnerabilityClass: c.vulnerabilityClass,
     result: 'VERIFIED', evidenceId: e.evidenceId, observedBehavior: { ...e.observedBehavior }, assertionResult: 'PASSED',
     environmentIdentity: { ...e.environmentIdentity }, executionIdentity: { ...e.executionIdentity },

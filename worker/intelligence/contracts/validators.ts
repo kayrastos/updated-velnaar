@@ -135,11 +135,13 @@ function binding(r: RecordValue, c: FindingCandidate): void {
   equal(r.organizationId, c.organizationId, 'organizationId'); equal(r.candidateId, c.candidateId, 'candidateId');
   equal(r.snapshotId, c.snapshot.snapshotId, 'snapshotId'); equal(r.commitSha, c.snapshot.commitSha, 'commitSha');
   equal(r.vulnerabilityClass, c.vulnerabilityClass, 'vulnerabilityClass');
+  // Compare against independently validated candidate bytes, never another wire claim.
+  equal(r.candidateBinding, candidateBinding(c), 'candidateBinding');
 }
 export function validateVerificationRequest(raw: unknown, candidate: unknown, expectedOrganizationId: string): VerificationRequest {
   id(expectedOrganizationId, 'expectedOrganizationId');
   const c = validateFindingCandidate(candidate, expectedOrganizationId);
-  const r = object(raw, ['contractVersion', 'requestId', 'organizationId', 'candidateId', 'snapshotId', 'commitSha', 'vulnerabilityClass',
+  const r = object(raw, ['contractVersion', 'requestId', 'organizationId', 'candidateId', 'candidateBinding', 'snapshotId', 'commitSha', 'vulnerabilityClass',
     'verificationProfile', 'environmentRequirements', 'networkPolicy', 'resourceBudget', 'timeBudgetMs', 'expectedAssertionType', 'createdAt']);
   tenant(r, expectedOrganizationId); id(r.requestId, 'requestId'); binding(r, c);
   profile(r.verificationProfile); environment(r.environmentRequirements);
@@ -177,7 +179,7 @@ function executionBinding(r: RecordValue, request: VerificationRequest): void {
   for (const key of ['environmentType', 'runtime', 'runtimeVersion']) equal(e[key], request.environmentRequirements[key], key);
   observation(r.observedBehavior, r.assertionResult); interval(r, request);
 }
-const evidenceFields = ['contractVersion', 'evidenceId', 'organizationId', 'candidateId', 'requestId', 'repositoryId', 'snapshotId',
+const evidenceFields = ['contractVersion', 'evidenceId', 'organizationId', 'candidateId', 'candidateBinding', 'requestId', 'repositoryId', 'snapshotId',
   'commitSha', 'vulnerabilityClass', 'verificationProfile', 'environmentIdentity', 'executionIdentity', 'assertionType',
   'assertionResult', 'observedBehavior', 'startedAt', 'completedAt', 'reproduction'] as const;
 function evidenceBody(raw: unknown, request: VerificationRequest, c: FindingCandidate): RecordValue {
@@ -199,6 +201,16 @@ function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`;
   return JSON.stringify(value);
+}
+function candidateBinding(candidate: FindingCandidate): string {
+  // No omissions: metadata, optional-field presence and sensor array order are bound too.
+  // Canonical text avoids adding a crypto dependency or an async gap to request validation.
+  return `${CONTRACT_VERSION}:FindingCandidate\n${canonical(candidate)}`;
+}
+/** Exact-content integrity identifier, NOT a producer signature or verification claim. */
+export function computeCandidateBinding(candidate: unknown, expectedOrganizationId: string): string {
+  id(expectedOrganizationId, 'expectedOrganizationId');
+  return candidateBinding(validateFindingCandidate(candidate, expectedOrganizationId));
 }
 async function hashBody(body: RecordValue): Promise<string> {
   const bytes = new TextEncoder().encode(`${CONTRACT_VERSION}:EvidenceArtifact\n${canonical(body)}`);
@@ -223,7 +235,7 @@ export async function validateVerificationResult(raw: unknown, rawRequest: unkno
   expectedOrganizationId: string): Promise<VerificationResult> {
   const request = validateVerificationRequest(rawRequest, candidate, expectedOrganizationId);
   const c = validateFindingCandidate(candidate, expectedOrganizationId);
-  const r = object(raw, ['contractVersion', 'requestId', 'candidateId', 'organizationId', 'snapshotId', 'commitSha', 'vulnerabilityClass',
+  const r = object(raw, ['contractVersion', 'requestId', 'candidateId', 'candidateBinding', 'organizationId', 'snapshotId', 'commitSha', 'vulnerabilityClass',
     'result', 'evidenceId', 'observedBehavior', 'assertionResult', 'environmentIdentity', 'executionIdentity', 'startedAt', 'completedAt', 'resourceUsage']);
   tenant(r, expectedOrganizationId); binding(r, c); executionBinding(r, request);
   choice(r.result, ['VERIFIED', 'NOT_VERIFIED', 'INCONCLUSIVE'], 'result');

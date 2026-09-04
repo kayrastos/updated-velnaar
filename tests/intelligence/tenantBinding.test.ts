@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateCodeSnapshotRef, validateFindingCandidate, validateVerificationRequest,
-  validateEvidenceArtifact, validateVerificationResult } from '../../worker/intelligence/contracts';
+  validateEvidenceArtifact, validateVerificationResult, computeCandidateBinding } from '../../worker/intelligence/contracts';
 import { fixture, candidate, snapshot, request, ORG } from './fixtures';
 const error = 'INTELLIGENCE_PROTOCOL_ERROR:';
 
@@ -40,6 +40,7 @@ describe('tenant and exact code-state bindings', () => {
   it('a valid Commit A proof cannot verify a consistent candidate/request/result for Commit B', async () => {
     const { c, q, e, r } = await fixture();
     c.snapshot.commitSha = q.commitSha = r.commitSha = 'b'.repeat(40);
+    q.candidateBinding = r.candidateBinding = computeCandidateBinding(c, ORG);
     await expect(validateVerificationResult(r, q, c, e, ORG)).rejects.toThrow(error);
   });
 });

@@ -20,8 +20,9 @@ whitespace; normal fields are bounded to 256 characters, relative paths to 512,
 and untrusted sensor summaries to 1000. Relative paths use forward slashes and
 exclude empty, dot, dot-dot, drive and absolute components. Symbols are mandatory;
 line (1-10,000,000), column (1-1,000,000, requiring line) and semantic ID are optional.
-No canonical finding fingerprint is claimed. Sensor fingerprints are raw-input
-SHA256 references and do not establish semantic identity or vulnerability truth.
+Sensor fingerprints are raw-input SHA256 references and do not alone establish
+semantic identity or vulnerability truth. The candidate-content binding below
+covers them together with the entire validated finding hypothesis.
 
 Commit IDs are full lowercase 40- or 64-hex Git object IDs, excluding all-zero IDs.
 Timestamps must round-trip exactly as `YYYY-MM-DDTHH:mm:ss.sssZ`, with valid calendar
@@ -36,12 +37,62 @@ Request/evidence/result validation requires a caller-supplied expected tenant an
 revalidates the entire candidate/request chain. Candidate, nested snapshot and
 sensors must agree on organization. Every request, artifact and result must match
 candidate ID, organization, snapshot ID, full commit and vulnerability class.
+Every request, artifact and result also requires `candidateBinding`, recomputed
+from the entire validated candidate independently at each boundary. Equality
+between wire binding fields alone is insufficient. Reusing candidateId within the
+same commit cannot transfer a proof to different candidate content.
 Evidence also matches repository ID, request ID, versioned verification profile,
 expected assertion and environment runtime/type/version. Its reproduction metadata
 must match its profile, assertion and environment. Result and evidence must agree
 on evidence ID, assertion outcome, observation, execution/environment identities,
 and start/completion timestamps. A coherent foreign-tenant set still fails the
 expected-tenant boundary. A proof for commit A cannot be reused for commit B.
+
+## Exact candidate-content binding (human-review repair)
+
+`computeCandidateBinding(candidate, expectedOrganizationId)` first validates the
+complete candidate, including nested tenant consistency, and takes a detached,
+deeply frozen copy. It returns the exact string:
+
+```text
+velnar-intelligence-contract-v1:FindingCandidate\n<canonical complete candidate JSON>
+```
+
+Here `\n` denotes one LF character. Canonical JSON uses the same recursively
+UTF-16-key-sorted, ECMAScript-stringified representation as the evidence hash
+protocol below. Object insertion order is immaterial; array order and optional
+field presence are retained. No Unicode normalization or semantic inference occurs.
+There are NO omitted fields: source/sink locations (including symbols, semantic
+IDs and coordinates), context/entrypoint/route, every sensor identity/rule/location/
+summary/raw fingerprint, reachability, tenant, repository/snapshot/provider/ref/
+commit, timestamps, candidateId, vulnerability class, version and CANDIDATE state
+are all bound. Future accepted candidate fields automatically enter the binding;
+unknown fields remain rejected.
+
+This is a canonical-content integrity identifier, NOT a compact SHA256 fingerprint,
+producer authentication, signing, deduplication key or evidence that a claim ran.
+Exact canonical text avoids a new runtime dependency or custom cryptographic
+implementation and keeps request validation synchronous. Its size is bounded by
+the existing closed candidate schema, but repeats candidate metadata on all three
+wire messages; transport/storage must account for that overhead and sensitivity.
+Do not log the binding as if it were a redacted digest. Existing schema failure
+messages do not echo its contents. Any content change, even a summary, timestamp
+or sensor reorder, requires a newly bound request/evidence/result chain; we make
+no cross-revision "semantically equivalent" reuse claim.
+
+Request validation, evidence-hash creation, evidence validation and result validation
+each compare the supplied binding against the validated exact candidate. Missing,
+malformed or unequal bindings fail closed, including INCONCLUSIVE without evidence.
+Evidence SHA256 includes `candidateBinding` as an ordinary mandatory field. Relabeling
+an artifact's binding invalidates its existing evidenceHash; an attacker who can
+fabricate and rehash the *entire* transcript still needs future producer authentication,
+as described below. No raw model/sensor output gains authority from this identifier.
+
+This is an intentional pre-M2 tightening of the frozen-in-review v1 wire shape.
+Messages from reviewed commit `1435edf73bded7f4503463163c0f4bd37700b72c` without the
+binding are rejected, with no legacy fallback. No deployed runtime consumer is
+connected to these M1 contracts. Workflow handles and validated outputs remain
+detached/deeply frozen; there is still no direct CANDIDATE -> VERIFIED transition.
 
 ## Evidence gate and limits of proof
 
@@ -76,7 +127,8 @@ boundary; this is not an execution sandbox.
 
 `evidenceHash` is `sha256:` followed by 64 lowercase hexadecimal digits. It covers
 EVERY validated EvidenceArtifact field except itself, including tenant, repository,
-code state, request, profile, identities, observations, timestamps and reproduction.
+code state, complete candidateBinding, request, profile, identities, observations,
+timestamps and reproduction.
 No caller-supplied key omission is supported.
 
 Canonicalization recursively sorts object keys by UTF-16 code units, retains array

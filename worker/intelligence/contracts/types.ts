@@ -94,6 +94,7 @@ export interface ResourceBudget {
 export interface VerificationRequest extends TenantContract {
   readonly requestId: string;
   readonly candidateId: string;
+  readonly candidateBinding: string; // Exact canonical candidate content; integrity, not authentication.
   readonly snapshotId: string;
   readonly commitSha: string;
   readonly vulnerabilityClass: VulnerabilityClass;
@@ -120,6 +121,7 @@ export interface ReproductionMetadata {
 export interface EvidenceArtifact extends TenantContract {
   readonly evidenceId: string;
   readonly candidateId: string;
+  readonly candidateBinding: string;
   readonly requestId: string;
   readonly repositoryId: string;
   readonly snapshotId: string;
@@ -146,6 +148,7 @@ export interface ResourceUsage {
 export interface VerificationResult extends TenantContract {
   readonly requestId: string;
   readonly candidateId: string;
+  readonly candidateBinding: string;
   readonly snapshotId: string;
   readonly commitSha: string;
   readonly vulnerabilityClass: VulnerabilityClass;
