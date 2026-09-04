@@ -52,6 +52,9 @@ import {
   HUMAN_BUDGET_STATUS,
   FUTURE_ACTIVATION_SAFETY_REQUIREMENT,
   DEEPSEEK_SUCCESSOR_CERTIFICATION_SPECIFICATION,
+  SYSTEM_FINGERPRINT_IS_MODEL_VERSION,
+  FINGERPRINT_COMPARED_TO_DOCUMENTED_VERSION_TARGET,
+  MODEL_PROVENANCE_CONTRACT,
   verifyModelProvenance,
   resolveOverallV1ProviderState,
 } from '../../worker/ai/canary/deepSeekSingleProviderCertificationSpecification';
@@ -303,7 +306,8 @@ describe('Phase A.12B.2C-5F DeepSeek Successor Certification Spec Contract', () 
     expect(verified.providerReportedBackendFingerprint).toBe('fp_a79f644e50');
     expect(verified.providerReportedModelVersion).toBeNull();
     expect(verified.documentedVersionTarget).toBe('DeepSeek-V4-Flash-0731');
-    expect(verified.systemFingerprintEqualsModelVersion).toBe(false);
+    expect(verified.systemFingerprintIsModelVersion).toBe(false);
+    expect(verified.fingerprintComparedToDocumentedVersionTarget).toBe(false);
 
     // Mismatch test
     const mismatched = verifyModelProvenance({
@@ -312,6 +316,69 @@ describe('Phase A.12B.2C-5F DeepSeek Successor Certification Spec Contract', () 
     });
     expect(mismatched.isValid).toBe(false);
     expect(mismatched.exactModelMatch).toBe(false);
+    expect(mismatched.systemFingerprintIsModelVersion).toBe(false);
+    expect(mismatched.fingerprintComparedToDocumentedVersionTarget).toBe(false);
+  });
+
+  // 23b. adversarial regression: systemFingerprint = "DeepSeek-V4-Flash-0731"
+  it('23b. adversarial regression: systemFingerprint matching documented version string does not alter provenance and invariant flags remain false', () => {
+    // Matching model with adversarial fingerprint
+    const adversarialMatch = verifyModelProvenance({
+      requestedModelIdentifier: 'deepseek-v4-flash',
+      returnedModelIdentifier: 'deepseek-v4-flash',
+      systemFingerprint: 'DeepSeek-V4-Flash-0731',
+      providerReportedModelVersion: null,
+    });
+
+    // Provenance is determined strictly by requested vs returned model match
+    expect(adversarialMatch.isValid).toBe(true);
+    expect(adversarialMatch.exactModelMatch).toBe(true);
+    // Invariant flags MUST remain false even when string matches documented version target
+    expect(adversarialMatch.systemFingerprintIsModelVersion).toBe(false);
+    expect(adversarialMatch.fingerprintComparedToDocumentedVersionTarget).toBe(false);
+    // Fingerprint preserved verbatim as opaque telemetry
+    expect(adversarialMatch.providerReportedBackendFingerprint).toBe('DeepSeek-V4-Flash-0731');
+    expect(adversarialMatch.providerReportedModelVersion).toBeNull();
+    expect(adversarialMatch.documentedVersionTarget).toBe('DeepSeek-V4-Flash-0731');
+
+    // Mismatched model with adversarial fingerprint - must NOT strengthen or rescue provenance
+    const adversarialMismatch = verifyModelProvenance({
+      requestedModelIdentifier: 'deepseek-v4-flash',
+      returnedModelIdentifier: 'deepseek-v4-pro',
+      systemFingerprint: 'DeepSeek-V4-Flash-0731',
+    });
+    expect(adversarialMismatch.isValid).toBe(false);
+    expect(adversarialMismatch.exactModelMatch).toBe(false);
+    expect(adversarialMismatch.systemFingerprintIsModelVersion).toBe(false);
+    expect(adversarialMismatch.fingerprintComparedToDocumentedVersionTarget).toBe(false);
+    expect(adversarialMismatch.providerReportedBackendFingerprint).toBe('DeepSeek-V4-Flash-0731');
+
+    // Telemetry preservation for normal fingerprint fp_a79f644e50
+    const normalTelemetry = verifyModelProvenance({
+      requestedModelIdentifier: 'deepseek-v4-flash',
+      returnedModelIdentifier: 'deepseek-v4-flash',
+      systemFingerprint: 'fp_a79f644e50',
+    });
+    expect(normalTelemetry.providerReportedBackendFingerprint).toBe('fp_a79f644e50');
+    expect(normalTelemetry.systemFingerprintIsModelVersion).toBe(false);
+    expect(normalTelemetry.fingerprintComparedToDocumentedVersionTarget).toBe(false);
+
+    // Genuine model version supplied explicitly by provider (not inferred from fingerprint)
+    const withExplicitVersion = verifyModelProvenance({
+      requestedModelIdentifier: 'deepseek-v4-flash',
+      returnedModelIdentifier: 'deepseek-v4-flash',
+      systemFingerprint: 'fp_a79f644e50',
+      providerReportedModelVersion: '2026-08-release-v1',
+    });
+    expect(withExplicitVersion.providerReportedModelVersion).toBe('2026-08-release-v1');
+    expect(withExplicitVersion.systemFingerprintIsModelVersion).toBe(false);
+    expect(withExplicitVersion.fingerprintComparedToDocumentedVersionTarget).toBe(false);
+
+    // Invariant constant exports verification
+    expect(SYSTEM_FINGERPRINT_IS_MODEL_VERSION).toBe(false);
+    expect(FINGERPRINT_COMPARED_TO_DOCUMENTED_VERSION_TARGET).toBe(false);
+    expect(MODEL_PROVENANCE_CONTRACT.systemFingerprintIsModelVersion).toBe(false);
+    expect(MODEL_PROVENANCE_CONTRACT.fingerprintComparedToDocumentedVersionTarget).toBe(false);
   });
 
   // 24. cache miss used for worst-case authorization

@@ -1,0 +1,56 @@
+{
+  "phase": "A.12B.2C-5F.1",
+  "artifactType": "DEEPSEEK_FINGERPRINT_VERSION_SEMANTICS_REPAIR",
+  "timestamp": "2026-09-04T12:04:30.000Z",
+  "baseCommit": "5f009e94424b5ea43d133a5bb801b8a814264377",
+  "baseTree": "69bc5672c7a246b034dcb61a0debde4d1c40a274",
+  "verifiedDefect": {
+    "description": "verifyModelProvenance computed equality between system_fingerprint / backendFingerprint and DOCUMENTED_VERSION_TARGET ('DeepSeek-V4-Flash-0731'). system_fingerprint is opaque backend configuration telemetry and must never be compared to documented model version targets.",
+    "affectedFile": "worker/ai/canary/deepSeekSingleProviderCertificationSpecification.ts"
+  },
+  "requiredRepair": {
+    "runtimeComparisonRemoved": true,
+    "fieldsReplaced": {
+      "systemFingerprintEqualsModelVersion": "REPLACED_WITH_INVARIANTS",
+      "systemFingerprintIsModelVersion": false,
+      "fingerprintComparedToDocumentedVersionTarget": false
+    },
+    "provenanceRule": "requestedModelIdentifier === 'deepseek-v4-flash' && returnedModelIdentifier === 'deepseek-v4-flash'",
+    "documentedVersionTargetStatus": "DOCUMENTATION_METADATA_ONLY",
+    "providerReportedBackendFingerprintStatus": "OPAQUE_TELEMETRY",
+    "providerReportedModelVersionStatus": "NULL_UNLESS_EXPLICITLY_SUPPLIED_BY_PROVIDER"
+  },
+  "systemFingerprintIsModelVersion": false,
+  "fingerprintComparedToDocumentedVersionTarget": false,
+  "modelProvenanceContract": {
+    "requestedModelIdentifier": "deepseek-v4-flash",
+    "returnedModelIdentifier": "deepseek-v4-flash",
+    "documentedVersionTarget": "DeepSeek-V4-Flash-0731",
+    "systemFingerprintIsModelVersion": false,
+    "fingerprintComparedToDocumentedVersionTarget": false,
+    "exactMatchRequired": true
+  },
+  "adversarialRegression": {
+    "adversarialString": "DeepSeek-V4-Flash-0731",
+    "systemFingerprintIsModelVersion": false,
+    "fingerprintComparedToDocumentedVersionTarget": false,
+    "provenanceNeitherStrengthenedNorWeakened": true,
+    "normalFingerprintPreservedVerbatim": "fp_a79f644e50"
+  },
+  "historicalEvidencePreserved": {
+    "file": "execution/a12b2c5f_deepseek_successor_certification_spec.json",
+    "modified": false
+  },
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "securityInvariants": {
+    "zeroDeepSeekCalls": true,
+    "zeroGeminiCalls": true,
+    "zeroProviderCredentials": true,
+    "zeroExternalNetworkCalls": true,
+    "providerNetworkCalls": 0,
+    "productionRoutingEnforcementAllowed": false,
+    "currentLiveBlockPreserved": true
+  },
+  "finalStatus": "A12B2C5F1_FINGERPRINT_VERSION_SEMANTICS_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION"
+}

@@ -99,6 +99,9 @@ export const SUCCESSOR_CANDIDATES: readonly SuccessorCanaryCandidate[] = [
 // 4. MODEL PROVENANCE CONTRACT
 // ============================================================================
 
+export const SYSTEM_FINGERPRINT_IS_MODEL_VERSION = false;
+export const FINGERPRINT_COMPARED_TO_DOCUMENTED_VERSION_TARGET = false;
+
 export interface ModelProvenanceVerificationInput {
   requestedModelIdentifier: string;
   returnedModelIdentifier: string;
@@ -112,13 +115,24 @@ export interface ModelProvenanceVerificationResult {
   documentedVersionTarget: string;
   providerReportedBackendFingerprint: string | null;
   providerReportedModelVersion: string | null;
-  systemFingerprintEqualsModelVersion: boolean;
+  systemFingerprintIsModelVersion: boolean;
+  fingerprintComparedToDocumentedVersionTarget: boolean;
   failureReason?: string;
 }
 
+export const MODEL_PROVENANCE_CONTRACT = {
+  requestedModelIdentifier: CERTIFICATION_MODEL,
+  returnedModelIdentifier: CERTIFICATION_MODEL,
+  documentedVersionTarget: DOCUMENTED_VERSION_TARGET,
+  systemFingerprintIsModelVersion: SYSTEM_FINGERPRINT_IS_MODEL_VERSION,
+  fingerprintComparedToDocumentedVersionTarget: FINGERPRINT_COMPARED_TO_DOCUMENTED_VERSION_TARGET,
+  exactMatchRequired: true,
+} as const;
+
 /**
  * Validates DeepSeek response model provenance.
- * Invariant: system_fingerprint is NOT model version and must never be compared to documented target.
+ * Invariant: system_fingerprint is opaque backend configuration telemetry,
+ * NOT a model version, and MUST NEVER be compared to DOCUMENTED_VERSION_TARGET.
  */
 export function verifyModelProvenance(
   input: ModelProvenanceVerificationInput
@@ -129,10 +143,6 @@ export function verifyModelProvenance(
 
   const backendFingerprint = input.systemFingerprint ?? null;
   const reportedVersion = input.providerReportedModelVersion ?? null;
-
-  // Invariant verification: system_fingerprint must never be compared against version target
-  const systemFingerprintEqualsModelVersion =
-    backendFingerprint !== null && backendFingerprint === (DOCUMENTED_VERSION_TARGET as string);
 
   let failureReason: string | undefined;
   if (!exactModelMatch) {
@@ -145,7 +155,8 @@ export function verifyModelProvenance(
     documentedVersionTarget: DOCUMENTED_VERSION_TARGET,
     providerReportedBackendFingerprint: backendFingerprint,
     providerReportedModelVersion: reportedVersion,
-    systemFingerprintEqualsModelVersion,
+    systemFingerprintIsModelVersion: false,
+    fingerprintComparedToDocumentedVersionTarget: false,
     failureReason,
   };
 }
@@ -482,6 +493,7 @@ export const DEEPSEEK_SUCCESSOR_CERTIFICATION_SPECIFICATION = {
   candidates: SUCCESSOR_CANDIDATES,
   offPeakCandidate: OFF_PEAK_CANDIDATE,
   peakCandidate: PEAK_CANDIDATE,
+  modelProvenanceContract: MODEL_PROVENANCE_CONTRACT,
   pricing: {
     offPeak: DEEPSEEK_OFF_PEAK_PRICING,
     peak: DEEPSEEK_PEAK_PRICING,
