@@ -304,7 +304,8 @@ describe('Phase A.12B.2C-5D Dual-Lane v1.2 Specification Foundation', () => {
         capabilitySecret: validSecret,
         executionLane: 'BACKGROUND_ECONOMY',
       },
-      { capabilitySecret: validSecret }
+      // Keep the real expiry check enabled at this fixture's deterministic time.
+      { capabilitySecret: validSecret, now: () => new Date(validTimestamp) }
     );
 
     expect(validationResult.valid).toBe(true);

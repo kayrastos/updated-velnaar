@@ -1,0 +1,7 @@
+# These sealed historical artifacts are hashed as bytes by existing regression tests.
+# Preserve the exact LF bytes already stored in Git, including on Windows.
+execution/a12b2c5b_canary_execution_attempt2_results.json text eol=lf
+execution/a12b2c5b_final_recanary_03186e5_results.json text eol=lf
+execution/a12b2c5c_latency_service_tier_fit_audit.json text eol=lf
+execution/a12b2c5c_latency_service_tier_fit_audit_amendment.json text eol=lf
+execution/a12b2c5d_dual_lane_v12_specification.json text eol=lf
