@@ -15,6 +15,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   CANARY_SPECIFICATION_VERSION,
   CANARY_LIVE_EXECUTION_ENABLED,
@@ -491,7 +493,10 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
       sourceTreeSha: validTree,
     };
 
-    const validation = validateAllWindowsCertificationEvidence(allWindowsEvidence);
+    const validation = validateAllWindowsCertificationEvidence(allWindowsEvidence, {
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
     expect(validation.valid).toBe(true);
 
     // Verify global live execution remains strictly false
@@ -523,7 +528,10 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
       liveGateStatus: false,
     };
 
-    const result = validateRoutingActivationEligibilityEvidence(withoutAudit);
+    const result = validateRoutingActivationEligibilityEvidence(withoutAudit, {
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('Independent audit must be completed'))).toBe(true);
   });
@@ -552,7 +560,10 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
       liveGateStatus: false,
     };
 
-    const validResult = validateRoutingActivationEligibilityEvidence(validEligibility);
+    const validResult = validateRoutingActivationEligibilityEvidence(validEligibility, {
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
     expect(validResult.valid).toBe(true);
 
     // If caller attempts to set productionRoutingEnforcementAllowed = true, must fail closed
@@ -561,7 +572,10 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
       productionRoutingEnforcementAllowed: true,
     };
 
-    const illegalResult = validateRoutingActivationEligibilityEvidence(illegalEnabling);
+    const illegalResult = validateRoutingActivationEligibilityEvidence(illegalEnabling, {
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
     expect(illegalResult.valid).toBe(false);
     expect(illegalResult.errors.some((e) => e.includes('productionRoutingEnforcementAllowed'))).toBe(true);
   });
@@ -1333,5 +1347,406 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
     expect(transitionResult.success).toBe(false);
     expect(transitionResult.snapshot.currentState).toBe('PEAK_AUTHORIZED');
     expect(transitionResult.errors.some((e) => e.includes('TRACK_STATE_INCONSISTENCY'))).toBe(true);
+  });
+
+  // =========================================================================
+  // Phase A.12B.2C-5I.3 All-Windows Authorization Escape-Hatch Regressions (A-O)
+  // =========================================================================
+
+  // 76. (5I.3 Regression A) validateCertificationEvidence without auth => rejected
+  it('76. (5I.3 Regression A) validateCertificationEvidence without auth => rejected', () => {
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const result = validateCertificationEvidence(liveEvidence);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('CERTIFICATION_AUTHORIZATION_BINDING_REQUIRED'))).toBe(true);
+  });
+
+  // 77. (5I.3 Regression B) validateCertificationEvidence with { allowAllWindowsAggregation: true } via as any but no auth => rejected
+  it('77. (5I.3 Regression B) validateCertificationEvidence with { allowAllWindowsAggregation: true } via as any but no auth => rejected', () => {
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const result = (validateCertificationEvidence as any)(liveEvidence, { allowAllWindowsAggregation: true });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('CERTIFICATION_AUTHORIZATION_BINDING_REQUIRED'))).toBe(true);
+  });
+
+  // 78. (5I.3 Regression C) static source: allowAllWindowsAggregation must not exist in production state-machine source
+  it('78. (5I.3 Regression C) static source: allowAllWindowsAggregation must not exist in production state-machine source', () => {
+    const sourcePath = path.resolve(process.cwd(), 'worker/ai/canary/deepSeekSuccessorCertificationStateMachine.ts');
+    const sourceCode = fs.readFileSync(sourcePath, 'utf8');
+    expect(sourceCode.includes('allowAllWindowsAggregation')).toBe(false);
+  });
+
+  // 79. (5I.3 Regression D) all-windows validation without OFF_PEAK auth => rejected
+  it('79. (5I.3 Regression D) all-windows validation without OFF_PEAK auth => rejected', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const allWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence,
+      peakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+    const result = (validateAllWindowsCertificationEvidence as any)(allWindowsEvidence, {
+      peakAuthorization: validPeakAuth,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('offPeakAuthorization') || e.includes('ALL_WINDOWS_AUTHORIZATION_REQUIRED'))).toBe(true);
+  });
+
+  // 80. (5I.3 Regression E) all-windows validation without PEAK auth => rejected
+  it('80. (5I.3 Regression E) all-windows validation without PEAK auth => rejected', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const allWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence,
+      peakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+    const result = (validateAllWindowsCertificationEvidence as any)(allWindowsEvidence, {
+      offPeakAuthorization: validOffPeakAuth,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('peakAuthorization') || e.includes('ALL_WINDOWS_AUTHORIZATION_REQUIRED'))).toBe(true);
+  });
+
+  // 81. (5I.3 Regression F) both correct authorizations => structurally valid when both evidence records are valid
+  it('81. (5I.3 Regression F) both correct authorizations => structurally valid when both evidence records are valid', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const allWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence,
+      peakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+    const result = validateAllWindowsCertificationEvidence(allWindowsEvidence, {
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  // 82. (5I.3 Regression G) OFF_PEAK auth supplied for PEAK evidence => rejected
+  it('82. (5I.3 Regression G) OFF_PEAK auth supplied for PEAK evidence => rejected', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const allWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence,
+      peakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+    const result = validateAllWindowsCertificationEvidence(allWindowsEvidence, {
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validOffPeakAuth as any,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('Authorization window mismatch') || e.includes('targetProgram mismatch'))).toBe(true);
+  });
+
+  // 83. (5I.3 Regression H) PEAK auth supplied for OFF_PEAK evidence => rejected
+  it('83. (5I.3 Regression H) PEAK auth supplied for OFF_PEAK evidence => rejected', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const allWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence,
+      peakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+    const result = validateAllWindowsCertificationEvidence(allWindowsEvidence, {
+      offPeakAuthorization: validPeakAuth as any,
+      peakAuthorization: validPeakAuth,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('Authorization window mismatch') || e.includes('targetProgram mismatch'))).toBe(true);
+  });
+
+  // 84. (5I.3 Regression I) ALL_WINDOWS transition with both tracks CERTIFIED but no authorizations => rejected
+  it('84. (5I.3 Regression I) ALL_WINDOWS transition with both tracks CERTIFIED but no authorizations => rejected', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const offPeakAuthKey = `${validOffPeakAuth.targetProgram}:${validOffPeakAuth.pricingWindow}:${validOffPeakAuth.sourceCommitSha}:${validOffPeakAuth.runNonce}`;
+    const peakAuthKey = `${validPeakAuth.targetProgram}:${validPeakAuth.pricingWindow}:${validPeakAuth.sourceCommitSha}:${validPeakAuth.runNonce}`;
+    const bothCertifiedSnapshot: CertificationStateMachineSnapshot = {
+      currentState: 'PEAK_CERTIFIED',
+      offPeakTrackState: 'CERTIFIED',
+      peakTrackState: 'CERTIFIED',
+      overallState: 'ALL_WINDOWS_CERTIFIED',
+      offPeakEvidence,
+      peakEvidence,
+      consumedAuthorizations: [
+        offPeakAuthKey,
+        validOffPeakAuth.authorizationTokenDigest,
+        peakAuthKey,
+        validPeakAuth.authorizationTokenDigest,
+      ],
+    };
+
+    const allWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence,
+      peakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+
+    const transitionResult = applyCertificationTransition(bothCertifiedSnapshot, 'ALL_WINDOWS_CERTIFIED', {
+      allWindowsEvidence,
+    });
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.errors.some((e) => e.includes('ALL_WINDOWS_AUTHORIZATION_REQUIRED'))).toBe(true);
+  });
+
+  // 85. (5I.3 Regression J) OFF_PEAK consumed auth missing => rejected with AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED
+  it('85. (5I.3 Regression J) OFF_PEAK consumed auth missing => rejected with AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const peakAuthKey = `${validPeakAuth.targetProgram}:${validPeakAuth.pricingWindow}:${validPeakAuth.sourceCommitSha}:${validPeakAuth.runNonce}`;
+    const snapshotWithoutOffPeakConsumed: CertificationStateMachineSnapshot = {
+      currentState: 'PEAK_CERTIFIED',
+      offPeakTrackState: 'CERTIFIED',
+      peakTrackState: 'CERTIFIED',
+      overallState: 'ALL_WINDOWS_CERTIFIED',
+      offPeakEvidence,
+      peakEvidence,
+      consumedAuthorizations: [
+        peakAuthKey,
+        validPeakAuth.authorizationTokenDigest,
+      ],
+    };
+
+    const allWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence,
+      peakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+
+    const transitionResult = applyCertificationTransition(snapshotWithoutOffPeakConsumed, 'ALL_WINDOWS_CERTIFIED', {
+      allWindowsEvidence,
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.errors.some((e) => e.includes('AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED'))).toBe(true);
+  });
+
+  // 86. (5I.3 Regression K) PEAK consumed auth missing => rejected with AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED
+  it('86. (5I.3 Regression K) PEAK consumed auth missing => rejected with AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const offPeakAuthKey = `${validOffPeakAuth.targetProgram}:${validOffPeakAuth.pricingWindow}:${validOffPeakAuth.sourceCommitSha}:${validOffPeakAuth.runNonce}`;
+    const snapshotWithoutPeakConsumed: CertificationStateMachineSnapshot = {
+      currentState: 'PEAK_CERTIFIED',
+      offPeakTrackState: 'CERTIFIED',
+      peakTrackState: 'CERTIFIED',
+      overallState: 'ALL_WINDOWS_CERTIFIED',
+      offPeakEvidence,
+      peakEvidence,
+      consumedAuthorizations: [
+        offPeakAuthKey,
+        validOffPeakAuth.authorizationTokenDigest,
+      ],
+    };
+
+    const allWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence,
+      peakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+
+    const transitionResult = applyCertificationTransition(snapshotWithoutPeakConsumed, 'ALL_WINDOWS_CERTIFIED', {
+      allWindowsEvidence,
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.errors.some((e) => e.includes('AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED'))).toBe(true);
+  });
+
+  // 87. (5I.3 Regression L) both authKey + digest pairs consumed and correct evidence => ALL_WINDOWS transition succeeds in unit test
+  it('87. (5I.3 Regression L) both authKey + digest pairs consumed and correct evidence => ALL_WINDOWS transition succeeds in unit test', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const offPeakAuthKey = `${validOffPeakAuth.targetProgram}:${validOffPeakAuth.pricingWindow}:${validOffPeakAuth.sourceCommitSha}:${validOffPeakAuth.runNonce}`;
+    const peakAuthKey = `${validPeakAuth.targetProgram}:${validPeakAuth.pricingWindow}:${validPeakAuth.sourceCommitSha}:${validPeakAuth.runNonce}`;
+    const validSnapshot: CertificationStateMachineSnapshot = {
+      currentState: 'PEAK_CERTIFIED',
+      offPeakTrackState: 'CERTIFIED',
+      peakTrackState: 'CERTIFIED',
+      overallState: 'ALL_WINDOWS_CERTIFIED',
+      offPeakEvidence,
+      peakEvidence,
+      consumedAuthorizations: [
+        offPeakAuthKey,
+        validOffPeakAuth.authorizationTokenDigest,
+        peakAuthKey,
+        validPeakAuth.authorizationTokenDigest,
+      ],
+    };
+
+    const allWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence,
+      peakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+
+    const transitionResult = applyCertificationTransition(validSnapshot, 'ALL_WINDOWS_CERTIFIED', {
+      allWindowsEvidence,
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
+    expect(transitionResult.success).toBe(true);
+    expect(transitionResult.snapshot.currentState).toBe('ALL_WINDOWS_CERTIFIED');
+    expect(transitionResult.snapshot.overallState).toBe('ALL_WINDOWS_CERTIFIED');
+    expect(transitionResult.snapshot.allWindowsEvidence).toEqual(allWindowsEvidence);
+  });
+
+  // 88. (5I.3 Regression M) allWindowsEvidence substitutes a different runNonce than currentSnapshot.offPeakEvidence => rejected
+  it('88. (5I.3 Regression M) allWindowsEvidence substitutes a different runNonce than currentSnapshot.offPeakEvidence => rejected', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const offPeakAuthKey = `${validOffPeakAuth.targetProgram}:${validOffPeakAuth.pricingWindow}:${validOffPeakAuth.sourceCommitSha}:${validOffPeakAuth.runNonce}`;
+    const peakAuthKey = `${validPeakAuth.targetProgram}:${validPeakAuth.pricingWindow}:${validPeakAuth.sourceCommitSha}:${validPeakAuth.runNonce}`;
+    const validSnapshot: CertificationStateMachineSnapshot = {
+      currentState: 'PEAK_CERTIFIED',
+      offPeakTrackState: 'CERTIFIED',
+      peakTrackState: 'CERTIFIED',
+      overallState: 'ALL_WINDOWS_CERTIFIED',
+      offPeakEvidence,
+      peakEvidence,
+      consumedAuthorizations: [
+        offPeakAuthKey,
+        validOffPeakAuth.authorizationTokenDigest,
+        peakAuthKey,
+        validPeakAuth.authorizationTokenDigest,
+      ],
+    };
+
+    const substitutedOffPeak = {
+      ...offPeakEvidence,
+      runNonce: 'substituted-run-nonce-12345',
+    };
+
+    const substitutedAllWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence: substitutedOffPeak,
+      peakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+
+    const transitionResult = applyCertificationTransition(validSnapshot, 'ALL_WINDOWS_CERTIFIED', {
+      allWindowsEvidence: substitutedAllWindowsEvidence,
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.errors.some((e) => e.includes('OFF_PEAK_EVIDENCE_SUBSTITUTION_REJECTED'))).toBe(true);
+  });
+
+  // 89. (5I.3 Regression N) substituted PEAK source tree => rejected
+  it('89. (5I.3 Regression N) substituted PEAK source tree => rejected', () => {
+    const offPeakEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const offPeakAuthKey = `${validOffPeakAuth.targetProgram}:${validOffPeakAuth.pricingWindow}:${validOffPeakAuth.sourceCommitSha}:${validOffPeakAuth.runNonce}`;
+    const peakAuthKey = `${validPeakAuth.targetProgram}:${validPeakAuth.pricingWindow}:${validPeakAuth.sourceCommitSha}:${validPeakAuth.runNonce}`;
+    const validSnapshot: CertificationStateMachineSnapshot = {
+      currentState: 'PEAK_CERTIFIED',
+      offPeakTrackState: 'CERTIFIED',
+      peakTrackState: 'CERTIFIED',
+      overallState: 'ALL_WINDOWS_CERTIFIED',
+      offPeakEvidence,
+      peakEvidence,
+      consumedAuthorizations: [
+        offPeakAuthKey,
+        validOffPeakAuth.authorizationTokenDigest,
+        peakAuthKey,
+        validPeakAuth.authorizationTokenDigest,
+      ],
+    };
+
+    const substitutedPeak = {
+      ...peakEvidence,
+      sourceTreeSha: 'ffffffffffffffffffffffffffffffffffffffff',
+    };
+
+    const substitutedAllWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence,
+      peakEvidence: substitutedPeak,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+
+    const transitionResult = applyCertificationTransition(validSnapshot, 'ALL_WINDOWS_CERTIFIED', {
+      allWindowsEvidence: substitutedAllWindowsEvidence,
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.errors.some((e) => e.includes('PEAK_EVIDENCE_SUBSTITUTION_REJECTED'))).toBe(true);
+  });
+
+  // 90. (5I.3 Regression O) offline replay evidence remains rejected even with both valid authorizations
+  it('90. (5I.3 Regression O) offline replay evidence remains rejected even with both valid authorizations', () => {
+    const offlineReplayOffPeak: WindowCertificationEvidence = {
+      ...createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth),
+      evidenceOrigin: 'OFFLINE_SYNTHETIC_REPLAY' as any,
+      certificationEligible: false as any,
+    };
+    const validPeakEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+
+    const allWindowsEvidence: AllWindowsCertificationEvidence = {
+      offPeakEvidence: offlineReplayOffPeak,
+      peakEvidence: validPeakEvidence,
+      offPeakArtifactHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      peakArtifactHash: 'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+      specificationVersion: SUCCESSOR_SPECIFICATION_VERSION,
+      sourceCommitSha: validCommit,
+      sourceTreeSha: validTree,
+    };
+
+    const result = validateAllWindowsCertificationEvidence(allWindowsEvidence, {
+      offPeakAuthorization: validOffPeakAuth,
+      peakAuthorization: validPeakAuth,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))).toBe(true);
   });
 });

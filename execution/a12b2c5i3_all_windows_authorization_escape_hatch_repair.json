@@ -1,0 +1,42 @@
+{
+  "phase": "A.12B.2C-5I.3",
+  "name": "ALL_WINDOWS_AUTHORIZATION_ESCAPE_HATCH_REPAIR",
+  "status": "IMPLEMENTED_AND_VERIFIED",
+  "baseCommit": "6b3b2b06a85729ebfe76027a58c033f62bb8dead",
+  "baseTree": "b537f545401f60568330cbbb8040524cbd47852f",
+  "timestamp": "2026-09-04T15:43:00Z",
+  "changes": [
+    "removed allowAllWindowsAggregation escape-hatch parameter from validateCertificationEvidence and state machine public API",
+    "strictly enforce boundAuthorization in validateCertificationEvidence for all callers",
+    "require offPeakAuthorization and peakAuthorization in validateAllWindowsCertificationEvidence",
+    "require offPeakAuthorization and peakAuthorization in validateRoutingActivationEligibilityEvidence",
+    "require offPeakAuthorization and peakAuthorization in applyCertificationTransition for ALL_WINDOWS_CERTIFIED and ROUTING_ACTIVATION_ELIGIBLE",
+    "verify both authorizations previously consumed in consumedAuthorizations for ALL_WINDOWS transitions",
+    "implemented matchCertifiedEvidence helper and reject evidence substitution attempts against snapshot"
+  ],
+  "regressionsCovered": [
+    "A_validate_without_auth_rejected",
+    "B_validate_with_allow_all_windows_flag_without_auth_rejected",
+    "C_static_source_no_allow_all_windows_string",
+    "D_all_windows_validation_without_off_peak_auth_rejected",
+    "E_all_windows_validation_without_peak_auth_rejected",
+    "F_both_correct_authorizations_succeeds",
+    "G_off_peak_auth_for_peak_evidence_rejected",
+    "H_peak_auth_for_off_peak_evidence_rejected",
+    "I_all_windows_transition_without_authorizations_rejected",
+    "J_off_peak_consumed_auth_missing_rejected",
+    "K_peak_consumed_auth_missing_rejected",
+    "L_both_consumed_auth_valid_transition_succeeds",
+    "M_off_peak_run_nonce_substitution_rejected",
+    "N_peak_source_tree_substitution_rejected",
+    "O_offline_replay_evidence_rejected_even_with_both_valid_auths"
+  ],
+  "invariantsPreserved": {
+    "liveProviderCalls": 0,
+    "credentialsUsed": 0,
+    "canaryLiveExecutionEnabled": false,
+    "v13Activated": false,
+    "productionRoutingEnabled": false,
+    "humanAuthorizationGenerated": false
+  }
+}

@@ -584,7 +584,6 @@ export function validateCertificationEvidence(
   evidence: WindowCertificationEvidence,
   options?: {
     boundAuthorization?: WindowAuthorizationEvidence;
-    allowAllWindowsAggregation?: boolean;
   }
 ): ValidationResult {
   const errors: string[] = [];
@@ -850,7 +849,7 @@ export function validateCertificationEvidence(
         `authorizedBudgetMicroUsd (${evidence.authorizedBudgetMicroUsd}) does not match authorization maxBudgetMicroUsd (${auth.maxBudgetMicroUsd}).`
       );
     }
-  } else if (!options?.allowAllWindowsAggregation) {
+  } else {
     errors.push(
       'CERTIFICATION_AUTHORIZATION_BINDING_REQUIRED: WindowCertificationEvidence requires boundAuthorization for certification validation. Standalone validation without authorization binding is prohibited.'
     );
@@ -865,22 +864,62 @@ export function validateCertificationEvidence(
 /**
  * Validates All-Windows Certification Evidence.
  * Enforces strict AND condition between OFF_PEAK_CERTIFIED and PEAK_CERTIFIED.
+ * Requires both offPeakAuthorization and peakAuthorization.
  */
 export function validateAllWindowsCertificationEvidence(
   evidence: AllWindowsCertificationEvidence,
-  options?: {
-    offPeakAuthorization?: WindowAuthorizationEvidence;
-    peakAuthorization?: WindowAuthorizationEvidence;
+  options: {
+    offPeakAuthorization: WindowAuthorizationEvidence;
+    peakAuthorization: WindowAuthorizationEvidence;
   }
 ): ValidationResult {
   const errors: string[] = [];
+
+  if (!options?.offPeakAuthorization) {
+    errors.push('ALL_WINDOWS_AUTHORIZATION_REQUIRED: Missing required offPeakAuthorization for all-windows certification validation.');
+  } else {
+    if (options.offPeakAuthorization.pricingWindow !== 'OFF_PEAK') {
+      errors.push(
+        `Authorization window mismatch: offPeakAuthorization pricingWindow must be 'OFF_PEAK' (got '${options.offPeakAuthorization.pricingWindow}').`
+      );
+    }
+    if (options.offPeakAuthorization.targetProgram !== OFF_PEAK_PROGRAM.programId) {
+      errors.push(
+        `targetProgram mismatch: offPeakAuthorization targetProgram must be '${OFF_PEAK_PROGRAM.programId}' (got '${options.offPeakAuthorization.targetProgram}').`
+      );
+    }
+    if (options.offPeakAuthorization.candidateId !== OFF_PEAK_CANDIDATE) {
+      errors.push(
+        `candidateId mismatch: offPeakAuthorization candidateId must be '${OFF_PEAK_CANDIDATE}' (got '${options.offPeakAuthorization.candidateId}').`
+      );
+    }
+  }
+
+  if (!options?.peakAuthorization) {
+    errors.push('ALL_WINDOWS_AUTHORIZATION_REQUIRED: Missing required peakAuthorization for all-windows certification validation.');
+  } else {
+    if (options.peakAuthorization.pricingWindow !== 'PEAK') {
+      errors.push(
+        `Authorization window mismatch: peakAuthorization pricingWindow must be 'PEAK' (got '${options.peakAuthorization.pricingWindow}').`
+      );
+    }
+    if (options.peakAuthorization.targetProgram !== PEAK_PROGRAM.programId) {
+      errors.push(
+        `targetProgram mismatch: peakAuthorization targetProgram must be '${PEAK_PROGRAM.programId}' (got '${options.peakAuthorization.targetProgram}').`
+      );
+    }
+    if (options.peakAuthorization.candidateId !== PEAK_CANDIDATE) {
+      errors.push(
+        `candidateId mismatch: peakAuthorization candidateId must be '${PEAK_CANDIDATE}' (got '${options.peakAuthorization.candidateId}').`
+      );
+    }
+  }
 
   if (!evidence.offPeakEvidence) {
     errors.push('Missing offPeakEvidence artifact in all-windows evidence.');
   } else {
     const offPeakValidation = validateCertificationEvidence(evidence.offPeakEvidence, {
       boundAuthorization: options?.offPeakAuthorization,
-      allowAllWindowsAggregation: true,
     });
     if (!offPeakValidation.valid) {
       errors.push(...offPeakValidation.errors.map(e => `OFF_PEAK: ${e}`));
@@ -895,7 +934,6 @@ export function validateAllWindowsCertificationEvidence(
   } else {
     const peakValidation = validateCertificationEvidence(evidence.peakEvidence, {
       boundAuthorization: options?.peakAuthorization,
-      allowAllWindowsAggregation: true,
     });
     if (!peakValidation.valid) {
       errors.push(...peakValidation.errors.map(e => `PEAK: ${e}`));
@@ -938,11 +976,15 @@ export function validateAllWindowsCertificationEvidence(
  * Does NOT enable production routing; verifies prerequisite audit & certification artifacts.
  */
 export function validateRoutingActivationEligibilityEvidence(
-  evidence: RoutingActivationEligibilityEvidence
+  evidence: RoutingActivationEligibilityEvidence,
+  options: {
+    offPeakAuthorization: WindowAuthorizationEvidence;
+    peakAuthorization: WindowAuthorizationEvidence;
+  }
 ): ValidationResult {
   const errors: string[] = [];
 
-  const allWindowsValidation = validateAllWindowsCertificationEvidence(evidence.allWindowsEvidence);
+  const allWindowsValidation = validateAllWindowsCertificationEvidence(evidence.allWindowsEvidence, options);
   if (!allWindowsValidation.valid) {
     errors.push(...allWindowsValidation.errors);
   }
@@ -1028,6 +1070,61 @@ export function resolveOverallCertificationState(
 }
 
 /**
+ * Deterministically verifies that supplied WindowCertificationEvidence
+ * strictly matches previously-certified WindowCertificationEvidence stored in snapshot.
+ */
+function matchCertifiedEvidence(
+  supplied: WindowCertificationEvidence,
+  stored: WindowCertificationEvidence
+): { matched: boolean; errors: string[] } {
+  const errors: string[] = [];
+  if (supplied.evidenceOrigin !== stored.evidenceOrigin) {
+    errors.push(`evidenceOrigin mismatch: supplied '${supplied.evidenceOrigin}', certified '${stored.evidenceOrigin}'.`);
+  }
+  if (supplied.certificationEligible !== stored.certificationEligible) {
+    errors.push(`certificationEligible mismatch: supplied '${supplied.certificationEligible}', certified '${stored.certificationEligible}'.`);
+  }
+  if (supplied.pricingWindow !== stored.pricingWindow) {
+    errors.push(`pricingWindow mismatch: supplied '${supplied.pricingWindow}', certified '${stored.pricingWindow}'.`);
+  }
+  if (supplied.candidateId !== stored.candidateId) {
+    errors.push(`candidateId mismatch: supplied '${supplied.candidateId}', certified '${stored.candidateId}'.`);
+  }
+  if (supplied.sourceCommitSha !== stored.sourceCommitSha) {
+    errors.push(`sourceCommitSha mismatch: supplied '${supplied.sourceCommitSha}', certified '${stored.sourceCommitSha}'.`);
+  }
+  if (supplied.sourceTreeSha !== stored.sourceTreeSha) {
+    errors.push(`sourceTreeSha mismatch: supplied '${supplied.sourceTreeSha}', certified '${stored.sourceTreeSha}'.`);
+  }
+  if (supplied.runNonce !== stored.runNonce) {
+    errors.push(`runNonce mismatch: supplied '${supplied.runNonce}', certified '${stored.runNonce}'.`);
+  }
+  if (supplied.authorizedBudgetMicroUsd !== stored.authorizedBudgetMicroUsd) {
+    errors.push(`authorizedBudgetMicroUsd mismatch: supplied '${supplied.authorizedBudgetMicroUsd}', certified '${stored.authorizedBudgetMicroUsd}'.`);
+  }
+  if (supplied.executedInvocations !== stored.executedInvocations) {
+    errors.push(`executedInvocations mismatch: supplied '${supplied.executedInvocations}', certified '${stored.executedInvocations}'.`);
+  }
+  if (supplied.transportAttemptCount !== stored.transportAttemptCount) {
+    errors.push(`transportAttemptCount mismatch: supplied '${supplied.transportAttemptCount}', certified '${stored.transportAttemptCount}'.`);
+  }
+  if (supplied.observedTotalCostMicroUsd !== stored.observedTotalCostMicroUsd) {
+    errors.push(`observedTotalCostMicroUsd mismatch: supplied '${supplied.observedTotalCostMicroUsd}', certified '${stored.observedTotalCostMicroUsd}'.`);
+  }
+
+  const suppliedTasks = supplied.invocationRecords?.map((r) => `${r.taskId}:${r.taskType}`).join(',') ?? '';
+  const storedTasks = stored.invocationRecords?.map((r) => `${r.taskId}:${r.taskType}`).join(',') ?? '';
+  if (suppliedTasks !== storedTasks) {
+    errors.push(`invocationRecords task identities mismatch.`);
+  }
+
+  return {
+    matched: errors.length === 0,
+    errors,
+  };
+}
+
+/**
  * Applies a certification transition in a pure, fail-closed manner.
  * Rejects all illegal state transitions and returns an explicit rejection snapshot with error details.
  */
@@ -1041,6 +1138,8 @@ export function applyCertificationTransition(
     allWindowsEvidence?: AllWindowsCertificationEvidence;
     routingEligibilityEvidence?: RoutingActivationEligibilityEvidence;
     boundAuthorization?: WindowAuthorizationEvidence;
+    offPeakAuthorization?: WindowAuthorizationEvidence;
+    peakAuthorization?: WindowAuthorizationEvidence;
     expectedCommitSha?: string;
     expectedTreeSha?: string;
     expectedNonce?: string;
@@ -1327,12 +1426,80 @@ export function applyCertificationTransition(
       };
     }
 
-    const validation = validateAllWindowsCertificationEvidence(payload.allWindowsEvidence);
-    if (!validation.valid) {
+    if (!currentSnapshot.offPeakEvidence || !currentSnapshot.peakEvidence) {
       return {
         success: false,
         snapshot: currentSnapshot,
-        errors: validation.errors,
+        errors: ['ALL_WINDOWS_EVIDENCE_BINDING_ERROR: Snapshot is missing certified offPeakEvidence or peakEvidence.'],
+      };
+    }
+
+    // Require both authorizations in payload (Section 6)
+    if (!payload?.offPeakAuthorization || !payload?.peakAuthorization) {
+      return {
+        success: false,
+        snapshot: currentSnapshot,
+        errors: [
+          'ALL_WINDOWS_AUTHORIZATION_REQUIRED: Transition to ALL_WINDOWS_CERTIFIED requires both offPeakAuthorization and peakAuthorization in payload.',
+        ],
+      };
+    }
+
+    const transitionErrors: string[] = [];
+
+    // Prove OFF_PEAK authKey + digest are present in consumedAuthorizations
+    const offPeakAuth = payload.offPeakAuthorization;
+    const offPeakAuthKey = `${offPeakAuth.targetProgram}:${offPeakAuth.pricingWindow}:${offPeakAuth.sourceCommitSha}:${offPeakAuth.runNonce}`;
+    const offPeakDigest = offPeakAuth.authorizationTokenDigest;
+
+    // Prove PEAK authKey + digest are present in consumedAuthorizations
+    const peakAuth = payload.peakAuthorization;
+    const peakAuthKey = `${peakAuth.targetProgram}:${peakAuth.pricingWindow}:${peakAuth.sourceCommitSha}:${peakAuth.runNonce}`;
+    const peakDigest = peakAuth.authorizationTokenDigest;
+
+    const consumedList = currentSnapshot.consumedAuthorizations ?? [];
+    if (!consumedList.includes(offPeakAuthKey) || !consumedList.includes(offPeakDigest)) {
+      transitionErrors.push(
+        `AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED: offPeakAuthorization (authKey='${offPeakAuthKey}', digest='${offPeakDigest}') was not previously consumed in snapshot.`
+      );
+    }
+    if (!consumedList.includes(peakAuthKey) || !consumedList.includes(peakDigest)) {
+      transitionErrors.push(
+        `AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED: peakAuthorization (authKey='${peakAuthKey}', digest='${peakDigest}') was not previously consumed in snapshot.`
+      );
+    }
+
+    // Aggregate actual certified evidence: verify match with stored snapshot evidence (Section 7)
+    const offPeakMatch = matchCertifiedEvidence(
+      payload.allWindowsEvidence.offPeakEvidence,
+      currentSnapshot.offPeakEvidence
+    );
+    if (!offPeakMatch.matched) {
+      transitionErrors.push(...offPeakMatch.errors.map((e) => `OFF_PEAK_EVIDENCE_SUBSTITUTION_REJECTED: ${e}`));
+    }
+
+    const peakMatch = matchCertifiedEvidence(
+      payload.allWindowsEvidence.peakEvidence,
+      currentSnapshot.peakEvidence
+    );
+    if (!peakMatch.matched) {
+      transitionErrors.push(...peakMatch.errors.map((e) => `PEAK_EVIDENCE_SUBSTITUTION_REJECTED: ${e}`));
+    }
+
+    // Validate AllWindowsCertificationEvidence with authorizations
+    const validation = validateAllWindowsCertificationEvidence(payload.allWindowsEvidence, {
+      offPeakAuthorization: payload.offPeakAuthorization,
+      peakAuthorization: payload.peakAuthorization,
+    });
+    if (!validation.valid) {
+      transitionErrors.push(...validation.errors);
+    }
+
+    if (transitionErrors.length > 0) {
+      return {
+        success: false,
+        snapshot: currentSnapshot,
+        errors: transitionErrors,
       };
     }
 
@@ -1368,7 +1535,20 @@ export function applyCertificationTransition(
       };
     }
 
-    const validation = validateRoutingActivationEligibilityEvidence(payload.routingEligibilityEvidence);
+    if (!payload?.offPeakAuthorization || !payload?.peakAuthorization) {
+      return {
+        success: false,
+        snapshot: currentSnapshot,
+        errors: [
+          'ALL_WINDOWS_AUTHORIZATION_REQUIRED: Transition to ROUTING_ACTIVATION_ELIGIBLE requires both offPeakAuthorization and peakAuthorization in payload.',
+        ],
+      };
+    }
+
+    const validation = validateRoutingActivationEligibilityEvidence(payload.routingEligibilityEvidence, {
+      offPeakAuthorization: payload.offPeakAuthorization,
+      peakAuthorization: payload.peakAuthorization,
+    });
     if (!validation.valid) {
       return {
         success: false,
