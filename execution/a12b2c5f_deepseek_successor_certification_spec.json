@@ -1,0 +1,261 @@
+{
+  "phase": "A.12B.2C-5F",
+  "artifactType": "DEEPSEEK_SINGLE_PROVIDER_SUCCESSOR_CERTIFICATION_SPEC",
+  "timestamp": "2026-09-04T11:53:30.000Z",
+  "baseCommit": "ce4e0e94007d3904345fa48f5128f06e4ede3713",
+  "baseTree": "4b485bb68ccb8762cfa942286be4112ac7b0e0d0",
+  "successorSpecificationVersion": "a12b2c5-v1.3-draft",
+  "activationStatus": "OFFLINE_DRAFT_NOT_LIVE",
+  "currentActiveTechnicalSpec": "a12b2c5-v1.2",
+  "currentStrategy": "DEEPSEEK_FIRST_SINGLE_PROVIDER_V1",
+  "provider": "deepseek",
+  "model": "deepseek-v4-flash",
+  "documentedVersion": "DeepSeek-V4-Flash-0731",
+  "baseUrl": "https://api.deepseek.com",
+  "endpoint": "https://api.deepseek.com/v1/chat/completions",
+  "thinking": "ENABLED",
+  "reasoningEffort": "low",
+  "maxOutputTokens": 2048,
+  "concurrencyLimit": 1,
+  "interactiveTimeoutMs": 15000,
+  "geminiStatus": "DORMANT_UNSELECTED_PROVIDER",
+  "offPeakCandidate": "deepseek-v4-flash-offpeak-low",
+  "peakCandidate": "deepseek-v4-flash-peak-low",
+  "candidates": [
+    {
+      "candidateId": "deepseek-v4-flash-offpeak-low",
+      "providerId": "deepseek",
+      "requestedModelIdentifier": "deepseek-v4-flash",
+      "expectedReturnedModelIdentifier": "deepseek-v4-flash",
+      "documentedVersionTarget": "DeepSeek-V4-Flash-0731",
+      "pricingWindow": "OFF_PEAK",
+      "reasoningEffort": "low",
+      "maxTokens": 2048,
+      "concurrency": 1
+    },
+    {
+      "candidateId": "deepseek-v4-flash-peak-low",
+      "providerId": "deepseek",
+      "requestedModelIdentifier": "deepseek-v4-flash",
+      "expectedReturnedModelIdentifier": "deepseek-v4-flash",
+      "documentedVersionTarget": "DeepSeek-V4-Flash-0731",
+      "pricingWindow": "PEAK",
+      "reasoningEffort": "low",
+      "maxTokens": 2048,
+      "concurrency": 1
+    }
+  ],
+  "pricingContract": {
+    "offPeak": {
+      "cacheHitInputUsdPerMillion": 0.007,
+      "cacheMissInputUsdPerMillion": 0.22,
+      "outputUsdPerMillion": 0.66,
+      "cacheHitInputMicroUsdPerMillion": 7000,
+      "cacheMissInputMicroUsdPerMillion": 220000,
+      "outputMicroUsdPerMillion": 660000
+    },
+    "peak": {
+      "cacheHitInputUsdPerMillion": 0.014,
+      "cacheMissInputUsdPerMillion": 0.44,
+      "outputUsdPerMillion": 1.32,
+      "cacheHitInputMicroUsdPerMillion": 14000,
+      "cacheMissInputMicroUsdPerMillion": 440000,
+      "outputMicroUsdPerMillion": 1320000
+    },
+    "pricingInvariants": {
+      "peakEqualsExactlyTwoTimesOffPeak": true,
+      "peakCacheHitMultiplier": 2.0,
+      "peakCacheMissMultiplier": 2.0,
+      "peakOutputMultiplier": 2.0
+    }
+  },
+  "pricingWindows": {
+    "peakDaysUtc": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+    "peakIntervalsUtc": [
+      { "startHour": 1, "endHour": 4, "description": "01:00 <= UTC < 04:00" },
+      { "startHour": 6, "endHour": 10, "description": "06:00 <= UTC < 10:00" }
+    ],
+    "offPeakDescription": "All remaining Monday-Friday intervals and all weekend hours (Saturday and Sunday 00:00-24:00 UTC)"
+  },
+  "plannedPrograms": {
+    "offPeakProgram": {
+      "programId": "DEEPSEEK_OFF_PEAK_SINGLE_PROVIDER_RESEAL",
+      "candidateId": "deepseek-v4-flash-offpeak-low",
+      "pricingWindow": "OFF_PEAK",
+      "canonicalTaskCount": 7,
+      "plannedDirectDeepSeekCalls": 7,
+      "clientRetries": 0,
+      "crossProviderFallbacks": 0,
+      "automaticReruns": 0,
+      "clientConcurrency": 1,
+      "humanAuthorizationStatus": "NOT_GRANTED",
+      "futureBudgetCeilingMicroUsd": "PENDING_HUMAN_APPROVAL",
+      "requiresSeparateNonce": true,
+      "requiresSeparateSourceBinding": true,
+      "requiresSeparateEvidenceArtifact": true
+    },
+    "peakProgram": {
+      "programId": "DEEPSEEK_PEAK_SINGLE_PROVIDER_CERTIFICATION",
+      "candidateId": "deepseek-v4-flash-peak-low",
+      "pricingWindow": "PEAK",
+      "canonicalTaskCount": 7,
+      "plannedDirectDeepSeekCalls": 7,
+      "clientRetries": 0,
+      "crossProviderFallbacks": 0,
+      "automaticReruns": 0,
+      "clientConcurrency": 1,
+      "humanAuthorizationStatus": "NOT_GRANTED",
+      "futureBudgetCeilingMicroUsd": "PENDING_HUMAN_APPROVAL",
+      "requiresSeparateNonce": true,
+      "requiresSeparateSourceBinding": true,
+      "requiresSeparateEvidenceArtifact": true
+    }
+  },
+  "plannedOffPeakCalls": 7,
+  "plannedPeakCalls": 7,
+  "combinedLiveRunAuthorized": false,
+  "sameProviderRetries": 0,
+  "crossProviderFallbacks": 0,
+  "interactiveTimeoutMs": 15000,
+  "costPreflight": {
+    "taskTokenBoundsAndCosts": [
+      {
+        "taskType": "LEAD_INTENT_CLASSIFICATION",
+        "fixtureId": "eval_v1_lead_01",
+        "estimatedInputTokenUpperBound": 1876,
+        "offPeakInputWorstCaseMicroUsd": 413,
+        "offPeakOutputWorstCaseMicroUsd": 1352,
+        "offPeakTotalWorstCaseMicroUsd": 1765,
+        "peakInputWorstCaseMicroUsd": 826,
+        "peakOutputWorstCaseMicroUsd": 2704,
+        "peakTotalWorstCaseMicroUsd": 3530
+      },
+      {
+        "taskType": "LEAK_EXPLANATION",
+        "fixtureId": "eval_v1_leak_01",
+        "estimatedInputTokenUpperBound": 2623,
+        "offPeakInputWorstCaseMicroUsd": 578,
+        "offPeakOutputWorstCaseMicroUsd": 1352,
+        "offPeakTotalWorstCaseMicroUsd": 1930,
+        "peakInputWorstCaseMicroUsd": 1156,
+        "peakOutputWorstCaseMicroUsd": 2704,
+        "peakTotalWorstCaseMicroUsd": 3860
+      },
+      {
+        "taskType": "GROWTH_ACTION_DRAFT",
+        "fixtureId": "eval_v1_growth_01",
+        "estimatedInputTokenUpperBound": 2962,
+        "offPeakInputWorstCaseMicroUsd": 652,
+        "offPeakOutputWorstCaseMicroUsd": 1352,
+        "offPeakTotalWorstCaseMicroUsd": 2004,
+        "peakInputWorstCaseMicroUsd": 1304,
+        "peakOutputWorstCaseMicroUsd": 2704,
+        "peakTotalWorstCaseMicroUsd": 4008
+      },
+      {
+        "taskType": "BUSINESS_TWIN_SUMMARY",
+        "fixtureId": "eval_v1_twin_01",
+        "estimatedInputTokenUpperBound": 1964,
+        "offPeakInputWorstCaseMicroUsd": 433,
+        "offPeakOutputWorstCaseMicroUsd": 1352,
+        "offPeakTotalWorstCaseMicroUsd": 1785,
+        "peakInputWorstCaseMicroUsd": 866,
+        "peakOutputWorstCaseMicroUsd": 2704,
+        "peakTotalWorstCaseMicroUsd": 3570
+      },
+      {
+        "taskType": "FUNNEL_DIAGNOSTIC_EXPLANATION",
+        "fixtureId": "eval_v1_funnel_01",
+        "estimatedInputTokenUpperBound": 1897,
+        "offPeakInputWorstCaseMicroUsd": 418,
+        "offPeakOutputWorstCaseMicroUsd": 1352,
+        "offPeakTotalWorstCaseMicroUsd": 1770,
+        "peakInputWorstCaseMicroUsd": 836,
+        "peakOutputWorstCaseMicroUsd": 2704,
+        "peakTotalWorstCaseMicroUsd": 3540
+      },
+      {
+        "taskType": "SEO_CONTENT_SUGGESTION",
+        "fixtureId": "eval_v1_seo_01",
+        "estimatedInputTokenUpperBound": 1884,
+        "offPeakInputWorstCaseMicroUsd": 415,
+        "offPeakOutputWorstCaseMicroUsd": 1352,
+        "offPeakTotalWorstCaseMicroUsd": 1767,
+        "peakInputWorstCaseMicroUsd": 830,
+        "peakOutputWorstCaseMicroUsd": 2704,
+        "peakTotalWorstCaseMicroUsd": 3534
+      },
+      {
+        "taskType": "ANOMALY_TRIAGE",
+        "fixtureId": "eval_v1_anomaly_01",
+        "estimatedInputTokenUpperBound": 1861,
+        "offPeakInputWorstCaseMicroUsd": 410,
+        "offPeakOutputWorstCaseMicroUsd": 1352,
+        "offPeakTotalWorstCaseMicroUsd": 1762,
+        "peakInputWorstCaseMicroUsd": 820,
+        "peakOutputWorstCaseMicroUsd": 2704,
+        "peakTotalWorstCaseMicroUsd": 3524
+      }
+    ],
+    "offPeakSevenCallWorstCaseMicroUsd": 12783,
+    "peakSevenCallWorstCaseMicroUsd": 25566,
+    "peakEqualsExactlyTwoTimesOffPeak": true
+  },
+  "offPeakSevenCallWorstCaseMicroUsd": 12783,
+  "peakSevenCallWorstCaseMicroUsd": 25566,
+  "offPeakHumanAuthorization": "NOT_GRANTED",
+  "peakHumanAuthorization": "NOT_GRANTED",
+  "offPeakFutureBudgetCeilingMicroUsd": "PENDING_HUMAN_APPROVAL",
+  "peakFutureBudgetCeilingMicroUsd": "PENDING_HUMAN_APPROVAL",
+  "modelProvenanceContract": {
+    "requestedModelIdentifier": "deepseek-v4-flash",
+    "returnedModelIdentifier": "deepseek-v4-flash",
+    "documentedVersionTarget": "DeepSeek-V4-Flash-0731",
+    "systemFingerprintIsModelVersion": false,
+    "exactMatchRequired": true
+  },
+  "qualityAndSchemaGates": {
+    "httpSuccessRequired": true,
+    "schemaValidRequired": true,
+    "providerReportedUsageRequired": true,
+    "taskPassRequired": true,
+    "noPrivacyViolation": true,
+    "noUnexpectedEndpoint": true,
+    "noTelemetryFabrication": true,
+    "aggregateSemanticRequirement": 0.85,
+    "requiredTaskCount": 7
+  },
+  "successStatusModel": {
+    "possibleOffPeakResults": [
+      "DEEPSEEK_OFF_PEAK_CERTIFIED",
+      "DEEPSEEK_OFF_PEAK_FAILED_CLOSED",
+      "DEEPSEEK_OFF_PEAK_INCOMPLETE"
+    ],
+    "possiblePeakResults": [
+      "DEEPSEEK_PEAK_CERTIFIED",
+      "DEEPSEEK_PEAK_FAILED_CLOSED",
+      "DEEPSEEK_PEAK_INCOMPLETE"
+    ],
+    "overallV1StateResolution": {
+      "bothPass": "DEEPSEEK_V1_ALL_WINDOWS_CERTIFIED",
+      "offPeakOnlyPass": "OFF_PEAK_ONLY_CERTIFIED",
+      "peakOnlyPass": "PEAK_ONLY_CERTIFIED"
+    }
+  },
+  "currentLiveBlockPreserved": true,
+  "futureVersionIndependentLiveGateRequired": true,
+  "futureActivationSafetyRequirement": "The future runner MUST NOT rely on a hard-coded specification string like CANARY_SPECIFICATION_VERSION === 'a12b2c5-v1.2'. Instead the future activation architecture must use an authoritative policy such as liveExecutionEnabled: false or equivalent fail-closed certification state. Version bumps must NEVER automatically remove the live block.",
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "securityInvariants": {
+    "zeroDeepSeekCalls": true,
+    "zeroGeminiCalls": true,
+    "zeroProviderCredentials": true,
+    "zeroExternalNetworkCalls": true,
+    "liveCanaryExecuted": false,
+    "humanAuthorizationGenerated": false,
+    "boundedCanaryRunnerModified": false,
+    "canarySpecificationVersionModified": false,
+    "productionRoutingEnforcementAllowed": false
+  }
+}
