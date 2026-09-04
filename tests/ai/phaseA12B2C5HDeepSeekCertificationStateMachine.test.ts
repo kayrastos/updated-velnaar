@@ -57,6 +57,7 @@ import {
   InvocationRecordSummary,
   AllWindowsCertificationEvidence,
   RoutingActivationEligibilityEvidence,
+  CertificationStateMachineSnapshot,
 } from '../../worker/ai/canary/deepSeekSuccessorCertificationStateMachine';
 
 describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () => {
@@ -965,5 +966,372 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
     const result = validateCertificationEvidence(perfectSynthetic, { boundAuthorization: validPeakAuth });
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))).toBe(true);
+  });
+
+  // ==========================================
+  // Phase 5I.2 Regressions (A through N)
+  // ==========================================
+
+  // 62. (Regression A) validateCertificationEvidence with NO boundAuthorization => invalid
+  it('62. (Regression A) validateCertificationEvidence with NO boundAuthorization is invalid', () => {
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const result = validateCertificationEvidence(liveEvidence);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('CERTIFICATION_AUTHORIZATION_BINDING_REQUIRED'))).toBe(true);
+  });
+
+  // 63. (Regression B) AUTHORIZED -> CERTIFIED with no boundAuthorization => rejected
+  it('63. (Regression B) AUTHORIZED -> CERTIFIED with no boundAuthorization is rejected', () => {
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const authKey = `${validOffPeakAuth.targetProgram}:${validOffPeakAuth.pricingWindow}:${validOffPeakAuth.sourceCommitSha}:${validOffPeakAuth.runNonce}`;
+    const digestKey = validOffPeakAuth.authorizationTokenDigest;
+
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey, digestKey],
+    };
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      // boundAuthorization intentionally omitted
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(transitionResult.snapshot.offPeakTrackState).toBe('AUTHORIZED');
+    expect(transitionResult.errors.some((e) => e.includes('CERTIFICATION_AUTHORIZATION_BINDING_REQUIRED'))).toBe(true);
+  });
+
+  // 64. (Regression C) valid boundAuthorization supplied but authKey absent from consumedAuthorizations => rejected
+  it('64. (Regression C) valid boundAuthorization supplied but authKey absent from consumedAuthorizations => rejected', () => {
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const digestKey = validOffPeakAuth.authorizationTokenDigest;
+
+    // authKey missing from consumedAuthorizations
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [digestKey],
+    };
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: validOffPeakAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(transitionResult.errors.some((e) => e.includes('AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED'))).toBe(true);
+  });
+
+  // 65. (Regression D) digest absent from consumedAuthorizations => rejected
+  it('65. (Regression D) digest absent from consumedAuthorizations => rejected', () => {
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const authKey = `${validOffPeakAuth.targetProgram}:${validOffPeakAuth.pricingWindow}:${validOffPeakAuth.sourceCommitSha}:${validOffPeakAuth.runNonce}`;
+
+    // digestKey missing from consumedAuthorizations
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey],
+    };
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: validOffPeakAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(transitionResult.errors.some((e) => e.includes('AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED'))).toBe(true);
+  });
+
+  // 66. (Regression E) correct authKey + digest previously consumed, correct boundAuthorization, correct live evidence => transition succeeds
+  it('66. (Regression E) correct authKey + digest previously consumed, correct boundAuthorization, correct live evidence => transition succeeds', () => {
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const authKey = `${validOffPeakAuth.targetProgram}:${validOffPeakAuth.pricingWindow}:${validOffPeakAuth.sourceCommitSha}:${validOffPeakAuth.runNonce}`;
+    const digestKey = validOffPeakAuth.authorizationTokenDigest;
+
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey, digestKey],
+    };
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: validOffPeakAuth,
+    });
+
+    expect(transitionResult.success).toBe(true);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_CERTIFIED');
+    expect(transitionResult.snapshot.offPeakTrackState).toBe('CERTIFIED');
+    expect(transitionResult.snapshot.offPeakEvidence).toBe(liveEvidence);
+    expect(transitionResult.errors).toHaveLength(0);
+  });
+
+  // 67. (Regression F) wrong window authorization => rejected
+  it('67. (Regression F) wrong window authorization => rejected', () => {
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const peakAuthKey = `${validPeakAuth.targetProgram}:${validPeakAuth.pricingWindow}:${validPeakAuth.sourceCommitSha}:${validPeakAuth.runNonce}`;
+    const peakDigestKey = validPeakAuth.authorizationTokenDigest;
+
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [peakAuthKey, peakDigestKey],
+    };
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: validPeakAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(
+      transitionResult.errors.some(
+        (e) => e.includes('Authorization window mismatch') || e.includes('targetProgram mismatch')
+      )
+    ).toBe(true);
+  });
+
+  // 68. (Regression G) wrong candidate => rejected
+  it('68. (Regression G) wrong candidate => rejected', () => {
+    const wrongCandidateAuth: WindowAuthorizationEvidence = {
+      ...validOffPeakAuth,
+      candidateId: 'deepseek-chat-rogue-candidate',
+    };
+    const authKey = `${wrongCandidateAuth.targetProgram}:${wrongCandidateAuth.pricingWindow}:${wrongCandidateAuth.sourceCommitSha}:${wrongCandidateAuth.runNonce}`;
+    const digestKey = wrongCandidateAuth.authorizationTokenDigest;
+
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey, digestKey],
+    };
+
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: wrongCandidateAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(
+      transitionResult.errors.some(
+        (e) => e.includes('candidateId mismatch') || e.includes('Mismatched candidateId')
+      )
+    ).toBe(true);
+  });
+
+  // 69. (Regression H) wrong source commit => rejected
+  it('69. (Regression H) wrong source commit => rejected', () => {
+    const wrongCommitAuth: WindowAuthorizationEvidence = {
+      ...validOffPeakAuth,
+      sourceCommitSha: '0000000000000000000000000000000000000000',
+    };
+    const authKey = `${wrongCommitAuth.targetProgram}:${wrongCommitAuth.pricingWindow}:${wrongCommitAuth.sourceCommitSha}:${wrongCommitAuth.runNonce}`;
+    const digestKey = wrongCommitAuth.authorizationTokenDigest;
+
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey, digestKey],
+    };
+
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: wrongCommitAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(transitionResult.errors.some((e) => e.includes('sourceCommitSha mismatch'))).toBe(true);
+  });
+
+  // 70. (Regression I) wrong source tree => rejected
+  it('70. (Regression I) wrong source tree => rejected', () => {
+    const wrongTreeAuth: WindowAuthorizationEvidence = {
+      ...validOffPeakAuth,
+      sourceTreeSha: '0000000000000000000000000000000000000000',
+    };
+    const authKey = `${wrongTreeAuth.targetProgram}:${wrongTreeAuth.pricingWindow}:${wrongTreeAuth.sourceCommitSha}:${wrongTreeAuth.runNonce}`;
+    const digestKey = wrongTreeAuth.authorizationTokenDigest;
+
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey, digestKey],
+    };
+
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: wrongTreeAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(transitionResult.errors.some((e) => e.includes('sourceTreeSha mismatch'))).toBe(true);
+  });
+
+  // 71. (Regression J) wrong nonce => rejected
+  it('71. (Regression J) wrong nonce => rejected', () => {
+    const wrongNonceAuth: WindowAuthorizationEvidence = {
+      ...validOffPeakAuth,
+      runNonce: 'different_unauthorized_nonce',
+    };
+    const authKey = `${wrongNonceAuth.targetProgram}:${wrongNonceAuth.pricingWindow}:${wrongNonceAuth.sourceCommitSha}:${wrongNonceAuth.runNonce}`;
+    const digestKey = wrongNonceAuth.authorizationTokenDigest;
+
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey, digestKey],
+    };
+
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: wrongNonceAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(transitionResult.errors.some((e) => e.includes('runNonce mismatch'))).toBe(true);
+  });
+
+  // 72. (Regression K) wrong budget => rejected
+  it('72. (Regression K) wrong budget => rejected', () => {
+    const wrongBudgetAuth: WindowAuthorizationEvidence = {
+      ...validOffPeakAuth,
+      maxBudgetMicroUsd: 50000,
+    };
+    const authKey = `${wrongBudgetAuth.targetProgram}:${wrongBudgetAuth.pricingWindow}:${wrongBudgetAuth.sourceCommitSha}:${wrongBudgetAuth.runNonce}`;
+    const digestKey = wrongBudgetAuth.authorizationTokenDigest;
+
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey, digestKey],
+    };
+
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: wrongBudgetAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(transitionResult.errors.some((e) => e.includes('authorizedBudgetMicroUsd'))).toBe(true);
+  });
+
+  // 73. (Regression L) offline evidence + valid consumed authorization => still rejected
+  it('73. (Regression L) offline evidence + valid consumed authorization => still rejected with OFFLINE_EVIDENCE_NOT_CERTIFIABLE', () => {
+    const authKey = `${validOffPeakAuth.targetProgram}:${validOffPeakAuth.pricingWindow}:${validOffPeakAuth.sourceCommitSha}:${validOffPeakAuth.runNonce}`;
+    const digestKey = validOffPeakAuth.authorizationTokenDigest;
+
+    const snapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'AUTHORIZED',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey, digestKey],
+    };
+
+    const offlineEvidence = {
+      ...createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth),
+      evidenceOrigin: 'OFFLINE_SYNTHETIC_REPLAY' as const,
+      certificationEligible: false as const,
+    };
+
+    const transitionResult = applyCertificationTransition(snapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: offlineEvidence as unknown as WindowCertificationEvidence,
+      boundAuthorization: validOffPeakAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(transitionResult.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))).toBe(true);
+  });
+
+  // 74. (Regression M) OFF_PEAK currentState AUTHORIZED but offPeakTrackState != AUTHORIZED => rejected
+  it('74. (Regression M) OFF_PEAK currentState AUTHORIZED but offPeakTrackState != AUTHORIZED => rejected with TRACK_STATE_INCONSISTENCY', () => {
+    const liveEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const authKey = `${validOffPeakAuth.targetProgram}:${validOffPeakAuth.pricingWindow}:${validOffPeakAuth.sourceCommitSha}:${validOffPeakAuth.runNonce}`;
+    const digestKey = validOffPeakAuth.authorizationTokenDigest;
+
+    // currentState is OFF_PEAK_AUTHORIZED but offPeakTrackState is READY
+    const inconsistentSnapshot: CertificationStateMachineSnapshot = {
+      currentState: 'OFF_PEAK_AUTHORIZED',
+      offPeakTrackState: 'READY',
+      peakTrackState: 'NOT_READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey, digestKey],
+    };
+
+    const transitionResult = applyCertificationTransition(inconsistentSnapshot, 'OFF_PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: validOffPeakAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+    expect(transitionResult.errors.some((e) => e.includes('TRACK_STATE_INCONSISTENCY'))).toBe(true);
+  });
+
+  // 75. (Regression N) PEAK currentState AUTHORIZED but peakTrackState != AUTHORIZED => rejected
+  it('75. (Regression N) PEAK currentState AUTHORIZED but peakTrackState != AUTHORIZED => rejected with TRACK_STATE_INCONSISTENCY', () => {
+    const liveEvidence = createCleanCertificationEvidence('PEAK', validPeakAuth);
+    const authKey = `${validPeakAuth.targetProgram}:${validPeakAuth.pricingWindow}:${validPeakAuth.sourceCommitSha}:${validPeakAuth.runNonce}`;
+    const digestKey = validPeakAuth.authorizationTokenDigest;
+
+    // currentState is PEAK_AUTHORIZED but peakTrackState is READY
+    const inconsistentSnapshot: CertificationStateMachineSnapshot = {
+      currentState: 'PEAK_AUTHORIZED',
+      offPeakTrackState: 'NOT_READY',
+      peakTrackState: 'READY',
+      overallState: 'CERTIFICATION_IN_PROGRESS',
+      consumedAuthorizations: [authKey, digestKey],
+    };
+
+    const transitionResult = applyCertificationTransition(inconsistentSnapshot, 'PEAK_CERTIFIED', {
+      certificationEvidence: liveEvidence,
+      boundAuthorization: validPeakAuth,
+    });
+
+    expect(transitionResult.success).toBe(false);
+    expect(transitionResult.snapshot.currentState).toBe('PEAK_AUTHORIZED');
+    expect(transitionResult.errors.some((e) => e.includes('TRACK_STATE_INCONSISTENCY'))).toBe(true);
   });
 });

@@ -1,0 +1,41 @@
+{
+  "phase": "A.12B.2C-5I.2",
+  "name": "AUTHORIZED_TO_CERTIFIED_BINDING_REPAIR",
+  "status": "IMPLEMENTED_AND_VERIFIED",
+  "baseCommit": "5de172643e3a2a397263992c1a42e3204a631404",
+  "baseTree": "fc6e8e02d79117d4db896eac54c5ed10a9152618",
+  "timestamp": "2026-09-04T13:30:00Z",
+  "changes": [
+    "require boundAuthorization in validateCertificationEvidence",
+    "require boundAuthorization in applyCertificationTransition for CERTIFIED states",
+    "verify authKey and authorizationTokenDigest previously consumed",
+    "validate boundAuthorization structurally using validateAuthorizationEvidence",
+    "enforce exact evidence <-> authorization binding for pricingWindow, candidateId, commit, tree, nonce, budget",
+    "enforce currentState and trackState consistency for CERTIFIED transitions",
+    "preserve offline replay rejection invariants under valid authorization"
+  ],
+  "regressionsCovered": [
+    "A_validate_without_auth_rejected",
+    "B_transition_without_auth_rejected",
+    "C_auth_key_not_consumed_rejected",
+    "D_digest_not_consumed_rejected",
+    "E_consumed_auth_valid_transition_succeeds",
+    "F_wrong_window_rejected",
+    "G_wrong_candidate_rejected",
+    "H_wrong_source_commit_rejected",
+    "I_wrong_source_tree_rejected",
+    "J_wrong_nonce_rejected",
+    "K_wrong_budget_rejected",
+    "L_offline_evidence_with_valid_auth_rejected",
+    "M_off_peak_inconsistent_track_state_rejected",
+    "N_peak_inconsistent_track_state_rejected"
+  ],
+  "invariantsPreserved": {
+    "liveProviderCalls": 0,
+    "credentialsUsed": 0,
+    "canaryLiveExecutionEnabled": false,
+    "v13Activated": false,
+    "productionRoutingEnabled": false,
+    "humanAuthorizationGenerated": false
+  }
+}

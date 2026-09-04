@@ -584,6 +584,7 @@ export function validateCertificationEvidence(
   evidence: WindowCertificationEvidence,
   options?: {
     boundAuthorization?: WindowAuthorizationEvidence;
+    allowAllWindowsAggregation?: boolean;
   }
 ): ValidationResult {
   const errors: string[] = [];
@@ -802,11 +803,34 @@ export function validateCertificationEvidence(
     );
   }
 
-  // Validate binding against authorization if supplied
+  // Validate binding against authorization (mandatory for certification validation)
   if (options?.boundAuthorization) {
     const auth = options.boundAuthorization;
+
+    // Structural validation of authorization evidence
+    const authValidation = validateAuthorizationEvidence(auth);
+    if (!authValidation.valid) {
+      errors.push(...authValidation.errors.map((e) => `BOUND_AUTHORIZATION_INVALID: ${e}`));
+    }
+
+    // Exact program for pricing window
+    const expectedProgram =
+      evidence.pricingWindow === 'OFF_PEAK'
+        ? OFF_PEAK_PROGRAM.programId
+        : PEAK_PROGRAM.programId;
+    if (auth.targetProgram !== expectedProgram) {
+      errors.push(
+        `targetProgram mismatch with authorization: expected '${expectedProgram}' for window '${evidence.pricingWindow}', got '${auth.targetProgram}'.`
+      );
+    }
+
     if (evidence.pricingWindow !== auth.pricingWindow) {
       errors.push(`Authorization window mismatch: auth is '${auth.pricingWindow}', evidence is '${evidence.pricingWindow}'.`);
+    }
+    if (evidence.candidateId !== auth.candidateId) {
+      errors.push(
+        `candidateId mismatch with authorization: auth is '${auth.candidateId}', evidence is '${evidence.candidateId}'.`
+      );
     }
     if (evidence.sourceCommitSha !== auth.sourceCommitSha) {
       errors.push(
@@ -826,6 +850,10 @@ export function validateCertificationEvidence(
         `authorizedBudgetMicroUsd (${evidence.authorizedBudgetMicroUsd}) does not match authorization maxBudgetMicroUsd (${auth.maxBudgetMicroUsd}).`
       );
     }
+  } else if (!options?.allowAllWindowsAggregation) {
+    errors.push(
+      'CERTIFICATION_AUTHORIZATION_BINDING_REQUIRED: WindowCertificationEvidence requires boundAuthorization for certification validation. Standalone validation without authorization binding is prohibited.'
+    );
   }
 
   return {
@@ -839,14 +867,21 @@ export function validateCertificationEvidence(
  * Enforces strict AND condition between OFF_PEAK_CERTIFIED and PEAK_CERTIFIED.
  */
 export function validateAllWindowsCertificationEvidence(
-  evidence: AllWindowsCertificationEvidence
+  evidence: AllWindowsCertificationEvidence,
+  options?: {
+    offPeakAuthorization?: WindowAuthorizationEvidence;
+    peakAuthorization?: WindowAuthorizationEvidence;
+  }
 ): ValidationResult {
   const errors: string[] = [];
 
   if (!evidence.offPeakEvidence) {
     errors.push('Missing offPeakEvidence artifact in all-windows evidence.');
   } else {
-    const offPeakValidation = validateCertificationEvidence(evidence.offPeakEvidence);
+    const offPeakValidation = validateCertificationEvidence(evidence.offPeakEvidence, {
+      boundAuthorization: options?.offPeakAuthorization,
+      allowAllWindowsAggregation: true,
+    });
     if (!offPeakValidation.valid) {
       errors.push(...offPeakValidation.errors.map(e => `OFF_PEAK: ${e}`));
     }
@@ -858,7 +893,10 @@ export function validateAllWindowsCertificationEvidence(
   if (!evidence.peakEvidence) {
     errors.push('Missing peakEvidence artifact in all-windows evidence.');
   } else {
-    const peakValidation = validateCertificationEvidence(evidence.peakEvidence);
+    const peakValidation = validateCertificationEvidence(evidence.peakEvidence, {
+      boundAuthorization: options?.peakAuthorization,
+      allowAllWindowsAggregation: true,
+    });
     if (!peakValidation.valid) {
       errors.push(...peakValidation.errors.map(e => `PEAK: ${e}`));
     }
@@ -1147,6 +1185,31 @@ export function applyCertificationTransition(
 
   // 5. Window-specific Certified transitions
   if (targetState === 'OFF_PEAK_CERTIFIED' || targetState === 'PEAK_CERTIFIED') {
+    // Track state consistency enforcement (Section 7)
+    if (targetState === 'OFF_PEAK_CERTIFIED') {
+      if (currentSnapshot.currentState !== 'OFF_PEAK_AUTHORIZED' || currentSnapshot.offPeakTrackState !== 'AUTHORIZED') {
+        return {
+          success: false,
+          snapshot: currentSnapshot,
+          errors: [
+            `TRACK_STATE_INCONSISTENCY: Transition to OFF_PEAK_CERTIFIED requires currentState === 'OFF_PEAK_AUTHORIZED' and offPeakTrackState === 'AUTHORIZED' (got currentState='${currentSnapshot.currentState}', offPeakTrackState='${currentSnapshot.offPeakTrackState}').`,
+          ],
+        };
+      }
+    }
+
+    if (targetState === 'PEAK_CERTIFIED') {
+      if (currentSnapshot.currentState !== 'PEAK_AUTHORIZED' || currentSnapshot.peakTrackState !== 'AUTHORIZED') {
+        return {
+          success: false,
+          snapshot: currentSnapshot,
+          errors: [
+            `TRACK_STATE_INCONSISTENCY: Transition to PEAK_CERTIFIED requires currentState === 'PEAK_AUTHORIZED' and peakTrackState === 'AUTHORIZED' (got currentState='${currentSnapshot.currentState}', peakTrackState='${currentSnapshot.peakTrackState}').`,
+          ],
+        };
+      }
+    }
+
     if (!payload?.certificationEvidence) {
       return {
         success: false,
@@ -1166,15 +1229,44 @@ export function applyCertificationTransition(
       };
     }
 
+    const transitionErrors: string[] = [];
+
+    // Mandatory bound authorization check (Section 3)
+    if (!payload?.boundAuthorization) {
+      transitionErrors.push(
+        `CERTIFICATION_AUTHORIZATION_BINDING_REQUIRED: Transition to '${targetState}' requires boundAuthorization in payload.`
+      );
+    } else {
+      // Prove authorization was previously consumed (Section 4)
+      const boundAuth = payload.boundAuthorization;
+      const authKey = `${boundAuth.targetProgram}:${boundAuth.pricingWindow}:${boundAuth.sourceCommitSha}:${boundAuth.runNonce}`;
+      const digestKey = boundAuth.authorizationTokenDigest;
+
+      const consumedList = currentSnapshot.consumedAuthorizations ?? [];
+      const hasAuthKey = consumedList.includes(authKey);
+      const hasDigestKey = consumedList.includes(digestKey);
+
+      if (!hasAuthKey || !hasDigestKey) {
+        transitionErrors.push(
+          `AUTHORIZATION_NOT_PREVIOUSLY_CONSUMED: boundAuthorization (authKey='${authKey}', digest='${digestKey}') was not previously consumed in snapshot. Consumed list contains: [${consumedList.join(', ')}].`
+        );
+      }
+    }
+
+    // Validate certification evidence and evidence-authorization binding (Sections 2, 5, 6, 8)
     const validation = validateCertificationEvidence(payload.certificationEvidence, {
       boundAuthorization: payload.boundAuthorization,
     });
 
     if (!validation.valid) {
+      transitionErrors.push(...validation.errors);
+    }
+
+    if (transitionErrors.length > 0) {
       return {
         success: false,
         snapshot: currentSnapshot,
-        errors: validation.errors,
+        errors: transitionErrors,
       };
     }
 
