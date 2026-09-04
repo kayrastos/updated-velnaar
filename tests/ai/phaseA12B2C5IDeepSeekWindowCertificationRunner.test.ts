@@ -55,6 +55,9 @@ import { TaskType } from '../../worker/ai/types';
 import {
   validateRunnerReadinessEvidence,
   validateCertificationEvidence,
+  applyCertificationTransition,
+  WindowCertificationEvidence,
+  CertificationStateMachineSnapshot,
   REQUIRED_CANONICAL_INVOCATION_COUNT,
   MAX_INVOCATION_LATENCY_MS,
 } from '../../worker/ai/canary/deepSeekSuccessorCertificationStateMachine';
@@ -89,6 +92,7 @@ import {
   createSyntheticTestReplayFixture,
   DeepSeekOfflineReplayFixture,
   DeepSeekOfflineReplayRecord,
+  DeepSeekOfflineReplayEvidence,
   DeepSeekWindowCertificationPlan,
 } from '../../worker/ai/canary/deepSeekWindowCertificationRunner';
 
@@ -146,6 +150,17 @@ describe('Phase A.12B.2C-5I — DeepSeek Window-Specific Offline Certification R
         'SEO_CONTENT_SUGGESTION',
         'ANOMALY_TRIAGE',
       ]);
+    });
+
+    it('verifies canonical separation between program IDs and candidate IDs', () => {
+      expect(RUNNER_OFF_PEAK_PROGRAM_ID).toBe(OFF_PEAK_PROGRAM.programId);
+      expect(RUNNER_PEAK_PROGRAM_ID).toBe(PEAK_PROGRAM.programId);
+      expect(RUNNER_OFF_PEAK_PROGRAM_ID).toBe('DEEPSEEK_OFF_PEAK_SINGLE_PROVIDER_RESEAL');
+      expect(RUNNER_PEAK_PROGRAM_ID).toBe('DEEPSEEK_PEAK_SINGLE_PROVIDER_CERTIFICATION');
+      expect(RUNNER_OFF_PEAK_PROGRAM_ID).not.toBe(RUNNER_OFF_PEAK_CANDIDATE);
+      expect(RUNNER_PEAK_PROGRAM_ID).not.toBe(RUNNER_PEAK_CANDIDATE);
+      expect(RUNNER_OFF_PEAK_CANDIDATE).toBe('deepseek-v4-flash-offpeak-low');
+      expect(RUNNER_PEAK_CANDIDATE).toBe('deepseek-v4-flash-peak-low');
     });
   });
 
@@ -379,9 +394,13 @@ describe('Phase A.12B.2C-5I — DeepSeek Window-Specific Offline Certification R
       expect(replayResult.valid).toBe(true);
       expect(replayResult.errors).toHaveLength(0);
       expect(replayResult.offlineReplayCanCertifyProvider).toBe(false);
-      expect(replayResult.certificationEvidence).not.toBeNull();
+      expect(replayResult.certificationEvidence).toBeNull();
+      expect(replayResult.offlineReplayEvidence).not.toBeNull();
 
-      const evidence = replayResult.certificationEvidence!;
+      const evidence = replayResult.offlineReplayEvidence!;
+      expect(evidence.evidenceOrigin).toBe('OFFLINE_SYNTHETIC_REPLAY');
+      expect(evidence.certificationEligible).toBe(false);
+      expect(evidence.syntheticTestOnly).toBe(true);
       expect(evidence.pricingWindow).toBe('OFF_PEAK');
       expect(evidence.candidateId).toBe(OFF_PEAK_CANDIDATE);
       expect(evidence.executedInvocations).toBe(7);
@@ -395,10 +414,14 @@ describe('Phase A.12B.2C-5I — DeepSeek Window-Specific Offline Certification R
       expect(evidence.aggregateSemanticScore).toBeGreaterThanOrEqual(0.85);
       expect(evidence.maxLatencyMs).toBeLessThan(15000);
 
-      // Verify state-machine validation passes on this evidence
-      const smValidation = validateCertificationEvidence(evidence);
-      expect(smValidation.valid).toBe(true);
-      expect(smValidation.errors).toHaveLength(0);
+      // Section 5: State-machine certification validation MUST fail closed on offline replay evidence
+      const smValidation = validateCertificationEvidence(
+        evidence as unknown as WindowCertificationEvidence
+      );
+      expect(smValidation.valid).toBe(false);
+      expect(
+        smValidation.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))
+      ).toBe(true);
     });
 
     it('executes clean PEAK replay producing OFFLINE_REPLAY_VALID', () => {
@@ -422,9 +445,22 @@ describe('Phase A.12B.2C-5I — DeepSeek Window-Specific Offline Certification R
       expect(replayResult.status).toBe('OFFLINE_REPLAY_VALID');
       expect(replayResult.valid).toBe(true);
       expect(replayResult.offlineReplayCanCertifyProvider).toBe(false);
-      expect(replayResult.certificationEvidence).not.toBeNull();
-      expect(replayResult.certificationEvidence!.pricingWindow).toBe('PEAK');
-      expect(replayResult.certificationEvidence!.candidateId).toBe(PEAK_CANDIDATE);
+      expect(replayResult.certificationEvidence).toBeNull();
+      expect(replayResult.offlineReplayEvidence).not.toBeNull();
+      expect(replayResult.offlineReplayEvidence!.pricingWindow).toBe('PEAK');
+      expect(replayResult.offlineReplayEvidence!.candidateId).toBe(PEAK_CANDIDATE);
+      expect(replayResult.offlineReplayEvidence!.evidenceOrigin).toBe('OFFLINE_SYNTHETIC_REPLAY');
+      expect(replayResult.offlineReplayEvidence!.certificationEligible).toBe(false);
+      expect(replayResult.offlineReplayEvidence!.syntheticTestOnly).toBe(true);
+
+      // Verify state machine rejects force-cast peak offline evidence
+      const smValidation = validateCertificationEvidence(
+        replayResult.offlineReplayEvidence! as unknown as WindowCertificationEvidence
+      );
+      expect(smValidation.valid).toBe(false);
+      expect(
+        smValidation.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))
+      ).toBe(true);
     });
 
     it('PROHIBITS emitting live certification states from offline replay', () => {
@@ -436,6 +472,67 @@ describe('Phase A.12B.2C-5I — DeepSeek Window-Specific Offline Certification R
       expect((replayResult as any).status).not.toBe('DEEPSEEK_PEAK_CERTIFIED');
       expect((replayResult as any).status).not.toBe('ALL_WINDOWS_CERTIFIED');
       expect((replayResult as any).status).not.toBe('ROUTING_ACTIVATION_ELIGIBLE');
+    });
+
+    // Section 6: Direct state-machine adversarial regression
+    it('REJECTS OFF_PEAK_AUTHORIZED -> OFF_PEAK_CERTIFIED transition using offline replay evidence', () => {
+      const fixture = createSyntheticTestReplayFixture('OFF_PEAK');
+      const replayResult = executeOfflineCertificationReplay(fixture);
+      expect(replayResult.status).toBe('OFFLINE_REPLAY_VALID');
+      expect(replayResult.offlineReplayEvidence).not.toBeNull();
+
+      const authorizedSnapshot: CertificationStateMachineSnapshot = {
+        currentState: 'OFF_PEAK_AUTHORIZED',
+        offPeakTrackState: 'AUTHORIZED',
+        peakTrackState: 'NOT_READY',
+        overallState: 'CERTIFICATION_IN_PROGRESS',
+        consumedAuthorizations: [],
+      };
+
+      const transitionResult = applyCertificationTransition(
+        authorizedSnapshot,
+        'OFF_PEAK_CERTIFIED',
+        {
+          certificationEvidence: replayResult.offlineReplayEvidence as unknown as WindowCertificationEvidence,
+        }
+      );
+
+      expect(transitionResult.success).toBe(false);
+      expect(transitionResult.snapshot.currentState).toBe('OFF_PEAK_AUTHORIZED');
+      expect(transitionResult.snapshot.offPeakTrackState).toBe('AUTHORIZED');
+      expect(
+        transitionResult.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))
+      ).toBe(true);
+    });
+
+    it('REJECTS PEAK_AUTHORIZED -> PEAK_CERTIFIED transition using offline replay evidence', () => {
+      const fixture = createSyntheticTestReplayFixture('PEAK');
+      const replayResult = executeOfflineCertificationReplay(fixture);
+      expect(replayResult.status).toBe('OFFLINE_REPLAY_VALID');
+      expect(replayResult.offlineReplayEvidence).not.toBeNull();
+
+      const peakAuthorizedSnapshot: CertificationStateMachineSnapshot = {
+        currentState: 'PEAK_AUTHORIZED',
+        offPeakTrackState: 'NOT_READY',
+        peakTrackState: 'AUTHORIZED',
+        overallState: 'CERTIFICATION_IN_PROGRESS',
+        consumedAuthorizations: [],
+      };
+
+      const transitionResult = applyCertificationTransition(
+        peakAuthorizedSnapshot,
+        'PEAK_CERTIFIED',
+        {
+          certificationEvidence: replayResult.offlineReplayEvidence as unknown as WindowCertificationEvidence,
+        }
+      );
+
+      expect(transitionResult.success).toBe(false);
+      expect(transitionResult.snapshot.currentState).toBe('PEAK_AUTHORIZED');
+      expect(transitionResult.snapshot.peakTrackState).toBe('AUTHORIZED');
+      expect(
+        transitionResult.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))
+      ).toBe(true);
     });
   });
 

@@ -151,6 +151,8 @@ export interface InvocationRecordSummary {
 }
 
 export interface WindowCertificationEvidence {
+  readonly evidenceOrigin: 'LIVE_PROVIDER_EXECUTION';
+  readonly certificationEligible: true;
   readonly pricingWindow: 'OFF_PEAK' | 'PEAK';
   readonly candidateId: string;
   readonly executedInvocations: number;
@@ -585,6 +587,19 @@ export function validateCertificationEvidence(
   }
 ): ValidationResult {
   const errors: string[] = [];
+
+  // Strict origin and certification eligibility check (OFFLINE_EVIDENCE_NOT_CERTIFIABLE)
+  if ((evidence as any)?.evidenceOrigin !== 'LIVE_PROVIDER_EXECUTION') {
+    errors.push(
+      `OFFLINE_EVIDENCE_NOT_CERTIFIABLE: evidenceOrigin must be 'LIVE_PROVIDER_EXECUTION' (got '${(evidence as any)?.evidenceOrigin}'). Offline/synthetic evidence cannot certify provider.`
+    );
+  }
+
+  if ((evidence as any)?.certificationEligible !== true) {
+    errors.push(
+      `OFFLINE_EVIDENCE_NOT_CERTIFIABLE: certificationEligible must be strictly true (got ${(evidence as any)?.certificationEligible}).`
+    );
+  }
 
   if (evidence.pricingWindow !== 'OFF_PEAK' && evidence.pricingWindow !== 'PEAK') {
     errors.push(`Invalid pricingWindow: '${evidence.pricingWindow}'. Expected 'OFF_PEAK' or 'PEAK'.`);

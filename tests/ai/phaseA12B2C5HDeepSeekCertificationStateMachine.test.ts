@@ -141,6 +141,8 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
     const totalCost = invocations.reduce((sum, inv) => sum + inv.observedCostMicroUsd, 0);
 
     return {
+      evidenceOrigin: 'LIVE_PROVIDER_EXECUTION',
+      certificationEligible: true,
       pricingWindow,
       candidateId: pricingWindow === 'OFF_PEAK' ? OFF_PEAK_CANDIDATE : PEAK_CANDIDATE,
       executedInvocations: 7,
@@ -883,5 +885,85 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
     });
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('sourceTreeSha mismatch'))).toBe(true);
+  });
+
+  // 57. evidenceOrigin missing => rejected
+  it('57. evidenceOrigin missing => rejected with OFFLINE_EVIDENCE_NOT_CERTIFIABLE', () => {
+    const cleanEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const noOrigin = { ...cleanEvidence } as any;
+    delete noOrigin.evidenceOrigin;
+    const result = validateCertificationEvidence(noOrigin);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))).toBe(true);
+  });
+
+  // 58. evidenceOrigin = OFFLINE_SYNTHETIC_REPLAY => rejected
+  it('58. evidenceOrigin = OFFLINE_SYNTHETIC_REPLAY => rejected with OFFLINE_EVIDENCE_NOT_CERTIFIABLE', () => {
+    const cleanEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const offlineOrigin = { ...cleanEvidence, evidenceOrigin: 'OFFLINE_SYNTHETIC_REPLAY' } as any;
+    const result = validateCertificationEvidence(offlineOrigin);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))).toBe(true);
+  });
+
+  // 59. certificationEligible = false => rejected
+  it('59. certificationEligible = false => rejected with OFFLINE_EVIDENCE_NOT_CERTIFIABLE', () => {
+    const cleanEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const notEligible = { ...cleanEvidence, certificationEligible: false } as any;
+    const result = validateCertificationEvidence(notEligible);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))).toBe(true);
+  });
+
+  // 60. offline evidence force-cast to WindowCertificationEvidence => rejected
+  it('60. offline evidence force-cast to WindowCertificationEvidence => rejected', () => {
+    const offlineEvidence = {
+      evidenceOrigin: 'OFFLINE_SYNTHETIC_REPLAY' as const,
+      certificationEligible: false as const,
+      syntheticTestOnly: true as const,
+      pricingWindow: 'OFF_PEAK' as const,
+      candidateId: OFF_PEAK_CANDIDATE,
+      executedInvocations: 7,
+      transportAttemptCount: 7,
+      completedRequiredMatrixCases: 7,
+      passedInvocations: 7,
+      failedInvocations: 0,
+      clientRetries: 0,
+      crossProviderFallbacks: 0,
+      automaticReruns: 0,
+      killSwitchEvents: 0,
+      provider: CERTIFICATION_PROVIDER,
+      modelRequested: CERTIFICATION_MODEL,
+      modelReturned: CERTIFICATION_MODEL,
+      providerReportedUsageCount: 7,
+      schemaValidCount: 7,
+      taskPassCount: 7,
+      maxLatencyMs: 1200,
+      latenciesMs: [1000, 1100, 1200, 1050, 1150, 1080, 1020],
+      aggregateSemanticScore: 0.95,
+      privacyViolations: 0,
+      unexpectedNetworkAttempts: 0,
+      observedTotalCostMicroUsd: 8400,
+      authorizedBudgetMicroUsd: 12783,
+      sourceCommitSha: '9b5325ae92d65e781e66647f31fbf9dce7261ec1',
+      sourceTreeSha: 'b21cfe6fa12f32907941d308bac4882f52c01479',
+      runNonce: 'nonce_force_cast_test',
+      invocationRecords: createCleanInvocations('OFF_PEAK'),
+    };
+    const result = validateCertificationEvidence(offlineEvidence as unknown as WindowCertificationEvidence);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))).toBe(true);
+  });
+
+  // 61. otherwise perfect 7/7 synthetic evidence carrying offline origin => rejected
+  it('61. otherwise perfect 7/7 synthetic evidence carrying offline origin => rejected', () => {
+    const perfectSynthetic = {
+      ...createCleanCertificationEvidence('PEAK', validPeakAuth),
+      evidenceOrigin: 'OFFLINE_SYNTHETIC_REPLAY',
+      certificationEligible: false,
+    } as unknown as WindowCertificationEvidence;
+    const result = validateCertificationEvidence(perfectSynthetic, { boundAuthorization: validPeakAuth });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('OFFLINE_EVIDENCE_NOT_CERTIFIABLE'))).toBe(true);
   });
 });

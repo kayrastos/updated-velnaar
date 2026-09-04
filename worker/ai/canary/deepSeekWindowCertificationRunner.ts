@@ -51,10 +51,8 @@ import {
 import {
   RunnerReadinessEvidence,
   validateRunnerReadinessEvidence,
-  WindowCertificationEvidence,
   InvocationRecordSummary,
   ValidationResult,
-  validateCertificationEvidence,
   REQUIRED_CANONICAL_INVOCATION_COUNT,
   SEMANTIC_SCORE_MIN_THRESHOLD,
   MAX_INVOCATION_LATENCY_MS,
@@ -424,11 +422,46 @@ export interface DeepSeekOfflineReplayFixture {
   readonly syntheticTestOnly?: boolean;
 }
 
+export interface DeepSeekOfflineReplayEvidence {
+  readonly evidenceOrigin: 'OFFLINE_SYNTHETIC_REPLAY';
+  readonly certificationEligible: false;
+  readonly syntheticTestOnly: true;
+  readonly pricingWindow: 'OFF_PEAK' | 'PEAK';
+  readonly candidateId: string;
+  readonly executedInvocations: number;
+  readonly transportAttemptCount: number;
+  readonly completedRequiredMatrixCases: number;
+  readonly passedInvocations: number;
+  readonly failedInvocations: number;
+  readonly clientRetries: number;
+  readonly crossProviderFallbacks: number;
+  readonly automaticReruns: number;
+  readonly killSwitchEvents: number;
+  readonly provider: string;
+  readonly modelRequested: string;
+  readonly modelReturned: string;
+  readonly providerReportedUsageCount: number;
+  readonly schemaValidCount: number;
+  readonly taskPassCount: number;
+  readonly maxLatencyMs: number;
+  readonly latenciesMs: readonly number[];
+  readonly aggregateSemanticScore: number;
+  readonly privacyViolations: number;
+  readonly unexpectedNetworkAttempts: number;
+  readonly observedTotalCostMicroUsd: number;
+  readonly authorizedBudgetMicroUsd: number;
+  readonly sourceCommitSha: string;
+  readonly sourceTreeSha: string;
+  readonly runNonce: string;
+  readonly invocationRecords: readonly InvocationRecordSummary[];
+}
+
 export interface DeepSeekOfflineReplayResult {
   readonly status: OfflineReplayStatus;
   readonly valid: boolean;
   readonly errors: readonly string[];
-  readonly certificationEvidence: WindowCertificationEvidence | null;
+  readonly offlineReplayEvidence: DeepSeekOfflineReplayEvidence | null;
+  readonly certificationEvidence: null;
   readonly offlineReplayCanCertifyProvider: false;
 }
 
@@ -716,6 +749,7 @@ export function executeOfflineCertificationReplay(
       status: 'OFFLINE_REPLAY_REJECTED',
       valid: false,
       errors: validation.errors,
+      offlineReplayEvidence: null,
       certificationEvidence: null,
       offlineReplayCanCertifyProvider: false,
     };
@@ -745,7 +779,10 @@ export function executeOfflineCertificationReplay(
     privacyViolation: r.privacyViolation,
   }));
 
-  const windowEvidence: WindowCertificationEvidence = {
+  const replayEvidence: DeepSeekOfflineReplayEvidence = {
+    evidenceOrigin: 'OFFLINE_SYNTHETIC_REPLAY',
+    certificationEligible: false,
+    syntheticTestOnly: true,
     pricingWindow: fixture.pricingWindow,
     candidateId: fixture.candidateId,
     executedInvocations: records.length,
@@ -776,23 +813,12 @@ export function executeOfflineCertificationReplay(
     invocationRecords,
   };
 
-  // State machine compatibility check
-  const smValidation = validateCertificationEvidence(windowEvidence);
-  if (!smValidation.valid) {
-    return {
-      status: 'OFFLINE_REPLAY_REJECTED',
-      valid: false,
-      errors: smValidation.errors,
-      certificationEvidence: null,
-      offlineReplayCanCertifyProvider: false,
-    };
-  }
-
   return {
     status: 'OFFLINE_REPLAY_VALID',
     valid: true,
     errors: [],
-    certificationEvidence: windowEvidence,
+    offlineReplayEvidence: replayEvidence,
+    certificationEvidence: null,
     offlineReplayCanCertifyProvider: false,
   };
 }
