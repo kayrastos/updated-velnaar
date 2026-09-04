@@ -1,0 +1,29 @@
+{
+  "phase": "A.12B.2C-5H.2",
+  "artifactType": "BASE_COMMIT_TREE_PROVENANCE_REPAIR",
+  "timestamp": "2026-09-04T12:52:00.000Z",
+  "repairBaseCommit": "01a0e0eb57ba3e994f7e842d290b1c6cc4959ed3",
+  "repairBaseTree": "2d4d427b7a40df0f432f5228a0b3ee9015b8d505",
+  "correctedHistoricalBaseCommit": "9b5325ae92d65e781e66647f31fbf9dce7261ec1",
+  "correctedHistoricalBaseTree": "b21cfe6fa12f32907941d308bac4882f52c01479",
+  "incorrectHistoricalBaseTree": "8d1247027fd5c05481f97d090d2bbc3eb2342eee",
+  "historical5H1ArtifactModified": false,
+  "commitTreeBindingFixtureCorrected": true,
+  "canonicalTaskBindingPreserved": true,
+  "offPeakCostBoundMicroUsd": 12783,
+  "peakCostBoundMicroUsd": 25566,
+  "providerNetworkCalls": 0,
+  "liveExecutionEnabled": false,
+  "productionRoutingEnforcementAllowed": false,
+  "provenanceVerification": {
+    "historical5H1ArtifactPath": "execution/a12b2c5h1_canonical_task_cost_binding_repair.json",
+    "historical5H1ArtifactUnmodified": true,
+    "canonicalCommitTreeRelation": "9b5325ae92d65e781e66647f31fbf9dce7261ec1 -> b21cfe6fa12f32907941d308bac4882f52c01479",
+    "regressionTests": [
+      "53. provenance A: commit 9b5325ae... + tree b21cfe6f... accepted when all authorization evidence valid",
+      "54. provenance B: commit 9b5325ae... + stale tree 8d124702... rejected when expectedTreeSha is b21cfe6f...",
+      "55. provenance C: correct tree (b21cfe6f...) + wrong commit => rejected",
+      "56. provenance D: correct commit (9b5325ae...) + wrong tree => rejected"
+    ]
+  }
+}

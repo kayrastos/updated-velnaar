@@ -63,7 +63,7 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
   let globalFetchSpy: ReturnType<typeof vi.spyOn>;
 
   const validCommit = '9b5325ae92d65e781e66647f31fbf9dce7261ec1';
-  const validTree = '8d1247027fd5c05481f97d090d2bbc3eb2342eee';
+  const validTree = 'b21cfe6fa12f32907941d308bac4882f52c01479';
   const validOffPeakNonce = 'nonce-offpeak-test-9921';
   const validPeakNonce = 'nonce-peak-test-8812';
 
@@ -814,5 +814,74 @@ describe('Phase A.12B.2C-5H DeepSeek Successor Certification State Machine', () 
     const resultPeak = validateRunnerReadinessEvidence(invalidPeak);
     expect(resultPeak.valid).toBe(false);
     expect(resultPeak.errors.some((e) => e.includes('Invalid windowSpecificCostBoundMicroUsd'))).toBe(true);
+  });
+
+  // 53. (A) commit 9b5325ae... + tree b21cfe6f... accepted when all authorization evidence valid
+  it('53. provenance A: commit 9b5325ae... + tree b21cfe6f... accepted when all authorization evidence valid', () => {
+    expect(validOffPeakAuth.sourceCommitSha).toBe('9b5325ae92d65e781e66647f31fbf9dce7261ec1');
+    expect(validOffPeakAuth.sourceTreeSha).toBe('b21cfe6fa12f32907941d308bac4882f52c01479');
+
+    const result = validateAuthorizationEvidence(validOffPeakAuth, {
+      expectedCommitSha: '9b5325ae92d65e781e66647f31fbf9dce7261ec1',
+      expectedTreeSha: 'b21cfe6fa12f32907941d308bac4882f52c01479',
+    });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+
+    const cleanEvidence = createCleanCertificationEvidence('OFF_PEAK', validOffPeakAuth);
+    const certResult = validateCertificationEvidence(cleanEvidence, { boundAuthorization: validOffPeakAuth });
+    expect(certResult.valid).toBe(true);
+    expect(certResult.errors).toEqual([]);
+  });
+
+  // 54. (B) commit 9b5325ae... + stale tree 8d124702... rejected when expectedTreeSha is b21cfe6f...
+  it('54. provenance B: commit 9b5325ae... + stale tree 8d124702... rejected when expectedTreeSha is b21cfe6f...', () => {
+    const staleTreeAuth: WindowAuthorizationEvidence = {
+      ...validOffPeakAuth,
+      sourceCommitSha: '9b5325ae92d65e781e66647f31fbf9dce7261ec1',
+      sourceTreeSha: '8d1247027fd5c05481f97d090d2bbc3eb2342eee',
+    };
+    const result = validateAuthorizationEvidence(staleTreeAuth, {
+      expectedCommitSha: '9b5325ae92d65e781e66647f31fbf9dce7261ec1',
+      expectedTreeSha: 'b21cfe6fa12f32907941d308bac4882f52c01479',
+    });
+    expect(result.valid).toBe(false);
+    expect(
+      result.errors.some((e) =>
+        e.includes(
+          "sourceTreeSha mismatch: expected 'b21cfe6fa12f32907941d308bac4882f52c01479', got '8d1247027fd5c05481f97d090d2bbc3eb2342eee'"
+        )
+      )
+    ).toBe(true);
+  });
+
+  // 55. (C) correct tree + wrong commit => rejected
+  it('55. provenance C: correct tree (b21cfe6f...) + wrong commit => rejected', () => {
+    const wrongCommitAuth: WindowAuthorizationEvidence = {
+      ...validOffPeakAuth,
+      sourceCommitSha: '0000000000000000000000000000000000000000',
+      sourceTreeSha: 'b21cfe6fa12f32907941d308bac4882f52c01479',
+    };
+    const result = validateAuthorizationEvidence(wrongCommitAuth, {
+      expectedCommitSha: '9b5325ae92d65e781e66647f31fbf9dce7261ec1',
+      expectedTreeSha: 'b21cfe6fa12f32907941d308bac4882f52c01479',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('sourceCommitSha mismatch'))).toBe(true);
+  });
+
+  // 56. (D) correct commit + wrong tree => rejected
+  it('56. provenance D: correct commit (9b5325ae...) + wrong tree => rejected', () => {
+    const wrongTreeAuth: WindowAuthorizationEvidence = {
+      ...validOffPeakAuth,
+      sourceCommitSha: '9b5325ae92d65e781e66647f31fbf9dce7261ec1',
+      sourceTreeSha: '0000000000000000000000000000000000000000',
+    };
+    const result = validateAuthorizationEvidence(wrongTreeAuth, {
+      expectedCommitSha: '9b5325ae92d65e781e66647f31fbf9dce7261ec1',
+      expectedTreeSha: 'b21cfe6fa12f32907941d308bac4882f52c01479',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('sourceTreeSha mismatch'))).toBe(true);
   });
 });
