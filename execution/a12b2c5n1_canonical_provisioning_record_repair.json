@@ -1,0 +1,42 @@
+{
+  "phase": "A.12B.2C-5N.1",
+  "artifactType": "CANONICAL_PRODUCTION_TRUST_ANCHOR_PROVISIONING_RECORD_REPAIR",
+
+  "baseCommit": "7ebd37ca33758946b95fa0894e216d99ab231ba7",
+  "baseTree": "26b969b0a7911abf451a04ae137e0da6b253c2f0",
+
+  "historical5NArtifactModified": false,
+
+  "canonicalProvisioningRecordImplemented": true,
+  "canonicalProvisioningRecordExactSchemaRequired": true,
+  "privateKeyAllowedInProvisioningRecord": false,
+  "generatedOutsideRepositoryRequired": true,
+  "privateKeyCommittedToRepositoryAllowed": false,
+  "privateKeyApplicationRuntimeAccessAllowed": false,
+  "privateKeyCustodyMode": "OFFLINE_OPERATOR_CUSTODY",
+  "operatorAcknowledgementRequired": true,
+
+  "sealedUtcValidatorReused": true,
+  "phase5MAuthorityValidatorReused": true,
+
+  "provisioningRecordDigestImplemented": true,
+  "provisioningRecordDigestCoversAllSecurityFields": true,
+  "callerControlledExpectedCeremonyPolicyAllowed": false,
+
+  "productionTrustAnchorProvisioningReady": false,
+  "productionAuthorityTrustAnchorProvisioned": false,
+  "productionAuthorityRegistryEntryCount": 0,
+
+  "productionPrivateKeyGenerated": false,
+  "productionPublicTrustAnchorProvisioned": false,
+
+  "sourceAttestationReady": false,
+  "humanAuthorizationAttestationReady": false,
+  "liveExecutionEnabled": false,
+
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "successorActivated": false,
+
+  "finalStatus": "A12B2C5N1_CANONICAL_PROVISIONING_RECORD_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION"
+}
