@@ -1,0 +1,36 @@
+{
+  "phase": "A.12B.2C-5M",
+  "artifactType": "PRODUCTION_HUMAN_AUTHORIZATION_TRUST_ANCHOR_REGISTRY_FOUNDATION",
+
+  "baseCommit": "91db3c7a1017ecf70bad14063a193c8a0fdce604",
+  "baseTree": "a3035513232f0606c356ac7fd1d69300cfc2a921",
+
+  "registryVersion": "a12b2c5m-v1",
+  "productionAuthorityRegistryImplemented": true,
+  "productionAuthorityTrustAnchorProvisioned": false,
+  "productionAuthorityRegistryEntryCount": 0,
+
+  "callerSuppliedAuthorityAcceptedAsProductionTrust": false,
+  "callerSuppliedPublicKeyAcceptedAsProductionTrust": false,
+  "callerSuppliedFingerprintAcceptedAsProductionTrust": false,
+  "productionVerificationUsesRegistryOnly": true,
+  "productionVerificationClockCallerControlled": false,
+
+  "publicKeyFingerprintVerificationImplemented": true,
+  "ed25519PublicKeyValidationImplemented": true,
+
+  "productionPrivateKeyEmbedded": false,
+  "productionSigningIssuerImplemented": false,
+  "productionKeyRotationImplemented": false,
+
+  "guardedTransportIntegrated": false,
+  "sourceAttestationReady": false,
+  "humanAuthorizationAttestationReady": false,
+  "liveExecutionEnabled": false,
+
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "successorActivated": false,
+
+  "finalStatus": "A12B2C5M_PRODUCTION_TRUST_REGISTRY_IMPLEMENTED_UNPROVISIONED_NOT_LIVE"
+}
