@@ -1256,18 +1256,26 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
   // SUITE 11: Additional Adversarial Boundary Checks
   // ==========================================================================
 
-  it('71. non-integer budget is strictly rejected', () => {
-    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+  it('71. non-integer budget is strictly rejected during canonicalization and verification', () => {
+    const { authority } = createSyntheticTestAuthority();
     const payload = createSyntheticValidPayload(authority.authorityId, {
       maxBudgetMicroUsd: 12783.5,
     });
-    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+    expect(() => canonicalizeHumanAuthorizationPayload(payload)).toThrow(
+      /CANONICALIZATION_FAILURE.*maxBudgetMicroUsd/
+    );
 
-    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+    const rawPkg: SignedHumanAuthorizationPackage = {
+      payload,
+      signatureBase64: 'fake-sig',
+      authorityId: authority.authorityId,
+      keyVersion: authority.keyVersion,
+      algorithm: 'Ed25519',
+    };
+    const result = verifyHumanAuthorizationPackage(rawPkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
       sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
-
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.includes('BUDGET_NOT_INTEGER'))).toBe(true);
   });
@@ -1734,7 +1742,166 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
     expect(isValidIsoUtcTimestamp(undefined as any)).toBe(false);
   });
 
-  it('100. total provider network calls during entire test suite execution is exactly 0', () => {
+  // ==========================================================================
+  // SUITE 18: Phase A.12B.2C-5L.1.1 Foundation Hardening Regressions
+  // ==========================================================================
+
+  it('101. (Req A) maxBudgetMicroUsd = 12783.5 rejects during canonicalization', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, {
+      maxBudgetMicroUsd: 12783.5,
+    });
+    expect(() => canonicalizeHumanAuthorizationPayload(payload)).toThrow(
+      /CANONICALIZATION_FAILURE.*maxBudgetMicroUsd.*integer/
+    );
+  });
+
+  it('102. (Req B) canonicalTaskCount = 7.5 rejects during canonicalization', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, {
+      canonicalTaskCount: 7.5,
+    });
+    expect(() => canonicalizeHumanAuthorizationPayload(payload)).toThrow(
+      /CANONICALIZATION_FAILURE.*canonicalTaskCount.*integer/
+    );
+  });
+
+  it('103. (Req C) maxBudgetMicroUsd = 12783 is accepted by numeric canonicalization', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, {
+      maxBudgetMicroUsd: 12783,
+    });
+    const canonical = canonicalizeHumanAuthorizationPayload(payload);
+    expect(canonical).toContain('"maxBudgetMicroUsd":12783');
+  });
+
+  it('104. (Req D) canonicalTaskCount = 7 is accepted by numeric canonicalization', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, {
+      canonicalTaskCount: 7,
+    });
+    const canonical = canonicalizeHumanAuthorizationPayload(payload);
+    expect(canonical).toContain('"canonicalTaskCount":7');
+  });
+
+  it('105. (Req E) issuedAt = 2026-02-30T12:00:00.000Z rejects during verification', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, {
+      issuedAt: '2026-02-30T12:00:00.000Z',
+    });
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('INVALID_ISSUED_AT'))).toBe(true);
+  });
+
+  it('106. (Req F) expiresAt = 2026-04-31T12:00:00.000Z rejects during verification', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, {
+      expiresAt: '2026-04-31T12:00:00.000Z',
+    });
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('INVALID_EXPIRES_AT'))).toBe(true);
+  });
+
+  it('107. (Req G) source attestation createdAt = invalid calendar rollover date with recomputed digest rejects', () => {
+    const rolloverDate = '2026-02-30T12:00:00.000Z';
+    const tamperedPartial = {
+      ...DEFAULT_TEST_ATTESTATION,
+      createdAt: rolloverDate,
+    };
+    const tamperedAttestation: TrustedSourceAttestation = {
+      ...tamperedPartial,
+      attestationDigest: computeSourceAttestationDigest(tamperedPartial),
+    };
+    const validation = validateTrustedSourceAttestation(tamperedAttestation);
+    expect(validation.valid).toBe(false);
+    expect(validation.errors.some(e => e.includes('INVALID_CREATED_AT'))).toBe(true);
+  });
+
+  it('108. (Req H) nowUtc = new Date(NaN) fails closed with INVALID_VERIFICATION_TIME', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId);
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date(NaN),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('INVALID_VERIFICATION_TIME'))).toBe(true);
+  });
+
+  it('109. (Req I) source attestation unknown extra property is rejected', () => {
+    const attestationWithExtra: any = {
+      ...DEFAULT_TEST_ATTESTATION,
+      bypassSourceValidation: true,
+    };
+    const validation = validateTrustedSourceAttestation(attestationWithExtra);
+    expect(validation.valid).toBe(false);
+    expect(validation.errors.some(e => e.includes('ATTESTATION_SCHEMA_UNKNOWN_FIELD'))).toBe(true);
+  });
+
+  it('110. (Req J) source attestation required field inherited only from prototype is rejected', () => {
+    const proto = {
+      createdAt: '2026-09-05T12:00:00.000Z',
+    };
+    const attestationInherited = Object.create(proto);
+    for (const [key, value] of Object.entries(DEFAULT_TEST_ATTESTATION)) {
+      if (key !== 'createdAt') {
+        attestationInherited[key] = value;
+      }
+    }
+    const validation = validateTrustedSourceAttestation(attestationInherited);
+    expect(validation.valid).toBe(false);
+    expect(validation.errors.some(e => e.includes('ATTESTATION_MISSING_OWN_PROPERTY'))).toBe(true);
+  });
+
+  it('111. (Req K) authorization payload required field inherited only from prototype is rejected by canonicalization', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const validBase = createSyntheticValidPayload(authority.authorityId);
+    const proto = {
+      runNonce: validBase.runNonce,
+    };
+    const payloadInherited = Object.create(proto);
+    for (const [key, value] of Object.entries(validBase)) {
+      if (key !== 'runNonce') {
+        payloadInherited[key] = value;
+      }
+    }
+    expect(() => canonicalizeHumanAuthorizationPayload(payloadInherited)).toThrow(
+      /CANONICALIZATION_FAILURE.*required field 'runNonce' must be an own property/
+    );
+  });
+
+  it('112. (Req L) clean exact source attestation still passes', () => {
+    const validation = validateTrustedSourceAttestation(DEFAULT_TEST_ATTESTATION);
+    expect(validation.valid).toBe(true);
+    expect(validation.errors).toHaveLength(0);
+  });
+
+  it('113. (Req M) clean exact signed authorization + exact source attestation still passes', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId);
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+    expect(result.authorizationPackageDigest).toBeDefined();
+    expect(result.authorizationConsumptionKey).toBeDefined();
+  });
+
+  it('114. total provider network calls during entire test suite execution is exactly 0', () => {
     expect(globalFetchCalls).toBe(0);
   });
 });

@@ -185,14 +185,42 @@ export const EXACT_PAYLOAD_KEYS = Object.freeze([
 const ALLOWED_PAYLOAD_KEYS_SET = new Set<string>(EXACT_PAYLOAD_KEYS);
 
 /**
- * Validates whether a timestamp string strictly matches UTC ISO-8601 representation.
+ * Validates whether a timestamp string strictly matches UTC ISO-8601 representation
+ * with strict calendar validity (rejects nonexistent rollover dates like Feb 30, April 31).
  */
 export function isValidIsoUtcTimestamp(timestamp: string): boolean {
   if (typeof timestamp !== 'string') return false;
-  const isoUtcRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
-  if (!isoUtcRegex.test(timestamp)) return false;
-  const parsed = Date.parse(timestamp);
-  return !Number.isNaN(parsed);
+  // Strictly enforce YYYY-MM-DDTHH:mm:ssZ or YYYY-MM-DDTHH:mm:ss.SSSZ (1 to 3 fractional digits)
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z$/.exec(timestamp);
+  if (!match) return false;
+
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+  const hour = parseInt(match[4], 10);
+  const minute = parseInt(match[5], 10);
+  const second = parseInt(match[6], 10);
+  const ms = match[7] ? parseInt(match[7].padEnd(3, '0'), 10) : 0;
+
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  if (hour < 0 || hour > 23) return false;
+  if (minute < 0 || minute > 59) return false;
+  if (second < 0 || second > 59) return false;
+
+  // Round-trip calendar validation to reject calendar rollover dates
+  const d = new Date(Date.UTC(year, month - 1, day, hour, minute, second, ms));
+  if (!Number.isFinite(d.getTime())) return false;
+
+  return (
+    d.getUTCFullYear() === year &&
+    d.getUTCMonth() === month - 1 &&
+    d.getUTCDate() === day &&
+    d.getUTCHours() === hour &&
+    d.getUTCMinutes() === minute &&
+    d.getUTCSeconds() === second &&
+    d.getUTCMilliseconds() === ms
+  );
 }
 
 /**
@@ -224,8 +252,11 @@ export function canonicalizeHumanAuthorizationPayload(
     }
   }
 
-  // 2. Reject missing or null required fields
+  // 2. Reject missing or null required fields (must be own property)
   for (const key of EXACT_PAYLOAD_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(payload, key)) {
+      throw new Error(`CANONICALIZATION_FAILURE: required field '${key}' must be an own property of payload`);
+    }
     if ((payload as any)[key] === undefined || (payload as any)[key] === null) {
       throw new Error(`CANONICALIZATION_FAILURE: required field '${key}' is missing or null`);
     }
@@ -261,10 +292,11 @@ export function canonicalizeHumanAuthorizationPayload(
 
   if (
     typeof payload.maxBudgetMicroUsd !== 'number' ||
-    !Number.isFinite(payload.maxBudgetMicroUsd)
+    !Number.isFinite(payload.maxBudgetMicroUsd) ||
+    !Number.isInteger(payload.maxBudgetMicroUsd)
   ) {
     throw new Error(
-      "CANONICALIZATION_FAILURE: field 'maxBudgetMicroUsd' must be a finite number"
+      "CANONICALIZATION_FAILURE: field 'maxBudgetMicroUsd' must be a finite integer number"
     );
   }
 
@@ -274,10 +306,11 @@ export function canonicalizeHumanAuthorizationPayload(
 
   if (
     typeof payload.canonicalTaskCount !== 'number' ||
-    !Number.isFinite(payload.canonicalTaskCount)
+    !Number.isFinite(payload.canonicalTaskCount) ||
+    !Number.isInteger(payload.canonicalTaskCount)
   ) {
     throw new Error(
-      "CANONICALIZATION_FAILURE: field 'canonicalTaskCount' must be a finite number"
+      "CANONICALIZATION_FAILURE: field 'canonicalTaskCount' must be a finite integer number"
     );
   }
 
@@ -364,6 +397,23 @@ export function buildTrustedSourceAttestation(params: {
   };
 }
 
+export const EXACT_SOURCE_ATTESTATION_KEYS = Object.freeze([
+  'attestationVersion',
+  'sourceCommitSha',
+  'sourceTreeSha',
+  'repositoryIdentity',
+  'transportModuleIdentity',
+  'transportModuleVersion',
+  'transportContractVersion',
+  'successorSpecificationVersion',
+  'canonicalTaskSetDigest',
+  'fixtureSetDigest',
+  'createdAt',
+  'attestationDigest',
+] as const);
+
+const ALLOWED_SOURCE_ATTESTATION_KEYS_SET = new Set<string>(EXACT_SOURCE_ATTESTATION_KEYS);
+
 /**
  * Validates self-consistency and format invariants of a TrustedSourceAttestation.
  */
@@ -372,69 +422,100 @@ export function validateTrustedSourceAttestation(
 ): { valid: boolean; errors: readonly string[]; failureReason?: string } {
   const errors: string[] = [];
 
-  if (!attestation || typeof attestation !== 'object') {
+  if (!attestation || typeof attestation !== 'object' || Array.isArray(attestation)) {
     return { valid: false, errors: ['ATTESTATION_NULL: attestation must be a non-null object'], failureReason: 'ATTESTATION_NULL' };
   }
 
-  // 0. Attestation version exact binding check
-  if (!attestation.attestationVersion || attestation.attestationVersion !== ATTESTATION_FOUNDATION_VERSION) {
+  // 1. Exact TrustedSourceAttestation schema allowlist (reject unknown extra fields)
+  const attestationKeys = Object.keys(attestation);
+  for (const key of attestationKeys) {
+    if (!ALLOWED_SOURCE_ATTESTATION_KEYS_SET.has(key)) {
+      errors.push(`ATTESTATION_SCHEMA_UNKNOWN_FIELD: unknown or unauthorized field '${key}' in source attestation`);
+    }
+  }
+
+  // 2. Own-property requirement (must not be inherited solely through prototype chain)
+  for (const key of EXACT_SOURCE_ATTESTATION_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(attestation, key)) {
+      errors.push(`ATTESTATION_MISSING_OWN_PROPERTY: required field '${key}' must be an own property of source attestation`);
+    }
+  }
+
+  // 3. Exact runtime type enforcement: all 12 fields must be strings (no coercion)
+  for (const key of EXACT_SOURCE_ATTESTATION_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(attestation, key)) {
+      const val = (attestation as any)[key];
+      if (typeof val !== 'string') {
+        errors.push(`ATTESTATION_FIELD_TYPE_INVALID: field '${key}' must be a string, got ${typeof val}`);
+      }
+    }
+  }
+
+  // 4. Attestation version exact binding check
+  if (typeof attestation.attestationVersion !== 'string' || attestation.attestationVersion !== ATTESTATION_FOUNDATION_VERSION) {
     errors.push(`ATTESTATION_VERSION_MISMATCH: expected '${ATTESTATION_FOUNDATION_VERSION}', got '${attestation.attestationVersion}'`);
   }
 
-  // 1. 40-char lowercase Git SHA-1 commit check
-  if (!/^[0-9a-f]{40}$/.test(attestation.sourceCommitSha)) {
+  // 5. 40-char lowercase Git SHA-1 commit check
+  if (typeof attestation.sourceCommitSha !== 'string' || !/^[0-9a-f]{40}$/.test(attestation.sourceCommitSha)) {
     errors.push(`INVALID_COMMIT_SHA_FORMAT: '${attestation.sourceCommitSha}' is not a 40-char lowercase hex SHA`);
   }
 
-  // 2. 40-char lowercase Git SHA-1 tree check
-  if (!/^[0-9a-f]{40}$/.test(attestation.sourceTreeSha)) {
+  // 6. 40-char lowercase Git SHA-1 tree check
+  if (typeof attestation.sourceTreeSha !== 'string' || !/^[0-9a-f]{40}$/.test(attestation.sourceTreeSha)) {
     errors.push(`INVALID_TREE_SHA_FORMAT: '${attestation.sourceTreeSha}' is not a 40-char lowercase hex SHA`);
   }
 
-  // 3. Repository identity check
+  // 7. Repository identity check
   if (attestation.repositoryIdentity !== SEALED_REPOSITORY_IDENTITY) {
     errors.push(`REPOSITORY_IDENTITY_MISMATCH: expected '${SEALED_REPOSITORY_IDENTITY}', got '${attestation.repositoryIdentity}'`);
   }
 
-  // 4. Transport module identity check
+  // 8. Transport module identity check
   if (attestation.transportModuleIdentity !== GUARDED_TRANSPORT_MODULE_IDENTITY) {
     errors.push(`TRANSPORT_MODULE_MISMATCH: expected '${GUARDED_TRANSPORT_MODULE_IDENTITY}', got '${attestation.transportModuleIdentity}'`);
   }
 
-  // 5. Transport module version check
+  // 9. Transport module version check
   if (attestation.transportModuleVersion !== GUARDED_TRANSPORT_MODULE_VERSION) {
     errors.push(`MODULE_VERSION_MISMATCH: expected '${GUARDED_TRANSPORT_MODULE_VERSION}', got '${attestation.transportModuleVersion}'`);
   }
 
-  // 6. Transport contract version check
+  // 10. Transport contract version check
   if (attestation.transportContractVersion !== TRANSPORT_CONTRACT_VERSION) {
     errors.push(`CONTRACT_VERSION_MISMATCH: expected '${TRANSPORT_CONTRACT_VERSION}', got '${attestation.transportContractVersion}'`);
   }
 
-  // 7. Successor specification version check
+  // 11. Successor specification version check
   if (attestation.successorSpecificationVersion !== SUCCESSOR_SPECIFICATION_VERSION) {
     errors.push(`SPEC_VERSION_MISMATCH: expected '${SUCCESSOR_SPECIFICATION_VERSION}', got '${attestation.successorSpecificationVersion}'`);
   }
 
-  // 8. Canonical task set hash check
+  // 12. Canonical task set hash check
   const expectedTaskHash = computeCanonicalTaskSetHash();
   if (attestation.canonicalTaskSetDigest !== expectedTaskHash) {
     errors.push(`CANONICAL_TASK_DIGEST_MISMATCH: expected '${expectedTaskHash}', got '${attestation.canonicalTaskSetDigest}'`);
   }
 
-  // 9. Fixture set hash check
+  // 13. Fixture set hash check
   const expectedFixtureHash = computeFixtureSetHash();
   if (attestation.fixtureSetDigest !== expectedFixtureHash) {
     errors.push(`FIXTURE_DIGEST_MISMATCH: expected '${expectedFixtureHash}', got '${attestation.fixtureSetDigest}'`);
   }
 
-  // 10. Attestation digest self-consistency
-  const recomputedDigest = computeSourceAttestationDigest(attestation);
-  if (attestation.attestationDigest !== recomputedDigest) {
-    errors.push(`ATTESTATION_DIGEST_MISMATCH: expected '${recomputedDigest}', got '${attestation.attestationDigest}'`);
+  // 14. Attestation digest self-consistency
+  if (typeof attestation.attestationDigest === 'string') {
+    try {
+      const recomputedDigest = computeSourceAttestationDigest(attestation);
+      if (attestation.attestationDigest !== recomputedDigest) {
+        errors.push(`ATTESTATION_DIGEST_MISMATCH: expected '${recomputedDigest}', got '${attestation.attestationDigest}'`);
+      }
+    } catch (err) {
+      errors.push(`ATTESTATION_DIGEST_COMPUTATION_ERROR: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
-  // 11. CreatedAt ISO timestamp (strict UTC ISO timestamp string)
+  // 15. CreatedAt ISO timestamp (strict UTC ISO timestamp string with calendar validation)
   if (!isValidIsoUtcTimestamp(attestation.createdAt)) {
     errors.push(`INVALID_CREATED_AT: '${attestation.createdAt}' is not a valid UTC ISO timestamp string`);
   }
@@ -564,6 +645,15 @@ export function verifyHumanAuthorizationPackage(
     errors.push('SOURCE_ATTESTATION_INVALID: sourceAttestation must be a non-null object');
   }
 
+  // Verification time clock validity check (fails closed on invalid Date)
+  let verificationTimeValid = true;
+  if (options && typeof options === 'object' && options.nowUtc !== undefined) {
+    if (!(options.nowUtc instanceof Date) || !Number.isFinite(options.nowUtc.getTime())) {
+      errors.push('INVALID_VERIFICATION_TIME: options.nowUtc must be a valid Date object with finite time');
+      verificationTimeValid = false;
+    }
+  }
+
   // 1. Authority ID matching
   if (!pkg.authorityId || pkg.authorityId !== authority.authorityId) {
     errors.push(`AUTHORITY_ID_MISMATCH: package authorityId '${pkg.authorityId}' does not match authority descriptor '${authority.authorityId}'`);
@@ -690,7 +780,7 @@ export function verifyHumanAuthorizationPackage(
   }
 
   // 7. Timestamps and lifetime bounds
-  const now = options?.nowUtc ? options.nowUtc.getTime() : Date.now();
+  const now = (options?.nowUtc && verificationTimeValid) ? options.nowUtc.getTime() : Date.now();
 
   if (!isValidIsoUtcTimestamp(p.issuedAt)) {
     errors.push(`INVALID_ISSUED_AT: '${p.issuedAt}' is not a valid UTC ISO timestamp string`);
