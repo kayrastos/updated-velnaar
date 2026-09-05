@@ -1,0 +1,22 @@
+{
+  "phase": "A.12B.2C-5L",
+  "artifactType": "TRUSTED_SOURCE_AND_HUMAN_AUTH_CRYPTOGRAPHIC_ATTESTATION_FOUNDATION",
+  "baseCommit": "9f85f4c32cca4ae3df992b18584016efb6c578f1",
+  "baseTree": "8179946ec3581d316a7a1a8b55aa207eef3efe10",
+  "algorithm": "Ed25519",
+  "productionPrivateKeyEmbedded": false,
+  "productionSigningIssuerImplemented": false,
+  "sourceAttestationVerifierImplemented": true,
+  "humanAuthorizationSignatureVerifierImplemented": true,
+  "authorizationPackageDigestImplemented": true,
+  "singleUseConsumptionIdentityImplemented": true,
+  "sourceAttestationBoundIntoSignedAuthorization": true,
+  "sourceAttestationReady": false,
+  "humanAuthorizationAttestationReady": false,
+  "liveExecutionEnabled": false,
+  "providerNetworkCalls": 0,
+  "humanLiveAuthorizationGenerated": false,
+  "productionRoutingEnforcementAllowed": false,
+  "successorActivated": false,
+  "finalStatus": "A12B2C5L_ATTESTATION_FOUNDATION_IMPLEMENTED_NOT_INTEGRATED_NOT_LIVE"
+}
