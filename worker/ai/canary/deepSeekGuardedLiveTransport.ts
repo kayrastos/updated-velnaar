@@ -90,6 +90,18 @@ export const GUARDED_DISPATCH_MODEL = SEALED_MODEL;       // 'deepseek-v4-flash'
 export const GUARDED_LIFECYCLE_TIMEOUT_MS = SEALED_LIFECYCLE_TIMEOUT_MS; // 15000
 export const GUARDED_CANONICAL_TASK_COUNT = SEALED_CANONICAL_TASK_COUNT; // 7
 
+/**
+ * Compile-time fail-closed readiness barrier for trusted runtime source attestation.
+ * MANDATE: MUST remain false until a dedicated trusted build/runtime attestation layer is implemented.
+ */
+export const GUARDED_SOURCE_ATTESTATION_READY = false as const;
+
+/**
+ * Compile-time fail-closed readiness barrier for cryptographic human authorization attestation.
+ * MANDATE: MUST remain false until cryptographic verification of authority signatures is implemented.
+ */
+export const GUARDED_HUMAN_AUTH_ATTESTATION_READY = false as const;
+
 // ============================================================================
 // 2. CREDENTIAL CAPABILITY (NARROWLY SCOPED & EPHEMERAL)
 // ============================================================================
@@ -529,14 +541,12 @@ export function prepareEvidencePersistenceRecord(params: {
 export interface GuardedTransportExecutionOptions {
   readonly authorization: WindowAuthorizationEvidence;
   readonly pricingWindow: 'OFF_PEAK' | 'PEAK';
-  readonly sourceCommitSha: string;
-  readonly sourceTreeSha: string;
   /**
    * Narrowly-scoped runtime credential resolver.
-   * STRICT INVARIANT: Evaluated ONLY AFTER global live gate and authorization preflight pass.
+   * STRICT INVARIANT: Evaluated ONLY AFTER global live gate, source attestation,
+   * human auth attestation, and authorization preflight pass.
    */
   readonly getRuntimeCredential?: () => Promise<DeepSeekRuntimeCredential> | DeepSeekRuntimeCredential;
-  readonly currentTimeUtc?: Date;
 }
 
 export interface GuardedTransportExecutionResult {
@@ -570,22 +580,20 @@ export interface GuardedTransportExecutionResult {
 /**
  * Authoritative Guarded DeepSeek Live Certification Transport Dispatcher.
  * 
- * FIRST BARRIER MANDATE:
- * When CANARY_LIVE_EXECUTION_ENABLED === false, this function MUST return fail-closed BEFORE:
- * - resolving credentials
- * - reading credentials
- * - constructing Authorization headers
- * - creating AbortController timers for transport
- * - invoking fetch
- * - opening sockets
- * - consuming authorization
- * - modifying evidence
- * - writing certification state
+ * STRICT BARRIER SEQUENCE (MANDATORY ORDER):
+ * 1. CANARY_LIVE_EXECUTION_ENABLED / authoritative live state
+ * 2. GUARDED_SOURCE_ATTESTATION_READY
+ * 3. GUARDED_HUMAN_AUTH_ATTESTATION_READY
+ * 4. Actual trusted authorization/source preflight (fresh runtime Date())
+ * 5. Credential resolution capability
+ * 6. Sequential canonical tasks (fresh runtime Date() before each invocation)
+ * 7. Quality gate evaluation
+ * 8. Intermediate evidence candidate construction
  * 
  * ZERO BYPASS PERMITTED:
- * - No caller parameter may override the gate.
- * - No process.env switch may override it.
- * - No CLI switch may override it.
+ * - No caller parameter may override any gate or inject arbitrary clocks/source hashes.
+ * - No process.env switch may override any gate.
+ * - No CLI switch may override any gate.
  */
 export async function executeGuardedDeepSeekCertificationTransport(
   options: GuardedTransportExecutionOptions
@@ -621,13 +629,76 @@ export async function executeGuardedDeepSeekCertificationTransport(
   }
 
   // ==========================================================================
-  // GATE BARRIER 2: AUTHORIZATION & SOURCE SEAL PREFLIGHT
+  // GATE BARRIER 2: SOURCE ATTESTATION BARRIER (FAIL-CLOSED READY CONSTANT)
   // ==========================================================================
-  const preflight = validateLiveTransportPreflight(options.authorization, {
+  if (!GUARDED_SOURCE_ATTESTATION_READY) {
+    return {
+      success: false,
+      status: 'LIVE_EXECUTION_BLOCKED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: [
+        'SOURCE_ATTESTATION_NOT_READY: Trusted runtime source attestation is not ready (GUARDED_SOURCE_ATTESTATION_READY === false). Real provider dispatch unreachable.',
+      ],
+      providerNetworkCalls: 0,
+      credentialReads: 0,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: options.authorization?.maxBudgetMicroUsd ?? 0,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // ==========================================================================
+  // GATE BARRIER 3: HUMAN AUTHORIZATION ATTESTATION BARRIER (FAIL-CLOSED)
+  // ==========================================================================
+  if (!GUARDED_HUMAN_AUTH_ATTESTATION_READY) {
+    return {
+      success: false,
+      status: 'LIVE_EXECUTION_BLOCKED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: [
+        'HUMAN_AUTH_ATTESTATION_NOT_READY: Cryptographic verification of human authorization authority is not ready (GUARDED_HUMAN_AUTH_ATTESTATION_READY === false). Real provider dispatch unreachable.',
+      ],
+      providerNetworkCalls: 0,
+      credentialReads: 0,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: options.authorization?.maxBudgetMicroUsd ?? 0,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // ==========================================================================
+  // GATE BARRIER 4: AUTHORIZATION & FUTURE ATTESTATION PREFLIGHT
+  // Note: A future phase must provide independently verified source provenance
+  // (e.g. build provenance / cryptographically bound authorization package).
+  // Production live execution MUST NOT accept caller-controlled clock or source.
+  // We take a fresh real UTC observation immediately before preflight.
+  // ==========================================================================
+  const initialPreflightClock = new Date();
+  const authorization = options.authorization;
+  const expectedCommit = authorization?.sourceCommitSha ?? '';
+  const expectedTree = authorization?.sourceTreeSha ?? '';
+
+  const preflight = validateLiveTransportPreflight(authorization, {
     expectedWindow: options.pricingWindow,
-    expectedCommit: options.sourceCommitSha,
-    expectedTree: options.sourceTreeSha,
-    currentTimeUtc: options.currentTimeUtc ?? new Date(),
+    expectedCommit,
+    expectedTree,
+    currentTimeUtc: initialPreflightClock,
   });
 
   if (!preflight.valid) {
@@ -653,7 +724,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
   }
 
   // ==========================================================================
-  // GATE BARRIER 3: RUNTIME CREDENTIAL RESOLUTION (AFTER GATES 1 & 2 ONLY)
+  // GATE BARRIER 5: RUNTIME CREDENTIAL RESOLUTION (AFTER GATES 1, 2, 3 & 4 ONLY)
   // ==========================================================================
   let credentialReads = 0;
   let credential: DeepSeekRuntimeCredential | null = null;
@@ -693,7 +764,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
   }
 
   // ==========================================================================
-  // GATE BARRIER 4: SEQUENTIAL EXECUTION OF 7 CANONICAL TASKS
+  // GATE BARRIER 6: SEQUENTIAL EXECUTION OF 7 CANONICAL TASKS
   // ==========================================================================
   const candidateId =
     options.pricingWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_CANDIDATE_ID : SEALED_PEAK_CANDIDATE_ID;
@@ -710,11 +781,14 @@ export async function executeGuardedDeepSeekCertificationTransport(
     const taskType = CERTIFIED_A12B2C_TASK_TYPES[index];
     const invocationIndex = index + 1;
 
-    // Window Crossing Check before invocation 2..7
+    // Fresh UTC clock observation immediately before EACH invocation dispatch
+    const taskClock = new Date();
+
+    // Window Crossing Check before invocation 2..7 using fresh taskClock
     if (invocationIndex > 1) {
       const crossingCheck = checkWindowCrossing(
         options.pricingWindow,
-        options.currentTimeUtc ?? new Date()
+        taskClock
       );
       if (crossingCheck.crossed) {
         return {
@@ -963,14 +1037,16 @@ export async function executeGuardedDeepSeekCertificationTransport(
   }
 
   // ==========================================================================
-  // GATE BARRIER 6: BUILD INTERMEDIATE EVIDENCE CANDIDATE (NOT CERTIFIED)
+  // GATE BARRIER 8: BUILD INTERMEDIATE EVIDENCE CANDIDATE (NOT CERTIFIED)
+  // Note: sourceCommitSha and sourceTreeSha originate from the future trusted
+  // authorization/attestation package rather than untrusted direct caller inputs.
   // ==========================================================================
   const candidate = buildLiveCertificationEvidenceCandidate({
     pricingWindow: options.pricingWindow,
     candidateId,
     targetProgram,
-    sourceCommitSha: options.sourceCommitSha,
-    sourceTreeSha: options.sourceTreeSha,
+    sourceCommitSha: options.authorization.sourceCommitSha,
+    sourceTreeSha: options.authorization.sourceTreeSha,
     runNonce: options.authorization.runNonce,
     invocationResponses,
     invocationRecords,

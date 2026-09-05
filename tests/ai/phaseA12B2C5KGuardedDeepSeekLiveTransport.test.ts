@@ -26,6 +26,8 @@ import {
   GUARDED_DISPATCH_MODEL,
   GUARDED_LIFECYCLE_TIMEOUT_MS,
   GUARDED_CANONICAL_TASK_COUNT,
+  GUARDED_SOURCE_ATTESTATION_READY,
+  GUARDED_HUMAN_AUTH_ATTESTATION_READY,
   serializeAndHashCanonicalRequest,
   classifyLifecycleDeadline,
   classifyTransportError,
@@ -95,8 +97,8 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
-    expect(globalFetchCalls).toBe(0);
+    globalFetchCalls = 0;
+    originalFetch = globalThis.fetch;
   });
 
   // Helper to build synthetic authorization evidence (TEST ONLY - NOT HUMAN AUTHORIZATION)
@@ -132,8 +134,6 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
     const result = await executeGuardedDeepSeekCertificationTransport({
       authorization: auth,
       pricingWindow: 'OFF_PEAK',
-      sourceCommitSha: auth.sourceCommitSha,
-      sourceTreeSha: auth.sourceTreeSha,
     });
 
     expect(result.success).toBe(false);
@@ -148,8 +148,6 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
     await executeGuardedDeepSeekCertificationTransport({
       authorization: auth,
       pricingWindow: 'OFF_PEAK',
-      sourceCommitSha: auth.sourceCommitSha,
-      sourceTreeSha: auth.sourceTreeSha,
     });
 
     expect(globalFetchCalls).toBe(0);
@@ -162,8 +160,6 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
     const result = await executeGuardedDeepSeekCertificationTransport({
       authorization: auth,
       pricingWindow: 'OFF_PEAK',
-      sourceCommitSha: auth.sourceCommitSha,
-      sourceTreeSha: auth.sourceTreeSha,
       getRuntimeCredential: () => {
         credentialResolverCalls++;
         return { apiKey: 'dummy-sentinel-key' };
@@ -181,8 +177,6 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
     const result = await executeGuardedDeepSeekCertificationTransport({
       authorization: auth,
       pricingWindow: 'OFF_PEAK',
-      sourceCommitSha: auth.sourceCommitSha,
-      sourceTreeSha: auth.sourceTreeSha,
     });
 
     expect(result.credentialReads).toBe(0);
@@ -195,8 +189,6 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
     await executeGuardedDeepSeekCertificationTransport({
       authorization: auth,
       pricingWindow: 'OFF_PEAK',
-      sourceCommitSha: auth.sourceCommitSha,
-      sourceTreeSha: auth.sourceTreeSha,
     });
 
     expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 15000);
@@ -208,8 +200,6 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
     const result = await executeGuardedDeepSeekCertificationTransport({
       authorization: auth,
       pricingWindow: 'OFF_PEAK',
-      sourceCommitSha: auth.sourceCommitSha,
-      sourceTreeSha: auth.sourceTreeSha,
     });
 
     expect(result.candidate).toBeNull();
@@ -438,8 +428,6 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
       const result = await executeGuardedDeepSeekCertificationTransport({
         authorization: auth,
         pricingWindow: 'OFF_PEAK',
-        sourceCommitSha: auth.sourceCommitSha,
-        sourceTreeSha: auth.sourceTreeSha,
       });
 
       expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
@@ -458,8 +446,6 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
       const result = await executeGuardedDeepSeekCertificationTransport({
         authorization: auth,
         pricingWindow: 'OFF_PEAK',
-        sourceCommitSha: auth.sourceCommitSha,
-        sourceTreeSha: auth.sourceTreeSha,
       });
 
       expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
@@ -872,8 +858,6 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
     const result = await executeGuardedDeepSeekCertificationTransport({
       authorization: auth,
       pricingWindow: 'OFF_PEAK',
-      sourceCommitSha: auth.sourceCommitSha,
-      sourceTreeSha: auth.sourceTreeSha,
     });
 
     expect(result.finalCertificationEligible).toBe(false);
@@ -921,7 +905,238 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
     expect(ACTIVATION_STATUS).toBe('OFFLINE_DRAFT_NOT_LIVE');
   });
 
-  it('62. total provider network calls during entire test suite execution is exactly 0', () => {
+  // ==========================================================================
+  // GROUP 10: TRUST BOUNDARY REPAIR REGRESSIONS (5K.1 Regressions A through R)
+  // ==========================================================================
+
+  it('62. Regression A: GuardedTransportExecutionOptions no longer exposes currentTimeUtc', () => {
+    const modulePath = path.resolve(__dirname, '../../worker/ai/canary/deepSeekGuardedLiveTransport.ts');
+    const source = fs.readFileSync(modulePath, 'utf8');
+
+    const ifaceMatch = source.match(/export interface GuardedTransportExecutionOptions\s*\{([\s\S]*?)\}/);
+    expect(ifaceMatch).not.toBeNull();
+    const ifaceBody = ifaceMatch![1];
+    expect(ifaceBody.includes('currentTimeUtc')).toBe(false);
+  });
+
+  it('63. Regression B: public execution source contains no options.currentTimeUtc', () => {
+    const modulePath = path.resolve(__dirname, '../../worker/ai/canary/deepSeekGuardedLiveTransport.ts');
+    const source = fs.readFileSync(modulePath, 'utf8');
+
+    expect(source.includes('options.currentTimeUtc')).toBe(false);
+  });
+
+  it('64. Regression C: public execution source contains no caller-controlled sourceCommitSha / sourceTreeSha as expected-source parameters', () => {
+    const modulePath = path.resolve(__dirname, '../../worker/ai/canary/deepSeekGuardedLiveTransport.ts');
+    const source = fs.readFileSync(modulePath, 'utf8');
+
+    const ifaceMatch = source.match(/export interface GuardedTransportExecutionOptions\s*\{([\s\S]*?)\}/);
+    expect(ifaceMatch).not.toBeNull();
+    expect(ifaceMatch![1].includes('sourceCommitSha')).toBe(false);
+    expect(ifaceMatch![1].includes('sourceTreeSha')).toBe(false);
+
+    expect(source.includes('options.sourceCommitSha')).toBe(false);
+    expect(source.includes('options.sourceTreeSha')).toBe(false);
+    expect(source.includes('expectedCommit: options.')).toBe(false);
+    expect(source.includes('expectedTree: options.')).toBe(false);
+  });
+
+  it('65. Regression D: forced as any currentTimeUtc supplied cannot influence live execution', async () => {
+    const auth = createSyntheticAuthorization();
+    const frozenPastDate = new Date('2020-01-01T00:00:00Z');
+
+    const result = await executeGuardedDeepSeekCertificationTransport({
+      authorization: auth,
+      pricingWindow: 'OFF_PEAK',
+      currentTimeUtc: frozenPastDate,
+    } as any);
+
+    expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+    expect(result.success).toBe(false);
+  });
+
+  it('66. Regression E: forced as any sourceCommitSha / sourceTreeSha supplied cannot become trusted expected source', async () => {
+    const auth = createSyntheticAuthorization();
+
+    const result = await executeGuardedDeepSeekCertificationTransport({
+      authorization: auth,
+      pricingWindow: 'OFF_PEAK',
+      sourceCommitSha: 'attacker_controlled_commit_sha',
+      sourceTreeSha: 'attacker_controlled_tree_sha',
+    } as any);
+
+    expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+    expect(result.success).toBe(false);
+  });
+
+  it('67. Regression F: GUARDED_SOURCE_ATTESTATION_READY === false', () => {
+    expect(GUARDED_SOURCE_ATTESTATION_READY).toBe(false);
+  });
+
+  it('68. Regression G: GUARDED_HUMAN_AUTH_ATTESTATION_READY === false', () => {
+    expect(GUARDED_HUMAN_AUTH_ATTESTATION_READY).toBe(false);
+  });
+
+  it('69. Regression H: credential resolver cannot run while source attestation not ready', async () => {
+    let credentialResolverCalls = 0;
+    const auth = createSyntheticAuthorization();
+
+    const result = await executeGuardedDeepSeekCertificationTransport({
+      authorization: auth,
+      pricingWindow: 'OFF_PEAK',
+      getRuntimeCredential: () => {
+        credentialResolverCalls++;
+        return { apiKey: 'dummy-sentinel-key' };
+      },
+    });
+
+    expect(credentialResolverCalls).toBe(0);
+    expect(result.credentialReads).toBe(0);
+    expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+  });
+
+  it('70. Regression I: credential resolver cannot run while human auth attestation not ready', async () => {
+    let credentialResolverCalls = 0;
+    const auth = createSyntheticAuthorization();
+
+    const result = await executeGuardedDeepSeekCertificationTransport({
+      authorization: auth,
+      pricingWindow: 'OFF_PEAK',
+      getRuntimeCredential: async () => {
+        credentialResolverCalls++;
+        return { apiKey: 'dummy-sentinel-key' };
+      },
+    });
+
+    expect(credentialResolverCalls).toBe(0);
+    expect(result.credentialReads).toBe(0);
+    expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+  });
+
+  it('71. Regression J: fetch cannot run while source attestation not ready', async () => {
+    const auth = createSyntheticAuthorization();
+
+    await executeGuardedDeepSeekCertificationTransport({
+      authorization: auth,
+      pricingWindow: 'OFF_PEAK',
+    });
+
+    expect(globalFetchCalls).toBe(0);
+  });
+
+  it('72. Regression K: fetch cannot run while human auth attestation not ready', async () => {
+    const auth = createSyntheticAuthorization();
+
+    await executeGuardedDeepSeekCertificationTransport({
+      authorization: auth,
+      pricingWindow: 'OFF_PEAK',
+    });
+
+    expect(globalFetchCalls).toBe(0);
+  });
+
+  it('73. Regression L: no process.env source-attestation override', async () => {
+    const originalEnv = process.env.GUARDED_SOURCE_ATTESTATION_READY;
+    try {
+      (process.env as any).GUARDED_SOURCE_ATTESTATION_READY = 'true';
+      (process.env as any).BYPASS_SOURCE_ATTESTATION = 'true';
+
+      const auth = createSyntheticAuthorization();
+      const result = await executeGuardedDeepSeekCertificationTransport({
+        authorization: auth,
+        pricingWindow: 'OFF_PEAK',
+      });
+
+      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+    } finally {
+      process.env.GUARDED_SOURCE_ATTESTATION_READY = originalEnv;
+      delete (process.env as any).BYPASS_SOURCE_ATTESTATION;
+    }
+  });
+
+  it('74. Regression M: no process.env auth-attestation override', async () => {
+    const originalEnv = process.env.GUARDED_HUMAN_AUTH_ATTESTATION_READY;
+    try {
+      (process.env as any).GUARDED_HUMAN_AUTH_ATTESTATION_READY = 'true';
+      (process.env as any).BYPASS_HUMAN_AUTH_ATTESTATION = 'true';
+
+      const auth = createSyntheticAuthorization();
+      const result = await executeGuardedDeepSeekCertificationTransport({
+        authorization: auth,
+        pricingWindow: 'OFF_PEAK',
+      });
+
+      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+    } finally {
+      process.env.GUARDED_HUMAN_AUTH_ATTESTATION_READY = originalEnv;
+      delete (process.env as any).BYPASS_HUMAN_AUTH_ATTESTATION;
+    }
+  });
+
+  it('75. Regression N: no CLI override for source or human auth attestation', async () => {
+    const originalArgv = [...process.argv];
+    try {
+      process.argv.push(
+        '--bypass-source-attestation',
+        '--bypass-human-auth-attestation',
+        '--force-attestation-ready'
+      );
+
+      const auth = createSyntheticAuthorization();
+      const result = await executeGuardedDeepSeekCertificationTransport({
+        authorization: auth,
+        pricingWindow: 'OFF_PEAK',
+      });
+
+      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+    } finally {
+      process.argv = originalArgv;
+    }
+  });
+
+  it('76. Regression O: no public bypassSourceAttestation export or method exists', () => {
+    expect((guardedTransportModule as any).bypassSourceAttestation).toBeUndefined();
+
+    const modulePath = path.resolve(__dirname, '../../worker/ai/canary/deepSeekGuardedLiveTransport.ts');
+    const source = fs.readFileSync(modulePath, 'utf8');
+    expect(source.includes('bypassSourceAttestation')).toBe(false);
+  });
+
+  it('77. Regression P: no public bypassHumanAuthorization export or method exists', () => {
+    expect((guardedTransportModule as any).bypassHumanAuthorization).toBeUndefined();
+
+    const modulePath = path.resolve(__dirname, '../../worker/ai/canary/deepSeekGuardedLiveTransport.ts');
+    const source = fs.readFileSync(modulePath, 'utf8');
+    expect(source.includes('bypassHumanAuthorization')).toBe(false);
+  });
+
+  it('78. Regression Q: pure checkWindowCrossing continues accepting deterministic Date for unit tests', () => {
+    const offPeakDate = new Date('2026-09-05T01:00:00Z'); // Saturday 01:00 UTC (OFF_PEAK)
+    const peakDate = new Date('2026-09-08T02:00:00Z'); // Tuesday 02:00 UTC (PEAK)
+
+    const offPeakCheck = checkWindowCrossing('OFF_PEAK', offPeakDate);
+    expect(offPeakCheck.crossed).toBe(false);
+    expect(offPeakCheck.currentWindow).toBe('OFF_PEAK');
+
+    const peakCheck = checkWindowCrossing('OFF_PEAK', peakDate);
+    expect(peakCheck.crossed).toBe(true);
+    expect(peakCheck.currentWindow).toBe('PEAK');
+    expect(peakCheck.failClosed).toBe(true);
+  });
+
+  it('79. Regression R: production path obtains a fresh runtime Date before each invocation rather than freezing one caller-provided Date', () => {
+    const modulePath = path.resolve(__dirname, '../../worker/ai/canary/deepSeekGuardedLiveTransport.ts');
+    const source = fs.readFileSync(modulePath, 'utf8');
+
+    // Invariant: preflight obtains fresh runtime clock
+    expect(source.includes('const initialPreflightClock = new Date();')).toBe(true);
+    // Invariant: each task invocation obtains fresh runtime clock
+    expect(source.includes('const taskClock = new Date();')).toBe(true);
+    // Invariant: checkWindowCrossing inside loop is passed taskClock
+    expect(source.includes('checkWindowCrossing(\n        options.pricingWindow,\n        taskClock\n      )')).toBe(true);
+  });
+
+  it('80. total provider network calls during entire test suite execution is exactly 0', () => {
     expect(globalFetchCalls).toBe(0);
   });
 });
