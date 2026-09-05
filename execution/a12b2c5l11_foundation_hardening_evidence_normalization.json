@@ -1,25 +1,53 @@
 {
   "phase": "A.12B.2C-5L.1.1",
-  "status": "A12B2C5L11_FOUNDATION_HARDENING_PASS_PENDING_INDEPENDENT_VERIFICATION",
-  "canonical_integer_enforced": true,
-  "strict_utc_calendar_validity_enforced": true,
-  "fail_closed_clock_enforced": true,
-  "source_attestation_schema_allowlist_enforced": true,
-  "source_attestation_own_property_enforced": true,
-  "source_attestation_exact_types_enforced": true,
-  "authorization_payload_own_property_enforced": true,
-  "no_rfc8785_claims_made": true,
-  "serialization_description": "deterministic fixed-order canonical serialization",
-  "deepseek_calls_observed": 0,
-  "gemini_calls_observed": 0,
-  "external_network_calls_observed": 0,
-  "canary_live_execution_enabled": false,
-  "guarded_source_attestation_ready": false,
-  "guarded_human_auth_attestation_ready": false,
-  "v13_activated": false,
-  "production_routing_enabled": false,
-  "live_human_authorization_created": false,
-  "completed_at": "2026-09-05T18:33:45.000Z",
-  "base_commit": "4e1623cfcc3f019727f2c1d4b08d6599a71cc73f",
-  "base_tree": "4ef151676ac8ac8f95b47f6df8be6d24a727815f"
+  "artifactType": "ATTESTATION_FOUNDATION_HARDENING_AND_EVIDENCE_NORMALIZATION",
+
+  "baseCommit": "4e1623cfcc3f019727f2c1d4b08d6599a71cc73f",
+  "baseTree": "4ef151676ac8ac8f95b47f6df8be6d24a727815f",
+
+  "historical5LArtifactModified": false,
+  "historical5L1ArtifactModified": false,
+
+  "canonicalizerSignsActualSingleUseValue": true,
+  "canonicalizerSignsActualTaskCountValue": true,
+  "canonicalizerRejectsUnknownProperties": true,
+  "canonicalizerRejectsTypeCoercion": true,
+  "canonicalizerRequiresIntegerBudget": true,
+  "canonicalizerRequiresIntegerTaskCount": true,
+
+  "strictUtcCalendarValidationRequired": true,
+  "invalidCalendarRolloverRejected": true,
+  "invalidVerificationClockRejected": true,
+
+  "authorizationVersionExactBindingRequired": true,
+  "sourceAttestationVersionExactBindingRequired": true,
+  "sourceAttestationMandatoryForSuccessfulVerification": true,
+  "sourceAttestationExactPropertySetRequired": true,
+  "sourceAttestationOwnPropertiesRequired": true,
+
+  "sourceCommitExactBindingRequired": true,
+  "sourceTreeExactBindingRequired": true,
+  "sourceAttestationDigestExactBindingRequired": true,
+
+  "allSecurityCriticalPayloadFieldsCryptographicallyCovered": true,
+  "authorizationPackageDigestCoversActualPayload": true,
+
+  "serializationDescription": "deterministic fixed-order canonical serialization",
+  "rfc8785ComplianceClaimed": false,
+
+  "productionAuthorityTrustAnchorIntegrated": false,
+  "productionPrivateKeyEmbedded": false,
+  "productionSigningIssuerImplemented": false,
+
+  "sourceAttestationReady": false,
+  "humanAuthorizationAttestationReady": false,
+  "liveExecutionEnabled": false,
+
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "successorActivated": false,
+
+  "canonical5L1FinalStatus": "A12B2C5L1_COMPLETE_BINDING_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION",
+
+  "finalStatus": "A12B2C5L11_FOUNDATION_HARDENING_PASS_PENDING_INDEPENDENT_VERIFICATION"
 }
