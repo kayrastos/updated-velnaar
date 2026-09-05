@@ -1,0 +1,38 @@
+{
+  "phase": "A.12B.2C-5O",
+  "artifactType": "PRODUCTION_PUBLIC_TRUST_ANCHOR_PROVISIONING_SLOT_AND_MANUAL_HANDOFF",
+
+  "baseCommit": "9d678efeee95f35812e0af3bfe005cf5d6a82285",
+  "baseTree": "5e42ecdf262eff698c6bca23d855482d888d2d64",
+
+  "slotVersion": "a12b2c5o-v1",
+
+  "productionTrustAnchorSlotImplemented": true,
+  "productionTrustAnchorSlotReady": false,
+  "productionTrustAnchorSlotPopulated": false,
+
+  "canonicalProvisioningCandidateValidatorImplemented": true,
+  "manualHandoffReceiptImplemented": true,
+  "manualHandoffDigestImplemented": true,
+  "candidateReceiptCrossBindingImplemented": true,
+
+  "privateKeyAllowedInRepository": false,
+  "privateKeyAllowedInApplicationRuntime": false,
+  "privateKeyAllowedInAIAgentContext": false,
+
+  "productionPrivateKeyGenerated": false,
+  "productionPublicTrustAnchorProvisioned": false,
+  "productionAuthorityRegistryEntryCount": 0,
+
+  "callerDynamicTrustSourceAllowed": false,
+
+  "sourceAttestationReady": false,
+  "humanAuthorizationAttestationReady": false,
+  "liveExecutionEnabled": false,
+
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "successorActivated": false,
+
+  "finalStatus": "A12B2C5O_PROVISIONING_SLOT_IMPLEMENTED_EMPTY_NOT_LIVE"
+}
