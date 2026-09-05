@@ -90,6 +90,7 @@ export const TRANSPORT_FAILURE_CATEGORIES = [
   'JSON_PARSE_FAILURE',
   'MODEL_PROVENANCE_MISMATCH',
   'USAGE_MISSING',
+  'USAGE_INTEGRITY_FAILURE',
   'SCHEMA_FAILURE',
   'TASK_FAILURE',
   'SEMANTIC_GATE_FAILURE',
@@ -135,6 +136,19 @@ export interface CanonicalChatMessage {
   readonly content: string;
 }
 
+export interface DeepSeekThinkingConfig {
+  readonly type: 'enabled';
+}
+
+export interface DeepSeekRequestBody {
+  readonly model: 'deepseek-v4-flash';
+  readonly messages: readonly CanonicalChatMessage[];
+  readonly max_tokens: 2048;
+  readonly thinking: DeepSeekThinkingConfig;
+  readonly reasoning_effort: 'low';
+  readonly stream: false;
+}
+
 export interface SealedLiveRequestDescriptor {
   readonly invocationIndex: number; // 1..7
   readonly taskType: TaskType;
@@ -150,6 +164,7 @@ export interface SealedLiveRequestDescriptor {
   readonly maxTokens: 2048;
   readonly messages: readonly CanonicalChatMessage[];
   readonly lifecycleTimeoutMs: 15000;
+  readonly requestBody: DeepSeekRequestBody;
   readonly requestPayloadHash: string;
 }
 
@@ -157,7 +172,6 @@ export interface BuildSealedLiveRequestDescriptorParams {
   readonly taskType: TaskType;
   readonly invocationIndex: number;
   readonly pricingWindow: 'OFF_PEAK' | 'PEAK';
-  readonly candidateId?: string;
 }
 
 /**
@@ -167,6 +181,12 @@ export interface BuildSealedLiveRequestDescriptorParams {
 export function buildSealedLiveRequestDescriptor(
   params: BuildSealedLiveRequestDescriptorParams
 ): SealedLiveRequestDescriptor {
+  if (params.pricingWindow !== 'OFF_PEAK' && params.pricingWindow !== 'PEAK') {
+    throw new Error(
+      `INVALID_PRICING_WINDOW: expected 'OFF_PEAK' | 'PEAK', got '${String(params.pricingWindow)}'`
+    );
+  }
+
   if (params.invocationIndex < 1 || params.invocationIndex > 7) {
     throw new Error(`INVALID_INVOCATION_INDEX: index must be 1..7, got ${params.invocationIndex}`);
   }
@@ -175,9 +195,9 @@ export function buildSealedLiveRequestDescriptor(
     throw new Error(`UNSUPPORTED_TASK_TYPE: ${params.taskType}`);
   }
 
-  const expectedCandidateId =
+  // Candidate is derived strictly from pricingWindow; caller overrides are completely rejected/ignored.
+  const candidateId =
     params.pricingWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_CANDIDATE_ID : SEALED_PEAK_CANDIDATE_ID;
-  const candidateId = params.candidateId ?? expectedCandidateId;
 
   const fixture = CANARY_SYNTHETIC_FIXTURES[params.taskType];
   if (!fixture) {
@@ -194,15 +214,19 @@ export function buildSealedLiveRequestDescriptor(
     { role: 'user', content: userPrompt },
   ];
 
-  const requestBodyObject = {
+  // Canonical DeepSeek V4 request body:
+  // - thinking contains ONLY { type: 'enabled' }
+  // - reasoning_effort is placed separately at TOP LEVEL
+  const requestBody: DeepSeekRequestBody = {
     model: SEALED_MODEL,
     messages,
     max_tokens: SEALED_MAX_TOKENS,
-    thinking: { type: 'enabled', reasoning_effort: SEALED_REASONING_EFFORT },
+    thinking: { type: 'enabled' },
+    reasoning_effort: SEALED_REASONING_EFFORT,
     stream: false,
   };
 
-  const payloadString = JSON.stringify(requestBodyObject);
+  const payloadString = JSON.stringify(requestBody);
   const requestPayloadHash = crypto.createHash('sha256').update(payloadString).digest('hex');
 
   return {
@@ -220,6 +244,7 @@ export function buildSealedLiveRequestDescriptor(
     maxTokens: SEALED_MAX_TOKENS,
     messages,
     lifecycleTimeoutMs: SEALED_LIFECYCLE_TIMEOUT_MS,
+    requestBody,
     requestPayloadHash,
   };
 }
@@ -267,8 +292,16 @@ export function parseDeepSeekCertificationResponse(
 ): DeepSeekParsedProviderResponse {
   const rawBodyHash = crypto.createHash('sha256').update(input.rawBodyText ?? '').digest('hex');
 
-  // 1. Timeout Check
-  if (typeof input.durationMs === 'number' && input.durationMs > SEALED_LIFECYCLE_TIMEOUT_MS) {
+  const emptyUsage: DeepSeekTokenUsage = {
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    promptCacheHitTokens: 0,
+    promptCacheMissTokens: 0,
+  };
+
+  // 1. Timeout Check: latency MUST be strictly < 15000 ms (durationMs >= 15000 must fail closed)
+  if (typeof input.durationMs === 'number' && input.durationMs >= SEALED_LIFECYCLE_TIMEOUT_MS) {
     return {
       success: false,
       httpStatus: input.httpStatus,
@@ -277,15 +310,9 @@ export function parseDeepSeekCertificationResponse(
       systemFingerprint: null,
       content: '',
       finishReason: null,
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        promptCacheHitTokens: 0,
-        promptCacheMissTokens: 0,
-      },
+      usage: emptyUsage,
       rawBodyHash,
-      failureReason: `LIFECYCLE_TIMEOUT_EXCEEDED: ${input.durationMs}ms > ${SEALED_LIFECYCLE_TIMEOUT_MS}ms`,
+      failureReason: `LIFECYCLE_TIMEOUT_EXCEEDED: ${input.durationMs}ms >= ${SEALED_LIFECYCLE_TIMEOUT_MS}ms`,
       failureCategory: 'HARD_LIFECYCLE_TIMEOUT',
     };
   }
@@ -300,13 +327,7 @@ export function parseDeepSeekCertificationResponse(
       systemFingerprint: null,
       content: '',
       finishReason: null,
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        promptCacheHitTokens: 0,
-        promptCacheMissTokens: 0,
-      },
+      usage: emptyUsage,
       rawBodyHash,
       failureReason: `HTTP_NON_SUCCESS: received status ${input.httpStatus}`,
       failureCategory: 'HTTP_NON_SUCCESS',
@@ -326,13 +347,7 @@ export function parseDeepSeekCertificationResponse(
       systemFingerprint: null,
       content: '',
       finishReason: null,
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        promptCacheHitTokens: 0,
-        promptCacheMissTokens: 0,
-      },
+      usage: emptyUsage,
       rawBodyHash,
       failureReason: `MALFORMED_JSON: ${(err as Error).message}`,
       failureCategory: 'JSON_PARSE_FAILURE',
@@ -348,20 +363,31 @@ export function parseDeepSeekCertificationResponse(
       systemFingerprint: null,
       content: '',
       finishReason: null,
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        promptCacheHitTokens: 0,
-        promptCacheMissTokens: 0,
-      },
+      usage: emptyUsage,
       rawBodyHash,
       failureReason: 'RESPONSE_BODY_NOT_OBJECT',
       failureCategory: 'SCHEMA_FAILURE',
     };
   }
 
-  // 4. Model Provenance Check
+  // 4. Object type check if provided
+  if (parsed.object !== undefined && parsed.object !== 'chat.completion') {
+    return {
+      success: false,
+      httpStatus: input.httpStatus,
+      returnedModel: typeof parsed.model === 'string' ? parsed.model : '',
+      providerReportedModelVersion: null,
+      systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
+      content: '',
+      finishReason: null,
+      usage: emptyUsage,
+      rawBodyHash,
+      failureReason: `SCHEMA_FAILURE: object must be 'chat.completion', received '${parsed.object}'`,
+      failureCategory: 'SCHEMA_FAILURE',
+    };
+  }
+
+  // 5. Model Provenance Check
   const returnedModel = typeof parsed.model === 'string' ? parsed.model : '';
   if (returnedModel !== SEALED_MODEL) {
     return {
@@ -372,27 +398,16 @@ export function parseDeepSeekCertificationResponse(
       systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
       content: '',
       finishReason: null,
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        promptCacheHitTokens: 0,
-        promptCacheMissTokens: 0,
-      },
+      usage: emptyUsage,
       rawBodyHash,
       failureReason: `MODEL_PROVENANCE_MISMATCH: expected '${SEALED_MODEL}', received '${returnedModel}'`,
       failureCategory: 'MODEL_PROVENANCE_MISMATCH',
     };
   }
 
-  // 5. Usage Object Check
+  // 6. Provider Usage Integrity Check
   const usageRaw = parsed.usage;
-  if (
-    !usageRaw ||
-    typeof usageRaw !== 'object' ||
-    typeof usageRaw.prompt_tokens !== 'number' ||
-    typeof usageRaw.completion_tokens !== 'number'
-  ) {
+  if (!usageRaw || typeof usageRaw !== 'object') {
     return {
       success: false,
       httpStatus: input.httpStatus,
@@ -401,27 +416,96 @@ export function parseDeepSeekCertificationResponse(
       systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
       content: '',
       finishReason: null,
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        promptCacheHitTokens: 0,
-        promptCacheMissTokens: 0,
-      },
+      usage: emptyUsage,
       rawBodyHash,
-      failureReason: 'USAGE_OBJECT_MISSING_OR_INCOMPLETE',
+      failureReason: 'USAGE_OBJECT_MISSING',
       failureCategory: 'USAGE_MISSING',
     };
   }
 
-  const promptTokens = usageRaw.prompt_tokens;
-  const completionTokens = usageRaw.completion_tokens;
-  const totalTokens = typeof usageRaw.total_tokens === 'number' ? usageRaw.total_tokens : promptTokens + completionTokens;
-  const promptCacheHitTokens = typeof usageRaw.prompt_cache_hit_tokens === 'number' ? usageRaw.prompt_cache_hit_tokens : 0;
-  const promptCacheMissTokens =
-    typeof usageRaw.prompt_cache_miss_tokens === 'number'
-      ? usageRaw.prompt_cache_miss_tokens
-      : Math.max(0, promptTokens - promptCacheHitTokens);
+  const requiredUsageFields = [
+    'prompt_tokens',
+    'completion_tokens',
+    'total_tokens',
+    'prompt_cache_hit_tokens',
+    'prompt_cache_miss_tokens',
+  ] as const;
+
+  for (const field of requiredUsageFields) {
+    if (usageRaw[field] === undefined || usageRaw[field] === null) {
+      return {
+        success: false,
+        httpStatus: input.httpStatus,
+        returnedModel,
+        providerReportedModelVersion: null,
+        systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
+        content: '',
+        finishReason: null,
+        usage: emptyUsage,
+        rawBodyHash,
+        failureReason: `USAGE_FIELD_MISSING: usage.${field} is required`,
+        failureCategory: 'USAGE_MISSING',
+      };
+    }
+  }
+
+  for (const field of requiredUsageFields) {
+    const val = usageRaw[field];
+    if (typeof val !== 'number' || !Number.isInteger(val) || !Number.isFinite(val) || val < 0) {
+      return {
+        success: false,
+        httpStatus: input.httpStatus,
+        returnedModel,
+        providerReportedModelVersion: null,
+        systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
+        content: '',
+        finishReason: null,
+        usage: emptyUsage,
+        rawBodyHash,
+        failureReason: `USAGE_INTEGRITY_FAILURE: usage.${field} must be a valid non-negative integer, got ${val}`,
+        failureCategory: 'USAGE_INTEGRITY_FAILURE',
+      };
+    }
+  }
+
+  const promptTokens = usageRaw.prompt_tokens as number;
+  const completionTokens = usageRaw.completion_tokens as number;
+  const totalTokens = usageRaw.total_tokens as number;
+  const promptCacheHitTokens = usageRaw.prompt_cache_hit_tokens as number;
+  const promptCacheMissTokens = usageRaw.prompt_cache_miss_tokens as number;
+
+  // Usage Arithmetic Invariants
+  if (promptTokens !== promptCacheHitTokens + promptCacheMissTokens) {
+    return {
+      success: false,
+      httpStatus: input.httpStatus,
+      returnedModel,
+      providerReportedModelVersion: null,
+      systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
+      content: '',
+      finishReason: null,
+      usage: emptyUsage,
+      rawBodyHash,
+      failureReason: `USAGE_ARITHMETIC_MISMATCH: prompt_tokens (${promptTokens}) !== prompt_cache_hit_tokens (${promptCacheHitTokens}) + prompt_cache_miss_tokens (${promptCacheMissTokens})`,
+      failureCategory: 'USAGE_INTEGRITY_FAILURE',
+    };
+  }
+
+  if (totalTokens !== promptTokens + completionTokens) {
+    return {
+      success: false,
+      httpStatus: input.httpStatus,
+      returnedModel,
+      providerReportedModelVersion: null,
+      systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
+      content: '',
+      finishReason: null,
+      usage: emptyUsage,
+      rawBodyHash,
+      failureReason: `USAGE_ARITHMETIC_MISMATCH: total_tokens (${totalTokens}) !== prompt_tokens (${promptTokens}) + completion_tokens (${completionTokens})`,
+      failureCategory: 'USAGE_INTEGRITY_FAILURE',
+    };
+  }
 
   const usage: DeepSeekTokenUsage = {
     promptTokens,
@@ -431,12 +515,92 @@ export function parseDeepSeekCertificationResponse(
     promptCacheMissTokens,
   };
 
-  // 6. Choice Content & Finish Reason Extraction
-  const choice = Array.isArray(parsed.choices) && parsed.choices.length > 0 ? parsed.choices[0] : null;
-  const content = choice?.message?.content && typeof choice.message.content === 'string' ? choice.message.content : '';
-  const finishReason = choice?.finish_reason && typeof choice.finish_reason === 'string' ? choice.finish_reason : null;
+  // 7. Choices Array and Response Schema Hardening
+  if (!Array.isArray(parsed.choices) || parsed.choices.length === 0) {
+    return {
+      success: false,
+      httpStatus: input.httpStatus,
+      returnedModel,
+      providerReportedModelVersion: null,
+      systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
+      content: '',
+      finishReason: null,
+      usage,
+      rawBodyHash,
+      failureReason: 'SCHEMA_FAILURE: choices must be a non-empty array',
+      failureCategory: 'SCHEMA_FAILURE',
+    };
+  }
 
-  // 7. System Fingerprint (Telemetry Only - Never Model Version)
+  const firstChoice = parsed.choices[0];
+  if (!firstChoice || typeof firstChoice !== 'object') {
+    return {
+      success: false,
+      httpStatus: input.httpStatus,
+      returnedModel,
+      providerReportedModelVersion: null,
+      systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
+      content: '',
+      finishReason: null,
+      usage,
+      rawBodyHash,
+      failureReason: 'SCHEMA_FAILURE: choices[0] must be an object',
+      failureCategory: 'SCHEMA_FAILURE',
+    };
+  }
+
+  if (!firstChoice.message || typeof firstChoice.message !== 'object') {
+    return {
+      success: false,
+      httpStatus: input.httpStatus,
+      returnedModel,
+      providerReportedModelVersion: null,
+      systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
+      content: '',
+      finishReason: null,
+      usage,
+      rawBodyHash,
+      failureReason: 'SCHEMA_FAILURE: choices[0].message must be an object',
+      failureCategory: 'SCHEMA_FAILURE',
+    };
+  }
+
+  if (typeof firstChoice.message.content !== 'string') {
+    return {
+      success: false,
+      httpStatus: input.httpStatus,
+      returnedModel,
+      providerReportedModelVersion: null,
+      systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
+      content: '',
+      finishReason: null,
+      usage,
+      rawBodyHash,
+      failureReason: 'SCHEMA_FAILURE: choices[0].message.content must be a string',
+      failureCategory: 'SCHEMA_FAILURE',
+    };
+  }
+
+  if (typeof firstChoice.finish_reason !== 'string' || firstChoice.finish_reason.trim() === '') {
+    return {
+      success: false,
+      httpStatus: input.httpStatus,
+      returnedModel,
+      providerReportedModelVersion: null,
+      systemFingerprint: typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null,
+      content: '',
+      finishReason: null,
+      usage,
+      rawBodyHash,
+      failureReason: 'SCHEMA_FAILURE: choices[0].finish_reason must be a non-empty string',
+      failureCategory: 'SCHEMA_FAILURE',
+    };
+  }
+
+  const content = firstChoice.message.content;
+  const finishReason = firstChoice.finish_reason;
+
+  // 8. System Fingerprint (Telemetry Only - Never Model Version)
   const systemFingerprint = typeof parsed.system_fingerprint === 'string' ? parsed.system_fingerprint : null;
   const providerReportedModelVersion = null; // DeepSeek does not expose a separate runtime model version field
 
@@ -606,15 +770,22 @@ export function computeFixtureSetHash(): string {
   return crypto.createHash('sha256').update(JSON.stringify(hashes)).digest('hex');
 }
 
-export function buildSourceSeal(params: {
-  pricingWindow: 'OFF_PEAK' | 'PEAK';
-  sourceCommitSha: string;
-  sourceTreeSha: string;
-  candidateId?: string;
-}): LiveCertificationSourceSeal {
+export interface BuildSourceSealParams {
+  readonly pricingWindow: 'OFF_PEAK' | 'PEAK';
+  readonly sourceCommitSha: string;
+  readonly sourceTreeSha: string;
+}
+
+export function buildSourceSeal(params: BuildSourceSealParams): LiveCertificationSourceSeal {
+  if (params.pricingWindow !== 'OFF_PEAK' && params.pricingWindow !== 'PEAK') {
+    throw new Error(
+      `INVALID_PRICING_WINDOW: expected 'OFF_PEAK' | 'PEAK', got '${String(params.pricingWindow)}'`
+    );
+  }
+
+  // Canonical candidate derived ONLY from pricingWindow; caller override strictly ignored/disallowed
   const candidateId =
-    params.candidateId ??
-    (params.pricingWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_CANDIDATE_ID : SEALED_PEAK_CANDIDATE_ID);
+    params.pricingWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_CANDIDATE_ID : SEALED_PEAK_CANDIDATE_ID;
   const sealedCostBound =
     params.pricingWindow === 'OFF_PEAK'
       ? SEALED_OFF_PEAK_COST_BOUND_MICRO_USD

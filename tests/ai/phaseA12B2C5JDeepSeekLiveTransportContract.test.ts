@@ -259,7 +259,13 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
     const rawResponse = JSON.stringify({
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
-      usage: { prompt_tokens: 10, completion_tokens: 5 },
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
       system_fingerprint: 'fp_opaque_telemetry_123',
     });
 
@@ -277,7 +283,13 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
     const rawResponse = JSON.stringify({
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
-      usage: { prompt_tokens: 10, completion_tokens: 5 },
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
       system_fingerprint: 'fp_opaque_telemetry_123',
     });
 
@@ -360,8 +372,14 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
   it('27. parser cannot directly emit WindowCertificationEvidence', () => {
     const rawResponse = JSON.stringify({
       model: 'deepseek-v4-flash',
-      choices: [{ message: { content: 'ok' } }],
-      usage: { prompt_tokens: 10, completion_tokens: 5 },
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
     });
 
     const parsed = parseDeepSeekCertificationResponse({
@@ -755,9 +773,9 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
     expect(offPeakSeal.fixtureSetHash).toBe(fixtureHash);
   });
 
-  // Test 47: all 15 transport failure categories defined
-  it('47. all 15 transport failure categories defined and fail closed', () => {
-    expect(TRANSPORT_FAILURE_CATEGORIES.length).toBe(15);
+  // Test 47: all 16 transport failure categories defined
+  it('47. all 16 transport failure categories defined and fail closed', () => {
+    expect(TRANSPORT_FAILURE_CATEGORIES.length).toBe(16);
     const requiredCategories = [
       'HARD_LIFECYCLE_TIMEOUT',
       'HTTP_NON_SUCCESS',
@@ -766,6 +784,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
       'JSON_PARSE_FAILURE',
       'MODEL_PROVENANCE_MISMATCH',
       'USAGE_MISSING',
+      'USAGE_INTEGRITY_FAILURE',
       'SCHEMA_FAILURE',
       'TASK_FAILURE',
       'SEMANTIC_GATE_FAILURE',
@@ -876,5 +895,481 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
     expect(artifact.finalStatus).toBe(
       'A12B2C5J_LIVE_TRANSPORT_CONTRACT_PASS_IMPLEMENTATION_NOT_AUTHORIZED'
     );
+  });
+
+  // ==========================================================================
+  // PHASE A.12B.2C-5J.1 CONTRACT REPAIR ADVERSARIAL REGRESSIONS (Tests 50 - 75)
+  // ==========================================================================
+
+  // DEFECT A: Request Body Shape & Top-Level reasoning_effort
+  it('50. requestBody.thinking contains strictly { type: "enabled" } and NO reasoning_effort', () => {
+    const desc = buildSealedLiveRequestDescriptor({
+      taskType: 'LEAD_INTENT_CLASSIFICATION',
+      invocationIndex: 1,
+      pricingWindow: 'OFF_PEAK',
+    });
+
+    expect(desc.requestBody.thinking).toEqual({ type: 'enabled' });
+    expect((desc.requestBody.thinking as any).reasoning_effort).toBeUndefined();
+  });
+
+  it('51. requestBody.reasoning_effort is strictly placed at top level with value "low"', () => {
+    const desc = buildSealedLiveRequestDescriptor({
+      taskType: 'GROWTH_ACTION_DRAFT',
+      invocationIndex: 2,
+      pricingWindow: 'PEAK',
+    });
+
+    expect(desc.requestBody.reasoning_effort).toBe('low');
+    expect(Object.prototype.hasOwnProperty.call(desc.requestBody, 'reasoning_effort')).toBe(true);
+  });
+
+  it('52. requestBody.model is strictly "deepseek-v4-flash"', () => {
+    const desc = buildSealedLiveRequestDescriptor({
+      taskType: 'ANOMALY_TRIAGE',
+      invocationIndex: 7,
+      pricingWindow: 'OFF_PEAK',
+    });
+
+    expect(desc.requestBody.model).toBe('deepseek-v4-flash');
+  });
+
+  it('53. requestBody.max_tokens is strictly 2048', () => {
+    const desc = buildSealedLiveRequestDescriptor({
+      taskType: 'LEAK_EXPLANATION',
+      invocationIndex: 3,
+      pricingWindow: 'OFF_PEAK',
+    });
+
+    expect(desc.requestBody.max_tokens).toBe(2048);
+  });
+
+  it('54. requestBody.stream is strictly false', () => {
+    const desc = buildSealedLiveRequestDescriptor({
+      taskType: 'BUSINESS_TWIN_SUMMARY',
+      invocationIndex: 4,
+      pricingWindow: 'PEAK',
+    });
+
+    expect(desc.requestBody.stream).toBe(false);
+  });
+
+  it('55. requestBody.messages contains valid system and user messages', () => {
+    const desc = buildSealedLiveRequestDescriptor({
+      taskType: 'SEO_CONTENT_SUGGESTION',
+      invocationIndex: 5,
+      pricingWindow: 'OFF_PEAK',
+    });
+
+    expect(desc.requestBody.messages.length).toBe(2);
+    expect(desc.requestBody.messages[0].role).toBe('system');
+    expect(desc.requestBody.messages[1].role).toBe('user');
+    expect(desc.requestBody.messages[0].content.length).toBeGreaterThan(0);
+    expect(desc.requestBody.messages[1].content.length).toBeGreaterThan(0);
+  });
+
+  it('56. requestPayloadHash is exactly sha256 of JSON-serialized requestBody', () => {
+    const desc = buildSealedLiveRequestDescriptor({
+      taskType: 'FUNNEL_DIAGNOSTIC_EXPLANATION',
+      invocationIndex: 6,
+      pricingWindow: 'PEAK',
+    });
+
+    const expectedHash = crypto
+      .createHash('sha256')
+      .update(JSON.stringify(desc.requestBody))
+      .digest('hex');
+
+    expect(desc.requestPayloadHash).toBe(expectedHash);
+  });
+
+  it('57. buildSealedLiveRequestDescriptor is strictly deterministic across all 7 canonical tasks', () => {
+    for (let i = 0; i < CERTIFIED_A12B2C_TASK_TYPES.length; i++) {
+      const taskType = CERTIFIED_A12B2C_TASK_TYPES[i];
+      const desc1 = buildSealedLiveRequestDescriptor({
+        taskType,
+        invocationIndex: i + 1,
+        pricingWindow: 'OFF_PEAK',
+      });
+      const desc2 = buildSealedLiveRequestDescriptor({
+        taskType,
+        invocationIndex: i + 1,
+        pricingWindow: 'OFF_PEAK',
+      });
+
+      expect(desc1.requestPayloadHash).toBe(desc2.requestPayloadHash);
+      expect(JSON.stringify(desc1)).toBe(JSON.stringify(desc2));
+    }
+  });
+
+  // DEFECT B: 15000ms Hard Lifecycle Timeout Boundary
+  it('58. parser rejects durationMs === 15000 exactly with HARD_LIFECYCLE_TIMEOUT', () => {
+    const validBody = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: validBody,
+      durationMs: 15000,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('HARD_LIFECYCLE_TIMEOUT');
+    expect(res.failureReason).toContain('LIFECYCLE_TIMEOUT_EXCEEDED');
+  });
+
+  it('59. parser rejects durationMs > 15000 (e.g. 15001ms) with HARD_LIFECYCLE_TIMEOUT', () => {
+    const validBody = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: validBody,
+      durationMs: 15001,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('HARD_LIFECYCLE_TIMEOUT');
+  });
+
+  it('60. parser accepts durationMs === 14999 strictly below boundary', () => {
+    const validBody = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: validBody,
+      durationMs: 14999,
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.failureCategory).toBeUndefined();
+  });
+
+  it('61. parser accepts durationMs === 0 and typical positive latencies', () => {
+    const validBody = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res0 = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: validBody,
+      durationMs: 0,
+    });
+    expect(res0.success).toBe(true);
+
+    const res350 = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: validBody,
+      durationMs: 350,
+    });
+    expect(res350.success).toBe(true);
+  });
+
+  // DEFECT C: Candidate Identity & Window Enforcing
+  it('62. buildSealedLiveRequestDescriptor rejects invalid pricingWindow runtime values', () => {
+    expect(() =>
+      buildSealedLiveRequestDescriptor({
+        taskType: 'LEAD_INTENT_CLASSIFICATION',
+        invocationIndex: 1,
+        pricingWindow: 'MID_PEAK' as any,
+      })
+    ).toThrow('INVALID_PRICING_WINDOW');
+  });
+
+  it('63. buildSealedLiveRequestDescriptor derives candidate strictly from pricingWindow for OFF_PEAK', () => {
+    const desc = buildSealedLiveRequestDescriptor({
+      taskType: 'LEAD_INTENT_CLASSIFICATION',
+      invocationIndex: 1,
+      pricingWindow: 'OFF_PEAK',
+      ...({ candidateId: 'malicious-override-candidate' } as any),
+    });
+
+    expect(desc.candidateId).toBe(SEALED_OFF_PEAK_CANDIDATE_ID);
+    expect(desc.candidateId).not.toBe('malicious-override-candidate');
+  });
+
+  it('64. buildSealedLiveRequestDescriptor derives candidate strictly from pricingWindow for PEAK', () => {
+    const desc = buildSealedLiveRequestDescriptor({
+      taskType: 'LEAD_INTENT_CLASSIFICATION',
+      invocationIndex: 1,
+      pricingWindow: 'PEAK',
+      ...({ candidateId: 'malicious-override-candidate' } as any),
+    });
+
+    expect(desc.candidateId).toBe(SEALED_PEAK_CANDIDATE_ID);
+    expect(desc.candidateId).not.toBe('malicious-override-candidate');
+  });
+
+  it('65. buildSourceSeal rejects invalid pricingWindow runtime values', () => {
+    expect(() =>
+      buildSourceSeal({
+        pricingWindow: 'WEEKEND' as any,
+        sourceCommitSha: 'da6c86932b6817a7294a84d4a380d2cc6fac15b7',
+        sourceTreeSha: 'e533483c009e221a81b1da5286ac5c27b68ca05f',
+      })
+    ).toThrow('INVALID_PRICING_WINDOW');
+  });
+
+  it('66. buildSourceSeal candidateId cannot be overridden and derives strictly from pricingWindow', () => {
+    const offPeakSeal = buildSourceSeal({
+      pricingWindow: 'OFF_PEAK',
+      sourceCommitSha: 'da6c86932b6817a7294a84d4a380d2cc6fac15b7',
+      sourceTreeSha: 'e533483c009e221a81b1da5286ac5c27b68ca05f',
+      ...({ candidateId: 'override-attempt' } as any),
+    });
+    expect(offPeakSeal.candidateId).toBe(SEALED_OFF_PEAK_CANDIDATE_ID);
+
+    const peakSeal = buildSourceSeal({
+      pricingWindow: 'PEAK',
+      sourceCommitSha: 'da6c86932b6817a7294a84d4a380d2cc6fac15b7',
+      sourceTreeSha: 'e533483c009e221a81b1da5286ac5c27b68ca05f',
+      ...({ candidateId: 'override-attempt' } as any),
+    });
+    expect(peakSeal.candidateId).toBe(SEALED_PEAK_CANDIDATE_ID);
+  });
+
+  // DEFECT D: Provider Usage & Schema Integrity
+  it('67. parser rejects response when usage is completely missing with USAGE_MISSING', () => {
+    const body = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('USAGE_MISSING');
+  });
+
+  it('68. parser rejects response when usage.prompt_tokens is missing with USAGE_MISSING', () => {
+    const body = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('USAGE_MISSING');
+  });
+
+  it('69. parser rejects response when usage.completion_tokens is missing with USAGE_MISSING', () => {
+    const body = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('USAGE_MISSING');
+  });
+
+  it('70. parser rejects response when usage.total_tokens is missing with USAGE_MISSING', () => {
+    const body = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('USAGE_MISSING');
+  });
+
+  it('71. parser rejects response when usage.prompt_cache_hit_tokens is missing with USAGE_MISSING', () => {
+    const body = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('USAGE_MISSING');
+  });
+
+  it('72. parser rejects response when usage.prompt_cache_miss_tokens is missing with USAGE_MISSING', () => {
+    const body = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('USAGE_MISSING');
+  });
+
+  it('73. parser rejects negative token values with USAGE_INTEGRITY_FAILURE', () => {
+    const body = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: -10,
+        completion_tokens: 5,
+        total_tokens: -5,
+        prompt_cache_hit_tokens: 0,
+        prompt_cache_miss_tokens: -10,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('USAGE_INTEGRITY_FAILURE');
+  });
+
+  it('74. parser rejects non-integer/fractional token values with USAGE_INTEGRITY_FAILURE', () => {
+    const body = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10.5,
+        completion_tokens: 5,
+        total_tokens: 15.5,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6.5,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('USAGE_INTEGRITY_FAILURE');
+  });
+
+  it('75. parser rejects usage arithmetic mismatches with USAGE_INTEGRITY_FAILURE', () => {
+    // Arithmetic mismatch 1: prompt_tokens !== prompt_cache_hit_tokens + prompt_cache_miss_tokens
+    const bodyMismatch1 = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 2,
+        prompt_cache_miss_tokens: 2, // 2 + 2 = 4 !== 10
+      },
+    });
+
+    const res1 = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: bodyMismatch1,
+    });
+
+    expect(res1.success).toBe(false);
+    expect(res1.failureCategory).toBe('USAGE_INTEGRITY_FAILURE');
+
+    // Arithmetic mismatch 2: total_tokens !== prompt_tokens + completion_tokens
+    const bodyMismatch2 = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 999, // 10 + 5 = 15 !== 999
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res2 = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: bodyMismatch2,
+    });
+
+    expect(res2.success).toBe(false);
+    expect(res2.failureCategory).toBe('USAGE_INTEGRITY_FAILURE');
   });
 });

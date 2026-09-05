@@ -1,0 +1,61 @@
+{
+  "phase": "A.12B.2C-5J.1",
+  "artifactType": "REQUEST_TIMEOUT_USAGE_CONTRACT_REPAIR",
+  "status": "IMPLEMENTED_AND_VERIFIED",
+  "baseCommit": "29efaf18072eb77e7e8401e49558d3e72920c5a6",
+  "baseTree": "bab1acf04a41dcec3afd9e27c86f7d186f351afd",
+  "repairs": {
+    "defectA_requestShape": {
+      "reasoningEffortPlacedAtTopLevel": true,
+      "thinkingContainsOnlyTypeEnabled": true,
+      "reasoningEffortInThinking": false,
+      "requestPayloadHashUpdated": true
+    },
+    "defectB_hardTimeoutBoundary": {
+      "timeoutThresholdMs": 15000,
+      "failClosedAtOrAbove15000ms": true,
+      "failureCategory": "HARD_LIFECYCLE_TIMEOUT"
+    },
+    "defectC_candidateIdentity": {
+      "callerControlledCandidateOverrideEliminated": true,
+      "candidateDerivedSolelyFromPricingWindow": true,
+      "offPeakCandidateId": "deepseek-v4-flash-offpeak-low",
+      "peakCandidateId": "deepseek-v4-flash-peak-low",
+      "invalidPricingWindowRejected": true
+    },
+    "defectD_providerUsageIntegrity": {
+      "usageObjectRequired": true,
+      "requiredFields": [
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+        "prompt_cache_hit_tokens",
+        "prompt_cache_miss_tokens"
+      ],
+      "nonNegativeIntegerValidation": true,
+      "promptTokensInvariantEnforced": "prompt_tokens === prompt_cache_hit_tokens + prompt_cache_miss_tokens",
+      "totalTokensInvariantEnforced": "total_tokens === prompt_tokens + completion_tokens",
+      "failureCategories": [
+        "USAGE_MISSING",
+        "USAGE_INTEGRITY_FAILURE",
+        "SCHEMA_FAILURE"
+      ]
+    }
+  },
+  "securityInvariants": {
+    "offlineOnly": true,
+    "zeroDeepSeekCalls": true,
+    "zeroGeminiCalls": true,
+    "zeroExternalNetworkCalls": true,
+    "zeroProviderCredentials": true,
+    "canaryLiveExecutionEnabled": false,
+    "productionRoutingEnforcementAllowed": false,
+    "v13Activated": false,
+    "humanAuthorizationGenerated": false,
+    "providerNetworkCalls": 0
+  },
+  "historicalArtifactsPreserved": {
+    "execution/a12b2c5j_deepseek_live_transport_contract_source_seal.json": "UNMODIFIED"
+  },
+  "finalStatus": "A12B2C5J1_REQUEST_TIMEOUT_USAGE_CONTRACT_REPAIR_PASS"
+}
