@@ -1,0 +1,34 @@
+{
+  "phase": "A.12B.2C-5N",
+  "artifactType": "PRODUCTION_HUMAN_AUTHORIZATION_TRUST_ANCHOR_PROVISIONING_CEREMONY_CONTRACT",
+
+  "baseCommit": "71090078a45cfcc626ca1d4195c6d70a42914662",
+  "baseTree": "a155e737904ae4c47c21d172b4fcf554414d769f",
+
+  "ceremonyVersion": "a12b2c5n-v1",
+  "ceremonyId": "ceremony-a12b2c5n-anchor-genesis",
+  "isolationLevel": "AIR_GAPPED_OFFLINE",
+  "targetAuthorityId": "velnar-lead-ops-prod",
+  "targetKeyVersion": "2026-v1",
+  "targetAlgorithm": "Ed25519",
+  "minimumWitnessCount": 3,
+
+  "productionTrustAnchorProvisioned": false,
+  "productionCeremonyExecuted": false,
+  "productionPrivateKeyEmbedded": false,
+  "productionSigningIssuerImplemented": false,
+
+  "callerSuppliedAuthorityAcceptedAsProductionTrust": false,
+  "callerSuppliedPublicKeyAcceptedAsProductionTrust": false,
+
+  "guardedTransportIntegrated": false,
+  "sourceAttestationReady": false,
+  "humanAuthorizationAttestationReady": false,
+  "liveExecutionEnabled": false,
+
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "successorActivated": false,
+
+  "finalStatus": "A12B2C5N_TRUST_ANCHOR_PROVISIONING_CEREMONY_CONTRACT_SEALED_UNEXECUTED"
+}
