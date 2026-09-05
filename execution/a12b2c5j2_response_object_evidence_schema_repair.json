@@ -1,0 +1,23 @@
+{
+  "phase": "A.12B.2C-5J.2",
+  "artifactType": "DEEPSEEK_RESPONSE_OBJECT_AND_EVIDENCE_SCHEMA_REPAIR",
+  "baseCommit": "6a4466b11c18f3953fbd9e43d730e1e7d8a1785d",
+  "baseTree": "918b964eb993d4f7deed50d715f6368e7db7b9e4",
+  "responseObjectRequired": true,
+  "requiredResponseObjectValue": "chat.completion",
+  "missingResponseObjectRejected": true,
+  "wrongResponseObjectRejected": true,
+  "historical5J1ArtifactModified": false,
+  "historical5J1ArtifactType": "REQUEST_TIMEOUT_USAGE_CONTRACT_REPAIR",
+  "canonical5J1ArtifactType": "DEEPSEEK_REQUEST_TIMEOUT_USAGE_CONTRACT_REPAIR",
+  "reasoningEffortTopLevelPreserved": true,
+  "strict15000msTimeoutBoundaryPreserved": true,
+  "usageIntegrityPreserved": true,
+  "candidateWindowBindingPreserved": true,
+  "networkTransportImplemented": false,
+  "liveDispatchCallable": false,
+  "providerNetworkCalls": 0,
+  "liveExecutionEnabled": false,
+  "productionRoutingEnforcementAllowed": false,
+  "finalStatus": "A12B2C5J2_RESPONSE_OBJECT_EVIDENCE_SCHEMA_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION"
+}

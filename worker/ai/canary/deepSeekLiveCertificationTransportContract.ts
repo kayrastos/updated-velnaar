@@ -370,8 +370,8 @@ export function parseDeepSeekCertificationResponse(
     };
   }
 
-  // 4. Object type check if provided
-  if (parsed.object !== undefined && parsed.object !== 'chat.completion') {
+  // 4. Sealed certification response contract requires object === 'chat.completion' exactly
+  if (parsed.object !== 'chat.completion') {
     return {
       success: false,
       httpStatus: input.httpStatus,

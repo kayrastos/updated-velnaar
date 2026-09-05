@@ -257,6 +257,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
   // Test 21: parser preserves fingerprint as opaque telemetry
   it('21. parser preserves fingerprint as opaque telemetry', () => {
     const rawResponse = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -281,6 +282,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
   // Test 22: fingerprint is not version
   it('22. fingerprint is not version and providerReportedModelVersion remains null', () => {
     const rawResponse = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -306,6 +308,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
   // Test 23: missing usage rejected
   it('23. missing usage rejected with USAGE_MISSING failure category', () => {
     const rawResponse = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' } }],
     });
@@ -333,6 +336,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
   // Test 25: wrong returned model rejected
   it('25. wrong returned model rejected with MODEL_PROVENANCE_MISMATCH', () => {
     const rawResponse = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-chat',
       choices: [{ message: { content: 'ok' } }],
       usage: { prompt_tokens: 10, completion_tokens: 5 },
@@ -371,6 +375,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
   // Test 27: parser cannot directly emit WindowCertificationEvidence
   it('27. parser cannot directly emit WindowCertificationEvidence', () => {
     const rawResponse = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1005,6 +1010,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
   // DEFECT B: 15000ms Hard Lifecycle Timeout Boundary
   it('58. parser rejects durationMs === 15000 exactly with HARD_LIFECYCLE_TIMEOUT', () => {
     const validBody = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1029,6 +1035,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
   it('59. parser rejects durationMs > 15000 (e.g. 15001ms) with HARD_LIFECYCLE_TIMEOUT', () => {
     const validBody = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1052,6 +1059,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
   it('60. parser accepts durationMs === 14999 strictly below boundary', () => {
     const validBody = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1075,6 +1083,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
   it('61. parser accepts durationMs === 0 and typical positive latencies', () => {
     const validBody = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1167,6 +1176,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
   // DEFECT D: Provider Usage & Schema Integrity
   it('67. parser rejects response when usage is completely missing with USAGE_MISSING', () => {
     const body = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
     });
@@ -1182,6 +1192,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
   it('68. parser rejects response when usage.prompt_tokens is missing with USAGE_MISSING', () => {
     const body = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1203,6 +1214,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
   it('69. parser rejects response when usage.completion_tokens is missing with USAGE_MISSING', () => {
     const body = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1224,6 +1236,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
   it('70. parser rejects response when usage.total_tokens is missing with USAGE_MISSING', () => {
     const body = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1245,6 +1258,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
   it('71. parser rejects response when usage.prompt_cache_hit_tokens is missing with USAGE_MISSING', () => {
     const body = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1266,6 +1280,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
   it('72. parser rejects response when usage.prompt_cache_miss_tokens is missing with USAGE_MISSING', () => {
     const body = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1287,6 +1302,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
   it('73. parser rejects negative token values with USAGE_INTEGRITY_FAILURE', () => {
     const body = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1309,6 +1325,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
   it('74. parser rejects non-integer/fractional token values with USAGE_INTEGRITY_FAILURE', () => {
     const body = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1332,6 +1349,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
   it('75. parser rejects usage arithmetic mismatches with USAGE_INTEGRITY_FAILURE', () => {
     // Arithmetic mismatch 1: prompt_tokens !== prompt_cache_hit_tokens + prompt_cache_miss_tokens
     const bodyMismatch1 = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1353,6 +1371,7 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
     // Arithmetic mismatch 2: total_tokens !== prompt_tokens + completion_tokens
     const bodyMismatch2 = JSON.stringify({
+      object: 'chat.completion',
       model: 'deepseek-v4-flash',
       choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
       usage: {
@@ -1371,5 +1390,132 @@ describe('A.12B.2C-5J DeepSeek Live Transport Contract & Source Seal', () => {
 
     expect(res2.success).toBe(false);
     expect(res2.failureCategory).toBe('USAGE_INTEGRITY_FAILURE');
+  });
+
+  // ==========================================================================
+  // PHASE A.12B.2C-5J.2 RESPONSE OBJECT IDENTITY REGRESSIONS (Tests 76 - 80)
+  // ==========================================================================
+
+  // Regression A: object missing => SCHEMA_FAILURE
+  it('76. parser rejects response when object field is completely missing with SCHEMA_FAILURE', () => {
+    const body = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('SCHEMA_FAILURE');
+    expect(res.failureReason).toContain("object must be 'chat.completion'");
+  });
+
+  // Regression B: object = 'wrong.object' => SCHEMA_FAILURE
+  it('77. parser rejects response when object is a wrong string (e.g. wrong.object) with SCHEMA_FAILURE', () => {
+    const body = JSON.stringify({
+      object: 'wrong.object',
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('SCHEMA_FAILURE');
+    expect(res.failureReason).toContain("object must be 'chat.completion'");
+  });
+
+  // Regression C: object = null => SCHEMA_FAILURE
+  it('78. parser rejects response when object is null with SCHEMA_FAILURE', () => {
+    const body = JSON.stringify({
+      object: null,
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('SCHEMA_FAILURE');
+    expect(res.failureReason).toContain("object must be 'chat.completion'");
+  });
+
+  // Regression D: object = 123 => SCHEMA_FAILURE
+  it('79. parser rejects response when object is a number (e.g. 123) with SCHEMA_FAILURE', () => {
+    const body = JSON.stringify({
+      object: 123,
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.failureCategory).toBe('SCHEMA_FAILURE');
+    expect(res.failureReason).toContain("object must be 'chat.completion'");
+  });
+
+  // Regression E: object = 'chat.completion' with all other valid fields => accepted
+  it('80. parser accepts response when object === "chat.completion" with all valid fields', () => {
+    const body = JSON.stringify({
+      object: 'chat.completion',
+      model: 'deepseek-v4-flash',
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 5,
+        total_tokens: 15,
+        prompt_cache_hit_tokens: 4,
+        prompt_cache_miss_tokens: 6,
+      },
+    });
+
+    const res = parseDeepSeekCertificationResponse({
+      httpStatus: 200,
+      rawBodyText: body,
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.failureCategory).toBeUndefined();
   });
 });
