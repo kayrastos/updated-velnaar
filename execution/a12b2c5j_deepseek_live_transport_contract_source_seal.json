@@ -1,0 +1,23 @@
+{
+  "phase": "A.12B.2C-5J",
+  "artifactType": "DEEPSEEK_LIVE_TRANSPORT_CONTRACT_SOURCE_SEAL",
+  "baseCommit": "da6c86932b6817a7294a84d4a380d2cc6fac15b7",
+  "baseTree": "e533483c009e221a81b1da5286ac5c27b68ca05f",
+  "provider": "deepseek",
+  "model": "deepseek-v4-flash",
+  "documentedVersionTarget": "DeepSeek-V4-Flash-0731",
+  "endpoint": "https://api.deepseek.com/v1/chat/completions",
+  "lifecycleTimeoutMs": 15000,
+  "offPeakProgram": "DEEPSEEK_OFF_PEAK_SINGLE_PROVIDER_RESEAL",
+  "peakProgram": "DEEPSEEK_PEAK_SINGLE_PROVIDER_CERTIFICATION",
+  "offPeakCostBoundMicroUsd": 12783,
+  "peakCostBoundMicroUsd": 25566,
+  "networkTransportImplemented": false,
+  "liveDispatchCallable": false,
+  "humanAuthorizationGenerated": false,
+  "providerNetworkCalls": 0,
+  "liveExecutionEnabled": false,
+  "productionRoutingEnforcementAllowed": false,
+  "successorActivated": false,
+  "finalStatus": "A12B2C5J_LIVE_TRANSPORT_CONTRACT_PASS_IMPLEMENTATION_NOT_AUTHORIZED"
+}
