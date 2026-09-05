@@ -44,6 +44,8 @@ import {
   computeAuthorizationPackageDigest,
   computeAuthorizationConsumptionKey,
   verifyHumanAuthorizationPackage,
+  VerifyAuthorizationOptions,
+  isValidIsoUtcTimestamp,
 } from '../../worker/ai/canary/deepSeekCertificationAttestation';
 
 import {
@@ -76,6 +78,12 @@ import * as attestationModule from '../../worker/ai/canary/deepSeekCertification
 
 const BASE_COMMIT_SHA = '9f85f4c32cca4ae3df992b18584016efb6c578f1';
 const BASE_TREE_SHA = '8179946ec3581d316a7a1a8b55aa207eef3efe10';
+
+const DEFAULT_TEST_ATTESTATION = buildTrustedSourceAttestation({
+  sourceCommitSha: BASE_COMMIT_SHA,
+  sourceTreeSha: BASE_TREE_SHA,
+  createdAt: '2026-09-05T12:00:00.000Z',
+});
 
 /**
  * SYNTHETIC_TEST_ONLY: Generates an ephemeral Ed25519 keypair strictly in process memory.
@@ -194,6 +202,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(true);
@@ -213,6 +222,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
     // Verify using wrong authority descriptor (with wrong authorityId & public key)
     const result = verifyHumanAuthorizationPackage(pkg, wrongAuthority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -230,6 +240,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(corruptedPkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -249,6 +260,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -264,6 +276,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(badPkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -279,6 +292,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(mismatchedPkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -294,6 +308,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(mismatchedPkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -313,6 +328,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, tamperedAuthority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -336,6 +352,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(tamperedPkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -414,6 +431,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -429,6 +447,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -444,6 +463,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -459,6 +479,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -474,6 +495,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -489,6 +511,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -504,6 +527,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -519,6 +543,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -534,6 +559,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -549,6 +575,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -564,6 +591,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -603,6 +631,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -619,6 +648,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:06:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -635,6 +665,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:15:00.000Z'), // Current time is AFTER expiresAt
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -651,6 +682,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'), // Current time is BEFORE issuedAt
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -667,22 +699,31 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.includes('LIFETIME_EXCEEDS_MAX'))).toBe(true);
   });
 
-  it('31. singleUse false rejects', () => {
-    const { authority } = createSyntheticTestAuthority();
+  it('31. singleUse false serializes false and verifier requires singleUse: true', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
     const badPayload: any = createSyntheticValidPayload(authority.authorityId, {
       singleUse: false as any,
     });
 
     expect(badPayload.singleUse).toBe(false);
-    // Canonicalizer enforces singleUse is true
+    // Canonicalizer serializes actual runtime value: singleUse: false
     const canonicalized = canonicalizeHumanAuthorizationPayload(badPayload);
-    expect(canonicalized.includes('"singleUse":true')).toBe(true);
+    expect(canonicalized.includes('"singleUse":false')).toBe(true);
+
+    const pkg = signSyntheticPayload(badPayload, authority, privateKeyPem);
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('SINGLE_USE_REQUIRED'))).toBe(true);
   });
 
   // ==========================================================================
@@ -701,6 +742,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(true);
@@ -718,6 +760,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(true);
@@ -735,6 +778,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -754,6 +798,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -770,6 +815,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -788,6 +834,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -804,6 +851,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -860,13 +908,23 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
     expect(jsonOriginal).toBe(jsonReversed);
   });
 
-  it('43. unknown injected property cannot silently alter signed semantics', () => {
+  it('43. unknown injected property is strictly rejected by canonicalizer and digest generator', () => {
     const { authority } = createSyntheticTestAuthority();
     const payload: any = createSyntheticValidPayload(authority.authorityId);
     payload.injectedHackerField = 'bypass_authorization';
 
-    const canonical = canonicalizeHumanAuthorizationPayload(payload);
-    expect(canonical.includes('injectedHackerField')).toBe(false);
+    expect(() => canonicalizeHumanAuthorizationPayload(payload)).toThrow(
+      /CANONICALIZATION_FAILURE.*unknown or unauthorized field 'injectedHackerField'/
+    );
+
+    const pkg: any = {
+      payload,
+      signatureBase64: 'fake',
+      authorityId: authority.authorityId,
+      keyVersion: authority.keyVersion,
+      algorithm: authority.algorithm,
+    };
+    expect(() => computeAuthorizationPackageDigest(pkg)).toThrow(/CANONICALIZATION_FAILURE/);
   });
 
   // ==========================================================================
@@ -1207,6 +1265,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -1222,6 +1281,7 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
     const result = verifyHumanAuthorizationPackage(pkg, authority, {
       nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
     });
 
     expect(result.valid).toBe(false);
@@ -1230,7 +1290,9 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
 
   it('73. null / non-object package returns fail-closed result', () => {
     const { authority } = createSyntheticTestAuthority();
-    const result = verifyHumanAuthorizationPackage(null as any, authority);
+    const result = verifyHumanAuthorizationPackage(null as any, authority, {
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
     expect(result.valid).toBe(false);
     expect(result.failureReason).toBe('PACKAGE_NULL');
   });
@@ -1240,12 +1302,439 @@ describe('VELNAR — A.12B.2C-5L Trusted Source Attestation & Cryptographic Huma
     const payload = createSyntheticValidPayload(authority.authorityId);
     const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
 
-    const result = verifyHumanAuthorizationPackage(pkg, null as any);
+    const result = verifyHumanAuthorizationPackage(pkg, null as any, {
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
     expect(result.valid).toBe(false);
     expect(result.failureReason).toBe('AUTHORITY_NULL');
   });
 
-  it('75. total provider network calls during entire test suite execution is exactly 0', () => {
+  it('75. undefined or invalid options returns fail-closed result with SOURCE_ATTESTATION_MISSING', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId);
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const result = verifyHumanAuthorizationPackage(pkg, authority, undefined as any);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('SOURCE_ATTESTATION_MISSING'))).toBe(true);
+  });
+
+  // ==========================================================================
+  // SUITE 12: All 19 Canonical Payload Fields Alter Output Bytes
+  // ==========================================================================
+
+  it('76. each of the 19 fields independently changes canonical byte representation', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const baseline = createSyntheticValidPayload(authority.authorityId);
+    const baselineCanonical = canonicalizeHumanAuthorizationPayload(baseline);
+
+    const fieldMutations: Array<{ field: keyof CanonicalHumanAuthorizationPayload; mutation: any }> = [
+      { field: 'authorizationVersion', mutation: 'a12b2c5-auth-v1.1-future' },
+      { field: 'authorityId', mutation: 'auth_alt_id_1234' },
+      { field: 'issuedAt', mutation: '2026-09-05T12:01:00.000Z' },
+      { field: 'expiresAt', mutation: '2026-09-05T12:14:00.000Z' },
+      { field: 'targetProgram', mutation: 'PEAK_PROGRAM_ALT' },
+      { field: 'pricingWindow', mutation: 'PEAK' },
+      { field: 'candidateId', mutation: 'candidate-alt' },
+      { field: 'sourceCommitSha', mutation: '1'.repeat(40) },
+      { field: 'sourceTreeSha', mutation: '2'.repeat(40) },
+      { field: 'specificationVersion', mutation: 'a12b2c5-v2.0' },
+      { field: 'maxBudgetMicroUsd', mutation: 25566 },
+      { field: 'runNonce', mutation: 'a'.repeat(32) },
+      { field: 'singleUse', mutation: false },
+      { field: 'provider', mutation: 'custom_provider' },
+      { field: 'model', mutation: 'deepseek-chat-v4' },
+      { field: 'canonicalTaskCount', mutation: 14 },
+      { field: 'transportContractVersion', mutation: '1.4.0' },
+      { field: 'guardedTransportModuleVersion', mutation: '1.1.0' },
+      { field: 'sourceAttestationDigest', mutation: '3'.repeat(64) },
+    ];
+
+    expect(fieldMutations).toHaveLength(19);
+
+    for (const { field, mutation } of fieldMutations) {
+      const mutated = { ...baseline, [field]: mutation };
+      const mutatedCanonical = canonicalizeHumanAuthorizationPayload(mutated as any);
+      expect(mutatedCanonical).not.toBe(baselineCanonical);
+      if (typeof mutation === 'number' || typeof mutation === 'boolean') {
+        expect(mutatedCanonical).toContain(`"${field}":${mutation}`);
+      } else {
+        expect(mutatedCanonical).toContain(`"${field}":"${mutation}"`);
+      }
+    }
+  });
+
+  // ==========================================================================
+  // SUITE 13: Package Digest Coverage for Repaired Bindings
+  // ==========================================================================
+
+  it('77. mutating singleUse changes authorizationPackageDigest', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payloadTrue = createSyntheticValidPayload(authority.authorityId, { singleUse: true });
+    const payloadFalse = createSyntheticValidPayload(authority.authorityId, { singleUse: false as any });
+    const pkgTrue = signSyntheticPayload(payloadTrue, authority, privateKeyPem);
+    const pkgFalse = signSyntheticPayload(payloadFalse, authority, privateKeyPem);
+
+    const digestTrue = computeAuthorizationPackageDigest(pkgTrue);
+    const digestFalse = computeAuthorizationPackageDigest(pkgFalse);
+    expect(digestTrue).not.toBe(digestFalse);
+  });
+
+  it('78. mutating canonicalTaskCount changes authorizationPackageDigest', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload7 = createSyntheticValidPayload(authority.authorityId, { canonicalTaskCount: 7 });
+    const payload14 = createSyntheticValidPayload(authority.authorityId, { canonicalTaskCount: 14 as any });
+    const pkg7 = signSyntheticPayload(payload7, authority, privateKeyPem);
+    const pkg14 = signSyntheticPayload(payload14, authority, privateKeyPem);
+
+    const digest7 = computeAuthorizationPackageDigest(pkg7);
+    const digest14 = computeAuthorizationPackageDigest(pkg14);
+    expect(digest7).not.toBe(digest14);
+  });
+
+  it('79. mutating authorizationVersion changes authorizationPackageDigest', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload1 = createSyntheticValidPayload(authority.authorityId, { authorizationVersion: 'a12b2c5-v1.3' });
+    const payload2 = createSyntheticValidPayload(authority.authorityId, { authorizationVersion: 'a12b2c5-v1.4' });
+    const pkg1 = signSyntheticPayload(payload1, authority, privateKeyPem);
+    const pkg2 = signSyntheticPayload(payload2, authority, privateKeyPem);
+
+    const digest1 = computeAuthorizationPackageDigest(pkg1);
+    const digest2 = computeAuthorizationPackageDigest(pkg2);
+    expect(digest1).not.toBe(digest2);
+  });
+
+  it('80. injecting unknown property into package payload throws CANONICALIZATION_FAILURE in computeAuthorizationPackageDigest', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const payload: any = createSyntheticValidPayload(authority.authorityId);
+    payload.rogueKey = 'rogueValue';
+    const pkg: any = {
+      payload,
+      signatureBase64: 'fake-sig',
+      authorityId: authority.authorityId,
+      keyVersion: authority.keyVersion,
+      algorithm: authority.algorithm,
+    };
+    expect(() => computeAuthorizationPackageDigest(pkg)).toThrow(
+      /CANONICALIZATION_FAILURE.*unknown or unauthorized field 'rogueKey'/
+    );
+  });
+
+  // ==========================================================================
+  // SUITE 14: Signature Verification Regressions on Mutated Fields Without Resigning
+  // ==========================================================================
+
+  it('81. in-place mutation of singleUse without resigning fails signature check', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, { singleUse: true });
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const mutatedPkg = {
+      ...pkg,
+      payload: {
+        ...pkg.payload,
+        singleUse: false as any,
+      },
+    };
+
+    const result = verifyHumanAuthorizationPackage(mutatedPkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('SIGNATURE_VERIFICATION_FAILED'))).toBe(true);
+  });
+
+  it('82. in-place mutation of canonicalTaskCount without resigning fails signature check', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, { canonicalTaskCount: 7 });
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const mutatedPkg = {
+      ...pkg,
+      payload: {
+        ...pkg.payload,
+        canonicalTaskCount: 14 as any,
+      },
+    };
+
+    const result = verifyHumanAuthorizationPackage(mutatedPkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('SIGNATURE_VERIFICATION_FAILED'))).toBe(true);
+  });
+
+  it('83. in-place mutation of authorizationVersion without resigning fails signature check', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, { authorizationVersion: 'a12b2c5-v1.3' });
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const mutatedPkg = {
+      ...pkg,
+      payload: {
+        ...pkg.payload,
+        authorizationVersion: 'a12b2c5-v1.4',
+      },
+    };
+
+    const result = verifyHumanAuthorizationPackage(mutatedPkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('SIGNATURE_VERIFICATION_FAILED'))).toBe(true);
+  });
+
+  // ==========================================================================
+  // SUITE 15: Mandatory Source Attestation Regressions (Cases A through H)
+  // ==========================================================================
+
+  it('84. Case A: omitted options parameter returns SOURCE_ATTESTATION_MISSING', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId);
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const result = (verifyHumanAuthorizationPackage as any)(pkg, authority);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('SOURCE_ATTESTATION_MISSING'))).toBe(true);
+  });
+
+  it('85. Case B: options without sourceAttestation returns SOURCE_ATTESTATION_MISSING', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId);
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+    } as any);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('SOURCE_ATTESTATION_MISSING'))).toBe(true);
+  });
+
+  it('86. Case C: non-object sourceAttestation returns SOURCE_ATTESTATION_INVALID', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId);
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: 'not_an_object' as any,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('SOURCE_ATTESTATION_INVALID'))).toBe(true);
+  });
+
+  it('87. Case D: tampered sourceAttestation digest returns ATTESTATION_DIGEST_INVALID', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId);
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const tamperedAttestation: TrustedSourceAttestation = {
+      ...DEFAULT_TEST_ATTESTATION,
+      attestationDigest: '0'.repeat(64),
+    };
+
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: tamperedAttestation,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('ATTESTATION_DIGEST_MISMATCH') || e.includes('SOURCE_ATTESTATION_INVALID'))).toBe(true);
+  });
+
+  it('88. Case E: mismatched sourceCommitSha returns SOURCE_COMMIT_MISMATCH', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId);
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const altAttestation = buildTrustedSourceAttestation({
+      sourceCommitSha: '0'.repeat(40),
+      sourceTreeSha: BASE_TREE_SHA,
+      createdAt: '2026-09-05T12:00:00.000Z',
+    });
+
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: altAttestation,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('SOURCE_COMMIT_MISMATCH'))).toBe(true);
+  });
+
+  it('89. Case F: mismatched sourceTreeSha returns SOURCE_TREE_MISMATCH', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId);
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const altAttestation = buildTrustedSourceAttestation({
+      sourceCommitSha: BASE_COMMIT_SHA,
+      sourceTreeSha: '0'.repeat(40),
+      createdAt: '2026-09-05T12:00:00.000Z',
+    });
+
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: altAttestation,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('SOURCE_TREE_MISMATCH'))).toBe(true);
+  });
+
+  it('90. Case G: mismatched attestationDigest returns ATTESTATION_DIGEST_BINDING_MISMATCH', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, {
+      sourceAttestationDigest: 'e'.repeat(64),
+    });
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('ATTESTATION_DIGEST_BINDING_MISMATCH'))).toBe(true);
+  });
+
+  it('91. Case H: mismatched attestationVersion returns ATTESTATION_VERSION_MISMATCH', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId);
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const badVersionAttestation: any = {
+      ...DEFAULT_TEST_ATTESTATION,
+      attestationVersion: '2.0.0-future',
+    };
+    // Recompute valid digest for the tampered structure so it passes digest check but fails version check
+    badVersionAttestation.attestationDigest = computeSourceAttestationDigest(badVersionAttestation);
+
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: badVersionAttestation,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('ATTESTATION_VERSION_MISMATCH'))).toBe(true);
+  });
+
+  // ==========================================================================
+  // SUITE 16: Version Binding Regressions
+  // ==========================================================================
+
+  it('92. authorizationVersion mismatch fails verification with AUTHORIZATION_VERSION_MISMATCH', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payload = createSyntheticValidPayload(authority.authorityId, {
+      authorizationVersion: 'a12b2c5-v1.2-obsolete',
+    });
+    const pkg = signSyntheticPayload(payload, authority, privateKeyPem);
+
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('AUTHORIZATION_VERSION_MISMATCH'))).toBe(true);
+  });
+
+  it('93. attestationVersion mismatch in source attestation fails validateTrustedSourceAttestation', () => {
+    const badAttestation: any = {
+      ...DEFAULT_TEST_ATTESTATION,
+      attestationVersion: 'invalid-ver',
+    };
+    const validation = validateTrustedSourceAttestation(badAttestation);
+    expect(validation.valid).toBe(false);
+    expect(validation.errors.some(e => e.includes('ATTESTATION_VERSION_MISMATCH'))).toBe(true);
+  });
+
+  // ==========================================================================
+  // SUITE 17: Strict Type Validation Regressions (No Lossy Coercion)
+  // ==========================================================================
+
+  it('94. string number for maxBudgetMicroUsd throws CANONICALIZATION_FAILURE', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const payload: any = createSyntheticValidPayload(authority.authorityId, {
+      maxBudgetMicroUsd: '12783' as any,
+    });
+    expect(() => canonicalizeHumanAuthorizationPayload(payload)).toThrow(
+      /CANONICALIZATION_FAILURE.*maxBudgetMicroUsd/
+    );
+  });
+
+  it('95. string number for canonicalTaskCount throws CANONICALIZATION_FAILURE', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const payload: any = createSyntheticValidPayload(authority.authorityId, {
+      canonicalTaskCount: '7' as any,
+    });
+    expect(() => canonicalizeHumanAuthorizationPayload(payload)).toThrow(
+      /CANONICALIZATION_FAILURE.*canonicalTaskCount/
+    );
+  });
+
+  it('96. NaN or Infinity for numeric fields throws CANONICALIZATION_FAILURE', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const payloadNaN: any = createSyntheticValidPayload(authority.authorityId, {
+      maxBudgetMicroUsd: NaN,
+    });
+    expect(() => canonicalizeHumanAuthorizationPayload(payloadNaN)).toThrow(/CANONICALIZATION_FAILURE/);
+
+    const payloadInf: any = createSyntheticValidPayload(authority.authorityId, {
+      canonicalTaskCount: Infinity,
+    });
+    expect(() => canonicalizeHumanAuthorizationPayload(payloadInf)).toThrow(/CANONICALIZATION_FAILURE/);
+  });
+
+  it('97. number or string for singleUse throws CANONICALIZATION_FAILURE', () => {
+    const { authority } = createSyntheticTestAuthority();
+    const payloadNum: any = createSyntheticValidPayload(authority.authorityId, {
+      singleUse: 1 as any,
+    });
+    expect(() => canonicalizeHumanAuthorizationPayload(payloadNum)).toThrow(
+      /CANONICALIZATION_FAILURE.*singleUse/
+    );
+
+    const payloadStr: any = createSyntheticValidPayload(authority.authorityId, {
+      singleUse: 'true' as any,
+    });
+    expect(() => canonicalizeHumanAuthorizationPayload(payloadStr)).toThrow(
+      /CANONICALIZATION_FAILURE.*singleUse/
+    );
+  });
+
+  it('98. numeric timestamp throws CANONICALIZATION_FAILURE and non-UTC timezone timestamp is rejected by verifier', () => {
+    const { authority, privateKeyPem } = createSyntheticTestAuthority();
+    const payloadNumDate: any = createSyntheticValidPayload(authority.authorityId, {
+      issuedAt: 1725537600000 as any,
+    });
+    expect(() => canonicalizeHumanAuthorizationPayload(payloadNumDate)).toThrow(
+      /CANONICALIZATION_FAILURE.*issuedAt/
+    );
+
+    const payloadNonUtc = createSyntheticValidPayload(authority.authorityId, {
+      expiresAt: '2026-09-05T12:00:00+02:00',
+    });
+    const pkg = signSyntheticPayload(payloadNonUtc, authority, privateKeyPem);
+    const result = verifyHumanAuthorizationPackage(pkg, authority, {
+      nowUtc: new Date('2026-09-05T12:05:00.000Z'),
+      sourceAttestation: DEFAULT_TEST_ATTESTATION,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('INVALID_EXPIRES_AT'))).toBe(true);
+  });
+
+  it('99. isValidIsoUtcTimestamp helper validates strictly conforming ISO-8601 UTC strings', () => {
+    expect(isValidIsoUtcTimestamp('2026-09-05T12:00:00.000Z')).toBe(true);
+    expect(isValidIsoUtcTimestamp('2026-09-05T12:00:00Z')).toBe(true);
+    expect(isValidIsoUtcTimestamp('2026-09-05T12:00:00+00:00')).toBe(false);
+    expect(isValidIsoUtcTimestamp('2026-09-05T12:00:00-07:00')).toBe(false);
+    expect(isValidIsoUtcTimestamp('2026-09-05 12:00:00')).toBe(false);
+    expect(isValidIsoUtcTimestamp('invalid')).toBe(false);
+    expect(isValidIsoUtcTimestamp('' as any)).toBe(false);
+    expect(isValidIsoUtcTimestamp(123456789 as any)).toBe(false);
+    expect(isValidIsoUtcTimestamp(null as any)).toBe(false);
+    expect(isValidIsoUtcTimestamp(undefined as any)).toBe(false);
+  });
+
+  it('100. total provider network calls during entire test suite execution is exactly 0', () => {
     expect(globalFetchCalls).toBe(0);
   });
 });

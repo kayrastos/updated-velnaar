@@ -1,0 +1,23 @@
+{
+  "phase": "A.12B.2C-5L.1",
+  "artifactType": "COMPLETE_SIGNED_PAYLOAD_AND_MANDATORY_SOURCE_ATTESTATION_BINDING_REPAIR",
+  "baseCommit": "d2c20696dc487d6a28b0294708da4a1f51f331c3",
+  "baseTree": "c9017b115e9b465e5ef292af475d7e1a1deae581",
+  "defectARepaired": true,
+  "all19CanonicalFieldsSigned": true,
+  "canonicalizerStrictAllowlistEnforced": true,
+  "canonicalizerCoercionForbidden": true,
+  "defectBRepaired": true,
+  "sourceAttestationMandatoryInVerifier": true,
+  "sourceAttestationOmissionFailsClosed": true,
+  "defectCRepaired": true,
+  "canonicalAuthorizationVersionBound": true,
+  "canonicalAttestationVersionBound": true,
+  "liveExecutionEnabled": false,
+  "guardedSourceAttestationReady": false,
+  "guardedHumanAuthAttestationReady": false,
+  "productionRoutingEnforcementAllowed": false,
+  "providerNetworkCalls": 0,
+  "totalSuiteTests": 100,
+  "finalStatus": "A12B2C5L1_REPAIR_COMPLETE_OFFLINE_VERIFIED"
+}

@@ -118,10 +118,10 @@ export interface CanonicalHumanAuthorizationPayload {
   readonly specificationVersion: string;
   readonly maxBudgetMicroUsd: number;
   readonly runNonce: string;
-  readonly singleUse: true;
+  readonly singleUse: boolean;
   readonly provider: 'deepseek';
   readonly model: 'deepseek-v4-flash';
-  readonly canonicalTaskCount: 7;
+  readonly canonicalTaskCount: number;
   readonly transportContractVersion: string;
   readonly guardedTransportModuleVersion: string;
   readonly sourceAttestationDigest: string;
@@ -160,6 +160,41 @@ export interface TrustedSourceAttestation {
 // 3. DETERMINISTIC CANONICALIZATION & SERIALIZATION
 // ============================================================================
 
+export const EXACT_PAYLOAD_KEYS = Object.freeze([
+  'authorizationVersion',
+  'authorityId',
+  'issuedAt',
+  'expiresAt',
+  'targetProgram',
+  'pricingWindow',
+  'candidateId',
+  'sourceCommitSha',
+  'sourceTreeSha',
+  'specificationVersion',
+  'maxBudgetMicroUsd',
+  'runNonce',
+  'singleUse',
+  'provider',
+  'model',
+  'canonicalTaskCount',
+  'transportContractVersion',
+  'guardedTransportModuleVersion',
+  'sourceAttestationDigest',
+] as const);
+
+const ALLOWED_PAYLOAD_KEYS_SET = new Set<string>(EXACT_PAYLOAD_KEYS);
+
+/**
+ * Validates whether a timestamp string strictly matches UTC ISO-8601 representation.
+ */
+export function isValidIsoUtcTimestamp(timestamp: string): boolean {
+  if (typeof timestamp !== 'string') return false;
+  const isoUtcRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
+  if (!isoUtcRegex.test(timestamp)) return false;
+  const parsed = Date.parse(timestamp);
+  return !Number.isNaN(parsed);
+}
+
 /**
  * Computes the SHA256 fingerprint of public key PEM material.
  */
@@ -170,17 +205,34 @@ export function computePublicKeyFingerprintSha256(publicKeyPem: string): string 
 
 /**
  * Serializes CanonicalHumanAuthorizationPayload into a deterministic UTF-8 byte stream.
- * Property order is fixed and strictly validated. Rejects missing, undefined, or invalid fields.
+ * Property order is fixed and strictly validated.
+ * Rejects unknown properties, missing properties, and lossy type coercion.
+ * Serializes actual validated runtime values (no hard-coded constants).
  */
 export function canonicalizeHumanAuthorizationPayload(
   payload: CanonicalHumanAuthorizationPayload
 ): string {
-  if (!payload || typeof payload !== 'object') {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new Error('CANONICALIZATION_FAILURE: payload must be a non-null object');
   }
 
-  // Validate required scalar properties and reject undefined
-  const requiredKeys: (keyof CanonicalHumanAuthorizationPayload)[] = [
+  // 1. Reject unknown extra properties
+  const payloadKeys = Object.keys(payload);
+  for (const key of payloadKeys) {
+    if (!ALLOWED_PAYLOAD_KEYS_SET.has(key)) {
+      throw new Error(`CANONICALIZATION_FAILURE: unknown or unauthorized field '${key}' in payload`);
+    }
+  }
+
+  // 2. Reject missing or null required fields
+  for (const key of EXACT_PAYLOAD_KEYS) {
+    if ((payload as any)[key] === undefined || (payload as any)[key] === null) {
+      throw new Error(`CANONICALIZATION_FAILURE: required field '${key}' is missing or null`);
+    }
+  }
+
+  // 3. Exact type validation (no lossy type coercion)
+  const requiredStringFields: (keyof CanonicalHumanAuthorizationPayload)[] = [
     'authorizationVersion',
     'authorityId',
     'issuedAt',
@@ -191,44 +243,65 @@ export function canonicalizeHumanAuthorizationPayload(
     'sourceCommitSha',
     'sourceTreeSha',
     'specificationVersion',
-    'maxBudgetMicroUsd',
     'runNonce',
-    'singleUse',
     'provider',
     'model',
-    'canonicalTaskCount',
     'transportContractVersion',
     'guardedTransportModuleVersion',
     'sourceAttestationDigest',
   ];
 
-  for (const key of requiredKeys) {
-    if ((payload as any)[key] === undefined || (payload as any)[key] === null) {
-      throw new Error(`CANONICALIZATION_FAILURE: required field '${key}' is missing or null`);
+  for (const field of requiredStringFields) {
+    if (typeof (payload as any)[field] !== 'string') {
+      throw new Error(
+        `CANONICALIZATION_FAILURE: field '${field}' must be a string (coercion prohibited)`
+      );
     }
   }
 
-  // Strict property-by-property deterministic key ordering
+  if (
+    typeof payload.maxBudgetMicroUsd !== 'number' ||
+    !Number.isFinite(payload.maxBudgetMicroUsd)
+  ) {
+    throw new Error(
+      "CANONICALIZATION_FAILURE: field 'maxBudgetMicroUsd' must be a finite number"
+    );
+  }
+
+  if (typeof payload.singleUse !== 'boolean') {
+    throw new Error("CANONICALIZATION_FAILURE: field 'singleUse' must be a boolean");
+  }
+
+  if (
+    typeof payload.canonicalTaskCount !== 'number' ||
+    !Number.isFinite(payload.canonicalTaskCount)
+  ) {
+    throw new Error(
+      "CANONICALIZATION_FAILURE: field 'canonicalTaskCount' must be a finite number"
+    );
+  }
+
+  // 4. Strict property-by-property deterministic key ordering using actual runtime values
   const ordered = {
-    authorizationVersion: String(payload.authorizationVersion),
-    authorityId: String(payload.authorityId),
-    issuedAt: String(payload.issuedAt),
-    expiresAt: String(payload.expiresAt),
-    targetProgram: String(payload.targetProgram),
+    authorizationVersion: payload.authorizationVersion,
+    authorityId: payload.authorityId,
+    issuedAt: payload.issuedAt,
+    expiresAt: payload.expiresAt,
+    targetProgram: payload.targetProgram,
     pricingWindow: payload.pricingWindow,
-    candidateId: String(payload.candidateId),
-    sourceCommitSha: String(payload.sourceCommitSha),
-    sourceTreeSha: String(payload.sourceTreeSha),
-    specificationVersion: String(payload.specificationVersion),
+    candidateId: payload.candidateId,
+    sourceCommitSha: payload.sourceCommitSha,
+    sourceTreeSha: payload.sourceTreeSha,
+    specificationVersion: payload.specificationVersion,
     maxBudgetMicroUsd: payload.maxBudgetMicroUsd,
-    runNonce: String(payload.runNonce),
-    singleUse: true as const,
+    runNonce: payload.runNonce,
+    singleUse: payload.singleUse,
     provider: payload.provider,
     model: payload.model,
-    canonicalTaskCount: 7 as const,
-    transportContractVersion: String(payload.transportContractVersion),
-    guardedTransportModuleVersion: String(payload.guardedTransportModuleVersion),
-    sourceAttestationDigest: String(payload.sourceAttestationDigest),
+    canonicalTaskCount: payload.canonicalTaskCount,
+    transportContractVersion: payload.transportContractVersion,
+    guardedTransportModuleVersion: payload.guardedTransportModuleVersion,
+    sourceAttestationDigest: payload.sourceAttestationDigest,
   };
 
   return JSON.stringify(ordered);
@@ -303,6 +376,11 @@ export function validateTrustedSourceAttestation(
     return { valid: false, errors: ['ATTESTATION_NULL: attestation must be a non-null object'], failureReason: 'ATTESTATION_NULL' };
   }
 
+  // 0. Attestation version exact binding check
+  if (!attestation.attestationVersion || attestation.attestationVersion !== ATTESTATION_FOUNDATION_VERSION) {
+    errors.push(`ATTESTATION_VERSION_MISMATCH: expected '${ATTESTATION_FOUNDATION_VERSION}', got '${attestation.attestationVersion}'`);
+  }
+
   // 1. 40-char lowercase Git SHA-1 commit check
   if (!/^[0-9a-f]{40}$/.test(attestation.sourceCommitSha)) {
     errors.push(`INVALID_COMMIT_SHA_FORMAT: '${attestation.sourceCommitSha}' is not a 40-char lowercase hex SHA`);
@@ -356,10 +434,9 @@ export function validateTrustedSourceAttestation(
     errors.push(`ATTESTATION_DIGEST_MISMATCH: expected '${recomputedDigest}', got '${attestation.attestationDigest}'`);
   }
 
-  // 11. CreatedAt ISO timestamp
-  const createdTime = Date.parse(attestation.createdAt);
-  if (Number.isNaN(createdTime)) {
-    errors.push(`INVALID_CREATED_AT: '${attestation.createdAt}' is not a valid ISO timestamp`);
+  // 11. CreatedAt ISO timestamp (strict UTC ISO timestamp string)
+  if (!isValidIsoUtcTimestamp(attestation.createdAt)) {
+    errors.push(`INVALID_CREATED_AT: '${attestation.createdAt}' is not a valid UTC ISO timestamp string`);
   }
 
   return {
@@ -446,10 +523,10 @@ export function computeAuthorizationConsumptionKey(params: {
 // ============================================================================
 
 export interface VerifyAuthorizationOptions {
+  /** Mandatory source attestation to verify cryptographic binding */
+  readonly sourceAttestation: TrustedSourceAttestation;
   /** Deterministic timestamp override for unit testing only */
   readonly nowUtc?: Date;
-  /** Optional source attestation to verify cryptographic binding */
-  readonly sourceAttestation?: TrustedSourceAttestation;
 }
 
 export interface VerifyAuthorizationResult {
@@ -467,7 +544,7 @@ export interface VerifyAuthorizationResult {
 export function verifyHumanAuthorizationPackage(
   pkg: SignedHumanAuthorizationPackage,
   authority: HumanAuthorizationAuthorityDescriptor,
-  options?: VerifyAuthorizationOptions
+  options: VerifyAuthorizationOptions
 ): VerifyAuthorizationResult {
   const errors: string[] = [];
 
@@ -476,6 +553,15 @@ export function verifyHumanAuthorizationPackage(
   }
   if (!authority || typeof authority !== 'object') {
     return { valid: false, errors: ['AUTHORITY_NULL: authority descriptor must be a non-null object'], failureReason: 'AUTHORITY_NULL' };
+  }
+
+  // Mandatory source attestation presence check
+  if (!options || typeof options !== 'object') {
+    errors.push('SOURCE_ATTESTATION_MISSING: verification options with sourceAttestation is required');
+  } else if (!options.sourceAttestation) {
+    errors.push('SOURCE_ATTESTATION_MISSING: sourceAttestation is mandatory for human authorization verification');
+  } else if (typeof options.sourceAttestation !== 'object') {
+    errors.push('SOURCE_ATTESTATION_INVALID: sourceAttestation must be a non-null object');
   }
 
   // 1. Authority ID matching
@@ -531,6 +617,11 @@ export function verifyHumanAuthorizationPackage(
   if (!p || typeof p !== 'object') {
     errors.push('PAYLOAD_MISSING: valid canonical payload required');
     return { valid: false, errors, failureReason: errors[0] };
+  }
+
+  // Authorization version check
+  if (!p.authorizationVersion || p.authorizationVersion !== CANONICAL_AUTHORIZATION_VERSION) {
+    errors.push(`AUTHORIZATION_VERSION_MISMATCH: expected '${CANONICAL_AUTHORIZATION_VERSION}', got '${p.authorizationVersion}'`);
   }
 
   // Single-use invariant
@@ -599,18 +690,19 @@ export function verifyHumanAuthorizationPackage(
   }
 
   // 7. Timestamps and lifetime bounds
-  const issuedTime = Date.parse(p.issuedAt);
-  const expiresTime = Date.parse(p.expiresAt);
   const now = options?.nowUtc ? options.nowUtc.getTime() : Date.now();
 
-  if (Number.isNaN(issuedTime)) {
-    errors.push(`INVALID_ISSUED_AT: '${p.issuedAt}' is not a valid ISO timestamp`);
+  if (!isValidIsoUtcTimestamp(p.issuedAt)) {
+    errors.push(`INVALID_ISSUED_AT: '${p.issuedAt}' is not a valid UTC ISO timestamp string`);
   }
-  if (Number.isNaN(expiresTime)) {
-    errors.push(`INVALID_EXPIRES_AT: '${p.expiresAt}' is not a valid ISO timestamp`);
+  if (!isValidIsoUtcTimestamp(p.expiresAt)) {
+    errors.push(`INVALID_EXPIRES_AT: '${p.expiresAt}' is not a valid UTC ISO timestamp string`);
   }
 
-  if (!Number.isNaN(issuedTime) && !Number.isNaN(expiresTime)) {
+  if (isValidIsoUtcTimestamp(p.issuedAt) && isValidIsoUtcTimestamp(p.expiresAt)) {
+    const issuedTime = Date.parse(p.issuedAt);
+    const expiresTime = Date.parse(p.expiresAt);
+
     if (expiresTime <= issuedTime) {
       errors.push(`INVALID_EXPIRY_SEQUENCE: expiresAt (${p.expiresAt}) must be strictly after issuedAt (${p.issuedAt})`);
     }
@@ -637,17 +729,17 @@ export function verifyHumanAuthorizationPackage(
     errors.push(`INVALID_SOURCE_ATTESTATION_DIGEST: '${p.sourceAttestationDigest}' is not a 64-char hex SHA256`);
   }
 
-  // 10. Optional source attestation cryptographic binding check
-  if (options?.sourceAttestation) {
+  // 10. Mandatory source attestation cryptographic binding check
+  if (options && typeof options === 'object' && options.sourceAttestation && typeof options.sourceAttestation === 'object') {
     const attCheck = validateTrustedSourceAttestation(options.sourceAttestation);
     if (!attCheck.valid) {
       errors.push(`SOURCE_ATTESTATION_INVALID: ${attCheck.errors.join(', ')}`);
     }
     if (p.sourceCommitSha !== options.sourceAttestation.sourceCommitSha) {
-      errors.push(`SOURCE_COMMIT_BINDING_MISMATCH: payload commit '${p.sourceCommitSha}' !== attestation commit '${options.sourceAttestation.sourceCommitSha}'`);
+      errors.push(`SOURCE_COMMIT_MISMATCH: SOURCE_COMMIT_BINDING_MISMATCH: payload commit '${p.sourceCommitSha}' !== attestation commit '${options.sourceAttestation.sourceCommitSha}'`);
     }
     if (p.sourceTreeSha !== options.sourceAttestation.sourceTreeSha) {
-      errors.push(`SOURCE_TREE_BINDING_MISMATCH: payload tree '${p.sourceTreeSha}' !== attestation tree '${options.sourceAttestation.sourceTreeSha}'`);
+      errors.push(`SOURCE_TREE_MISMATCH: SOURCE_TREE_BINDING_MISMATCH: payload tree '${p.sourceTreeSha}' !== attestation tree '${options.sourceAttestation.sourceTreeSha}'`);
     }
     if (p.sourceAttestationDigest !== options.sourceAttestation.attestationDigest) {
       errors.push(`ATTESTATION_DIGEST_BINDING_MISMATCH: payload digest '${p.sourceAttestationDigest}' !== attestation digest '${options.sourceAttestation.attestationDigest}'`);
