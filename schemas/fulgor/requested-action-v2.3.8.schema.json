@@ -1,0 +1,594 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "maxLength": 104857600
+    },
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "FILE_WRITE",
+        "GIT_COMMIT",
+        "NETWORK_POST",
+        "COMMAND_EXEC"
+      ],
+      "maxLength": 104857600
+    },
+    "action_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "maxLength": 104857600
+    },
+    "target_endpoint": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 104857600
+    },
+    "payload_parameters": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "const": "FILE_WRITE"
+            },
+            "target_path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 104857600
+            },
+            "content_base64": {
+              "type": "string",
+              "maxLength": 104857600
+            },
+            "content_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 104857600
+            },
+            "overwrite": {
+              "type": "boolean"
+            },
+            "expected_pre_content_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "action_type",
+            "target_path",
+            "content_base64",
+            "content_sha256",
+            "overwrite",
+            "expected_pre_content_sha256"
+          ],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "overwrite": {
+                    "const": false
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "expected_pre_content_sha256": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "const": "GIT_COMMIT"
+            },
+            "repository_uri": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 104857600
+            },
+            "branch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 104857600
+            },
+            "commit_message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 104857600
+            },
+            "tree_digest": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+              "maxLength": 64
+            },
+            "expected_parent": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "action_type",
+            "repository_uri",
+            "branch",
+            "commit_message",
+            "tree_digest",
+            "expected_parent"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "const": "NETWORK_POST"
+            },
+            "endpoint_uri": {
+              "type": "string",
+              "maxLength": 104857600
+            },
+            "http_method": {
+              "type": "string",
+              "enum": [
+                "POST",
+                "PUT"
+              ],
+              "maxLength": 104857600
+            },
+            "request_headers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "maxLength": 104857600
+              }
+            },
+            "payload_body_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 104857600
+            }
+          },
+          "required": [
+            "action_type",
+            "endpoint_uri",
+            "http_method",
+            "request_headers",
+            "payload_body_sha256"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "const": "COMMAND_EXEC"
+            },
+            "command_binary": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 104857600
+            },
+            "command_args": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 104857600
+              },
+              "maxItems": 65536
+            },
+            "environment_variables": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "maxLength": 104857600
+              }
+            },
+            "working_directory": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 104857600
+            },
+            "command_binary_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "action_type",
+            "command_binary",
+            "command_args",
+            "environment_variables",
+            "working_directory",
+            "command_binary_sha256"
+          ]
+        }
+      ]
+    },
+    "target_scope": {
+      "$ref": "urn:fulgor:RequestedActionV2_3_8#/$defs/TargetScopeDescriptor"
+    },
+    "target_scope_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "maxLength": 64
+    }
+  },
+  "required": [
+    "action_id",
+    "action_type",
+    "action_digest",
+    "target_endpoint",
+    "payload_parameters",
+    "target_scope",
+    "target_scope_digest"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action_type": {
+            "const": "FILE_WRITE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload_parameters": {
+            "properties": {
+              "action_type": {
+                "const": "FILE_WRITE"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_type": {
+            "const": "GIT_COMMIT"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload_parameters": {
+            "properties": {
+              "action_type": {
+                "const": "GIT_COMMIT"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_type": {
+            "const": "NETWORK_POST"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload_parameters": {
+            "properties": {
+              "action_type": {
+                "const": "NETWORK_POST"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_type": {
+            "const": "COMMAND_EXEC"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload_parameters": {
+            "properties": {
+              "action_type": {
+                "const": "COMMAND_EXEC"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_type": {
+            "const": "FILE_WRITE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target_scope": {
+            "properties": {
+              "action_type": {
+                "const": "FILE_WRITE"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_type": {
+            "const": "GIT_COMMIT"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target_scope": {
+            "properties": {
+              "action_type": {
+                "const": "GIT_COMMIT"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_type": {
+            "const": "NETWORK_POST"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target_scope": {
+            "properties": {
+              "action_type": {
+                "const": "NETWORK_POST"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action_type": {
+            "const": "COMMAND_EXEC"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target_scope": {
+            "properties": {
+              "action_type": {
+                "const": "COMMAND_EXEC"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$id": "urn:fulgor:RequestedActionV2_3_8",
+  "$defs": {
+    "TargetScopeDescriptor": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "const": "FILE_WRITE"
+            },
+            "namespace_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 64
+            },
+            "path_prefix": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "allow_overwrite": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "action_type",
+            "namespace_id",
+            "path_prefix",
+            "allow_overwrite"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "const": "GIT_COMMIT"
+            },
+            "repository_identity": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 64
+            },
+            "repository_uri": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "allowed_refs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 1,
+              "maxItems": 65536,
+              "uniqueItems": true
+            },
+            "object_format": {
+              "enum": [
+                "SHA1",
+                "SHA256"
+              ]
+            }
+          },
+          "required": [
+            "action_type",
+            "repository_identity",
+            "repository_uri",
+            "allowed_refs",
+            "object_format"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "const": "NETWORK_POST"
+            },
+            "authority_identity": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 64
+            },
+            "origin": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "path_prefix": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "allowed_methods": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "POST",
+                  "PUT"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 65536,
+              "uniqueItems": true
+            },
+            "allowed_header_names": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 0,
+              "maxItems": 65536,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "action_type",
+            "authority_identity",
+            "origin",
+            "path_prefix",
+            "allowed_methods",
+            "allowed_header_names"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action_type": {
+              "const": "COMMAND_EXEC"
+            },
+            "namespace_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 64
+            },
+            "binary_path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "binary_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 64
+            },
+            "working_directory": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "argv": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "minItems": 0,
+              "maxItems": 65536
+            },
+            "environment": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "maxLength": 4096
+              }
+            }
+          },
+          "required": [
+            "action_type",
+            "namespace_id",
+            "binary_path",
+            "binary_sha256",
+            "working_directory",
+            "argv",
+            "environment"
+          ]
+        }
+      ]
+    }
+  }
+}

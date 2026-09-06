@@ -1,4 +1,4 @@
-"""Frozen Fulgor V2.3.8 Phase 0 trust primitives."""
+"""Frozen Fulgor V2.3.8 Phase 1 local trust primitives."""
 
 from .canonical import MAX_PAYLOAD_BYTES, MAX_SAFE_INTEGER, canonicalize, parse_json_strict
 from .digests import contract_digest
@@ -35,6 +35,22 @@ from .header import (
 )
 from .paths import logical_path_sha256, validate_logical_path, validate_no_casefold_collisions
 from .profiles import CANONICAL_PROFILE, ED25519_PROFILE, LOGICAL_PATH_PROFILE
+from .phase1_payloads import (
+    EvidenceSignerCertificatePayloadV2_3_8,
+    FinalEvidencePayloadV2_3_8,
+    LocalTrustStatus,
+    LocalValidationResult,
+    RootTrustAnchorV2_3_8,
+    SafetyTrustPolicyPayloadV2_3_8,
+    parse_evidence_signer_certificate,
+    parse_final_evidence,
+    parse_root_trust_anchor,
+    parse_safety_trust_policy,
+    validate_evidence_signer_certificate,
+    validate_final_evidence,
+    validate_root_trust_anchor,
+    validate_safety_trust_policy,
+)
 from .validators import REGISTERED_PAYLOAD_VALIDATORS, TypedPayloadValidatorRegistration
 
 __all__ = [
@@ -43,9 +59,13 @@ __all__ = [
     "DetachedSignatureEnvelope",
     "DetachedVerificationResult",
     "ED25519_PROFILE",
+    "EvidenceSignerCertificatePayloadV2_3_8",
+    "FinalEvidencePayloadV2_3_8",
     "FulgorErrorCode",
     "FulgorValidationError",
     "LOGICAL_PATH_PROFILE",
+    "LocalTrustStatus",
+    "LocalValidationResult",
     "MAX_PAYLOAD_BYTES",
     "MAX_SAFE_INTEGER",
     "OPERATION_DOMAINS",
@@ -55,6 +75,8 @@ __all__ = [
     "ProtectedHeader",
     "REGISTERED_PAYLOAD_VALIDATORS",
     "REGISTERED_DOMAIN_TAGS",
+    "RootTrustAnchorV2_3_8",
+    "SafetyTrustPolicyPayloadV2_3_8",
     "TrustStatus",
     "TypedPayloadValidatorRegistration",
     "VerificationExpectations",
@@ -66,13 +88,21 @@ __all__ = [
     "decode_signature_base64",
     "logical_path_sha256",
     "parse_json_strict",
+    "parse_evidence_signer_certificate",
+    "parse_final_evidence",
     "parse_protected_header",
     "parse_protected_header_bytes",
+    "parse_root_trust_anchor",
+    "parse_safety_trust_policy",
     "sign_detached",
     "signature_input",
     "signature_input_serialized",
     "validate_content_digest",
+    "validate_evidence_signer_certificate",
+    "validate_final_evidence",
     "validate_protected_header",
+    "validate_root_trust_anchor",
+    "validate_safety_trust_policy",
     "validate_serialized_content_digest",
     "validate_logical_path",
     "validate_no_casefold_collisions",

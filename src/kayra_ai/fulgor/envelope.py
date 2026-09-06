@@ -19,11 +19,27 @@ from .header import (
     parse_protected_header_bytes,
     validate_protected_header,
 )
+from . import validators as _validator_module
 from .validators import validate_registered_payload
+
+_INITIAL_VALIDATE_REGISTERED_PAYLOAD = validate_registered_payload
+
+
+def _authoritative_validate_payload(payload_type: str, payload: Any) -> None:
+    if (
+        validate_registered_payload is not _INITIAL_VALIDATE_REGISTERED_PAYLOAD
+        or getattr(_validator_module, "validate_registered_payload", None) is not _INITIAL_VALIDATE_REGISTERED_PAYLOAD
+    ):
+        raise FulgorValidationError(
+            FulgorErrorCode.UNSUPPORTED_PAYLOAD_TYPE,
+            "authoritative payload validator was rebound",
+        )
+    _INITIAL_VALIDATE_REGISTERED_PAYLOAD(payload_type, payload)
 
 
 class TrustStatus(StrEnum):
     NOT_EVALUATED_PHASE_0 = "NOT_EVALUATED_PHASE_0"
+    NOT_EVALUATED_PHASE_1 = "NOT_EVALUATED_PHASE_1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,10 +88,13 @@ class DetachedVerificationResult:
     error_detail: str | None = None
 
     def __post_init__(self) -> None:
-        if self.trust_status is not TrustStatus.NOT_EVALUATED_PHASE_0:
+        if self.trust_status not in {
+            TrustStatus.NOT_EVALUATED_PHASE_0,
+            TrustStatus.NOT_EVALUATED_PHASE_1,
+        }:
             raise FulgorValidationError(
                 FulgorErrorCode.INVALID_ENVELOPE,
-                "Phase 0 verification results cannot represent trust authorization",
+                "local verification results cannot represent trust authorization",
             )
         if any(
             value is not None
@@ -89,12 +108,12 @@ class DetachedVerificationResult:
         ):
             raise FulgorValidationError(
                 FulgorErrorCode.INVALID_ENVELOPE,
-                "later-phase authority fields must remain unevaluated in Phase 0",
+                "later-phase authority fields must remain unevaluated",
             )
         if self.cryptographically_valid != self.signature_valid:
             raise FulgorValidationError(
                 FulgorErrorCode.INVALID_ENVELOPE,
-                "cryptographic and signature validity must agree in Phase 0",
+                "cryptographic and signature validity must agree",
             )
         if self.cryptographically_valid:
             if (
@@ -106,7 +125,7 @@ class DetachedVerificationResult:
             ):
                 raise FulgorValidationError(
                     FulgorErrorCode.INVALID_ENVELOPE,
-                    "successful Phase 0 result requires one valid payload digest and no error",
+                    "successful local result requires one valid payload digest and no error",
                 )
         elif self.payload_digest is not None:
             raise FulgorValidationError(
@@ -187,7 +206,7 @@ def sign_detached(
     payload: Any,
 ) -> DetachedSignatureEnvelope:
     parsed_header = _validated_header(header)
-    validate_registered_payload(parsed_header.payload_type, payload)
+    _authoritative_validate_payload(parsed_header.payload_type, payload)
     _validate_programmatic_content_digest(parsed_header, payload)
     signature = private_key.sign(signature_input(parsed_header, payload))
     return DetachedSignatureEnvelope(
@@ -221,7 +240,7 @@ def verify_detached(
             )
         parsed = parse_detached_envelope_bytes(envelope_raw)
         payload = parse_json_strict(payload_raw)
-        validate_registered_payload(parsed.protected_header.payload_type, payload)
+        _authoritative_validate_payload(parsed.protected_header.payload_type, payload)
         digest = _validate_programmatic_content_digest(parsed.protected_header, payload)
         decoded_public_key = (
             decode_public_key_base64(public_key) if type(public_key) is str else public_key
@@ -238,7 +257,12 @@ def verify_detached(
         verify_strict(decoded_public_key, signature, signature_input(parsed.protected_header, payload))
         return DetachedVerificationResult(
             cryptographically_valid=True,
-            trust_status=TrustStatus.NOT_EVALUATED_PHASE_0,
+            trust_status=(TrustStatus.NOT_EVALUATED_PHASE_1
+                          if parsed.protected_header.payload_type in {
+                              "SafetyTrustPolicyPayloadV2_3_8",
+                              "EvidenceSignerCertificatePayloadV2_3_8",
+                              "FinalEvidencePayloadV2_3_8",
+                          } else TrustStatus.NOT_EVALUATED_PHASE_0),
             signature_valid=True,
             issuer_authorized=None,
             not_revoked=None,

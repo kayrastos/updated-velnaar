@@ -1,0 +1,1225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "policy_epoch": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "root_generation": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "issuers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "authority_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "serial_floor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "keys": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "key_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$",
+                  "maxLength": 104857600
+                },
+                "public_key": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9+/]{43}=$",
+                  "maxLength": 104857600
+                },
+                "permitted_payload_types": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "SafetyTrustPolicyPayloadV2_3_8",
+                      "EvidenceSignerCertificatePayloadV2_3_8",
+                      "FinalEvidencePayloadV2_3_8",
+                      "HumanDecisionV2_3_8",
+                      "SafetyKernelDecisionV2_3_8",
+                      "ModelArtifactAttestationPayloadV2_3_8",
+                      "ExecutionBundleAttestationPayloadV2_3_8",
+                      "RuntimeObservationV2_3_8",
+                      "ProvenanceValidationRegistryV2_3_8",
+                      "ActionScopedCapabilityV2_3_8",
+                      "ActionResultV2_3_8"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 65536
+                },
+                "permitted_purposes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "ATTESTATION",
+                      "POLICY",
+                      "CERTIFICATE",
+                      "EVIDENCE",
+                      "DECISION",
+                      "ACTION",
+                      "OBSERVATION"
+                    ],
+                    "maxLength": 104857600
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 65536
+                },
+                "permitted_scope_digests": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "maxLength": 104857600
+                  },
+                  "uniqueItems": true,
+                  "maxItems": 65536
+                },
+                "valid_from": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "valid_until": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "key_id",
+                "public_key",
+                "permitted_payload_types",
+                "permitted_purposes",
+                "permitted_scope_digests",
+                "valid_from",
+                "valid_until"
+              ]
+            },
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 104857600
+            }
+          }
+        },
+        "required": [
+          "authority_id",
+          "serial_floor",
+          "keys"
+        ]
+      },
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$",
+        "maxLength": 104857600
+      }
+    },
+    "revoked_key_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$",
+        "maxLength": 104857600
+      },
+      "uniqueItems": true,
+      "maxItems": 65536
+    },
+    "revoked_object_digests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$",
+        "maxLength": 104857600
+      },
+      "uniqueItems": true,
+      "maxItems": 65536
+    },
+    "authorized_bootstrap_digests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$",
+        "maxLength": 104857600
+      },
+      "uniqueItems": true,
+      "maxItems": 65536
+    },
+    "authorized_time_sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "permitted_mechanisms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "TPM2_TIME",
+              "RFC3161_CMS"
+            ],
+            "maxLength": 104857600
+          },
+          "uniqueItems": true,
+          "maxItems": 65536
+        },
+        "authorized_ak_key_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "uniqueItems": true,
+          "maxItems": 65536
+        },
+        "authorized_tsa_root_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "uniqueItems": true,
+          "maxItems": 65536
+        },
+        "authorized_tsa_policy_oids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)+$",
+            "maxLength": 104857600
+          },
+          "uniqueItems": true,
+          "maxItems": 65536
+        },
+        "public_keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "key_id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "maxLength": 104857600
+              },
+              "public_key_der_base64": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 131072,
+                "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+              },
+              "role": {
+                "enum": [
+                  "TPM_AK",
+                  "TSA_ROOT"
+                ]
+              }
+            },
+            "required": [
+              "key_id",
+              "public_key_der_base64",
+              "role"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 65536,
+          "uniqueItems": true
+        },
+        "tpm_utc_calibration": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "ak_key_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$",
+                  "maxLength": 104857600
+                },
+                "reset_count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "restart_count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "clock_milliseconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "utc_lower_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "utc_upper_ms": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_drift_ppm": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000
+                }
+              },
+              "required": [
+                "ak_key_id",
+                "reset_count",
+                "restart_count",
+                "clock_milliseconds",
+                "utc_lower_ms",
+                "utc_upper_ms",
+                "max_drift_ppm"
+              ]
+            }
+          ]
+        },
+        "local_monotonic_max_drift_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "cms_accuracy_bound_ms": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        }
+      },
+      "required": [
+        "permitted_mechanisms",
+        "authorized_ak_key_ids",
+        "authorized_tsa_root_ids",
+        "authorized_tsa_policy_oids",
+        "public_keys",
+        "tpm_utc_calibration",
+        "local_monotonic_max_drift_ppm",
+        "cms_accuracy_bound_ms"
+      ]
+    },
+    "max_trusted_time_uncertainty": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "max_trusted_time_age": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "authorized_runtime_profile_digests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$",
+        "maxLength": 104857600
+      },
+      "minItems": 1,
+      "maxItems": 65536,
+      "uniqueItems": true
+    },
+    "authorized_adapter_digests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$",
+        "maxLength": 104857600
+      },
+      "minItems": 1,
+      "maxItems": 65536,
+      "uniqueItems": true
+    },
+    "provenance_registry_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "maxLength": 104857600
+    },
+    "authorized_observer_key_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$",
+        "maxLength": 104857600
+      },
+      "minItems": 0,
+      "maxItems": 65536,
+      "uniqueItems": true
+    },
+    "allowed_action_types": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "FILE_WRITE",
+          "GIT_COMMIT",
+          "NETWORK_POST",
+          "COMMAND_EXEC"
+        ]
+      },
+      "uniqueItems": true,
+      "maxItems": 4
+    },
+    "allowed_target_scopes": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:fulgor:RequestedActionV2_3_8#/$defs/TargetScopeDescriptor"
+      },
+      "minItems": 0,
+      "maxItems": 65536,
+      "uniqueItems": true
+    },
+    "max_capability_lifetime": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "anchor_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "profile_version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "profile_document_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "verifier_code_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "provider_type": {
+            "enum": [
+              "TPM_NV",
+              "HSM",
+              "PROTECTED_HOST_DAEMON",
+              "REMOTE_AUTHORITY"
+            ]
+          },
+          "anchor_instance_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "provider_instance_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "host_binding": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "authorized_service_identity": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "counter_namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "counter_object_identity": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "provisioning_generation": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "rollback_domain_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "durable_ledger_domain_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "trusted_administrators_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "reset_authority_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "capability": {
+            "enum": [
+              "STRONG_ANTI_ROLLBACK",
+              "IDENTITY_ONLY"
+            ]
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "key_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "public_key_base64": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 131072,
+                  "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+                },
+                "algorithm": {
+                  "enum": [
+                    "ED25519",
+                    "TPM_ALG_RSASSA_SHA256",
+                    "TPM_ALG_ECDSA_SHA256",
+                    "VENDOR_NATIVE"
+                  ]
+                }
+              },
+              "required": [
+                "key_id",
+                "public_key_base64",
+                "algorithm"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 65536,
+            "uniqueItems": true
+          },
+          "threshold": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "response_key_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "native_parameters": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "TPM_NV"
+                  },
+                  "nv_index": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "nv_name": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 131072,
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+                  },
+                  "nv_public_bytes": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 131072,
+                    "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+                  },
+                  "ak_key_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "maxLength": 104857600
+                  },
+                  "nv_attributes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "counter_attribute": {
+                    "const": "TPMA_NV_COUNTER"
+                  },
+                  "reset_protection_profile_digest": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "maxLength": 104857600
+                  }
+                },
+                "required": [
+                  "kind",
+                  "nv_index",
+                  "nv_name",
+                  "nv_public_bytes",
+                  "ak_key_id",
+                  "nv_attributes",
+                  "counter_attribute",
+                  "reset_protection_profile_digest"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "HSM"
+                  },
+                  "vendor_profile_digest": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "maxLength": 104857600
+                  },
+                  "monotonic_object_identity": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "maxLength": 104857600
+                  },
+                  "primitive": {
+                    "enum": [
+                      "ATOMIC_EXPECTED_INCREMENT",
+                      "UNSUPPORTED"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "vendor_profile_digest",
+                  "monotonic_object_identity",
+                  "primitive"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "PROTECTED_HOST_DAEMON"
+                  },
+                  "daemon_key_id": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "maxLength": 104857600
+                  },
+                  "ledger_identity": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "maxLength": 104857600
+                  }
+                },
+                "required": [
+                  "kind",
+                  "daemon_key_id",
+                  "ledger_identity"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "REMOTE_AUTHORITY"
+                  },
+                  "authority_set_digest": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "maxLength": 104857600
+                  },
+                  "consensus_profile_digest": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "maxLength": 104857600
+                  },
+                  "log_identity": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "maxLength": 104857600
+                  }
+                },
+                "required": [
+                  "kind",
+                  "authority_set_digest",
+                  "consensus_profile_digest",
+                  "log_identity"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "profile_id",
+          "profile_version",
+          "profile_document_sha256",
+          "verifier_code_digest",
+          "provider_type",
+          "anchor_instance_id",
+          "provider_instance_id",
+          "host_binding",
+          "authorized_service_identity",
+          "counter_namespace",
+          "counter_object_identity",
+          "provisioning_generation",
+          "rollback_domain_id",
+          "durable_ledger_domain_id",
+          "trusted_administrators_digest",
+          "reset_authority_digest",
+          "capability",
+          "keys",
+          "threshold",
+          "response_key_id",
+          "native_parameters"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "provider_type": {
+                  "const": "TPM_NV"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "native_parameters": {
+                  "properties": {
+                    "kind": {
+                      "const": "TPM_NV"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "provider_type": {
+                  "const": "HSM"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "native_parameters": {
+                  "properties": {
+                    "kind": {
+                      "const": "HSM"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "provider_type": {
+                  "const": "PROTECTED_HOST_DAEMON"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "native_parameters": {
+                  "properties": {
+                    "kind": {
+                      "const": "PROTECTED_HOST_DAEMON"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "provider_type": {
+                  "const": "REMOTE_AUTHORITY"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "native_parameters": {
+                  "properties": {
+                    "kind": {
+                      "const": "REMOTE_AUTHORITY"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 65536,
+      "uniqueItems": true
+    },
+    "checker_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "checker_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "checker_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "checker_code_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "checker_config_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "assertion_types": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "OUTPUT_ASSERTION",
+                "EVENT_COMPLETENESS",
+                "ARTIFACT_IMMUTABILITY",
+                "BOOTSTRAP_IDENTITY",
+                "IPC_ISOLATION",
+                "RUNTIME_OBSERVATION",
+                "LOADED_MAPPING",
+                "DEPENDENCY_CLOSURE",
+                "CLOCK_CAPTURE"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 65536,
+            "uniqueItems": true
+          },
+          "supervisor_key_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "supervisor_public_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9+/]{43}=$"
+          },
+          "supervisor_measurement_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "authority_mode": {
+            "const": "CONTROLLED_SUPERVISOR"
+          },
+          "source_profile_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "reproducible_assertion_types": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "OUTPUT_ASSERTION",
+                "EVENT_COMPLETENESS",
+                "ARTIFACT_IMMUTABILITY",
+                "BOOTSTRAP_IDENTITY",
+                "IPC_ISOLATION",
+                "RUNTIME_OBSERVATION",
+                "LOADED_MAPPING",
+                "DEPENDENCY_CLOSURE",
+                "CLOCK_CAPTURE"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 65536,
+            "uniqueItems": true
+          },
+          "required_assertion_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "maxLength": 104857600
+            },
+            "minItems": 1,
+            "maxItems": 65536,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "checker_id",
+          "checker_version",
+          "checker_code_digest",
+          "checker_config_digest",
+          "assertion_types",
+          "supervisor_key_id",
+          "supervisor_public_key",
+          "supervisor_measurement_digest",
+          "authority_mode",
+          "source_profile_digest",
+          "reproducible_assertion_types",
+          "required_assertion_ids"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 65536,
+      "uniqueItems": true
+    },
+    "effect_profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "action_type": {
+            "enum": [
+              "FILE_WRITE",
+              "GIT_COMMIT",
+              "NETWORK_POST"
+            ]
+          },
+          "target_identity": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "target_scope_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "authority_key_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "authority_public_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9+/]{43}=$"
+          },
+          "verifier_code_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "idempotency_namespace": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "retention": {
+            "const": "UNTIL_EXPLICIT_RETIREMENT"
+          },
+          "one_winner_semantics": {
+            "const": "ATOMIC_KEY_REQUEST_EFFECT_RECEIPT"
+          },
+          "profile_document_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 104857600
+          },
+          "target_scope": {
+            "$ref": "urn:fulgor:RequestedActionV2_3_8#/$defs/TargetScopeDescriptor"
+          }
+        },
+        "required": [
+          "profile_id",
+          "action_type",
+          "target_identity",
+          "target_scope_digest",
+          "authority_key_id",
+          "authority_public_key",
+          "verifier_code_digest",
+          "idempotency_namespace",
+          "retention",
+          "one_winner_semantics",
+          "profile_document_sha256",
+          "target_scope"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "action_type": {
+                  "const": "FILE_WRITE"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "target_scope": {
+                  "properties": {
+                    "action_type": {
+                      "const": "FILE_WRITE"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "action_type": {
+                  "const": "GIT_COMMIT"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "target_scope": {
+                  "properties": {
+                    "action_type": {
+                      "const": "GIT_COMMIT"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "action_type": {
+                  "const": "NETWORK_POST"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "target_scope": {
+                  "properties": {
+                    "action_type": {
+                      "const": "NETWORK_POST"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "action_type": {
+                  "const": "COMMAND_EXEC"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "target_scope": {
+                  "properties": {
+                    "action_type": {
+                      "const": "COMMAND_EXEC"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 65536,
+      "uniqueItems": true
+    },
+    "transcript_verification_authorities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "authority_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 64
+          },
+          "key_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 64
+          },
+          "public_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9+/]{43}=$",
+            "maxLength": 44
+          },
+          "supervisor_measurement_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 64
+          },
+          "verification_profile_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 64
+          },
+          "valid_from": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "valid_until": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "authority_id",
+          "key_id",
+          "public_key",
+          "supervisor_measurement_digest",
+          "verification_profile_digest",
+          "valid_from",
+          "valid_until"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 65536,
+      "uniqueItems": true
+    },
+    "state_verification_authorities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "authority_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 64
+          },
+          "key_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 64
+          },
+          "public_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9+/]{43}=$",
+            "maxLength": 44
+          },
+          "service_measurement_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 64
+          },
+          "verification_profile_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "maxLength": 64
+          },
+          "verification_profile_version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "valid_from": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "valid_until": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "authority_id",
+          "key_id",
+          "public_key",
+          "service_measurement_digest",
+          "verification_profile_id",
+          "verification_profile_version",
+          "valid_from",
+          "valid_until"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 65536,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "policy_epoch",
+    "root_generation",
+    "issuers",
+    "revoked_key_ids",
+    "revoked_object_digests",
+    "authorized_bootstrap_digests",
+    "authorized_time_sources",
+    "max_trusted_time_uncertainty",
+    "max_trusted_time_age",
+    "authorized_runtime_profile_digests",
+    "authorized_adapter_digests",
+    "provenance_registry_digest",
+    "authorized_observer_key_ids",
+    "allowed_action_types",
+    "allowed_target_scopes",
+    "max_capability_lifetime",
+    "anchor_profiles",
+    "checker_profiles",
+    "effect_profiles",
+    "transcript_verification_authorities",
+    "state_verification_authorities"
+  ],
+  "$id": "urn:fulgor:SafetyTrustPolicyPayloadV2_3_8"
+}

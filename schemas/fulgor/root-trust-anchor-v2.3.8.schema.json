@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fulgor:RootTrustAnchorV2_3_8",
+  "type": "object", "additionalProperties": false,
+  "properties": {
+    "root_authority_id": {"type":"string","pattern":"^[0-9a-f]{64}$","maxLength":104857600},
+    "root_key_id": {"type":"string","pattern":"^[0-9a-f]{64}$","maxLength":104857600},
+    "root_public_key": {"type":"string","pattern":"^[A-Za-z0-9+/]{43}=$","maxLength":104857600},
+    "root_generation": {"type":"integer","minimum":0,"maximum":9007199254740991},
+    "minimum_policy_epoch": {"type":"integer","minimum":0,"maximum":9007199254740991},
+    "recovery_quorum": {"type":"object","additionalProperties":false,"properties":{"threshold":{"type":"integer","minimum":1,"maximum":9007199254740991},"members":{"type":"array","minItems":1,"maxItems":65536,"uniqueItems":true,"items":{"type":"object","additionalProperties":false,"properties":{"member_id":{"type":"string","pattern":"^[0-9a-f]{64}$","maxLength":104857600},"public_key":{"type":"string","pattern":"^[A-Za-z0-9+/]{43}=$","maxLength":104857600}},"required":["member_id","public_key"]}}},"required":["threshold","members"]},
+    "anchor_instance_id": {"type":"string","pattern":"^[0-9a-f]{64}$","maxLength":104857600}
+  },
+  "required":["root_authority_id","root_key_id","root_public_key","root_generation","minimum_policy_epoch","recovery_quorum","anchor_instance_id"]
+}

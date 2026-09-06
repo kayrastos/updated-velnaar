@@ -441,7 +441,7 @@ class FrozenSchemaTests(unittest.TestCase):
     def test_phase0_schema_files_are_closed_and_locally_resolved(self) -> None:
         schema_dir = ROOT / "schemas" / "fulgor"
         files = sorted(schema_dir.glob("*.schema.json"))
-        self.assertEqual(6, len(files))
+        self.assertEqual(11, len(files))
         for path in files:
             schema = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual("https://json-schema.org/draft/2020-12/schema", schema["$schema"])
