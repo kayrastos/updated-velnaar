@@ -93,7 +93,7 @@ Because these canonical operational route barriers are `false`, the handler retu
 
 ### 4.2 Current End-to-End Worker Production Behavior
 In the complete Worker pipeline (`worker/index.ts`), session and user authentication are resolved before dispatching to the operational route branch:
-- `worker/index.ts` invokes `AuthContextService.resolveSessionUser(request, env)` before operational route routing.
+- `worker/index.ts` extracts the `Authorization` header into `authHeader` and invokes `AuthContextService.resolveSessionUser(authHeader, environment)` before operational route dispatch.
 - Because verified production session authentication and production superadmin authentication are not yet implemented or proven in the canonical runtime, ordinary end-to-end production requests do not reach the operational route handler. Instead, they fail closed at the host authentication boundary with HTTP `401 UNAUTHORIZED`.
 - If a request were ever authenticated in the future, it would then encounter the dormant handler-level barrier and return HTTP `404 NOT_FOUND` as long as operational route gates remain closed.
 
