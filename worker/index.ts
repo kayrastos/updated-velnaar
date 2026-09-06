@@ -28,6 +28,8 @@ import { handleBootstrapRoute } from './routes/bootstrapRouter';
 import { SafeLogger } from './security/safeLogger';
 import { isVaultConfigured } from './crypto/vaultCrypto';
 import { WorkerEnv } from './env';
+import { PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH } from './ai/canary/deepSeekProductionOperationalRoutePolicy';
+import { handleProductionCanaryOperationalRoute } from './ai/canary/deepSeekProductionWorkerOperationalRoute';
 
 export type { WorkerEnv };
 
@@ -164,6 +166,16 @@ export default {
           message: 'Authentication required. Missing or invalid authorization token.',
         }, { status: 401 });
         return addCorsAndSecurityHeaders(unauthorizedResp, validatedOrigin);
+      }
+
+      // Dedicated Production Canary Operational Route (Dormant Foundation)
+      if (url.pathname === PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH) {
+        const operationalResponse = await handleProductionCanaryOperationalRoute(
+          request,
+          user,
+          env
+        );
+        return addCorsAndSecurityHeaders(operationalResponse, validatedOrigin);
       }
 
       // If in production and DB binding is missing, fail-closed with 503 DATABASE_NOT_CONFIGURED
