@@ -25,6 +25,7 @@ import {
   EXACT_REPLAY_IDENTITY_KEYS,
   EXACT_RESERVATION_REQUEST_KEYS,
   FORBIDDEN_CALLER_OVERRIDE_KEYS,
+  FORBIDDEN_BUILDER_KEYS,
   AuthorizationReplayIdentity,
   AuthorizationReplayReservationRequest,
   DurableAuthorizationReplayBackend,
@@ -33,6 +34,8 @@ import {
   validateAuthorizationReplayReservationRequest,
   computeCanonicalAuthorizationPayloadDigestSha256,
   deriveReplayIdentityFromVerifiedAuthorization,
+  buildAuthorizationReplayReservationRequestFromVerifiedAuthorization,
+  validateReplayReservationAgainstVerifiedAuthorization,
   reserveProductionAuthorizationReplay,
 } from '../../worker/ai/canary/deepSeekDurableAuthorizationReplayLedger';
 import * as replayLedgerModule from '../../worker/ai/canary/deepSeekDurableAuthorizationReplayLedger';
@@ -1135,6 +1138,378 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
 
     it('84. total provider network calls during entire test suite execution is exactly 0', () => {
       expect(globalFetchCalls).toBe(0);
+    });
+  });
+
+  // ==========================================================================
+  // 11. PHASE A.12B.2C-5R.1: SIGNED AUTHORIZATION EXPIRY REPLAY BINDING REPAIR
+  // ==========================================================================
+  describe('11. Phase A.12B.2C-5R.1: Signed Authorization Expiry Replay Reservation Binding Repair', () => {
+    it('85. canonical builder expiresAt === auth.payload.expiresAt', () => {
+      const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T11:22:33.000Z' });
+      const auth = { payload, keyVersion: 'v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      expect(req.expiresAt).toBe('2026-09-06T11:22:33.000Z');
+      expect(req.expiresAt).toBe(auth.payload.expiresAt);
+    });
+
+    it('86. builder computes replayKey internally', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+
+      const derived = deriveReplayIdentityFromVerifiedAuthorization(auth);
+      const expectedKey = computeAuthorizationReplayKey(derived);
+      expect(req.replayKey).toBe(expectedKey);
+    });
+
+    it('87. builder computes authorization payload digest internally', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+
+      const expectedDigest = computeCanonicalAuthorizationPayloadDigestSha256(payload);
+      expect(req.authorizationPayloadDigestSha256).toBe(expectedDigest);
+    });
+
+    it('88. builder cannot accept caller replayKey', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = {
+        payload,
+        keyVersion: '2026-v1',
+        replayKey: 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+      };
+      expect(() =>
+        buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any)
+      ).toThrow('FORBIDDEN_CALLER_OVERRIDE');
+    });
+
+    it('89. builder cannot accept caller expiresAt', () => {
+      const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T12:00:00.000Z' });
+      const auth = {
+        payload,
+        keyVersion: '2026-v1',
+        expiresAt: '2026-09-06T10:00:00.000Z',
+      };
+      expect(() =>
+        buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any)
+      ).toThrow('FORBIDDEN_CALLER_OVERRIDE');
+    });
+
+    it('90. builder cannot accept TTL/retention override', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      for (const overrideField of [
+        'ttl',
+        'ttlMs',
+        'retentionSeconds',
+        'retentionMs',
+        'overrideExpiry',
+        'replayExpiry',
+      ]) {
+        const auth = {
+          payload,
+          keyVersion: '2026-v1',
+          [overrideField]: 3600,
+        };
+        expect(() =>
+          buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any)
+        ).toThrow('FORBIDDEN_CALLER_OVERRIDE');
+      }
+    });
+
+    it('91. built request passes existing reservation validator', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const res = validateAuthorizationReplayReservationRequest(req);
+      expect(res.valid).toBe(true);
+      expect(res.errors).toHaveLength(0);
+    });
+
+    it('92. built request passes new authorization-binding validator', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const res = validateReplayReservationAgainstVerifiedAuthorization(req, auth);
+      expect(res.valid).toBe(true);
+      expect(res.errors).toHaveLength(0);
+    });
+
+    it('93. reservation expiry earlier than signed auth expiry rejects', () => {
+      const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T12:10:00.000Z' });
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+
+      // Mutate reservation to expire earlier
+      const earlierReq = {
+        ...req,
+        expiresAt: '2026-09-06T10:01:00.000Z',
+      };
+      const res = validateReplayReservationAgainstVerifiedAuthorization(earlierReq, auth);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('EXPIRES_AT_MISMATCH'))).toBe(true);
+    });
+
+    it('94. reservation expiry later than signed auth expiry rejects', () => {
+      const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T12:10:00.000Z' });
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+
+      // Mutate reservation to expire later
+      const laterReq = {
+        ...req,
+        expiresAt: '2026-09-06T14:00:00.000Z',
+      };
+      const res = validateReplayReservationAgainstVerifiedAuthorization(laterReq, auth);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('EXPIRES_AT_MISMATCH'))).toBe(true);
+    });
+
+    it('95. exact same expiry passes', () => {
+      const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T15:30:00.000Z' });
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      expect(req.expiresAt).toBe('2026-09-06T15:30:00.000Z');
+      const res = validateReplayReservationAgainstVerifiedAuthorization(req, auth);
+      expect(res.valid).toBe(true);
+      expect(res.errors).toHaveLength(0);
+    });
+
+    it('96. replayKey mismatch rejects', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+
+      const tamperedReq = {
+        ...req,
+        replayKey: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      };
+      const res = validateReplayReservationAgainstVerifiedAuthorization(tamperedReq, auth);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('REPLAY_KEY_MISMATCH'))).toBe(true);
+    });
+
+    it('97. payload digest mismatch rejects', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+
+      const tamperedReq = {
+        ...req,
+        authorizationPayloadDigestSha256:
+          'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      };
+      const res = validateReplayReservationAgainstVerifiedAuthorization(tamperedReq, auth);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('PAYLOAD_DIGEST_MISMATCH'))).toBe(true);
+    });
+
+    it('98. authorityId mismatch rejects', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+
+      const tamperedReq = {
+        ...req,
+        authorityId: 'auth_other_attacker_authority',
+      };
+      const res = validateReplayReservationAgainstVerifiedAuthorization(tamperedReq, auth);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('AUTHORITY_ID_MISMATCH'))).toBe(true);
+    });
+
+    it('99. keyVersion mismatch rejects', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+
+      const tamperedReq = {
+        ...req,
+        keyVersion: '2026-v2',
+      };
+      const res = validateReplayReservationAgainstVerifiedAuthorization(tamperedReq, auth);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('KEY_VERSION_MISMATCH'))).toBe(true);
+    });
+
+    it('100. runNonce mismatch rejects', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+
+      const tamperedReq = {
+        ...req,
+        runNonce: 'a12b2c5r_nonce_tampered_9999999999',
+      };
+      const res = validateReplayReservationAgainstVerifiedAuthorization(tamperedReq, auth);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('NONCE_MISMATCH'))).toBe(true);
+    });
+
+    it('101. authorization expiresAt mutation invalidates old reservation binding', () => {
+      const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T10:10:00.000Z' });
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+
+      // Now auth payload is renewed / mutated to new expiry
+      const renewedAuth = {
+        payload: { ...payload, expiresAt: '2026-09-06T11:10:00.000Z' },
+        keyVersion: '2026-v1',
+      };
+      const res = validateReplayReservationAgainstVerifiedAuthorization(req, renewedAuth);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('EXPIRES_AT_MISMATCH'))).toBe(true);
+    });
+
+    it('102. singleUse false rejects', () => {
+      const payload = createValidSyntheticCanonicalPayload({ singleUse: false });
+      const auth = { payload, keyVersion: '2026-v1' };
+      expect(() =>
+        buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any)
+      ).toThrow('SINGLE_USE_REQUIRED');
+
+      const dummyReq = createValidSyntheticReservationRequest();
+      const res = validateReplayReservationAgainstVerifiedAuthorization(dummyReq, auth);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('SINGLE_USE_REQUIRED'))).toBe(true);
+    });
+
+    it('103. invalid canonical payload rejects', () => {
+      expect(() =>
+        buildAuthorizationReplayReservationRequestFromVerifiedAuthorization({} as any)
+      ).toThrow('BUILD_REPLAY_RESERVATION_REQUEST_FAILED');
+
+      const dummyReq = createValidSyntheticReservationRequest();
+      const res = validateReplayReservationAgainstVerifiedAuthorization(dummyReq, {} as any);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('AUTH_INVALID'))).toBe(true);
+    });
+
+    it('104. package-level authorityId != payload.authorityId rejects', () => {
+      const payload = createValidSyntheticCanonicalPayload({ authorityId: 'auth_velnar_secops' });
+      const auth = {
+        payload,
+        keyVersion: '2026-v1',
+        authorityId: 'auth_attacker_different',
+      };
+      expect(() => deriveReplayIdentityFromVerifiedAuthorization(auth as any)).toThrow(
+        'AUTHORITY_MISMATCH'
+      );
+      expect(() =>
+        buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any)
+      ).toThrow('AUTHORITY_MISMATCH');
+
+      const dummyReq = createValidSyntheticReservationRequest();
+      const res = validateReplayReservationAgainstVerifiedAuthorization(dummyReq, auth);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes('AUTHORITY_MISMATCH'))).toBe(true);
+    });
+
+    it('105. matching authority IDs pass', () => {
+      const payload = createValidSyntheticCanonicalPayload({ authorityId: 'auth_velnar_secops' });
+      const auth = {
+        payload,
+        keyVersion: '2026-v1',
+        authorityId: 'auth_velnar_secops',
+      };
+      const id = deriveReplayIdentityFromVerifiedAuthorization(auth as any);
+      expect(id.authorityId).toBe('auth_velnar_secops');
+
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any);
+      expect(req.authorityId).toBe('auth_velnar_secops');
+      const res = validateReplayReservationAgainstVerifiedAuthorization(req, auth);
+      expect(res.valid).toBe(true);
+    });
+
+    it('106. production reservation remains BACKEND_NOT_BOUND', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const res = reserveProductionAuthorizationReplay(req);
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('BACKEND_NOT_BOUND');
+    });
+
+    it('107. production reservation cannot return RESERVED', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const res = reserveProductionAuthorizationReplay(req);
+      expect(res.status).not.toBe('RESERVED');
+      expect(res.success).toBe(false);
+    });
+
+    it('108. backend bound remains false', () => {
+      expect(DURABLE_AUTHORIZATION_REPLAY_BACKEND_BOUND).toBe(false);
+    });
+
+    it('109. atomic implementation remains false', () => {
+      expect(ATOMIC_RESERVE_IF_ABSENT_IMPLEMENTED).toBe(false);
+    });
+
+    it('110. source readiness false', () => {
+      expect(GUARDED_SOURCE_ATTESTATION_READY).toBe(false);
+      expect(TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY).toBe(false);
+    });
+
+    it('111. human auth readiness false', () => {
+      expect(GUARDED_HUMAN_AUTH_ATTESTATION_READY).toBe(false);
+      expect(PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED).toBe(false);
+    });
+
+    it('112. live execution false', () => {
+      expect(CANARY_LIVE_EXECUTION_ENABLED).toBe(false);
+    });
+
+    it('113. zero provider calls', () => {
+      expect(globalFetchCalls).toBe(0);
+    });
+
+    it('114. zero network calls', () => {
+      expect(globalFetchCalls).toBe(0);
+    });
+
+    it('115. verify 5R.1 repair evidence artifact matches canonical specification', () => {
+      const artifactPath = path.resolve(
+        process.cwd(),
+        'execution/a12b2c5r1_authorization_expiry_replay_binding_repair.json'
+      );
+      expect(fs.existsSync(artifactPath)).toBe(true);
+      const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+
+      expect(artifact.phase).toBe('A.12B.2C-5R.1');
+      expect(artifact.artifactType).toBe(
+        'SIGNED_AUTHORIZATION_EXPIRY_REPLAY_RESERVATION_BINDING_REPAIR'
+      );
+      expect(artifact.baseCommit).toBe('b7a65c6ee9f8034df6c40618197aa1fb6d14cf2f');
+      expect(artifact.baseTree).toBe('8ad38bd8fc543e57829acc0d380efecf03040654');
+      expect(artifact.historical5RArtifactModified).toBe(false);
+      expect(artifact.canonicalReservationBuilderImplemented).toBe(true);
+      expect(artifact.callerSuppliedReplayKeyAcceptedByCanonicalBuilder).toBe(false);
+      expect(artifact.callerSuppliedReplayExpiryAcceptedByCanonicalBuilder).toBe(false);
+      expect(artifact.reservationReplayKeyBoundToAuthorization).toBe(true);
+      expect(artifact.reservationPayloadDigestBoundToAuthorization).toBe(true);
+      expect(artifact.reservationAuthorityBoundToAuthorization).toBe(true);
+      expect(artifact.reservationKeyVersionBoundToAuthorization).toBe(true);
+      expect(artifact.reservationNonceBoundToAuthorization).toBe(true);
+      expect(artifact.reservationExpiryBoundToAuthorizationExpiry).toBe(true);
+      expect(artifact.reservationExpiryUsesExactAuthorizationExpiry).toBe(true);
+      expect(artifact.packageAuthorityBoundToPayloadAuthority).toBe(true);
+      expect(artifact.shorterReplayRetentionAllowed).toBe(false);
+      expect(artifact.durableBackendBound).toBe(false);
+      expect(artifact.atomicReserveIfAbsentImplemented).toBe(false);
+      expect(artifact.productionReplayReservationReady).toBe(false);
+      expect(artifact.productionReservationCanReturnReserved).toBe(false);
+      expect(artifact.guardedTransportIntegrated).toBe(false);
+      expect(artifact.sourceAttestationReady).toBe(false);
+      expect(artifact.humanAuthorizationAttestationReady).toBe(false);
+      expect(artifact.liveExecutionEnabled).toBe(false);
+      expect(artifact.providerNetworkCalls).toBe(0);
+      expect(artifact.productionRoutingEnforcementAllowed).toBe(false);
+      expect(artifact.successorActivated).toBe(false);
+      expect(artifact.finalStatus).toBe(
+        'A12B2C5R1_AUTHORIZATION_EXPIRY_REPLAY_BINDING_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION'
+      );
     });
   });
 });

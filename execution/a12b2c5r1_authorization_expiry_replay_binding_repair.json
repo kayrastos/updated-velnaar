@@ -1,0 +1,40 @@
+{
+  "phase": "A.12B.2C-5R.1",
+  "artifactType": "SIGNED_AUTHORIZATION_EXPIRY_REPLAY_RESERVATION_BINDING_REPAIR",
+
+  "baseCommit": "b7a65c6ee9f8034df6c40618197aa1fb6d14cf2f",
+  "baseTree": "8ad38bd8fc543e57829acc0d380efecf03040654",
+
+  "historical5RArtifactModified": false,
+
+  "canonicalReservationBuilderImplemented": true,
+  "callerSuppliedReplayKeyAcceptedByCanonicalBuilder": false,
+  "callerSuppliedReplayExpiryAcceptedByCanonicalBuilder": false,
+
+  "reservationReplayKeyBoundToAuthorization": true,
+  "reservationPayloadDigestBoundToAuthorization": true,
+  "reservationAuthorityBoundToAuthorization": true,
+  "reservationKeyVersionBoundToAuthorization": true,
+  "reservationNonceBoundToAuthorization": true,
+  "reservationExpiryBoundToAuthorizationExpiry": true,
+  "reservationExpiryUsesExactAuthorizationExpiry": true,
+
+  "packageAuthorityBoundToPayloadAuthority": true,
+  "shorterReplayRetentionAllowed": false,
+
+  "durableBackendBound": false,
+  "atomicReserveIfAbsentImplemented": false,
+  "productionReplayReservationReady": false,
+  "productionReservationCanReturnReserved": false,
+
+  "guardedTransportIntegrated": false,
+  "sourceAttestationReady": false,
+  "humanAuthorizationAttestationReady": false,
+  "liveExecutionEnabled": false,
+
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "successorActivated": false,
+
+  "finalStatus": "A12B2C5R1_AUTHORIZATION_EXPIRY_REPLAY_BINDING_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION"
+}

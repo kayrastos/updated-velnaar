@@ -124,6 +124,27 @@ export const FORBIDDEN_CALLER_OVERRIDE_KEYS = Object.freeze([
   'adapter',
   'nowUtc',
   'atomicOverride',
+  'ttl',
+  'ttlMs',
+  'retentionSeconds',
+  'retentionMs',
+  'overrideExpiry',
+  'replayExpiry',
+] as const);
+
+export const FORBIDDEN_BUILDER_KEYS = Object.freeze([
+  'replayKey',
+  'expiresAt',
+  'ttl',
+  'ttlMs',
+  'retentionSeconds',
+  'retentionMs',
+  'nowUtc',
+  'overrideExpiry',
+  'replayExpiry',
+  'backend',
+  'storage',
+  'adapter',
 ] as const);
 
 const SAFE_IDENTIFIER_REGEX = /^[a-zA-Z0-9_-]+$/;
@@ -552,10 +573,21 @@ export function deriveReplayIdentityFromVerifiedAuthorization(
     throw new Error('DERIVE_REPLAY_IDENTITY_FAILED: keyVersion must be a non-empty string');
   }
 
-  const authorityId =
-    'authorityId' in auth && typeof auth.authorityId === 'string' && auth.authorityId
-      ? auth.authorityId
-      : payload.authorityId;
+  // Implementation C: Authority Consistency Hardening
+  // If package-level authorityId is provided, it MUST equal payload.authorityId
+  if ('authorityId' in auth && (auth as any).authorityId !== undefined) {
+    const pkgAuthId = (auth as any).authorityId;
+    if (typeof pkgAuthId !== 'string' || !pkgAuthId) {
+      throw new Error('AUTHORITY_MISMATCH: package authorityId must be a non-empty string when present');
+    }
+    if (pkgAuthId !== payload.authorityId) {
+      throw new Error(
+        `AUTHORITY_MISMATCH: Package authorityId '${pkgAuthId}' does not match payload authorityId '${payload.authorityId}'`
+      );
+    }
+  }
+
+  const authorityId = payload.authorityId;
 
   const authorizationPayloadDigestSha256 = computeCanonicalAuthorizationPayloadDigestSha256(payload);
 
@@ -581,7 +613,222 @@ export function deriveReplayIdentityFromVerifiedAuthorization(
 }
 
 // ============================================================================
-// 9. PRODUCTION RESERVATION ENTRYPOINT (FAIL-CLOSED)
+// 9. PHASE 5R.1: CANONICAL RESERVATION BUILDER & EXACT EXPIRY BINDING
+// ============================================================================
+
+/**
+ * A durable replay reservation MUST NOT expire before the signed authorization
+ * expires.
+ *
+ * Shorter replay retention would reopen a still-valid authorization for replay.
+ *
+ * Phase 5R.1 therefore uses exact signed authorization expiry binding.
+ */
+
+export interface ValidateReplayReservationBindingResult {
+  readonly valid: boolean;
+  readonly errors: readonly string[];
+}
+
+/**
+ * Canonical builder that derives an AuthorizationReplayReservationRequest
+ * from a verified human authorization package.
+ *
+ * INVARIANTS:
+ * - Requires canonical authorization payload
+ * - Requires singleUse === true
+ * - Reuses deriveReplayIdentityFromVerifiedAuthorization(auth)
+ * - Computes replayKey internally using computeAuthorizationReplayKey(...)
+ * - Computes/uses authorization payload digest internally
+ * - Sets expiresAt EXACTLY from auth.payload.expiresAt
+ * - Rejects any caller-supplied replayKey, expiresAt, ttl, retention, override, backend, etc.
+ */
+export function buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(
+  auth:
+    | SignedHumanAuthorizationPackage
+    | {
+        payload: CanonicalHumanAuthorizationPayload;
+        keyVersion: string;
+        authorityId?: string;
+      },
+  ...rest: unknown[]
+): AuthorizationReplayReservationRequest {
+  if (rest.length > 0) {
+    throw new Error(
+      'FORBIDDEN_CALLER_PARAMETER: builder accepts only a single verified authorization parameter'
+    );
+  }
+
+  if (!auth || typeof auth !== 'object' || Array.isArray(auth)) {
+    throw new Error('BUILD_REPLAY_RESERVATION_REQUEST_FAILED: auth package must be a non-null object');
+  }
+
+  const authRecord = auth as Record<string, unknown>;
+
+  // Reject forbidden caller parameters/overrides
+  for (const forbiddenKey of FORBIDDEN_BUILDER_KEYS) {
+    if (forbiddenKey in authRecord) {
+      throw new Error(
+        `FORBIDDEN_CALLER_OVERRIDE: caller parameter '${forbiddenKey}' is strictly prohibited in reservation request builder`
+      );
+    }
+  }
+
+  const payload = 'payload' in authRecord ? authRecord.payload : null;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('BUILD_REPLAY_RESERVATION_REQUEST_FAILED: auth package must contain a valid canonical payload');
+  }
+
+  const payloadRecord = payload as Record<string, unknown>;
+  for (const forbiddenKey of ['ttl', 'ttlMs', 'retentionSeconds', 'retentionMs', 'nowUtc', 'overrideExpiry', 'replayExpiry', 'backend', 'storage', 'adapter']) {
+    if (forbiddenKey in payloadRecord) {
+      throw new Error(
+        `FORBIDDEN_CALLER_OVERRIDE: caller parameter '${forbiddenKey}' is strictly prohibited in authorization payload`
+      );
+    }
+  }
+
+  // Derive replay identity (enforces singleUse === true, authority consistency, keyVersion, schema)
+  const derivedIdentity = deriveReplayIdentityFromVerifiedAuthorization(auth as any);
+
+  // Compute replay key internally
+  const computedReplayKey = computeAuthorizationReplayKey(derivedIdentity);
+
+  const request: AuthorizationReplayReservationRequest = {
+    ledgerVersion: DURABLE_AUTHORIZATION_REPLAY_LEDGER_VERSION,
+    replayKey: computedReplayKey,
+    authorizationPayloadDigestSha256: derivedIdentity.authorizationPayloadDigestSha256,
+    authorityId: derivedIdentity.authorityId,
+    keyVersion: derivedIdentity.keyVersion,
+    runNonce: derivedIdentity.runNonce,
+    expiresAt: (payload as CanonicalHumanAuthorizationPayload).expiresAt,
+  };
+
+  const validation = validateAuthorizationReplayReservationRequest(request);
+  if (!validation.valid) {
+    throw new Error(
+      `BUILD_REPLAY_RESERVATION_REQUEST_FAILED: Built reservation request failed validation: ${validation.errors.join('; ')}`
+    );
+  }
+
+  return Object.freeze(request);
+}
+
+/**
+ * Validates an AuthorizationReplayReservationRequest against the verified authorization package.
+ *
+ * INVARIANTS:
+ * 1. Existing reservation request validator passes
+ * 2. Auth contains canonical authorization payload
+ * 3. singleUse === true
+ * 4. Derives replay identity from auth
+ * 5. Recomputes replayKey
+ * 6. EXACT equality on:
+ *    - replayKey === computedReplayKey
+ *    - authorizationPayloadDigestSha256 === derivedIdentity.authorizationPayloadDigestSha256
+ *    - authorityId === derivedIdentity.authorityId
+ *    - keyVersion === derivedIdentity.keyVersion
+ *    - runNonce === derivedIdentity.runNonce
+ *    - expiresAt === auth.payload.expiresAt
+ *
+ * Any mismatch fails closed with valid: false and descriptive error messages.
+ */
+export function validateReplayReservationAgainstVerifiedAuthorization(
+  request: unknown,
+  auth: unknown
+): ValidateReplayReservationBindingResult {
+  const errors: string[] = [];
+
+  // Step 1: Existing reservation request validation
+  const reqValidation = validateAuthorizationReplayReservationRequest(request);
+  if (!reqValidation.valid) {
+    errors.push(...reqValidation.errors);
+  }
+
+  // Step 2: Auth package validation
+  if (!auth || typeof auth !== 'object' || Array.isArray(auth)) {
+    errors.push('AUTH_INVALID: auth must be a non-null, non-array object');
+    return { valid: false, errors };
+  }
+
+  const authRecord = auth as Record<string, unknown>;
+  const payload = authRecord.payload as CanonicalHumanAuthorizationPayload | undefined;
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    errors.push('AUTH_INVALID: auth must contain a valid canonical authorization payload');
+    return { valid: false, errors };
+  }
+
+  // Step 3: singleUse check
+  if (payload.singleUse !== true) {
+    errors.push(
+      'SINGLE_USE_REQUIRED: singleUse must be strictly true for single-use authorization replay tracking'
+    );
+  }
+
+  // Step 4 & 5: Derive replay identity & recompute replayKey
+  let derivedIdentity: AuthorizationReplayIdentity | null = null;
+  let computedReplayKey: string | null = null;
+
+  try {
+    derivedIdentity = deriveReplayIdentityFromVerifiedAuthorization(auth as any);
+    computedReplayKey = computeAuthorizationReplayKey(derivedIdentity);
+  } catch (err: any) {
+    errors.push(`DERIVE_REPLAY_IDENTITY_FAILED: ${err?.message || String(err)}`);
+  }
+
+  // If request itself is not a valid request object or identity could not be derived, return now
+  if (!reqValidation.valid || !derivedIdentity || !computedReplayKey) {
+    return { valid: false, errors };
+  }
+
+  const req = request as AuthorizationReplayReservationRequest;
+
+  // Step 6: EXACT equality checks
+  if (req.replayKey !== computedReplayKey) {
+    errors.push(
+      `REPLAY_KEY_MISMATCH: reservation replayKey '${req.replayKey}' does not match computed authorization replay key '${computedReplayKey}'`
+    );
+  }
+
+  if (req.authorizationPayloadDigestSha256 !== derivedIdentity.authorizationPayloadDigestSha256) {
+    errors.push(
+      `PAYLOAD_DIGEST_MISMATCH: reservation authorizationPayloadDigestSha256 '${req.authorizationPayloadDigestSha256}' does not match derived digest '${derivedIdentity.authorizationPayloadDigestSha256}'`
+    );
+  }
+
+  if (req.authorityId !== derivedIdentity.authorityId) {
+    errors.push(
+      `AUTHORITY_ID_MISMATCH: reservation authorityId '${req.authorityId}' does not match derived authorityId '${derivedIdentity.authorityId}'`
+    );
+  }
+
+  if (req.keyVersion !== derivedIdentity.keyVersion) {
+    errors.push(
+      `KEY_VERSION_MISMATCH: reservation keyVersion '${req.keyVersion}' does not match derived keyVersion '${derivedIdentity.keyVersion}'`
+    );
+  }
+
+  if (req.runNonce !== derivedIdentity.runNonce) {
+    errors.push(
+      `NONCE_MISMATCH: reservation runNonce '${req.runNonce}' does not match derived runNonce '${derivedIdentity.runNonce}'`
+    );
+  }
+
+  if (req.expiresAt !== payload.expiresAt) {
+    errors.push(
+      `EXPIRES_AT_MISMATCH: reservation expiresAt '${req.expiresAt}' does not match authorization payload expiresAt '${payload.expiresAt}'`
+    );
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+// ============================================================================
+// 10. PRODUCTION RESERVATION ENTRYPOINT (FAIL-CLOSED)
 // ============================================================================
 
 /**
