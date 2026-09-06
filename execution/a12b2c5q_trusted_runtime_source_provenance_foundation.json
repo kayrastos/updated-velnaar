@@ -1,0 +1,43 @@
+{
+  "phase": "A.12B.2C-5Q",
+  "artifactType": "TRUSTED_RUNTIME_SOURCE_PROVENANCE_FOUNDATION",
+
+  "baseCommit": "95466e0429feaa03fd70ad93abaad02d5ac29301",
+  "baseTree": "913d804dc2c9412b4d32d7aa8f19ddddaf57e83b",
+
+  "provenanceVersion": "a12b2c5q-v1",
+  "registryVersion": "a12b2c5q-registry-v1",
+
+  "runtimeSourceProvenanceVerifierImplemented": true,
+  "productionSourceProvenanceRegistryImplemented": true,
+  "productionSourceProvenanceRegistryEntryCount": 0,
+  "productionSourceProvenanceTrustAnchorProvisioned": false,
+
+  "canonicalRepositoryBound": true,
+  "canonicalEnvironmentBound": true,
+  "sourceCommitCryptographicallyCovered": true,
+  "sourceTreeCryptographicallyCovered": true,
+  "buildArtifactDigestCryptographicallyCovered": true,
+  "buildAndDeploymentIdentityCryptographicallyCovered": true,
+
+  "callerSuppliedSourceAuthorityAcceptedAsProductionTrust": false,
+  "callerSuppliedPublicKeyAcceptedAsProductionTrust": false,
+  "callerRegistryOverrideAccepted": false,
+  "productionVerificationClockCallerControlled": false,
+
+  "trustedRuntimeSourceProvenanceReady": false,
+  "guardedTransportIntegrated": false,
+
+  "sourceAttestationReady": false,
+  "humanAuthorizationAttestationReady": false,
+  "liveExecutionEnabled": false,
+
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "successorActivated": false,
+
+  "realProductionSourcePrivateKeyGenerated": false,
+  "realProductionSourcePublicKeyProvisioned": false,
+
+  "finalStatus": "A12B2C5Q_SOURCE_PROVENANCE_FOUNDATION_IMPLEMENTED_UNPROVISIONED_NOT_LIVE"
+}
