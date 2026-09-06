@@ -1,0 +1,32 @@
+{
+  "phase": "A.12B.2C-5P",
+  "artifactType": "SYNTHETIC_END_TO_END_TRUST_ANCHOR_PRE_PROVISIONING_REHEARSAL",
+
+  "baseCommit": "941293c6b67bedef3d108300aac75428d03409a6",
+  "baseTree": "a8b627b03f60e9a7a4108a4ea443abd60f3275c5",
+
+  "auditVersion": "a12b2c5p-v1",
+
+  "preProvisioningAuditImplemented": true,
+  "preProvisioningAuditCanAuthorizeProvisioning": false,
+  "rehearsalKeypairType": "EPHEMERAL_SYNTHETIC_MEMORY_ONLY",
+
+  "realProductionPrivateKeyGenerated": false,
+  "realProductionPublicTrustAnchorProvisioned": false,
+  "productionAuthorityRegistryEntryCount": 0,
+
+  "productionTrustAnchorSlotPopulated": false,
+  "productionTrustAnchorSlotReady": false,
+
+  "guardedSourceAttestationReady": false,
+  "guardedHumanAuthAttestationReady": false,
+  "canaryLiveExecutionEnabled": false,
+
+  "providerNetworkCalls": 0,
+  "externalNetworkCalls": 0,
+
+  "genericOfflineVerifierRehearsalPassed": true,
+  "productionVerifierFailsClosedConfirmed": true,
+
+  "finalStatus": "A12B2C5P_SYNTHETIC_REHEARSAL_VERIFIED_FAIL_CLOSED_NOT_LIVE"
+}
