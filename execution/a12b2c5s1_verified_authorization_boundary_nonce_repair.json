@@ -1,0 +1,49 @@
+{
+  "phase": "A.12B.2C-5S.1",
+
+  "artifactType":
+    "VERIFIED_AUTHORIZATION_ORCHESTRATION_BOUNDARY_AND_NONCE_CANONICALITY_REPAIR",
+
+  "baseCommit":
+    "d072587aeeac29743ba3d83a0ff0be90f5ff7498",
+
+  "baseTree":
+    "a5c384d95251c4e567dc04d1b4ffba7c35efd4ee",
+
+  "codexPre5TBlockerReviewApplied": true,
+
+  "runNonceExactTrimEqualityRequired": true,
+  "runNonceSilentlyNormalized": false,
+
+  "misleadingVerifiedReplayHelperNamesRemoved": true,
+  "pureReplayHelpersExplicitlyNonAuthoritative": true,
+
+  "productionAuthorizationVerificationCalledInsideReplayBoundary": true,
+  "callerSuppliedVerificationResultAccepted": false,
+  "callerSuppliedVerifiedBooleanAccepted": false,
+
+  "productionRuntimeExpiryRecheckImplemented": true,
+  "productionRuntimeClockCallerControlled": false,
+
+  "productionAuthorityTrustAnchorProvisioned": false,
+
+  "durableBackendBound": false,
+  "atomicReserveIfAbsentImplemented": false,
+  "productionReplayReservationReady": false,
+  "productionReservationCanReturnReserved": false,
+
+  "d1BackendImplemented": false,
+  "d1ProductionBindingProvisioned": false,
+
+  "guardedTransportIntegrated": false,
+  "sourceAttestationReady": false,
+  "humanAuthorizationAttestationReady": false,
+  "liveExecutionEnabled": false,
+
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "successorActivated": false,
+
+  "finalStatus":
+    "A12B2C5S1_VERIFIED_AUTH_BOUNDARY_NONCE_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION"
+}

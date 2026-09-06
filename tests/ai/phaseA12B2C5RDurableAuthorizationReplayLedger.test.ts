@@ -33,9 +33,13 @@ import {
   computeAuthorizationReplayKey,
   validateAuthorizationReplayReservationRequest,
   computeCanonicalAuthorizationPayloadDigestSha256,
-  deriveReplayIdentityFromVerifiedAuthorization,
-  buildAuthorizationReplayReservationRequestFromVerifiedAuthorization,
-  validateReplayReservationAgainstVerifiedAuthorization,
+  deriveReplayIdentityFromCanonicalAuthorization,
+  buildAuthorizationReplayReservationRequestFromCanonicalAuthorization,
+  validateReplayReservationAgainstCanonicalAuthorization,
+  buildProductionReplayReservationAfterAuthorizationVerification,
+  FORBIDDEN_PRODUCTION_ORCHESTRATION_KEYS,
+  type ProductionReplayReservationStatus,
+  type ProductionReplayReservationOrchestrationResult,
   reserveProductionAuthorizationReplay,
 } from '../../worker/ai/canary/deepSeekDurableAuthorizationReplayLedger';
 import * as replayLedgerModule from '../../worker/ai/canary/deepSeekDurableAuthorizationReplayLedger';
@@ -55,6 +59,7 @@ import {
   OFF_PEAK_MIN_BUDGET_MICRO_USD,
   buildTrustedSourceAttestation,
   canonicalizeHumanAuthorizationPayload,
+  validateRunNonce,
   type CanonicalHumanAuthorizationPayload,
   type SignedHumanAuthorizationPackage,
 } from '../../worker/ai/canary/deepSeekCertificationAttestation';
@@ -583,7 +588,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
         algorithm: 'Ed25519',
       };
 
-      const identity = deriveReplayIdentityFromVerifiedAuthorization(pkg);
+      const identity = deriveReplayIdentityFromCanonicalAuthorization(pkg);
       expect(identity.authorityId).toBe(payload.authorityId);
       expect(identity.keyVersion).toBe('2026-v1');
       expect(identity.runNonce).toBe(payload.runNonce);
@@ -601,7 +606,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
         keyVersion: '2026-v1',
         replayKey: 'caller_injected_replay_key_attempt',
       };
-      const identity = deriveReplayIdentityFromVerifiedAuthorization(callerAttempt as any);
+      const identity = deriveReplayIdentityFromCanonicalAuthorization(callerAttempt as any);
       expect((identity as any).replayKey).toBeUndefined();
     });
 
@@ -609,11 +614,11 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       const payload1 = createValidSyntheticCanonicalPayload({ maxBudgetMicroUsd: 12783 });
       const payload2 = createValidSyntheticCanonicalPayload({ maxBudgetMicroUsd: 20000 });
 
-      const id1 = deriveReplayIdentityFromVerifiedAuthorization({
+      const id1 = deriveReplayIdentityFromCanonicalAuthorization({
         payload: payload1,
         keyVersion: 'v1',
       });
-      const id2 = deriveReplayIdentityFromVerifiedAuthorization({
+      const id2 = deriveReplayIdentityFromCanonicalAuthorization({
         payload: payload2,
         keyVersion: 'v1',
       });
@@ -632,11 +637,11 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
           '2222222222222222222222222222222222222222222222222222222222222222',
       });
 
-      const id1 = deriveReplayIdentityFromVerifiedAuthorization({
+      const id1 = deriveReplayIdentityFromCanonicalAuthorization({
         payload: payload1,
         keyVersion: 'v1',
       });
-      const id2 = deriveReplayIdentityFromVerifiedAuthorization({
+      const id2 = deriveReplayIdentityFromCanonicalAuthorization({
         payload: payload2,
         keyVersion: 'v1',
       });
@@ -653,11 +658,11 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
         runNonce: 'a12b2c5r_nonce_second_222222222222',
       });
 
-      const id1 = deriveReplayIdentityFromVerifiedAuthorization({
+      const id1 = deriveReplayIdentityFromCanonicalAuthorization({
         payload: payload1,
         keyVersion: 'v1',
       });
-      const id2 = deriveReplayIdentityFromVerifiedAuthorization({
+      const id2 = deriveReplayIdentityFromCanonicalAuthorization({
         payload: payload2,
         keyVersion: 'v1',
       });
@@ -968,7 +973,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
 
     it('73. exact singleUse semantics: singleUse must be strictly true', () => {
       const payload = createValidSyntheticCanonicalPayload({ singleUse: true });
-      const id = deriveReplayIdentityFromVerifiedAuthorization({
+      const id = deriveReplayIdentityFromCanonicalAuthorization({
         payload,
         keyVersion: 'v1',
       });
@@ -978,7 +983,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('74. singleUse false must not be silently upgraded into reusable production auth', () => {
       const payload = createValidSyntheticCanonicalPayload({ singleUse: false });
       expect(() =>
-        deriveReplayIdentityFromVerifiedAuthorization({
+        deriveReplayIdentityFromCanonicalAuthorization({
           payload,
           keyVersion: 'v1',
         })
@@ -986,14 +991,14 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     });
 
     it('75. invalid canonical authorization input rejects', () => {
-      expect(() => deriveReplayIdentityFromVerifiedAuthorization(null as any)).toThrow(
+      expect(() => deriveReplayIdentityFromCanonicalAuthorization(null as any)).toThrow(
         'DERIVE_REPLAY_IDENTITY_FAILED'
       );
       expect(() =>
-        deriveReplayIdentityFromVerifiedAuthorization({} as any)
+        deriveReplayIdentityFromCanonicalAuthorization({} as any)
       ).toThrow('DERIVE_REPLAY_IDENTITY_FAILED');
       expect(() =>
-        deriveReplayIdentityFromVerifiedAuthorization({
+        deriveReplayIdentityFromCanonicalAuthorization({
           payload: createValidSyntheticCanonicalPayload(),
           keyVersion: '', // empty keyVersion
         })
@@ -1148,7 +1153,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('85. canonical builder expiresAt === auth.payload.expiresAt', () => {
       const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T11:22:33.000Z' });
       const auth = { payload, keyVersion: 'v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
       expect(req.expiresAt).toBe('2026-09-06T11:22:33.000Z');
       expect(req.expiresAt).toBe(auth.payload.expiresAt);
     });
@@ -1156,9 +1161,9 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('86. builder computes replayKey internally', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
 
-      const derived = deriveReplayIdentityFromVerifiedAuthorization(auth);
+      const derived = deriveReplayIdentityFromCanonicalAuthorization(auth);
       const expectedKey = computeAuthorizationReplayKey(derived);
       expect(req.replayKey).toBe(expectedKey);
     });
@@ -1166,7 +1171,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('87. builder computes authorization payload digest internally', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
 
       const expectedDigest = computeCanonicalAuthorizationPayloadDigestSha256(payload);
       expect(req.authorizationPayloadDigestSha256).toBe(expectedDigest);
@@ -1180,7 +1185,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
         replayKey: 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
       };
       expect(() =>
-        buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any)
+        buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth as any)
       ).toThrow('FORBIDDEN_CALLER_OVERRIDE');
     });
 
@@ -1192,7 +1197,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
         expiresAt: '2026-09-06T10:00:00.000Z',
       };
       expect(() =>
-        buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any)
+        buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth as any)
       ).toThrow('FORBIDDEN_CALLER_OVERRIDE');
     });
 
@@ -1212,7 +1217,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
           [overrideField]: 3600,
         };
         expect(() =>
-          buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any)
+          buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth as any)
         ).toThrow('FORBIDDEN_CALLER_OVERRIDE');
       }
     });
@@ -1220,7 +1225,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('91. built request passes existing reservation validator', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
       const res = validateAuthorizationReplayReservationRequest(req);
       expect(res.valid).toBe(true);
       expect(res.errors).toHaveLength(0);
@@ -1229,8 +1234,8 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('92. built request passes new authorization-binding validator', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
-      const res = validateReplayReservationAgainstVerifiedAuthorization(req, auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(req, auth);
       expect(res.valid).toBe(true);
       expect(res.errors).toHaveLength(0);
     });
@@ -1238,14 +1243,14 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('93. reservation expiry earlier than signed auth expiry rejects', () => {
       const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T12:10:00.000Z' });
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
 
       // Mutate reservation to expire earlier
       const earlierReq = {
         ...req,
         expiresAt: '2026-09-06T10:01:00.000Z',
       };
-      const res = validateReplayReservationAgainstVerifiedAuthorization(earlierReq, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(earlierReq, auth);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('EXPIRES_AT_MISMATCH'))).toBe(true);
     });
@@ -1253,14 +1258,14 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('94. reservation expiry later than signed auth expiry rejects', () => {
       const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T12:10:00.000Z' });
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
 
       // Mutate reservation to expire later
       const laterReq = {
         ...req,
         expiresAt: '2026-09-06T14:00:00.000Z',
       };
-      const res = validateReplayReservationAgainstVerifiedAuthorization(laterReq, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(laterReq, auth);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('EXPIRES_AT_MISMATCH'))).toBe(true);
     });
@@ -1268,9 +1273,9 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('95. exact same expiry passes', () => {
       const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T15:30:00.000Z' });
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
       expect(req.expiresAt).toBe('2026-09-06T15:30:00.000Z');
-      const res = validateReplayReservationAgainstVerifiedAuthorization(req, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(req, auth);
       expect(res.valid).toBe(true);
       expect(res.errors).toHaveLength(0);
     });
@@ -1278,13 +1283,13 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('96. replayKey mismatch rejects', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
 
       const tamperedReq = {
         ...req,
         replayKey: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       };
-      const res = validateReplayReservationAgainstVerifiedAuthorization(tamperedReq, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(tamperedReq, auth);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('REPLAY_KEY_MISMATCH'))).toBe(true);
     });
@@ -1292,14 +1297,14 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('97. payload digest mismatch rejects', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
 
       const tamperedReq = {
         ...req,
         authorizationPayloadDigestSha256:
           'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       };
-      const res = validateReplayReservationAgainstVerifiedAuthorization(tamperedReq, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(tamperedReq, auth);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('PAYLOAD_DIGEST_MISMATCH'))).toBe(true);
     });
@@ -1307,13 +1312,13 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('98. authorityId mismatch rejects', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
 
       const tamperedReq = {
         ...req,
         authorityId: 'auth_other_attacker_authority',
       };
-      const res = validateReplayReservationAgainstVerifiedAuthorization(tamperedReq, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(tamperedReq, auth);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('AUTHORITY_ID_MISMATCH'))).toBe(true);
     });
@@ -1321,13 +1326,13 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('99. keyVersion mismatch rejects', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
 
       const tamperedReq = {
         ...req,
         keyVersion: '2026-v2',
       };
-      const res = validateReplayReservationAgainstVerifiedAuthorization(tamperedReq, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(tamperedReq, auth);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('KEY_VERSION_MISMATCH'))).toBe(true);
     });
@@ -1335,13 +1340,13 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('100. runNonce mismatch rejects', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
 
       const tamperedReq = {
         ...req,
         runNonce: 'a12b2c5r_nonce_tampered_9999999999',
       };
-      const res = validateReplayReservationAgainstVerifiedAuthorization(tamperedReq, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(tamperedReq, auth);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('NONCE_MISMATCH'))).toBe(true);
     });
@@ -1349,14 +1354,14 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('101. authorization expiresAt mutation invalidates old reservation binding', () => {
       const payload = createValidSyntheticCanonicalPayload({ expiresAt: '2026-09-06T10:10:00.000Z' });
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
 
       // Now auth payload is renewed / mutated to new expiry
       const renewedAuth = {
         payload: { ...payload, expiresAt: '2026-09-06T11:10:00.000Z' },
         keyVersion: '2026-v1',
       };
-      const res = validateReplayReservationAgainstVerifiedAuthorization(req, renewedAuth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(req, renewedAuth);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('EXPIRES_AT_MISMATCH'))).toBe(true);
     });
@@ -1365,22 +1370,22 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       const payload = createValidSyntheticCanonicalPayload({ singleUse: false });
       const auth = { payload, keyVersion: '2026-v1' };
       expect(() =>
-        buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any)
+        buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth as any)
       ).toThrow('SINGLE_USE_REQUIRED');
 
       const dummyReq = createValidSyntheticReservationRequest();
-      const res = validateReplayReservationAgainstVerifiedAuthorization(dummyReq, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(dummyReq, auth);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('SINGLE_USE_REQUIRED'))).toBe(true);
     });
 
     it('103. invalid canonical payload rejects', () => {
       expect(() =>
-        buildAuthorizationReplayReservationRequestFromVerifiedAuthorization({} as any)
+        buildAuthorizationReplayReservationRequestFromCanonicalAuthorization({} as any)
       ).toThrow('BUILD_REPLAY_RESERVATION_REQUEST_FAILED');
 
       const dummyReq = createValidSyntheticReservationRequest();
-      const res = validateReplayReservationAgainstVerifiedAuthorization(dummyReq, {} as any);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(dummyReq, {} as any);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('AUTH_INVALID'))).toBe(true);
     });
@@ -1392,15 +1397,15 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
         keyVersion: '2026-v1',
         authorityId: 'auth_attacker_different',
       };
-      expect(() => deriveReplayIdentityFromVerifiedAuthorization(auth as any)).toThrow(
+      expect(() => deriveReplayIdentityFromCanonicalAuthorization(auth as any)).toThrow(
         'AUTHORITY_MISMATCH'
       );
       expect(() =>
-        buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any)
+        buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth as any)
       ).toThrow('AUTHORITY_MISMATCH');
 
       const dummyReq = createValidSyntheticReservationRequest();
-      const res = validateReplayReservationAgainstVerifiedAuthorization(dummyReq, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(dummyReq, auth);
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes('AUTHORITY_MISMATCH'))).toBe(true);
     });
@@ -1412,19 +1417,19 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
         keyVersion: '2026-v1',
         authorityId: 'auth_velnar_secops',
       };
-      const id = deriveReplayIdentityFromVerifiedAuthorization(auth as any);
+      const id = deriveReplayIdentityFromCanonicalAuthorization(auth as any);
       expect(id.authorityId).toBe('auth_velnar_secops');
 
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth as any);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth as any);
       expect(req.authorityId).toBe('auth_velnar_secops');
-      const res = validateReplayReservationAgainstVerifiedAuthorization(req, auth);
+      const res = validateReplayReservationAgainstCanonicalAuthorization(req, auth);
       expect(res.valid).toBe(true);
     });
 
     it('106. production reservation remains BACKEND_NOT_BOUND', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
       const res = reserveProductionAuthorizationReplay(req);
       expect(res.success).toBe(false);
       expect(res.status).toBe('BACKEND_NOT_BOUND');
@@ -1433,7 +1438,7 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     it('107. production reservation cannot return RESERVED', () => {
       const payload = createValidSyntheticCanonicalPayload();
       const auth = { payload, keyVersion: '2026-v1' };
-      const req = buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(auth);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
       const res = reserveProductionAuthorizationReplay(req);
       expect(res.status).not.toBe('RESERVED');
       expect(res.success).toBe(false);
@@ -1509,6 +1514,508 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       expect(artifact.successorActivated).toBe(false);
       expect(artifact.finalStatus).toBe(
         'A12B2C5R1_AUTHORIZATION_EXPIRY_REPLAY_BINDING_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION'
+      );
+    });
+  });
+
+  // ==========================================================================
+  // 17. PHASE A.12B.2C-5S.1: VERIFIED AUTHORIZATION BOUNDARY & NONCE CANONICALITY
+  // ==========================================================================
+  describe('17. Phase A.12B.2C-5S.1 Verified Authorization Boundary & Nonce Canonicality Regressions', () => {
+    // ------------------------------------------------------------------------
+    // A-C. Misleading old helper names do NOT exist
+    // ------------------------------------------------------------------------
+    it('A. old misleading exported helper deriveReplayIdentityFromVerifiedAuthorization does NOT exist', () => {
+      expect((replayLedgerModule as any).deriveReplayIdentityFromVerifiedAuthorization).toBeUndefined();
+    });
+
+    it('B. old misleading exported helper buildAuthorizationReplayReservationRequestFromVerifiedAuthorization does NOT exist', () => {
+      expect((replayLedgerModule as any).buildAuthorizationReplayReservationRequestFromVerifiedAuthorization).toBeUndefined();
+    });
+
+    it('C. old misleading exported helper validateReplayReservationAgainstVerifiedAuthorization does NOT exist', () => {
+      expect((replayLedgerModule as any).validateReplayReservationAgainstVerifiedAuthorization).toBeUndefined();
+    });
+
+    // ------------------------------------------------------------------------
+    // D-E. Pure canonical transformation helpers are explicitly non-authoritative
+    // ------------------------------------------------------------------------
+    it('D. canonical helper is explicitly non-authoritative and does not return verified/authorized/trusted claims', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const unsignedAuth = { payload, keyVersion: '2026-v1' };
+      const identity = deriveReplayIdentityFromCanonicalAuthorization(unsignedAuth);
+      expect((identity as any).verified).toBeUndefined();
+      expect((identity as any).authorized).toBeUndefined();
+      expect((identity as any).trusted).toBeUndefined();
+
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(unsignedAuth);
+      expect((req as any).verified).toBeUndefined();
+      expect((req as any).authorized).toBeUndefined();
+      expect((req as any).trusted).toBeUndefined();
+
+      const validation = validateReplayReservationAgainstCanonicalAuthorization(req, unsignedAuth);
+      expect((validation as any).verified).toBeUndefined();
+      expect((validation as any).authorized).toBeUndefined();
+      expect((validation as any).trusted).toBeUndefined();
+      expect(validation.valid).toBe(true);
+    });
+
+    it('E. unsigned canonical object can be transformed only through the explicitly named canonical helper', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const unsignedAuth = { payload, keyVersion: '2026-v1' };
+      const identity = deriveReplayIdentityFromCanonicalAuthorization(unsignedAuth);
+      expect(identity.authorityId).toBe(payload.authorityId);
+      expect(identity.runNonce).toBe(payload.runNonce);
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(unsignedAuth);
+      expect(req.replayKey).toBe(computeAuthorizationReplayKey(identity));
+      expect(req.expiresAt).toBe(payload.expiresAt);
+    });
+
+    // ------------------------------------------------------------------------
+    // F-L. Production orchestration boundary enforcement
+    // ------------------------------------------------------------------------
+    it('F. unsigned canonical object cannot pass the new production orchestration boundary', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const unsignedAuth = { payload, keyVersion: '2026-v1' };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = buildProductionReplayReservationAfterAuthorizationVerification(
+        unsignedAuth as any,
+        attestation
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.request).toBeUndefined();
+    });
+
+    it('G. caller field: verified: true cannot bypass production verification', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const fakeVerified = { payload, keyVersion: '2026-v1', verified: true };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = buildProductionReplayReservationAfterAuthorizationVerification(
+        fakeVerified as any,
+        attestation
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toContain('FORBIDDEN_CALLER_OVERRIDE');
+      expect(res.request).toBeUndefined();
+    });
+
+    it('H. caller field: alreadyVerified: true cannot bypass production verification', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const fakeVerified = { payload, keyVersion: '2026-v1', alreadyVerified: true };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = buildProductionReplayReservationAfterAuthorizationVerification(
+        fakeVerified as any,
+        attestation
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toContain('FORBIDDEN_CALLER_OVERRIDE');
+      expect(res.request).toBeUndefined();
+    });
+
+    it('I. caller-supplied ProductionVerificationResult cannot be injected', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const fakeInjected = {
+        payload,
+        keyVersion: '2026-v1',
+        verificationResult: { verified: true, authorityId: payload.authorityId },
+      };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = buildProductionReplayReservationAfterAuthorizationVerification(
+        fakeInjected as any,
+        attestation
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toContain('FORBIDDEN_CALLER_OVERRIDE');
+      expect(res.request).toBeUndefined();
+    });
+
+    it('J. production orchestration calls production verification internally', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const syntheticPkg: SignedHumanAuthorizationPackage = {
+        payload,
+        signatureBase64: Buffer.from('mock_signature').toString('base64'),
+        publicKeyFingerprintSha256: 'a'.repeat(64),
+        algorithm: 'Ed25519',
+        keyVersion: '2026-v1',
+        authorityId: payload.authorityId,
+      };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      // Invokes verifyProductionHumanAuthorizationPackage which checks PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED
+      const res = buildProductionReplayReservationAfterAuthorizationVerification(
+        syntheticPkg,
+        attestation
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toBe('PRODUCTION_AUTHORITY_TRUST_ANCHOR_NOT_PROVISIONED');
+    });
+
+    it('K. production orchestration currently fails: PRODUCTION_AUTHORITY_TRUST_ANCHOR_NOT_PROVISIONED', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const syntheticPkg: SignedHumanAuthorizationPackage = {
+        payload,
+        signatureBase64: Buffer.from('mock_sig').toString('base64'),
+        publicKeyFingerprintSha256: 'b'.repeat(64),
+        algorithm: 'Ed25519',
+        keyVersion: '2026-v1',
+        authorityId: payload.authorityId,
+      };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = buildProductionReplayReservationAfterAuthorizationVerification(
+        syntheticPkg,
+        attestation
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toBe('PRODUCTION_AUTHORITY_TRUST_ANCHOR_NOT_PROVISIONED');
+    });
+
+    it('L. current production orchestration returns no reservation request', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const syntheticPkg: SignedHumanAuthorizationPackage = {
+        payload,
+        signatureBase64: Buffer.from('mock_sig').toString('base64'),
+        publicKeyFingerprintSha256: 'c'.repeat(64),
+        algorithm: 'Ed25519',
+        keyVersion: '2026-v1',
+        authorityId: payload.authorityId,
+      };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = buildProductionReplayReservationAfterAuthorizationVerification(
+        syntheticPkg,
+        attestation
+      );
+      expect(res.ready).toBe(false);
+      expect(res.request).toBeUndefined();
+    });
+
+    it('M. no production caller nowUtc parameter exists', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const syntheticPkg: SignedHumanAuthorizationPackage = {
+        payload,
+        signatureBase64: Buffer.from('mock_sig').toString('base64'),
+        publicKeyFingerprintSha256: 'd'.repeat(64),
+        algorithm: 'Ed25519',
+        keyVersion: '2026-v1',
+        authorityId: payload.authorityId,
+      };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = (buildProductionReplayReservationAfterAuthorizationVerification as any)(
+        syntheticPkg,
+        attestation,
+        { nowUtc: new Date() }
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toContain('FORBIDDEN_CALLER_PARAMETER');
+      expect(res.request).toBeUndefined();
+    });
+
+    it('N. no caller replayKey override exists in production orchestration', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const tamperedPkg = {
+        payload,
+        signatureBase64: Buffer.from('mock_sig').toString('base64'),
+        publicKeyFingerprintSha256: 'e'.repeat(64),
+        algorithm: 'Ed25519',
+        keyVersion: '2026-v1',
+        authorityId: payload.authorityId,
+        replayKey: 'f'.repeat(64),
+      };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = buildProductionReplayReservationAfterAuthorizationVerification(
+        tamperedPkg as any,
+        attestation
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toContain('FORBIDDEN_CALLER_OVERRIDE');
+      expect(res.request).toBeUndefined();
+    });
+
+    it('O. no caller expiresAt override exists in production orchestration', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const tamperedPkg = {
+        payload,
+        signatureBase64: Buffer.from('mock_sig').toString('base64'),
+        publicKeyFingerprintSha256: 'a1'.repeat(32),
+        algorithm: 'Ed25519',
+        keyVersion: '2026-v1',
+        authorityId: payload.authorityId,
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = buildProductionReplayReservationAfterAuthorizationVerification(
+        tamperedPkg as any,
+        attestation
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toContain('FORBIDDEN_CALLER_OVERRIDE');
+      expect(res.request).toBeUndefined();
+    });
+
+    it('P. canonical package and constructed replay request preserve authorityId binding', () => {
+      const payload = createValidSyntheticCanonicalPayload({
+        authorityId: 'auth_custom_secops_5s1',
+      });
+      const auth = { payload, keyVersion: '2026-v2', authorityId: 'auth_custom_secops_5s1' };
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
+      expect(req.authorityId).toBe('auth_custom_secops_5s1');
+    });
+
+    it('Q. canonical package and constructed replay request preserve keyVersion binding', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v5s1-spec' };
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
+      expect(req.keyVersion).toBe('2026-v5s1-spec');
+    });
+
+    it('R. canonical expiry remains exact', () => {
+      const payload = createValidSyntheticCanonicalPayload({
+        expiresAt: '2026-09-06T11:22:33.444Z',
+      });
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
+      expect(req.expiresAt).toBe('2026-09-06T11:22:33.444Z');
+    });
+
+    it('S. reserveProductionAuthorizationReplay remains BACKEND_NOT_BOUND', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
+      const res = reserveProductionAuthorizationReplay(req);
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('BACKEND_NOT_BOUND');
+    });
+
+    it('T. reserveProductionAuthorizationReplay never returns RESERVED', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+      const req = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(auth);
+      const res = reserveProductionAuthorizationReplay(req);
+      expect(res.status).not.toBe('RESERVED');
+    });
+
+    // ------------------------------------------------------------------------
+    // Section 17. NONCE CANONICALITY REGRESSIONS
+    // ------------------------------------------------------------------------
+    describe('validateRunNonce Canonicality Regressions', () => {
+      const validNonce = 'a12b2c5r_nonce_8d4e92b10f5a73e61c4d82';
+
+      it('1. valid canonical nonce: PASS', () => {
+        const res = validateRunNonce(validNonce);
+        expect(res.valid).toBe(true);
+        expect(res.error).toBeUndefined();
+      });
+
+      it('2. leading ASCII space: REJECT with NONCE_NON_CANONICAL_WHITESPACE', () => {
+        const res = validateRunNonce(` ${validNonce}`);
+        expect(res.valid).toBe(false);
+        expect(res.error).toContain('NONCE_NON_CANONICAL_WHITESPACE');
+      });
+
+      it('3. trailing ASCII space: REJECT with NONCE_NON_CANONICAL_WHITESPACE', () => {
+        const res = validateRunNonce(`${validNonce} `);
+        expect(res.valid).toBe(false);
+        expect(res.error).toContain('NONCE_NON_CANONICAL_WHITESPACE');
+      });
+
+      it('4. leading tab: REJECT with NONCE_NON_CANONICAL_WHITESPACE', () => {
+        const res = validateRunNonce(`\t${validNonce}`);
+        expect(res.valid).toBe(false);
+        expect(res.error).toContain('NONCE_NON_CANONICAL_WHITESPACE');
+      });
+
+      it('5. trailing tab: REJECT with NONCE_NON_CANONICAL_WHITESPACE', () => {
+        const res = validateRunNonce(`${validNonce}\t`);
+        expect(res.valid).toBe(false);
+        expect(res.error).toContain('NONCE_NON_CANONICAL_WHITESPACE');
+      });
+
+      it('6. leading newline: REJECT with NONCE_NON_CANONICAL_WHITESPACE', () => {
+        const res = validateRunNonce(`\n${validNonce}`);
+        expect(res.valid).toBe(false);
+        expect(res.error).toContain('NONCE_NON_CANONICAL_WHITESPACE');
+      });
+
+      it('7. trailing newline: REJECT with NONCE_NON_CANONICAL_WHITESPACE', () => {
+        const res = validateRunNonce(`${validNonce}\n`);
+        expect(res.valid).toBe(false);
+        expect(res.error).toContain('NONCE_NON_CANONICAL_WHITESPACE');
+      });
+
+      it('8. CRLF padding: REJECT with NONCE_NON_CANONICAL_WHITESPACE', () => {
+        const res = validateRunNonce(`\r\n${validNonce}\r\n`);
+        expect(res.valid).toBe(false);
+        expect(res.error).toContain('NONCE_NON_CANONICAL_WHITESPACE');
+      });
+
+      it('9. internal illegal whitespace: REJECT', () => {
+        const internalSpace = 'a12b2c5r_nonce 8d4e92b10f5a73e61c4d82';
+        const res = validateRunNonce(internalSpace);
+        expect(res.valid).toBe(false);
+        expect(res.error).toContain('NONCE_CHARSET_INVALID');
+      });
+
+      it('10. same canonical nonce remains deterministic in replay key derivation', () => {
+        const id1 = createValidSyntheticReplayIdentity({ runNonce: validNonce });
+        const id2 = createValidSyntheticReplayIdentity({ runNonce: validNonce });
+        expect(computeAuthorizationReplayKey(id1)).toBe(computeAuthorizationReplayKey(id2));
+      });
+
+      it('11. two inputs differing only by prohibited outer whitespace must NOT both be accepted as valid identities', () => {
+        expect(validateRunNonce(validNonce).valid).toBe(true);
+        expect(validateRunNonce(` ${validNonce}`).valid).toBe(false);
+        expect(validateRunNonce(`${validNonce} `).valid).toBe(false);
+        expect(validateRunNonce(`\t${validNonce}\t`).valid).toBe(false);
+      });
+    });
+
+    // ------------------------------------------------------------------------
+    // Section 18. STATIC SECURITY TESTS
+    // ------------------------------------------------------------------------
+    describe('Static Security & Parameter Tampering Hardening', () => {
+      const forbiddenParams = [
+        'nowUtc',
+        'verified',
+        'authorized',
+        'alreadyVerified',
+        'verificationResult',
+        'authority',
+        'publicKey',
+        'registry',
+        'backend',
+        'storage',
+        'adapter',
+        'replayKey',
+        'expiresAt',
+      ] as const;
+
+      for (const param of forbiddenParams) {
+        it(`rejects caller override parameter '${param}' in pkg or sourceAttestation`, () => {
+          expect(FORBIDDEN_PRODUCTION_ORCHESTRATION_KEYS).toContain(param);
+
+          const payload = createValidSyntheticCanonicalPayload();
+          const pkgWithForbidden = {
+            payload,
+            keyVersion: '2026-v1',
+            [param]: 'caller_injected_value',
+          };
+          const attestation = buildTrustedSourceAttestation({
+            sourceCommitSha: TEST_COMMIT_SHA,
+            sourceTreeSha: TEST_TREE_SHA,
+            createdAt: '2026-09-06T10:00:00.000Z',
+          });
+
+          const res = buildProductionReplayReservationAfterAuthorizationVerification(
+            pkgWithForbidden as any,
+            attestation
+          );
+          expect(res.ready).toBe(false);
+          expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+          expect(res.failureReason).toContain('FORBIDDEN_CALLER_OVERRIDE');
+        });
+      }
+    });
+
+    // ------------------------------------------------------------------------
+    // Repair Artifact Integrity Check
+    // ------------------------------------------------------------------------
+    it('verifies Phase A.12B.2C-5S.1 repair artifact integrity', () => {
+      const artifactPath = path.resolve(
+        process.cwd(),
+        'execution/a12b2c5s1_verified_authorization_boundary_nonce_repair.json'
+      );
+      expect(fs.existsSync(artifactPath)).toBe(true);
+      const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+
+      expect(artifact.phase).toBe('A.12B.2C-5S.1');
+      expect(artifact.artifactType).toBe(
+        'VERIFIED_AUTHORIZATION_ORCHESTRATION_BOUNDARY_AND_NONCE_CANONICALITY_REPAIR'
+      );
+      expect(artifact.baseCommit).toBe('d072587aeeac29743ba3d83a0ff0be90f5ff7498');
+      expect(artifact.baseTree).toBe('a5c384d95251c4e567dc04d1b4ffba7c35efd4ee');
+      expect(artifact.codexPre5TBlockerReviewApplied).toBe(true);
+      expect(artifact.runNonceExactTrimEqualityRequired).toBe(true);
+      expect(artifact.runNonceSilentlyNormalized).toBe(false);
+      expect(artifact.misleadingVerifiedReplayHelperNamesRemoved).toBe(true);
+      expect(artifact.pureReplayHelpersExplicitlyNonAuthoritative).toBe(true);
+      expect(artifact.productionAuthorizationVerificationCalledInsideReplayBoundary).toBe(true);
+      expect(artifact.callerSuppliedVerificationResultAccepted).toBe(false);
+      expect(artifact.callerSuppliedVerifiedBooleanAccepted).toBe(false);
+      expect(artifact.productionRuntimeExpiryRecheckImplemented).toBe(true);
+      expect(artifact.productionRuntimeClockCallerControlled).toBe(false);
+      expect(artifact.productionAuthorityTrustAnchorProvisioned).toBe(false);
+      expect(artifact.durableBackendBound).toBe(false);
+      expect(artifact.atomicReserveIfAbsentImplemented).toBe(false);
+      expect(artifact.productionReplayReservationReady).toBe(false);
+      expect(artifact.productionReservationCanReturnReserved).toBe(false);
+      expect(artifact.d1BackendImplemented).toBe(false);
+      expect(artifact.d1ProductionBindingProvisioned).toBe(false);
+      expect(artifact.guardedTransportIntegrated).toBe(false);
+      expect(artifact.sourceAttestationReady).toBe(false);
+      expect(artifact.humanAuthorizationAttestationReady).toBe(false);
+      expect(artifact.liveExecutionEnabled).toBe(false);
+      expect(artifact.providerNetworkCalls).toBe(0);
+      expect(artifact.productionRoutingEnforcementAllowed).toBe(false);
+      expect(artifact.successorActivated).toBe(false);
+      expect(artifact.finalStatus).toBe(
+        'A12B2C5S1_VERIFIED_AUTH_BOUNDARY_NONCE_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION'
       );
     });
   });

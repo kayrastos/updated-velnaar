@@ -28,7 +28,11 @@ import {
   validateRunNonce,
   type CanonicalHumanAuthorizationPayload,
   type SignedHumanAuthorizationPackage,
+  type TrustedSourceAttestation,
 } from './deepSeekCertificationAttestation';
+import {
+  verifyProductionHumanAuthorizationPackage,
+} from './deepSeekProductionAuthorizationTrust';
 
 // ============================================================================
 // 1. VERSION & READINESS CONSTANTS
@@ -147,6 +151,23 @@ export const FORBIDDEN_BUILDER_KEYS = Object.freeze([
   'adapter',
 ] as const);
 
+export const FORBIDDEN_PRODUCTION_ORCHESTRATION_KEYS = Object.freeze([
+  'nowUtc',
+  'verified',
+  'authorized',
+  'alreadyVerified',
+  'verificationResult',
+  'authority',
+  'publicKey',
+  'registry',
+  'backend',
+  'storage',
+  'adapter',
+  'replayKey',
+  'expiresAt',
+  'bypass',
+] as const);
+
 const SAFE_IDENTIFIER_REGEX = /^[a-zA-Z0-9_-]+$/;
 const SAFE_KEY_VERSION_REGEX = /^[a-zA-Z0-9_.-]+$/;
 const HEX_64_LOWER_REGEX = /^[0-9a-f]{64}$/;
@@ -233,6 +254,43 @@ export interface DurableAuthorizationReplayBackend {
     request: AuthorizationReplayReservationRequest
   ): Promise<AuthorizationReplayReservationResult> | AuthorizationReplayReservationResult;
 }
+
+/**
+ * Status union for production replay reservation orchestration results.
+ */
+export type ProductionReplayReservationStatus =
+  | 'AUTHORIZATION_NOT_VERIFIED'
+  | 'AUTHORIZATION_EXPIRED'
+  | 'CANONICAL_REPLAY_REQUEST_INVALID'
+  | 'READY_FOR_DURABLE_RESERVATION';
+
+/**
+ * Result structure returned by buildProductionReplayReservationAfterAuthorizationVerification.
+ */
+export type ProductionReplayReservationOrchestrationResult =
+  | {
+      readonly ready: false;
+      readonly status: 'AUTHORIZATION_NOT_VERIFIED';
+      readonly failureReason?: string;
+      readonly request?: never;
+    }
+  | {
+      readonly ready: false;
+      readonly status: 'AUTHORIZATION_EXPIRED';
+      readonly failureReason: string;
+      readonly request?: never;
+    }
+  | {
+      readonly ready: false;
+      readonly status: 'CANONICAL_REPLAY_REQUEST_INVALID';
+      readonly failureReason: string;
+      readonly request?: never;
+    }
+  | {
+      readonly ready: true;
+      readonly status: 'READY_FOR_DURABLE_RESERVATION';
+      readonly request: AuthorizationReplayReservationRequest;
+    };
 
 // ============================================================================
 // 5. VALIDATION: REPLAY IDENTITY
@@ -539,12 +597,18 @@ export function computeCanonicalAuthorizationPayloadDigestSha256(
 }
 
 /**
- * Pure helper to derive AuthorizationReplayIdentity from verified authorization data.
+ * Pure helper to derive AuthorizationReplayIdentity from canonical authorization data.
+ *
+ * CRITICAL SECURITY INVARIANT:
+ * THESE PURE HELPERS DO NOT VERIFY SIGNATURES.
+ * THESE PURE HELPERS DO NOT ESTABLISH PRODUCTION AUTHORIZATION.
+ * THEY ARE CANONICAL DATA TRANSFORMATION / CONSISTENCY HELPERS ONLY.
+ *
  * Input must be based on canonical authorization data.
  * Does NOT accept caller-supplied replayKey.
  * Rejects if singleUse !== true.
  */
-export function deriveReplayIdentityFromVerifiedAuthorization(
+export function deriveReplayIdentityFromCanonicalAuthorization(
   auth:
     | SignedHumanAuthorizationPackage
     | {
@@ -632,18 +696,23 @@ export interface ValidateReplayReservationBindingResult {
 
 /**
  * Canonical builder that derives an AuthorizationReplayReservationRequest
- * from a verified human authorization package.
+ * from a canonical human authorization package.
+ *
+ * CRITICAL SECURITY INVARIANT:
+ * THESE PURE HELPERS DO NOT VERIFY SIGNATURES.
+ * THESE PURE HELPERS DO NOT ESTABLISH PRODUCTION AUTHORIZATION.
+ * THEY ARE CANONICAL DATA TRANSFORMATION / CONSISTENCY HELPERS ONLY.
  *
  * INVARIANTS:
  * - Requires canonical authorization payload
  * - Requires singleUse === true
- * - Reuses deriveReplayIdentityFromVerifiedAuthorization(auth)
+ * - Reuses deriveReplayIdentityFromCanonicalAuthorization(auth)
  * - Computes replayKey internally using computeAuthorizationReplayKey(...)
  * - Computes/uses authorization payload digest internally
  * - Sets expiresAt EXACTLY from auth.payload.expiresAt
  * - Rejects any caller-supplied replayKey, expiresAt, ttl, retention, override, backend, etc.
  */
-export function buildAuthorizationReplayReservationRequestFromVerifiedAuthorization(
+export function buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(
   auth:
     | SignedHumanAuthorizationPackage
     | {
@@ -655,7 +724,7 @@ export function buildAuthorizationReplayReservationRequestFromVerifiedAuthorizat
 ): AuthorizationReplayReservationRequest {
   if (rest.length > 0) {
     throw new Error(
-      'FORBIDDEN_CALLER_PARAMETER: builder accepts only a single verified authorization parameter'
+      'FORBIDDEN_CALLER_PARAMETER: builder accepts only a single canonical authorization parameter'
     );
   }
 
@@ -689,7 +758,7 @@ export function buildAuthorizationReplayReservationRequestFromVerifiedAuthorizat
   }
 
   // Derive replay identity (enforces singleUse === true, authority consistency, keyVersion, schema)
-  const derivedIdentity = deriveReplayIdentityFromVerifiedAuthorization(auth as any);
+  const derivedIdentity = deriveReplayIdentityFromCanonicalAuthorization(auth as any);
 
   // Compute replay key internally
   const computedReplayKey = computeAuthorizationReplayKey(derivedIdentity);
@@ -715,13 +784,18 @@ export function buildAuthorizationReplayReservationRequestFromVerifiedAuthorizat
 }
 
 /**
- * Validates an AuthorizationReplayReservationRequest against the verified authorization package.
+ * Validates an AuthorizationReplayReservationRequest against the canonical authorization package.
+ *
+ * CRITICAL SECURITY INVARIANT:
+ * THESE PURE HELPERS DO NOT VERIFY SIGNATURES.
+ * THESE PURE HELPERS DO NOT ESTABLISH PRODUCTION AUTHORIZATION.
+ * THEY ARE CANONICAL DATA TRANSFORMATION / CONSISTENCY HELPERS ONLY.
  *
  * INVARIANTS:
  * 1. Existing reservation request validator passes
  * 2. Auth contains canonical authorization payload
  * 3. singleUse === true
- * 4. Derives replay identity from auth
+ * 4. Derives replay identity from auth using deriveReplayIdentityFromCanonicalAuthorization
  * 5. Recomputes replayKey
  * 6. EXACT equality on:
  *    - replayKey === computedReplayKey
@@ -733,7 +807,7 @@ export function buildAuthorizationReplayReservationRequestFromVerifiedAuthorizat
  *
  * Any mismatch fails closed with valid: false and descriptive error messages.
  */
-export function validateReplayReservationAgainstVerifiedAuthorization(
+export function validateReplayReservationAgainstCanonicalAuthorization(
   request: unknown,
   auth: unknown
 ): ValidateReplayReservationBindingResult {
@@ -771,7 +845,7 @@ export function validateReplayReservationAgainstVerifiedAuthorization(
   let computedReplayKey: string | null = null;
 
   try {
-    derivedIdentity = deriveReplayIdentityFromVerifiedAuthorization(auth as any);
+    derivedIdentity = deriveReplayIdentityFromCanonicalAuthorization(auth as any);
     computedReplayKey = computeAuthorizationReplayKey(derivedIdentity);
   } catch (err: any) {
     errors.push(`DERIVE_REPLAY_IDENTITY_FAILED: ${err?.message || String(err)}`);
@@ -828,7 +902,128 @@ export function validateReplayReservationAgainstVerifiedAuthorization(
 }
 
 // ============================================================================
-// 10. PRODUCTION RESERVATION ENTRYPOINT (FAIL-CLOSED)
+// 10. PRODUCTION ORCHESTRATION BOUNDARY (VERIFIED AUTHORIZATION -> REPLAY RESERVATION)
+// ============================================================================
+
+/**
+ * Trusted production orchestration boundary for deriving replay reservations
+ * strictly following verified production human authorization.
+ *
+ * CRITICAL ARCHITECTURAL BOUNDARY:
+ * 1. Invokes verifyProductionHumanAuthorizationPackage(pkg, sourceAttestation) internally.
+ * 2. Does NOT accept caller-supplied verification booleans, results, or trust tokens.
+ * 3. Fails closed immediately if verification.verified !== true.
+ * 4. Performs fresh runtime clock expiry check using new Date() internally (no caller time override).
+ * 5. Builds canonical replay reservation request via buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(pkg).
+ * 6. Validates binding via validateReplayReservationAgainstCanonicalAuthorization(request, pkg).
+ * 7. Returns structured result with status 'READY_FOR_DURABLE_RESERVATION' only upon full pass.
+ *
+ * NOTE: A later guarded-transport integration phase MUST perform another trusted runtime
+ * expiry check immediately before credential resolution.
+ */
+export function buildProductionReplayReservationAfterAuthorizationVerification(
+  pkg: SignedHumanAuthorizationPackage,
+  sourceAttestation: TrustedSourceAttestation,
+  ...rest: unknown[]
+): ProductionReplayReservationOrchestrationResult {
+  if (rest.length > 0) {
+    return {
+      ready: false,
+      status: 'AUTHORIZATION_NOT_VERIFIED',
+      failureReason: 'FORBIDDEN_CALLER_PARAMETER: orchestration accepts only pkg and sourceAttestation',
+    };
+  }
+
+  // Reject caller override fields on pkg
+  if (pkg && typeof pkg === 'object') {
+    const pkgRecord = pkg as Record<string, unknown>;
+    for (const forbiddenKey of FORBIDDEN_PRODUCTION_ORCHESTRATION_KEYS) {
+      if (forbiddenKey in pkgRecord) {
+        return {
+          ready: false,
+          status: 'AUTHORIZATION_NOT_VERIFIED',
+          failureReason: `FORBIDDEN_CALLER_OVERRIDE: caller parameter '${forbiddenKey}' is strictly prohibited`,
+        };
+      }
+    }
+  }
+
+  // Reject caller override fields on sourceAttestation
+  if (sourceAttestation && typeof sourceAttestation === 'object') {
+    const sourceRecord = sourceAttestation as Record<string, unknown>;
+    for (const forbiddenKey of FORBIDDEN_PRODUCTION_ORCHESTRATION_KEYS) {
+      if (forbiddenKey in sourceRecord) {
+        return {
+          ready: false,
+          status: 'AUTHORIZATION_NOT_VERIFIED',
+          failureReason: `FORBIDDEN_CALLER_OVERRIDE: caller parameter '${forbiddenKey}' is strictly prohibited`,
+        };
+      }
+    }
+  }
+
+  // 1. Verify production human authorization package internally
+  const verification = verifyProductionHumanAuthorizationPackage(pkg, sourceAttestation);
+  if (!verification || verification.verified !== true) {
+    return {
+      ready: false,
+      status: 'AUTHORIZATION_NOT_VERIFIED',
+      failureReason: verification?.failureReason ?? 'AUTHORIZATION_NOT_VERIFIED',
+    };
+  }
+
+  // 2. Fresh runtime expiry check using new Date() internally
+  // Require: Date.parse(pkg.payload.expiresAt) > runtimeNow
+  const expiresAtStr = pkg?.payload?.expiresAt;
+  if (!expiresAtStr || typeof expiresAtStr !== 'string') {
+    return {
+      ready: false,
+      status: 'CANONICAL_REPLAY_REQUEST_INVALID',
+      failureReason: 'EXPIRES_AT_MISSING: pkg.payload.expiresAt is missing or invalid',
+    };
+  }
+  const runtimeNow = new Date().getTime();
+  const expiresAtMs = Date.parse(expiresAtStr);
+  if (isNaN(expiresAtMs) || expiresAtMs <= runtimeNow) {
+    return {
+      ready: false,
+      status: 'AUTHORIZATION_EXPIRED',
+      failureReason: 'AUTHORIZATION_EXPIRED: authorization has expired or is at exact expiry at runtime evaluation',
+    };
+  }
+
+  // 3. Build canonical reservation request
+  let builtRequest: AuthorizationReplayReservationRequest;
+  try {
+    builtRequest = buildAuthorizationReplayReservationRequestFromCanonicalAuthorization(pkg);
+  } catch (err: any) {
+    return {
+      ready: false,
+      status: 'CANONICAL_REPLAY_REQUEST_INVALID',
+      failureReason: `CANONICAL_REPLAY_BUILD_FAILED: ${err?.message || String(err)}`,
+    };
+  }
+
+  // 4. Validate reservation against canonical authorization
+  const bindingValidation = validateReplayReservationAgainstCanonicalAuthorization(builtRequest, pkg);
+  if (!bindingValidation.valid) {
+    return {
+      ready: false,
+      status: 'CANONICAL_REPLAY_REQUEST_INVALID',
+      failureReason: `CANONICAL_REPLAY_VALIDATION_FAILED: ${bindingValidation.errors.join('; ')}`,
+    };
+  }
+
+  // 5. Success: ready for durable reservation
+  return {
+    ready: true,
+    status: 'READY_FOR_DURABLE_RESERVATION',
+    request: builtRequest,
+  };
+}
+
+// ============================================================================
+// 11. PRODUCTION RESERVATION ENTRYPOINT (FAIL-CLOSED)
 // ============================================================================
 
 /**

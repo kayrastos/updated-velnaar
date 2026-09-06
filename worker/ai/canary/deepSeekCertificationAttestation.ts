@@ -532,29 +532,41 @@ export function validateTrustedSourceAttestation(
 // ============================================================================
 
 /**
- * Validates the runNonce parameter against length, character set, and placeholder rules.
+ * Validates the runNonce parameter against canonical whitespace, length, character set,
+ * and placeholder rules.
+ *
+ * CANONICALITY INVARIANT (Phase 5S.1):
+ * - runNonce === runNonce.trim() is strictly required.
+ * - Leading, trailing, tab, or newline whitespace fails closed with NONCE_NON_CANONICAL_WHITESPACE.
+ * - No silent normalization or trimming.
  */
 export function validateRunNonce(runNonce: string): { valid: boolean; error?: string } {
   if (!runNonce || typeof runNonce !== 'string') {
     return { valid: false, error: 'NONCE_EMPTY: runNonce must be a non-empty string' };
   }
 
-  const trimmed = runNonce.trim();
-  if (trimmed.length < 16 || trimmed.length > 128) {
+  if (runNonce !== runNonce.trim()) {
     return {
       valid: false,
-      error: `NONCE_LENGTH_INVALID: length must be between 16 and 128 chars (got ${trimmed.length})`,
+      error: 'NONCE_NON_CANONICAL_WHITESPACE: runNonce must not contain leading or trailing whitespace',
     };
   }
 
-  if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) {
+  if (runNonce.length < 16 || runNonce.length > 128) {
+    return {
+      valid: false,
+      error: `NONCE_LENGTH_INVALID: length must be between 16 and 128 chars (got ${runNonce.length})`,
+    };
+  }
+
+  if (!/^[A-Za-z0-9_-]+$/.test(runNonce)) {
     return {
       valid: false,
       error: 'NONCE_CHARSET_INVALID: runNonce contains invalid characters (allowed: [A-Za-z0-9_-])',
     };
   }
 
-  const lower = trimmed.toLowerCase();
+  const lower = runNonce.toLowerCase();
   for (const placeholder of FORBIDDEN_PLACEHOLDER_NONCES) {
     if (lower === placeholder || lower.startsWith(`${placeholder}_`)) {
       return {
