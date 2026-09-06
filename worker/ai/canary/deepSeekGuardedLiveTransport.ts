@@ -27,8 +27,15 @@
 import crypto from 'node:crypto';
 import type { D1Database } from '@cloudflare/workers-types';
 import { GUARDED_TRANSPORT_MODULE_VERSION } from './deepSeekGuardedTransportIdentity';
-import type { SignedHumanAuthorizationPackage } from './deepSeekCertificationAttestation';
-import type { RuntimeSourceProvenanceReceipt } from './deepSeekTrustedRuntimeSourceProvenance';
+import {
+  EXACT_PAYLOAD_KEYS,
+  type SignedHumanAuthorizationPackage,
+  type CanonicalHumanAuthorizationPayload,
+} from './deepSeekCertificationAttestation';
+import {
+  EXACT_RECEIPT_KEYS,
+  type RuntimeSourceProvenanceReceipt,
+} from './deepSeekTrustedRuntimeSourceProvenance';
 import { coordinateProductionReplayReservation } from './deepSeekProductionReplayCoordinator';
 import {
   CANARY_LIVE_EXECUTION_ENABLED,
@@ -89,6 +96,24 @@ import { EvaluationScorer } from '../evaluation/evaluationScorer';
 // ============================================================================
 
 export { GUARDED_TRANSPORT_MODULE_VERSION };
+
+/**
+ * Permanent non-production barrier for legacy guarded transport.
+ * MANDATE: Legacy transport lacks cryptographic human authorization and durable replay.
+ * It is permanently disabled for production execution.
+ */
+export const LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false as const;
+
+/**
+ * Exact canonical allowlisted keys for the outer SignedHumanAuthorizationPackage.
+ */
+const EXACT_SIGNED_AUTHORIZATION_PACKAGE_KEYS = [
+  'payload',
+  'signatureBase64',
+  'authorityId',
+  'keyVersion',
+  'algorithm',
+] as const;
 export const GUARDED_DISPATCH_ENDPOINT = SEALED_ENDPOINT; // 'https://api.deepseek.com/v1/chat/completions'
 export const GUARDED_DISPATCH_METHOD = SEALED_METHOD;     // 'POST'
 export const GUARDED_DISPATCH_MODEL = SEALED_MODEL;       // 'deepseek-v4-flash'
@@ -634,6 +659,33 @@ export async function executeGuardedDeepSeekCertificationTransport(
   }
 
   // ==========================================================================
+  // GATE BARRIER 1.5: PERMANENT LEGACY NON-PRODUCTION BARRIER
+  // ==========================================================================
+  if (!LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED) {
+    return {
+      success: false,
+      status: 'LIVE_EXECUTION_BLOCKED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: [
+        'LEGACY_GUARDED_TRANSPORT_PERMANENTLY_NON_PRODUCTION: Legacy guarded transport is permanently disabled for production execution. Cryptographic authorization and durable replay required.',
+      ],
+      providerNetworkCalls: 0,
+      credentialReads: 0,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: 0,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // ==========================================================================
   // GATE BARRIER 2: SOURCE ATTESTATION BARRIER (FAIL-CLOSED READY CONSTANT)
   // ==========================================================================
   if (!GUARDED_SOURCE_ATTESTATION_READY) {
@@ -1108,6 +1160,176 @@ async function executeCanonicalDispatchAfterCredential(
 
 
 // ============================================================================
+// 4.8. PRIVATE EXACT DATA-PROPERTY MATERIALIZATION HELPERS (NOT EXPORTED)
+// ============================================================================
+
+/**
+ * Safely inspects an untrusted input object without executing getters or proxies.
+ * Requires plain Object.prototype or null prototype, no symbol keys, no getters/setters.
+ */
+function safeInspectObject(input: unknown): PropertyDescriptorMap | null {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    return null;
+  }
+  let proto: unknown;
+  try {
+    proto = Object.getPrototypeOf(input);
+  } catch {
+    return null;
+  }
+  if (proto !== Object.prototype && proto !== null) {
+    return null;
+  }
+  let symbols: symbol[];
+  try {
+    symbols = Object.getOwnPropertySymbols(input);
+  } catch {
+    return null;
+  }
+  if (symbols.length > 0) {
+    return null;
+  }
+  try {
+    return Object.getOwnPropertyDescriptors(input);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Safely materializes an immutable snapshot of HumanAuthorizationPayload.
+ * Enforces exact own data-property rules and primitive type categorization.
+ */
+function materializePayloadSnapshot(untrustedPayload: unknown): CanonicalHumanAuthorizationPayload | null {
+  const descriptors = safeInspectObject(untrustedPayload);
+  if (!descriptors) {
+    return null;
+  }
+  const ownKeys = Object.keys(descriptors);
+  if (ownKeys.length !== EXACT_PAYLOAD_KEYS.length) {
+    return null;
+  }
+  for (const key of EXACT_PAYLOAD_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(descriptors, key)) {
+      return null;
+    }
+    const desc = descriptors[key];
+    if (!desc || 'get' in desc || 'set' in desc || !('value' in desc)) {
+      return null;
+    }
+  }
+
+  // Validate primitive categories consistent with canonical interface
+  const maxBudget = descriptors.maxBudgetMicroUsd.value;
+  if (typeof maxBudget !== 'number' || !Number.isFinite(maxBudget) || maxBudget < 0) {
+    return null;
+  }
+  const taskCount = descriptors.canonicalTaskCount.value;
+  if (typeof taskCount !== 'number' || !Number.isFinite(taskCount)) {
+    return null;
+  }
+  const singleUse = descriptors.singleUse.value;
+  if (typeof singleUse !== 'boolean') {
+    return null;
+  }
+
+  for (const key of EXACT_PAYLOAD_KEYS) {
+    if (key === 'maxBudgetMicroUsd' || key === 'canonicalTaskCount' || key === 'singleUse') {
+      continue;
+    }
+    if (typeof descriptors[key].value !== 'string') {
+      return null;
+    }
+  }
+
+  const snapshot: Record<string, unknown> = {};
+  for (const key of EXACT_PAYLOAD_KEYS) {
+    snapshot[key] = descriptors[key].value;
+  }
+  return Object.freeze(snapshot) as unknown as CanonicalHumanAuthorizationPayload;
+}
+
+/**
+ * Safely materializes an immutable snapshot of RuntimeSourceProvenanceReceipt.
+ * All receipt fields must be exact own string data properties.
+ */
+function materializeSourceReceiptSnapshot(untrustedReceipt: unknown): RuntimeSourceProvenanceReceipt | null {
+  const descriptors = safeInspectObject(untrustedReceipt);
+  if (!descriptors) {
+    return null;
+  }
+  const ownKeys = Object.keys(descriptors);
+  if (ownKeys.length !== EXACT_RECEIPT_KEYS.length) {
+    return null;
+  }
+  for (const key of EXACT_RECEIPT_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(descriptors, key)) {
+      return null;
+    }
+    const desc = descriptors[key];
+    if (!desc || 'get' in desc || 'set' in desc || !('value' in desc)) {
+      return null;
+    }
+    if (typeof desc.value !== 'string') {
+      return null;
+    }
+  }
+
+  const snapshot: Record<string, unknown> = {};
+  for (const key of EXACT_RECEIPT_KEYS) {
+    snapshot[key] = descriptors[key].value;
+  }
+  return Object.freeze(snapshot) as unknown as RuntimeSourceProvenanceReceipt;
+}
+
+/**
+ * Safely materializes an immutable snapshot of SignedHumanAuthorizationPackage.
+ * References the newly copied immutable payload and freezes the outer envelope.
+ */
+function materializeSignedAuthorizationPackageSnapshot(untrustedPkg: unknown): SignedHumanAuthorizationPackage | null {
+  const descriptors = safeInspectObject(untrustedPkg);
+  if (!descriptors) {
+    return null;
+  }
+  const ownKeys = Object.keys(descriptors);
+  if (ownKeys.length !== EXACT_SIGNED_AUTHORIZATION_PACKAGE_KEYS.length) {
+    return null;
+  }
+  for (const key of EXACT_SIGNED_AUTHORIZATION_PACKAGE_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(descriptors, key)) {
+      return null;
+    }
+    const desc = descriptors[key];
+    if (!desc || 'get' in desc || 'set' in desc || !('value' in desc)) {
+      return null;
+    }
+  }
+
+  if (
+    typeof descriptors.signatureBase64.value !== 'string' ||
+    typeof descriptors.authorityId.value !== 'string' ||
+    typeof descriptors.keyVersion.value !== 'string' ||
+    typeof descriptors.algorithm.value !== 'string'
+  ) {
+    return null;
+  }
+
+  const immutablePayload = materializePayloadSnapshot(descriptors.payload.value);
+  if (!immutablePayload) {
+    return null;
+  }
+
+  const snapshot = {
+    payload: immutablePayload,
+    signatureBase64: descriptors.signatureBase64.value as string,
+    authorityId: descriptors.authorityId.value as string,
+    keyVersion: descriptors.keyVersion.value as string,
+    algorithm: descriptors.algorithm.value as string,
+  };
+  return Object.freeze(snapshot) as unknown as SignedHumanAuthorizationPackage;
+}
+
+// ============================================================================
 // 5. REPLAY-PROTECTED PRODUCTION DISPATCH ENTRYPOINT (PHASE 5U.2)
 // ============================================================================
 
@@ -1142,7 +1364,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
   getRuntimeCredential:
     () => Promise<DeepSeekRuntimeCredential> | DeepSeekRuntimeCredential
 ): Promise<GuardedTransportExecutionResult> {
-  // 1. Strict argument count enforcement (fail closed before any side-effects)
+  // 1. Strict argument count enforcement (fail closed before ANY evaluation)
   if (arguments.length !== 4) {
     return {
       success: false,
@@ -1159,7 +1381,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       invocationResponses: [],
       invocationRecords: [],
       observedTotalCostMicroUsd: 0,
-      authorizedBudgetMicroUsd: pkg?.payload?.maxBudgetMicroUsd ?? 0,
+      authorizedBudgetMicroUsd: 0,
       aggregateSemanticScore: 0,
       allTasksPassed: false,
       allSchemasValid: false,
@@ -1167,7 +1389,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
     };
   }
 
-  // 2. Global Live Gate (FIRST DECISION MANDATE: do NOT invoke coordinator if live execution is false)
+  // 2. Global Live Gate (FIRST DECISION MANDATE: evaluated BEFORE reading or materializing caller input)
   if (
     !CANARY_LIVE_EXECUTION_ENABLED ||
     (CANARY_LIVE_EXECUTION_STATE as string) !== 'LIVE_EXECUTION_ALLOWED'
@@ -1187,7 +1409,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       invocationResponses: [],
       invocationRecords: [],
       observedTotalCostMicroUsd: 0,
-      authorizedBudgetMicroUsd: pkg?.payload?.maxBudgetMicroUsd ?? 0,
+      authorizedBudgetMicroUsd: 0,
       aggregateSemanticScore: 0,
       allTasksPassed: false,
       allSchemasValid: false,
@@ -1195,11 +1417,42 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
     };
   }
 
-  // 3. Directly invoke production replay coordinator inside the same invocation
+  // 3. Safe Materialization of Immutable Snapshots (BEFORE first await)
+  const immutablePkg = materializeSignedAuthorizationPackageSnapshot(pkg);
+  const immutableSourceReceipt = materializeSourceReceiptSnapshot(sourceReceipt);
+
+  if (!immutablePkg || !immutableSourceReceipt) {
+    return {
+      success: false,
+      status: 'PREFLIGHT_VALIDATION_FAILED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: [
+        'PRODUCTION_INPUT_MATERIALIZATION_FAILED: Safe immutable snapshot acquisition failed. Non-plain, accessor, symbol, or malformed input rejected.',
+      ],
+      providerNetworkCalls: 0,
+      credentialReads: 0,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: 0,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // Invariant: original pkg and sourceReceipt are NEVER read again beyond this point!
+  // All policy parameters derive exclusively from immutablePkg and immutableSourceReceipt.
+
+  // 4. Directly invoke production replay coordinator inside the same invocation
   const replayCoordination = await coordinateProductionReplayReservation(
     db,
-    pkg,
-    sourceReceipt
+    immutablePkg,
+    immutableSourceReceipt
   );
 
   if (replayCoordination.readyForCredentialResolution !== true) {
@@ -1218,7 +1471,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       invocationResponses: [],
       invocationRecords: [],
       observedTotalCostMicroUsd: 0,
-      authorizedBudgetMicroUsd: pkg?.payload?.maxBudgetMicroUsd ?? 0,
+      authorizedBudgetMicroUsd: immutablePkg.payload.maxBudgetMicroUsd,
       aggregateSemanticScore: 0,
       allTasksPassed: false,
       allSchemasValid: false,
@@ -1226,8 +1479,8 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
     };
   }
 
-  // 4. Pre-Credential Authorization Expiry Check
-  const preCredentialExpiryMs = Date.parse(pkg.payload.expiresAt);
+  // 5. Pre-Credential Authorization Expiry Check
+  const preCredentialExpiryMs = Date.parse(immutablePkg.payload.expiresAt);
   const preCredentialNowMs = Date.now();
   if (!Number.isFinite(preCredentialExpiryMs) || preCredentialExpiryMs <= preCredentialNowMs) {
     return {
@@ -1235,7 +1488,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       status: 'PREFLIGHT_VALIDATION_FAILED',
       failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
       errors: [
-        `AUTHORIZATION_EXPIRED_PRE_CREDENTIAL: Authorization expired at ${pkg.payload.expiresAt} before credential resolution. Zero credential reads.`,
+        `AUTHORIZATION_EXPIRED_PRE_CREDENTIAL: Authorization expired at ${immutablePkg.payload.expiresAt} before credential resolution. Zero credential reads.`,
       ],
       providerNetworkCalls: 0,
       credentialReads: 0,
@@ -1245,7 +1498,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       invocationResponses: [],
       invocationRecords: [],
       observedTotalCostMicroUsd: 0,
-      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      authorizedBudgetMicroUsd: immutablePkg.payload.maxBudgetMicroUsd,
       aggregateSemanticScore: 0,
       allTasksPassed: false,
       allSchemasValid: false,
@@ -1253,15 +1506,15 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
     };
   }
 
-  // 5. Pre-Credential Pricing Window Check
+  // 6. Pre-Credential Pricing Window Check
   const preCredentialWindow = getPricingWindow(new Date());
-  if (preCredentialWindow !== pkg.payload.pricingWindow) {
+  if (preCredentialWindow !== immutablePkg.payload.pricingWindow) {
     return {
       success: false,
       status: 'PREFLIGHT_VALIDATION_FAILED',
       failureCategory: 'PRICING_WINDOW_CHANGED',
       errors: [
-        `PRICING_WINDOW_CHANGED_PRE_CREDENTIAL: Current pricing window '${preCredentialWindow}' does not match authorized window '${pkg.payload.pricingWindow}'. Zero credential reads.`,
+        `PRICING_WINDOW_CHANGED_PRE_CREDENTIAL: Current pricing window '${preCredentialWindow}' does not match authorized window '${immutablePkg.payload.pricingWindow}'. Zero credential reads.`,
       ],
       providerNetworkCalls: 0,
       credentialReads: 0,
@@ -1271,7 +1524,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       invocationResponses: [],
       invocationRecords: [],
       observedTotalCostMicroUsd: 0,
-      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      authorizedBudgetMicroUsd: immutablePkg.payload.maxBudgetMicroUsd,
       aggregateSemanticScore: 0,
       allTasksPassed: false,
       allSchemasValid: false,
@@ -1279,7 +1532,17 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
     };
   }
 
-  // 6. Credential Resolution (evaluated exactly once after coordinator RESERVED)
+  // 7. Construct Immutable Dispatch Context (frozen before credential resolution)
+  const immutableDispatchContext: InternalCanonicalDispatchContext = Object.freeze({
+    pricingWindow: immutablePkg.payload.pricingWindow,
+    sourceCommitSha: immutablePkg.payload.sourceCommitSha,
+    sourceTreeSha: immutablePkg.payload.sourceTreeSha,
+    runNonce: immutablePkg.payload.runNonce,
+    maxBudgetMicroUsd: immutablePkg.payload.maxBudgetMicroUsd,
+    enforceFirstInvocationWindowCheck: true,
+  });
+
+  // 8. Credential Resolution (evaluated exactly once after coordinator RESERVED)
   let credentialReads = 0;
   let credential: DeepSeekRuntimeCredential;
 
@@ -1302,7 +1565,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       invocationResponses: [],
       invocationRecords: [],
       observedTotalCostMicroUsd: 0,
-      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      authorizedBudgetMicroUsd: immutablePkg.payload.maxBudgetMicroUsd,
       aggregateSemanticScore: 0,
       allTasksPassed: false,
       allSchemasValid: false,
@@ -1331,7 +1594,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       invocationResponses: [],
       invocationRecords: [],
       observedTotalCostMicroUsd: 0,
-      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      authorizedBudgetMicroUsd: immutablePkg.payload.maxBudgetMicroUsd,
       aggregateSemanticScore: 0,
       allTasksPassed: false,
       allSchemasValid: false,
@@ -1339,8 +1602,8 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
     };
   }
 
-  // 7. Post-Credential Authorization Expiry Recheck
-  const postCredentialExpiryMs = Date.parse(pkg.payload.expiresAt);
+  // 9. Post-Credential Authorization Expiry Recheck
+  const postCredentialExpiryMs = Date.parse(immutablePkg.payload.expiresAt);
   const postCredentialNowMs = Date.now();
   if (!Number.isFinite(postCredentialExpiryMs) || postCredentialExpiryMs <= postCredentialNowMs) {
     return {
@@ -1348,7 +1611,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       status: 'PREFLIGHT_VALIDATION_FAILED',
       failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
       errors: [
-        `AUTHORIZATION_EXPIRED_POST_CREDENTIAL: Authorization expired at ${pkg.payload.expiresAt} after credential resolution. Provider dispatch blocked.`,
+        `AUTHORIZATION_EXPIRED_POST_CREDENTIAL: Authorization expired at ${immutablePkg.payload.expiresAt} after credential resolution. Provider dispatch blocked.`,
       ],
       providerNetworkCalls: 0,
       credentialReads,
@@ -1358,7 +1621,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       invocationResponses: [],
       invocationRecords: [],
       observedTotalCostMicroUsd: 0,
-      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      authorizedBudgetMicroUsd: immutablePkg.payload.maxBudgetMicroUsd,
       aggregateSemanticScore: 0,
       allTasksPassed: false,
       allSchemasValid: false,
@@ -1366,15 +1629,15 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
     };
   }
 
-  // 8. Post-Credential Pricing Window Recheck
+  // 10. Post-Credential Pricing Window Recheck
   const postCredentialWindow = getPricingWindow(new Date());
-  if (postCredentialWindow !== pkg.payload.pricingWindow) {
+  if (postCredentialWindow !== immutablePkg.payload.pricingWindow) {
     return {
       success: false,
       status: 'WINDOW_CROSSING_TERMINATED',
       failureCategory: 'PRICING_WINDOW_CHANGED',
       errors: [
-        `PRICING_WINDOW_CHANGED_POST_CREDENTIAL: Pricing window shifted from '${pkg.payload.pricingWindow}' to '${postCredentialWindow}' during credential resolution. Provider dispatch blocked.`,
+        `PRICING_WINDOW_CHANGED_POST_CREDENTIAL: Pricing window shifted from '${immutablePkg.payload.pricingWindow}' to '${postCredentialWindow}' during credential resolution. Provider dispatch blocked.`,
       ],
       providerNetworkCalls: 0,
       credentialReads,
@@ -1384,7 +1647,7 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
       invocationResponses: [],
       invocationRecords: [],
       observedTotalCostMicroUsd: 0,
-      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      authorizedBudgetMicroUsd: immutablePkg.payload.maxBudgetMicroUsd,
       aggregateSemanticScore: 0,
       allTasksPassed: false,
       allSchemasValid: false,
@@ -1392,16 +1655,9 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
     };
   }
 
-  // 9. Execute Canonical 7-Task Dispatch with enforceFirstInvocationWindowCheck: true
+  // 11. Execute Canonical 7-Task Dispatch with frozen dispatch context
   return executeCanonicalDispatchAfterCredential(
-    {
-      pricingWindow: pkg.payload.pricingWindow,
-      sourceCommitSha: pkg.payload.sourceCommitSha,
-      sourceTreeSha: pkg.payload.sourceTreeSha,
-      runNonce: pkg.payload.runNonce,
-      maxBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
-      enforceFirstInvocationWindowCheck: true,
-    },
+    immutableDispatchContext,
     credential,
     credentialReads
   );

@@ -1,25 +1,26 @@
 /**
  * @file tests/ai/phaseA12B2C5U2ProductionGuardedTransportIntegration.test.ts
- * @description VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Transport Integration Tests.
+ * @description VELNAR — A.12B.2C-5U.2.1 Same-Invocation Replay-Protected Guarded Transport Integration Tests.
  *
  * STRICT VERIFICATION REQUIREMENTS:
  * - Pure offline testing only.
  * - ZERO DeepSeek calls, ZERO Gemini calls, ZERO external provider calls.
  * - ZERO real Cloudflare D1 network calls.
  * - ZERO private keys or trust anchors provisioned.
- * - Comprehensive coverage of guarded transport replay integration invariants:
+ * - Comprehensive coverage of 5U.2 + 5U.2.1 security repairs:
  *   1. Parameter tuple exact 4 typed arguments (db, pkg, sourceReceipt, getRuntimeCredential).
  *   2. Rejection of caller-supplied backends, clocks, pricingWindow, expectedCommit, expectedTree, mocks, overrides.
  *   3. Transport identity cycle broken via deepSeekGuardedTransportIdentity.ts.
  *   4. Authoritative global live gate evaluated FIRST before coordinator, D1, credential resolution, or fetch.
- *   5. coordinateProductionReplayReservation called directly inside same invocation without portable trust token.
- *   6. Single-attempt policy: zero retries, zero compensating queries, terminal replay denial.
- *   7. Pre-credential authorization expiry & pricing window rechecks.
- *   8. Credential resolution evaluated once after coordinator RESERVED; errors caught and wrapped.
- *   9. Post-credential authorization expiry & pricing window rechecks.
- *  10. Private canonical dispatch helper not exported and not in index.ts; reused by legacy and production paths.
- *  11. Legacy executeGuardedDeepSeekCertificationTransport backwards-compatibility.
- *  12. Global fetch sentinel proves exactly zero provider network calls.
+ *   5. Pre-gate getter passivity: 0 getter invocations on invalid args or closed live gate; budget remains 0.
+ *   6. Safe exact data-property materialization before first await.
+ *   7. Rejection of accessors (get/set), symbols, custom prototypes, and unknown keys.
+ *   8. Zero rereads of original pkg or sourceReceipt after materialization.
+ *   9. Single-attempt policy: zero retries, zero compensating queries, terminal replay denial.
+ *  10. TOCTOU mutation resistance across async boundaries (coordinator await, credential resolution).
+ *  11. Immutable dispatch context frozen before credential resolution.
+ *  12. Permanent legacy non-production barrier (LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED === false).
+ *  13. Global fetch sentinel proves exactly zero provider network calls.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -32,6 +33,7 @@ import {
   GUARDED_TRANSPORT_MODULE_VERSION,
   GUARDED_SOURCE_ATTESTATION_READY,
   GUARDED_HUMAN_AUTH_ATTESTATION_READY,
+  LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED,
   type GuardedTransportExecutionResult,
 } from '../../worker/ai/canary/deepSeekGuardedLiveTransport';
 import {
@@ -143,7 +145,7 @@ function createSampleSourceReceipt(overrides?: Partial<RuntimeSourceProvenanceRe
   };
 }
 
-describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Transport Integration', () => {
+describe('VELNAR — A.12B.2C-5U.2 / 5U.2.1 Replay-Protected Guarded Transport Integration', () => {
   // Global fetch sentinel tracking
   let originalFetch: typeof globalThis.fetch;
   let globalFetchCalls = 0;
@@ -195,6 +197,7 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
       expect(result.errors[0]).toContain('FORBIDDEN_CALLER_PARAMETER');
       expect(result.errors[0]).toContain('got 0');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
     });
 
     it('1.4 rejects 1 argument with PREFLIGHT_VALIDATION_FAILED', async () => {
@@ -203,6 +206,7 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(result.success).toBe(false);
       expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
       expect(result.errors[0]).toContain('got 1');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
     });
 
     it('1.5 rejects 2 arguments with PREFLIGHT_VALIDATION_FAILED', async () => {
@@ -212,6 +216,7 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(result.success).toBe(false);
       expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
       expect(result.errors[0]).toContain('got 2');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
     });
 
     it('1.6 rejects 3 arguments with PREFLIGHT_VALIDATION_FAILED', async () => {
@@ -222,6 +227,7 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(result.success).toBe(false);
       expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
       expect(result.errors[0]).toContain('got 3');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
     });
 
     it('1.7 rejects 5 arguments with PREFLIGHT_VALIDATION_FAILED before any live gate or coordinator call', async () => {
@@ -246,6 +252,7 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(result.success).toBe(false);
       expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
       expect(result.errors[0]).toContain('got 5');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
       expect(getPrepareCalls()).toBe(0);
       expect(credCalls).toBe(0);
       expect(globalFetchCalls).toBe(0);
@@ -269,6 +276,7 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(result.success).toBe(false);
       expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
       expect(result.errors[0]).toContain('got 6');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
     });
 
     it('1.9 function signature contains no variadic ...rest parameter', () => {
@@ -583,7 +591,7 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(globalFetchCalls).toBe(0);
     });
 
-    it('3.15 authorizedBudgetMicroUsd reflects package budget even when blocked', async () => {
+    it('3.15 authorizedBudgetMicroUsd is strictly 0 when live gate blocks (zero evaluation of pkg)', async () => {
       const { db } = createStrictMockD1();
       const pkg = createSampleAuthPackage({ payload: { maxBudgetMicroUsd: 75000 } });
       const receipt = createSampleSourceReceipt();
@@ -596,7 +604,7 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
         credResolver
       );
 
-      expect(result.authorizedBudgetMicroUsd).toBe(75000);
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
     });
   });
 
@@ -680,13 +688,15 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(idxBefore.includes('fetch(')).toBe(false);
     });
 
-    it('5.2 Step 2: global live gate is evaluated before coordinator invocation', () => {
+    it('5.2 Step 2: global live gate is evaluated before materialization or coordinator', () => {
       const idxArgCheck = prodFnBody.indexOf('if (arguments.length !== 4)');
       const idxLiveGate = prodFnBody.indexOf('!CANARY_LIVE_EXECUTION_ENABLED');
+      const idxMaterialize = prodFnBody.indexOf('materializeSignedAuthorizationPackageSnapshot(');
       const idxCoordinator = prodFnBody.indexOf('coordinateProductionReplayReservation(');
 
       expect(idxLiveGate).toBeGreaterThan(idxArgCheck);
-      expect(idxCoordinator).toBeGreaterThan(idxLiveGate);
+      expect(idxMaterialize).toBeGreaterThan(idxLiveGate);
+      expect(idxCoordinator).toBeGreaterThan(idxMaterialize);
     });
 
     it('5.3 Step 3: coordinator invocation precedes readyForCredentialResolution check', () => {
@@ -705,11 +715,13 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(idxPreWindow).toBeGreaterThan(idxPreExpiry);
     });
 
-    it('5.5 Step 5: pre-credential checks precede credential resolution', () => {
+    it('5.5 Step 5: immutable dispatch context is constructed and frozen before credential resolution', () => {
       const idxPreWindow = prodFnBody.indexOf('PRICING_WINDOW_CHANGED_PRE_CREDENTIAL');
+      const idxFreezeContext = prodFnBody.indexOf('Object.freeze({');
       const idxCredResolution = prodFnBody.indexOf('await getRuntimeCredential()');
 
-      expect(idxCredResolution).toBeGreaterThan(idxPreWindow);
+      expect(idxFreezeContext).toBeGreaterThan(idxPreWindow);
+      expect(idxCredResolution).toBeGreaterThan(idxFreezeContext);
     });
 
     it('5.6 Step 6: credential resolution is wrapped in try/catch block', () => {
@@ -741,11 +753,11 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(idxDispatch).toBeGreaterThan(idxPostWindow);
     });
 
-    it('5.10 coordinateProductionReplayReservation is directly called with db, pkg, sourceReceipt', () => {
+    it('5.10 coordinateProductionReplayReservation is called with immutablePkg and immutableSourceReceipt', () => {
       expect(prodFnBody.includes('coordinateProductionReplayReservation(')).toBe(true);
       expect(prodFnBody.includes('db,')).toBe(true);
-      expect(prodFnBody.includes('pkg,')).toBe(true);
-      expect(prodFnBody.includes('sourceReceipt')).toBe(true);
+      expect(prodFnBody.includes('immutablePkg,')).toBe(true);
+      expect(prodFnBody.includes('immutableSourceReceipt')).toBe(true);
     });
 
     it('5.11 no trust token is passed to executeProductionReplayProtectedDeepSeekCertificationTransport', () => {
@@ -901,7 +913,7 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
     it('7.1 pre-credential expiry recheck parses expiresAt with Date.parse', () => {
       const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
       const prodFnBody = guardedTransportSource.slice(prodFnStart);
-      expect(prodFnBody.includes('const preCredentialExpiryMs = Date.parse(pkg.payload.expiresAt);')).toBe(true);
+      expect(prodFnBody.includes('const preCredentialExpiryMs = Date.parse(immutablePkg.payload.expiresAt);')).toBe(true);
     });
 
     it('7.2 pre-credential expiry recheck compares against fresh Date.now()', () => {
@@ -934,10 +946,10 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(prodFnBody.includes('const preCredentialWindow = getPricingWindow(new Date());')).toBe(true);
     });
 
-    it('7.6 pre-credential pricing window compares against pkg.payload.pricingWindow', () => {
+    it('7.6 pre-credential pricing window compares against immutablePkg.payload.pricingWindow', () => {
       const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
       const prodFnBody = guardedTransportSource.slice(prodFnStart);
-      expect(prodFnBody.includes('preCredentialWindow !== pkg.payload.pricingWindow')).toBe(true);
+      expect(prodFnBody.includes('preCredentialWindow !== immutablePkg.payload.pricingWindow')).toBe(true);
     });
 
     it('7.7 pre-credential pricing window failure mentions PRICING_WINDOW_CHANGED_PRE_CREDENTIAL', () => {
@@ -950,8 +962,8 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
       const prodFnBody = guardedTransportSource.slice(prodFnStart);
       const preWindowBlock = prodFnBody.slice(
-        prodFnBody.indexOf('// 5. Pre-Credential Pricing Window Check'),
-        prodFnBody.indexOf('// 6. Credential Resolution')
+        prodFnBody.indexOf('// 6. Pre-Credential Pricing Window Check'),
+        prodFnBody.indexOf('// 7. Construct Immutable Dispatch Context')
       );
       expect(preWindowBlock.includes("failureCategory: 'PRICING_WINDOW_CHANGED'")).toBe(true);
     });
@@ -960,8 +972,8 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
       const prodFnBody = guardedTransportSource.slice(prodFnStart);
       const preWindowBlock = prodFnBody.slice(
-        prodFnBody.indexOf('PRICING_WINDOW_CHANGED_PRE_CREDENTIAL'),
-        prodFnBody.indexOf('credentialReads = 1;')
+        prodFnBody.indexOf('// 6. Pre-Credential Pricing Window Check'),
+        prodFnBody.indexOf('// 7. Construct Immutable Dispatch Context')
       );
       expect(preWindowBlock.includes('credentialReads: 0')).toBe(true);
       expect(preWindowBlock.includes('providerNetworkCalls: 0')).toBe(true);
@@ -1068,7 +1080,7 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
     it('9.1 post-credential expiry recheck parses expiresAt with Date.parse', () => {
       const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
       const prodFnBody = guardedTransportSource.slice(prodFnStart);
-      expect(prodFnBody.includes('const postCredentialExpiryMs = Date.parse(pkg.payload.expiresAt);')).toBe(true);
+      expect(prodFnBody.includes('const postCredentialExpiryMs = Date.parse(immutablePkg.payload.expiresAt);')).toBe(true);
     });
 
     it('9.2 post-credential expiry recheck compares against fresh Date.now()', () => {
@@ -1101,10 +1113,10 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       expect(prodFnBody.includes('const postCredentialWindow = getPricingWindow(new Date());')).toBe(true);
     });
 
-    it('9.6 post-credential pricing window compares against pkg.payload.pricingWindow', () => {
+    it('9.6 post-credential pricing window compares against immutablePkg.payload.pricingWindow', () => {
       const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
       const prodFnBody = guardedTransportSource.slice(prodFnStart);
-      expect(prodFnBody.includes('postCredentialWindow !== pkg.payload.pricingWindow')).toBe(true);
+      expect(prodFnBody.includes('postCredentialWindow !== immutablePkg.payload.pricingWindow')).toBe(true);
     });
 
     it('9.7 post-credential pricing window failure mentions PRICING_WINDOW_CHANGED_POST_CREDENTIAL', () => {
@@ -1117,8 +1129,8 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
       const prodFnBody = guardedTransportSource.slice(prodFnStart);
       const postWindowBlock = prodFnBody.slice(
-        prodFnBody.indexOf('// 8. Post-Credential Pricing Window Recheck'),
-        prodFnBody.indexOf('// 9. Execute Canonical 7-Task Dispatch')
+        prodFnBody.indexOf('// 10. Post-Credential Pricing Window Recheck'),
+        prodFnBody.indexOf('// 11. Execute Canonical 7-Task Dispatch')
       );
       expect(postWindowBlock.includes("status: 'WINDOW_CROSSING_TERMINATED'")).toBe(true);
       expect(postWindowBlock.includes("failureCategory: 'PRICING_WINDOW_CHANGED'")).toBe(true);
@@ -1128,8 +1140,8 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
       const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
       const prodFnBody = guardedTransportSource.slice(prodFnStart);
       const postWindowBlock = prodFnBody.slice(
-        prodFnBody.indexOf('PRICING_WINDOW_CHANGED_POST_CREDENTIAL'),
-        prodFnBody.indexOf('executeCanonicalDispatchAfterCredential(')
+        prodFnBody.indexOf('// 10. Post-Credential Pricing Window Recheck'),
+        prodFnBody.indexOf('// 11. Execute Canonical 7-Task Dispatch')
       );
       expect(postWindowBlock.includes('credentialReads,')).toBe(true);
       expect(postWindowBlock.includes('providerNetworkCalls: 0')).toBe(true);
@@ -1207,6 +1219,501 @@ describe('VELNAR — A.12B.2C-5U.2 Same-Invocation Replay-Protected Guarded Tran
 
     it('10.10 sentinel lifecycle: afterEach properly maintains fetch isolation', () => {
       expect(typeof originalFetch).toBe('function');
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 11: Pre-Gate Getter Passivity & Anti-Tampering (10 tests)
+  // ==========================================================================
+  describe('11. Pre-Gate Getter Passivity & Anti-Tampering', () => {
+    it('11.1 throwing getter on payload does not throw on invalid argument count', async () => {
+      const { db } = createStrictMockD1();
+      let getterInvocations = 0;
+      const maliciousPkg = {
+        get payload() {
+          getterInvocations++;
+          throw new Error('MALICIOUS_GETTER_TRIGGERED');
+        },
+      };
+
+      const result = await (executeProductionReplayProtectedDeepSeekCertificationTransport as any)(
+        db,
+        maliciousPkg
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(getterInvocations).toBe(0);
+    });
+
+    it('11.2 counting getter on payload records exactly 0 calls on invalid argument count', async () => {
+      const { db } = createStrictMockD1();
+      let getterInvocations = 0;
+      const maliciousPkg = {
+        get payload() {
+          getterInvocations++;
+          return { maxBudgetMicroUsd: 999999 };
+        },
+      };
+
+      const result = await (executeProductionReplayProtectedDeepSeekCertificationTransport as any)(
+        db,
+        maliciousPkg,
+        'extra'
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(getterInvocations).toBe(0);
+    });
+
+    it('11.3 counting getter on outer package fields records 0 calls on invalid argument count', async () => {
+      const { db } = createStrictMockD1();
+      let getterInvocations = 0;
+      const maliciousPkg = {
+        get signatureBase64() {
+          getterInvocations++;
+          return 'sig';
+        },
+      };
+
+      await (executeProductionReplayProtectedDeepSeekCertificationTransport as any)(
+        db,
+        maliciousPkg
+      );
+
+      expect(getterInvocations).toBe(0);
+    });
+
+    it('11.4 counting getter on sourceReceipt records 0 calls on invalid argument count', async () => {
+      const { db } = createStrictMockD1();
+      let getterInvocations = 0;
+      const maliciousReceipt = {
+        get sourceCommitSha() {
+          getterInvocations++;
+          return 'sha';
+        },
+      };
+
+      await (executeProductionReplayProtectedDeepSeekCertificationTransport as any)(
+        db,
+        maliciousReceipt
+      );
+
+      expect(getterInvocations).toBe(0);
+    });
+
+    it('11.5 throwing getter on payload does not throw when live gate is closed', async () => {
+      const { db } = createStrictMockD1();
+      let getterInvocations = 0;
+      const maliciousPkg = {
+        get payload() {
+          getterInvocations++;
+          throw new Error('MALICIOUS_GETTER_TRIGGERED');
+        },
+        signatureBase64: 'sig',
+        authorityId: 'auth',
+        keyVersion: 'v1',
+        algorithm: 'Ed25519',
+      };
+      const receipt = createSampleSourceReceipt();
+      const credResolver = () => ({ apiKey: 'dummy' });
+
+      const result = await executeProductionReplayProtectedDeepSeekCertificationTransport(
+        db,
+        maliciousPkg as any,
+        receipt,
+        credResolver
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(getterInvocations).toBe(0);
+    });
+
+    it('11.6 counting getter on payload records exactly 0 calls when live gate is closed', async () => {
+      const { db } = createStrictMockD1();
+      let getterInvocations = 0;
+      const maliciousPkg = {
+        get payload() {
+          getterInvocations++;
+          return { maxBudgetMicroUsd: 12345 };
+        },
+        signatureBase64: 'sig',
+        authorityId: 'auth',
+        keyVersion: 'v1',
+        algorithm: 'Ed25519',
+      };
+      const receipt = createSampleSourceReceipt();
+      const credResolver = () => ({ apiKey: 'dummy' });
+
+      const result = await executeProductionReplayProtectedDeepSeekCertificationTransport(
+        db,
+        maliciousPkg as any,
+        receipt,
+        credResolver
+      );
+
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(getterInvocations).toBe(0);
+    });
+
+    it('11.7 counting getter on sourceReceipt records exactly 0 calls when live gate is closed', async () => {
+      const { db } = createStrictMockD1();
+      let getterInvocations = 0;
+      const pkg = createSampleAuthPackage();
+      const maliciousReceipt = {
+        get sourceCommitSha() {
+          getterInvocations++;
+          return 'sha';
+        },
+      };
+      const credResolver = () => ({ apiKey: 'dummy' });
+
+      const result = await executeProductionReplayProtectedDeepSeekCertificationTransport(
+        db,
+        pkg,
+        maliciousReceipt as any,
+        credResolver
+      );
+
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(getterInvocations).toBe(0);
+    });
+
+    it('11.8 Proxy throwing on get trap does not execute when live gate is closed', async () => {
+      const { db } = createStrictMockD1();
+      let proxyTraps = 0;
+      const maliciousProxy = new Proxy({}, {
+        get() {
+          proxyTraps++;
+          throw new Error('PROXY_GET_TRAP_EXPLODED');
+        },
+      });
+      const receipt = createSampleSourceReceipt();
+      const credResolver = () => ({ apiKey: 'dummy' });
+
+      const result = await executeProductionReplayProtectedDeepSeekCertificationTransport(
+        db,
+        maliciousProxy as any,
+        receipt,
+        credResolver
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+      expect(proxyTraps).toBe(0);
+    });
+
+    it('11.9 db.prepare is never called on pre-gate rejection', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const pkg = createSampleAuthPackage();
+      const receipt = createSampleSourceReceipt();
+      const credResolver = () => ({ apiKey: 'dummy' });
+
+      await executeProductionReplayProtectedDeepSeekCertificationTransport(
+        db,
+        pkg,
+        receipt,
+        credResolver
+      );
+
+      expect(getPrepareCalls()).toBe(0);
+    });
+
+    it('11.10 getRuntimeCredential is never called on pre-gate rejection', async () => {
+      const { db } = createStrictMockD1();
+      const pkg = createSampleAuthPackage();
+      const receipt = createSampleSourceReceipt();
+      let credInvocations = 0;
+      const credResolver = () => {
+        credInvocations++;
+        return { apiKey: 'dummy' };
+      };
+
+      await executeProductionReplayProtectedDeepSeekCertificationTransport(
+        db,
+        pkg,
+        receipt,
+        credResolver
+      );
+
+      expect(credInvocations).toBe(0);
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 12: Materialization & Malformed Object Rejection (15 tests)
+  // ==========================================================================
+  describe('12. Materialization & Malformed Object Rejection (Static & Structural)', () => {
+    it('12.1 safeInspectObject rejects non-object or null input', () => {
+      expect(guardedTransportSource.includes("if (input === null || typeof input !== 'object' || Array.isArray(input))")).toBe(true);
+    });
+
+    it('12.2 safeInspectObject rejects prototypes other than Object.prototype or null', () => {
+      expect(guardedTransportSource.includes('proto !== Object.prototype && proto !== null')).toBe(true);
+    });
+
+    it('12.3 safeInspectObject rejects objects containing Symbol keys', () => {
+      expect(guardedTransportSource.includes('Object.getOwnPropertySymbols(input)')).toBe(true);
+      expect(guardedTransportSource.includes('symbols.length > 0')).toBe(true);
+    });
+
+    it('12.4 safeInspectObject reads descriptors with getOwnPropertyDescriptors without property access', () => {
+      expect(guardedTransportSource.includes('Object.getOwnPropertyDescriptors(input)')).toBe(true);
+    });
+
+    it('12.5 materializePayloadSnapshot enforces EXACT_PAYLOAD_KEYS length match', () => {
+      expect(guardedTransportSource.includes('ownKeys.length !== EXACT_PAYLOAD_KEYS.length')).toBe(true);
+    });
+
+    it('12.6 materializePayloadSnapshot rejects getter or setter descriptors', () => {
+      expect(guardedTransportSource.includes("'get' in desc || 'set' in desc")).toBe(true);
+    });
+
+    it('12.7 materializePayloadSnapshot requires value in descriptor', () => {
+      expect(guardedTransportSource.includes("!('value' in desc)")).toBe(true);
+    });
+
+    it('12.8 materializePayloadSnapshot enforces maxBudgetMicroUsd as non-negative finite number', () => {
+      expect(guardedTransportSource.includes("typeof maxBudget !== 'number' || !Number.isFinite(maxBudget) || maxBudget < 0")).toBe(true);
+    });
+
+    it('12.9 materializePayloadSnapshot enforces canonicalTaskCount as finite number', () => {
+      expect(guardedTransportSource.includes("typeof taskCount !== 'number' || !Number.isFinite(taskCount)")).toBe(true);
+    });
+
+    it('12.10 materializePayloadSnapshot enforces singleUse as boolean', () => {
+      expect(guardedTransportSource.includes("typeof singleUse !== 'boolean'")).toBe(true);
+    });
+
+    it('12.11 materializePayloadSnapshot enforces all other payload fields as string', () => {
+      expect(guardedTransportSource.includes("typeof descriptors[key].value !== 'string'")).toBe(true);
+    });
+
+    it('12.12 materializeSourceReceiptSnapshot enforces EXACT_RECEIPT_KEYS length match', () => {
+      expect(guardedTransportSource.includes('ownKeys.length !== EXACT_RECEIPT_KEYS.length')).toBe(true);
+    });
+
+    it('12.13 materializeSourceReceiptSnapshot rejects non-string receipt fields', () => {
+      expect(guardedTransportSource.includes("typeof desc.value !== 'string'")).toBe(true);
+    });
+
+    it('12.14 materializeSignedAuthorizationPackageSnapshot enforces EXACT_SIGNED_AUTHORIZATION_PACKAGE_KEYS', () => {
+      expect(guardedTransportSource.includes('ownKeys.length !== EXACT_SIGNED_AUTHORIZATION_PACKAGE_KEYS.length')).toBe(true);
+    });
+
+    it('12.15 materialization failure returns PRODUCTION_INPUT_MATERIALIZATION_FAILED with budget 0', () => {
+      const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
+      const prodFnBody = guardedTransportSource.slice(prodFnStart);
+      const matFailBlock = prodFnBody.slice(
+        prodFnBody.indexOf('if (!immutablePkg || !immutableSourceReceipt)'),
+        prodFnBody.indexOf('// 4. Directly invoke production replay coordinator')
+      );
+      expect(matFailBlock.includes('PRODUCTION_INPUT_MATERIALIZATION_FAILED')).toBe(true);
+      expect(matFailBlock.includes('authorizedBudgetMicroUsd: 0')).toBe(true);
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 13: Immutability, Freezing, and Zero-Normalization Guarantees (10 tests)
+  // ==========================================================================
+  describe('13. Immutability, Freezing, and Zero-Normalization Guarantees', () => {
+    it('13.1 materializePayloadSnapshot calls Object.freeze on new snapshot object', () => {
+      expect(guardedTransportSource.includes('return Object.freeze(snapshot) as unknown as CanonicalHumanAuthorizationPayload;')).toBe(true);
+    });
+
+    it('13.2 materializeSourceReceiptSnapshot calls Object.freeze on new snapshot object', () => {
+      expect(guardedTransportSource.includes('return Object.freeze(snapshot) as unknown as RuntimeSourceProvenanceReceipt;')).toBe(true);
+    });
+
+    it('13.3 materializeSignedAuthorizationPackageSnapshot calls Object.freeze on new snapshot object', () => {
+      expect(guardedTransportSource.includes('return Object.freeze(snapshot) as unknown as SignedHumanAuthorizationPackage;')).toBe(true);
+    });
+
+    it('13.4 outer package snapshot references the immutable payload snapshot, not original', () => {
+      expect(guardedTransportSource.includes('payload: immutablePayload,')).toBe(true);
+    });
+
+    it('13.5 snapshot copying does not call JSON.stringify or JSON.parse', () => {
+      const helperStart = guardedTransportSource.indexOf('// 4.8. PRIVATE EXACT DATA-PROPERTY MATERIALIZATION HELPERS');
+      const helperEnd = guardedTransportSource.indexOf('// 5. REPLAY-PROTECTED PRODUCTION DISPATCH ENTRYPOINT');
+      const helperBody = guardedTransportSource.slice(helperStart, helperEnd);
+      expect(helperBody.includes('JSON.stringify')).toBe(false);
+      expect(helperBody.includes('JSON.parse')).toBe(false);
+    });
+
+    it('13.6 snapshot copying does not call structuredClone', () => {
+      const helperStart = guardedTransportSource.indexOf('// 4.8. PRIVATE EXACT DATA-PROPERTY MATERIALIZATION HELPERS');
+      const helperEnd = guardedTransportSource.indexOf('// 5. REPLAY-PROTECTED PRODUCTION DISPATCH ENTRYPOINT');
+      const helperBody = guardedTransportSource.slice(helperStart, helperEnd);
+      expect(helperBody.includes('structuredClone')).toBe(false);
+    });
+
+    it('13.7 snapshot copying does not trim or modify strings', () => {
+      const helperStart = guardedTransportSource.indexOf('// 4.8. PRIVATE EXACT DATA-PROPERTY MATERIALIZATION HELPERS');
+      const helperEnd = guardedTransportSource.indexOf('// 5. REPLAY-PROTECTED PRODUCTION DISPATCH ENTRYPOINT');
+      const helperBody = guardedTransportSource.slice(helperStart, helperEnd);
+      expect(helperBody.includes('.trim(')).toBe(false);
+    });
+
+    it('13.8 snapshot copying does not reformat or normalize timestamps', () => {
+      const helperStart = guardedTransportSource.indexOf('// 4.8. PRIVATE EXACT DATA-PROPERTY MATERIALIZATION HELPERS');
+      const helperEnd = guardedTransportSource.indexOf('// 5. REPLAY-PROTECTED PRODUCTION DISPATCH ENTRYPOINT');
+      const helperBody = guardedTransportSource.slice(helperStart, helperEnd);
+      expect(helperBody.includes('toISOString')).toBe(false);
+      expect(helperBody.includes('Date.parse')).toBe(false);
+    });
+
+    it('13.9 snapshot copying does not coerce types', () => {
+      const helperStart = guardedTransportSource.indexOf('// 4.8. PRIVATE EXACT DATA-PROPERTY MATERIALIZATION HELPERS');
+      const helperEnd = guardedTransportSource.indexOf('// 5. REPLAY-PROTECTED PRODUCTION DISPATCH ENTRYPOINT');
+      const helperBody = guardedTransportSource.slice(helperStart, helperEnd);
+      expect(helperBody.includes('String(')).toBe(false);
+      expect(helperBody.includes('Number(')).toBe(false);
+      expect(helperBody.includes('Boolean(')).toBe(false);
+    });
+
+    it('13.10 caller objects are never frozen or mutated by guarded transport', () => {
+      expect(guardedTransportSource.includes('Object.freeze(pkg)')).toBe(false);
+      expect(guardedTransportSource.includes('Object.freeze(sourceReceipt)')).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 14: TOCTOU Mutation Resistance Across Async Boundaries (8 tests)
+  // ==========================================================================
+  describe('14. TOCTOU Mutation Resistance Across Async Boundaries', () => {
+    const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
+    const prodFnBody = guardedTransportSource.slice(prodFnStart);
+
+    it('14.1 materialization occurs strictly before coordinateProductionReplayReservation call', () => {
+      const idxMat = prodFnBody.indexOf('materializeSignedAuthorizationPackageSnapshot(');
+      const idxCoord = prodFnBody.indexOf('coordinateProductionReplayReservation(');
+      expect(idxMat).toBeGreaterThan(-1);
+      expect(idxCoord).toBeGreaterThan(idxMat);
+    });
+
+    it('14.2 coordinator receives immutablePkg and immutableSourceReceipt', () => {
+      const idxCoord = prodFnBody.indexOf('coordinateProductionReplayReservation(');
+      const coordCall = prodFnBody.slice(idxCoord, idxCoord + 150);
+      expect(coordCall).toContain('immutablePkg');
+      expect(coordCall).toContain('immutableSourceReceipt');
+    });
+
+    it('14.3 pre-credential expiry check uses immutablePkg.payload.expiresAt', () => {
+      expect(prodFnBody.includes('Date.parse(immutablePkg.payload.expiresAt)')).toBe(true);
+    });
+
+    it('14.4 pre-credential pricing window check uses immutablePkg.payload.pricingWindow', () => {
+      expect(prodFnBody.includes('preCredentialWindow !== immutablePkg.payload.pricingWindow')).toBe(true);
+    });
+
+    it('14.5 post-credential expiry check uses immutablePkg.payload.expiresAt', () => {
+      expect(prodFnBody.includes('const postCredentialExpiryMs = Date.parse(immutablePkg.payload.expiresAt);')).toBe(true);
+    });
+
+    it('14.6 post-credential pricing window check uses immutablePkg.payload.pricingWindow', () => {
+      expect(prodFnBody.includes('postCredentialWindow !== immutablePkg.payload.pricingWindow')).toBe(true);
+    });
+
+    it('14.7 immutable dispatch context is constructed from immutablePkg.payload and frozen', () => {
+      expect(prodFnBody.includes('const immutableDispatchContext: InternalCanonicalDispatchContext = Object.freeze({')).toBe(true);
+      expect(prodFnBody.includes('pricingWindow: immutablePkg.payload.pricingWindow,')).toBe(true);
+      expect(prodFnBody.includes('sourceCommitSha: immutablePkg.payload.sourceCommitSha,')).toBe(true);
+      expect(prodFnBody.includes('sourceTreeSha: immutablePkg.payload.sourceTreeSha,')).toBe(true);
+      expect(prodFnBody.includes('runNonce: immutablePkg.payload.runNonce,')).toBe(true);
+      expect(prodFnBody.includes('maxBudgetMicroUsd: immutablePkg.payload.maxBudgetMicroUsd,')).toBe(true);
+    });
+
+    it('14.8 zero reads of original pkg or sourceReceipt exist after materialization', () => {
+      const afterMat = prodFnBody.slice(prodFnBody.indexOf('const immutableSourceReceipt = materializeSourceReceiptSnapshot'));
+      // Search for any access to pkg. or sourceReceipt. after materialization
+      expect(afterMat.includes('pkg.')).toBe(false);
+      expect(afterMat.includes('pkg?.')).toBe(false);
+      expect(afterMat.includes('sourceReceipt.')).toBe(false);
+      expect(afterMat.includes('sourceReceipt?.')).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 15: Permanent Legacy Non-Production Barrier (7 tests)
+  // ==========================================================================
+  describe('15. Permanent Legacy Non-Production Barrier', () => {
+    it('15.1 LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED is exported', () => {
+      expect(typeof LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED).toBe('boolean');
+    });
+
+    it('15.2 LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED is compile-time false', () => {
+      expect(LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED).toBe(false);
+    });
+
+    it('15.3 legacy executeGuardedDeepSeekCertificationTransport returns LIVE_EXECUTION_BLOCKED with permanent barrier error', async () => {
+      const result = await executeGuardedDeepSeekCertificationTransport({
+        authorization: {
+          authorizationVersion: '1.0.0-legacy',
+          authorityId: 'legacy',
+          issuedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 3600000).toISOString(),
+          targetProgram: 'PROGRAM_A12B2C_CERTIFICATION_OFF_PEAK',
+          pricingWindow: 'OFF_PEAK',
+          candidateId: 'legacy',
+          sourceCommitSha: 'a'.repeat(40),
+          sourceTreeSha: 'b'.repeat(40),
+          specificationVersion: '1.0.0-successor',
+          maxBudgetMicroUsd: 50000,
+          runNonce: 'NONCE',
+          singleUse: true,
+          authorizationDigestReference: 'c'.repeat(64),
+        } as any,
+        pricingWindow: 'OFF_PEAK',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+      expect(result.failureCategory).toBe('AUTHORIZATION_BINDING_FAILURE');
+    });
+
+    it('15.4 legacy barrier is structurally checked in executeGuardedDeepSeekCertificationTransport', () => {
+      const legacyStart = guardedTransportSource.indexOf('export async function executeGuardedDeepSeekCertificationTransport');
+      const legacyEnd = guardedTransportSource.indexOf('async function executeCanonicalDispatchAfterCredential');
+      const legacyBody = guardedTransportSource.slice(legacyStart, legacyEnd);
+
+      expect(legacyBody.includes('if (!LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED)')).toBe(true);
+      expect(legacyBody.includes('LEGACY_GUARDED_TRANSPORT_PERMANENTLY_NON_PRODUCTION')).toBe(true);
+    });
+
+    it('15.5 legacy barrier is checked before validateLiveTransportPreflight', () => {
+      const legacyStart = guardedTransportSource.indexOf('export async function executeGuardedDeepSeekCertificationTransport');
+      const legacyEnd = guardedTransportSource.indexOf('async function executeCanonicalDispatchAfterCredential');
+      const legacyBody = guardedTransportSource.slice(legacyStart, legacyEnd);
+
+      const idxLegacyBarrier = legacyBody.indexOf('if (!LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED)');
+      const idxPreflight = legacyBody.indexOf('validateLiveTransportPreflight(');
+
+      expect(idxLegacyBarrier).toBeGreaterThan(-1);
+      expect(idxPreflight).toBeGreaterThan(idxLegacyBarrier);
+    });
+
+    it('15.6 legacy barrier is checked before getRuntimeCredential', () => {
+      const legacyStart = guardedTransportSource.indexOf('export async function executeGuardedDeepSeekCertificationTransport');
+      const legacyEnd = guardedTransportSource.indexOf('async function executeCanonicalDispatchAfterCredential');
+      const legacyBody = guardedTransportSource.slice(legacyStart, legacyEnd);
+
+      const idxLegacyBarrier = legacyBody.indexOf('if (!LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED)');
+      const idxCredential = legacyBody.indexOf('options.getRuntimeCredential');
+
+      expect(idxLegacyBarrier).toBeGreaterThan(-1);
+      expect(idxCredential).toBeGreaterThan(idxLegacyBarrier);
+    });
+
+    it('15.7 production entrypoint does NOT reference LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED', () => {
+      const prodFnStart = guardedTransportSource.indexOf('export async function executeProductionReplayProtectedDeepSeekCertificationTransport');
+      const prodFnBody = guardedTransportSource.slice(prodFnStart);
+
+      expect(prodFnBody.includes('LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED')).toBe(false);
     });
   });
 });
