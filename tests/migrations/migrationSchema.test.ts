@@ -26,6 +26,7 @@ describe('Cloudflare D1 Migration Schema & Source of Truth Verification', () => 
     expect(files).toContain('0005_appointment_concurrency_hardening.sql');
     expect(files).toContain('0006_appointment_identity_resource_hardening.sql');
     expect(files).toContain('0007_ai_run_protocol_hardening.sql');
+    expect(files).toContain('0008_authorization_replay_ledger.sql');
   });
 
   it('Legacy src/db/migrations directory must not exist or be referenced for deployment', () => {
@@ -92,5 +93,31 @@ describe('Cloudflare D1 Migration Schema & Source of Truth Verification', () => 
     expect(migration1).not.toContain('estimated_deal_value REAL');
     expect(migration1).not.toContain('estimated_monthly_loss REAL');
     expect(migration1).not.toContain('revenue_recovered_amount REAL');
+  });
+
+  it('Migration 0008 must contain canonical authorization_replay_ledger table and constraints', () => {
+    const migration8Path = path.join(migrationsDir, '0008_authorization_replay_ledger.sql');
+    expect(fs.existsSync(migration8Path)).toBe(true);
+    const migration8 = fs.readFileSync(migration8Path, 'utf-8');
+
+    // Canonical table definition
+    expect(migration8).toContain('CREATE TABLE authorization_replay_ledger');
+    expect(migration8).not.toContain('CREATE TABLE IF NOT EXISTS authorization_replay_ledger');
+
+    // Required columns
+    expect(migration8).toContain('replay_key TEXT PRIMARY KEY');
+    expect(migration8).toContain('ledger_version');
+    expect(migration8).toContain('authorization_payload_digest_sha256');
+    expect(migration8).toContain('authority_id');
+    expect(migration8).toContain('key_version');
+    expect(migration8).toContain('run_nonce');
+    expect(migration8).toContain('expires_at');
+    expect(migration8).toContain('expires_at_epoch_ms');
+    expect(migration8).toContain('reserved_at');
+
+    // Safety and architecture constraints
+    expect(migration8).not.toContain('WITHOUT ROWID');
+    expect(migration8).not.toContain('UNIQUE'); // replay_key PRIMARY KEY alone provides uniqueness
+    expect(migration8).toContain('CREATE INDEX idx_authorization_replay_ledger_expires_at_epoch_ms');
   });
 });
