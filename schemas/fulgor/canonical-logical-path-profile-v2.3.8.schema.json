@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fulgor:CanonicalLogicalPathProfileV2_3_8",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "path_profile_id": {"type": "string", "enum": ["FULGOR_LOGICAL_PATH_V2_3_8"], "maxLength": 104857600},
+    "separator_standard": {"type": "string", "enum": ["FORWARD_SLASH"], "maxLength": 104857600},
+    "absolute_paths_permitted": {"type": "boolean", "const": false},
+    "device_namespace_permitted": {"type": "boolean", "const": false},
+    "traversal_tokens_permitted": {"type": "boolean", "const": false}
+  },
+  "required": ["path_profile_id", "separator_standard", "absolute_paths_permitted", "device_namespace_permitted", "traversal_tokens_permitted"]
+}

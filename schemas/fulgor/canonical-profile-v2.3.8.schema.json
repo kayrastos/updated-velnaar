@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fulgor:FulgorCanonicalProfileV2_3_8",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "canonical_profile_id": {"type": "string", "enum": ["FULGOR_JCS_V2_3_8"], "maxLength": 104857600},
+    "ruleset_version": {"type": "string", "enum": ["2.3.8"], "maxLength": 104857600},
+    "target_format": {"type": "string", "enum": ["RFC8785_JCS"], "maxLength": 104857600},
+    "number_representation": {"type": "string", "enum": ["IEEE754_STRICT_INTEGER_LIMIT"], "maxLength": 104857600},
+    "max_payload_bytes": {"type": "integer", "minimum": 1, "maximum": 104857600}
+  },
+  "required": ["canonical_profile_id", "ruleset_version", "target_format", "number_representation", "max_payload_bytes"]
+}

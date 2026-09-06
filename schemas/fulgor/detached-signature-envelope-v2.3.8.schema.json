@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fulgor:DetachedSignatureEnvelopeV2_3_8",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protected_header": {"$ref": "urn:fulgor:ProtectedHeaderV2_3_8"},
+    "signature": {"type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$", "maxLength": 104857600}
+  },
+  "required": ["protected_header", "signature"]
+}

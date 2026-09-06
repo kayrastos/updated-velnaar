@@ -1,0 +1,34 @@
+from __future__ import annotations
+
+from enum import StrEnum
+
+
+class FulgorErrorCode(StrEnum):
+    INVALID_JSON = "INVALID_JSON"
+    DUPLICATE_JSON_KEY = "DUPLICATE_JSON_KEY"
+    INVALID_UTF8 = "INVALID_UTF8"
+    NON_CANONICAL_JSON = "NON_CANONICAL_JSON"
+    INVALID_JSON_VALUE = "INVALID_JSON_VALUE"
+    PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
+    INVALID_LOGICAL_PATH = "INVALID_LOGICAL_PATH"
+    CASEFOLD_PATH_COLLISION = "CASEFOLD_PATH_COLLISION"
+    UNREGISTERED_DOMAIN = "UNREGISTERED_DOMAIN"
+    DOMAIN_OWNER_MISMATCH = "DOMAIN_OWNER_MISMATCH"
+    INVALID_PROFILE = "INVALID_PROFILE"
+    INVALID_HEADER = "INVALID_HEADER"
+    INVALID_ENVELOPE = "INVALID_ENVELOPE"
+    INVALID_BASE64 = "INVALID_BASE64"
+    INVALID_PUBLIC_KEY = "INVALID_PUBLIC_KEY"
+    INVALID_SIGNATURE = "INVALID_SIGNATURE"
+    PAYLOAD_DIGEST_MISMATCH = "PAYLOAD_DIGEST_MISMATCH"
+    HEADER_BINDING_MISMATCH = "HEADER_BINDING_MISMATCH"
+    UNSUPPORTED_PAYLOAD_TYPE = "UNSUPPORTED_PAYLOAD_TYPE"
+
+
+class FulgorValidationError(ValueError):
+    """Fail-closed error with a stable, machine-readable reason."""
+
+    def __init__(self, code: FulgorErrorCode, detail: str) -> None:
+        self.code = code
+        self.detail = detail
+        super().__init__(f"{code}: {detail}")

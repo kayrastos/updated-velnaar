@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fulgor:FulgorEd25519ProfileV2_3_8",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "ed25519_profile_id": {"type": "string", "enum": ["FULGOR_ED25519_STRICT_V2_3_8"], "maxLength": 104857600},
+    "public_key_bytes": {"type": "integer", "const": 32, "minimum": 0, "maximum": 9007199254740991},
+    "signature_bytes": {"type": "integer", "const": 64, "minimum": 0, "maximum": 9007199254740991},
+    "curve": {"type": "string", "enum": ["Edwards25519"], "maxLength": 104857600},
+    "algorithm_agility_permitted": {"type": "boolean", "const": false}
+  },
+  "required": ["ed25519_profile_id", "public_key_bytes", "signature_bytes", "curve", "algorithm_agility_permitted"]
+}

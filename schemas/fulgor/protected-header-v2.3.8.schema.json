@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fulgor:ProtectedHeaderV2_3_8",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "string", "enum": ["2.3.8"], "maxLength": 104857600},
+    "payload_type": {"enum": ["SafetyTrustPolicyPayloadV2_3_8", "EvidenceSignerCertificatePayloadV2_3_8", "FinalEvidencePayloadV2_3_8", "HumanDecisionV2_3_8", "SafetyKernelDecisionV2_3_8", "ModelArtifactAttestationPayloadV2_3_8", "ExecutionBundleAttestationPayloadV2_3_8", "RuntimeObservationV2_3_8", "ProvenanceValidationRegistryV2_3_8", "ActionScopedCapabilityV2_3_8", "ActionResultV2_3_8"]},
+    "purpose": {"type": "string", "enum": ["ATTESTATION", "POLICY", "CERTIFICATE", "EVIDENCE", "DECISION", "ACTION", "OBSERVATION"], "maxLength": 104857600},
+    "scope_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$", "maxLength": 104857600},
+    "authority_id": {"type": "string", "pattern": "^[0-9a-f]{64}$", "maxLength": 104857600},
+    "key_id": {"type": "string", "pattern": "^[0-9a-f]{64}$", "maxLength": 104857600},
+    "policy_epoch": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "serial": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "issued_at": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "not_before": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "not_after": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "subject_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$", "maxLength": 104857600},
+    "nonce": {"type": "string", "pattern": "^[0-9a-f]{64}$", "maxLength": 104857600},
+    "content_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$", "maxLength": 104857600},
+    "root_generation": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+  },
+  "required": ["schema_version", "payload_type", "purpose", "scope_digest", "authority_id", "key_id", "policy_epoch", "serial", "issued_at", "not_before", "not_after", "subject_digest", "nonce", "content_digest", "root_generation"]
+}
