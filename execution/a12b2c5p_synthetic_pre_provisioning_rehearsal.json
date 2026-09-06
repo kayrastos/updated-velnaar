@@ -7,26 +7,39 @@
 
   "auditVersion": "a12b2c5p-v1",
 
-  "preProvisioningAuditImplemented": true,
+  "syntheticKeypairTestOnly": true,
+  "syntheticPrivateKeyPersisted": false,
+  "syntheticPrivateKeyCommitted": false,
+  "syntheticPrivateKeyEnteredProductionSource": false,
+
+  "syntheticPublicAuthorityValidationRehearsed": true,
+  "canonicalProvisioningRecordRehearsed": true,
+  "canonicalProvisioningCandidateRehearsed": true,
+  "manualHandoffReceiptRehearsed": true,
+  "candidateReceiptCrossBindingRehearsed": true,
+
+  "genericOfflineHumanAuthorizationCryptoRehearsed": true,
+  "productionVerifierFailClosedWhileUnprovisioned": true,
+
   "preProvisioningAuditCanAuthorizeProvisioning": false,
-  "rehearsalKeypairType": "EPHEMERAL_SYNTHETIC_MEMORY_ONLY",
 
-  "realProductionPrivateKeyGenerated": false,
-  "realProductionPublicTrustAnchorProvisioned": false,
   "productionAuthorityRegistryEntryCount": 0,
-
-  "productionTrustAnchorSlotPopulated": false,
+  "productionAuthorityTrustAnchorProvisioned": false,
+  "productionTrustAnchorProvisioningReady": false,
   "productionTrustAnchorSlotReady": false,
+  "productionTrustAnchorSlotPopulated": false,
 
-  "guardedSourceAttestationReady": false,
-  "guardedHumanAuthAttestationReady": false,
-  "canaryLiveExecutionEnabled": false,
+  "sourceAttestationReady": false,
+  "humanAuthorizationAttestationReady": false,
+  "liveExecutionEnabled": false,
 
   "providerNetworkCalls": 0,
-  "externalNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
 
-  "genericOfflineVerifierRehearsalPassed": true,
-  "productionVerifierFailsClosedConfirmed": true,
+  "realProductionPrivateKeyGenerated": false,
+  "realProductionPublicKeyProvisioned": false,
 
-  "finalStatus": "A12B2C5P_SYNTHETIC_REHEARSAL_VERIFIED_FAIL_CLOSED_NOT_LIVE"
+  "successorActivated": false,
+
+  "finalStatus": "A12B2C5P_SYNTHETIC_PRE_PROVISIONING_REHEARSAL_PASS_PENDING_INDEPENDENT_VERIFICATION"
 }
