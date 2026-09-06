@@ -31,7 +31,7 @@ import {
   computeCanonicalTaskSetHash,
   computeFixtureSetHash,
 } from './deepSeekLiveCertificationTransportContract';
-import { GUARDED_TRANSPORT_MODULE_VERSION } from './deepSeekGuardedLiveTransport';
+import { GUARDED_TRANSPORT_MODULE_VERSION } from './deepSeekGuardedTransportIdentity';
 import {
   SUCCESSOR_SPECIFICATION_VERSION,
 } from './deepSeekSingleProviderCertificationSpecification';

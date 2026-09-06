@@ -1,0 +1,60 @@
+{
+  "phase": "A.12B.2C-5U.2",
+  "title": "Same-Invocation Replay-Protected Guarded Transport Integration",
+  "status": "A12B2C5U2_REPLAY_PROTECTED_GUARDED_TRANSPORT_PASS_PENDING_INDEPENDENT_SECURITY_REVIEW",
+  "timestampUtc": "2026-09-06T14:34:49.374Z",
+  "git": {
+    "baseCommit": "276f127e88f34aab5dee80b153f2d784b5d4ef58",
+    "baseTree": "8a7b291df30cdbf8b022c809408ef58639c54819"
+  },
+  "guardrails": {
+    "strictlyOffline": true,
+    "zeroDeepSeekCalls": true,
+    "zeroGeminiCalls": true,
+    "zeroProviderCalls": true,
+    "zeroExternalNetworkCalls": true,
+    "zeroRealD1Calls": true,
+    "zeroKeysProvisioned": true,
+    "zeroTrustAnchorsProvisioned": true,
+    "liveExecutionCategoricallyBlocked": true,
+    "circularDependencyCycleBroken": true
+  },
+  "architecture": {
+    "transportIdentityModule": "worker/ai/canary/deepSeekGuardedTransportIdentity.ts",
+    "guardedTransportModule": "worker/ai/canary/deepSeekGuardedLiveTransport.ts",
+    "attestationModule": "worker/ai/canary/deepSeekCertificationAttestation.ts",
+    "coordinatorModule": "worker/ai/canary/deepSeekProductionReplayCoordinator.ts",
+    "productionEntrypoint": "executeProductionReplayProtectedDeepSeekCertificationTransport",
+    "parameterTuple": [
+      "db: D1Database",
+      "pkg: SignedHumanAuthorizationPackage",
+      "sourceReceipt: RuntimeSourceProvenanceReceipt",
+      "getRuntimeCredential: () => Promise<DeepSeekRuntimeCredential> | DeepSeekRuntimeCredential"
+    ],
+    "parameterCount": 4,
+    "privateDispatchHelper": "executeCanonicalDispatchAfterCredential",
+    "privateHelperExported": false,
+    "privateHelperReExportedInIndex": false,
+    "portableTrustTokenCreated": false,
+    "callerReplayInjectionSupported": false,
+    "singleAttemptPolicyEnforced": true,
+    "executionOrder": [
+      "1. authoritative global live gate",
+      "2. coordinateProductionReplayReservation(db, pkg, sourceReceipt)",
+      "3. require readyForCredentialResolution === true",
+      "4. pre-credential authorization expiry recheck",
+      "5. pre-credential pricing-window recheck",
+      "6. evaluate getRuntimeCredential() once",
+      "7. post-credential authorization expiry recheck",
+      "8. post-credential pricing-window recheck",
+      "9. executeCanonicalDispatchAfterCredential with enforceFirstInvocationWindowCheck: true"
+    ]
+  },
+  "verification": {
+    "typecheck": "PASS",
+    "targetedVitestTests": "PASS",
+    "fullSuite": "PASS",
+    "lint": "PASS",
+    "build": "PASS"
+  }
+}

@@ -25,6 +25,11 @@
  */
 
 import crypto from 'node:crypto';
+import type { D1Database } from '@cloudflare/workers-types';
+import { GUARDED_TRANSPORT_MODULE_VERSION } from './deepSeekGuardedTransportIdentity';
+import type { SignedHumanAuthorizationPackage } from './deepSeekCertificationAttestation';
+import type { RuntimeSourceProvenanceReceipt } from './deepSeekTrustedRuntimeSourceProvenance';
+import { coordinateProductionReplayReservation } from './deepSeekProductionReplayCoordinator';
 import {
   CANARY_LIVE_EXECUTION_ENABLED,
   CANARY_LIVE_EXECUTION_STATE,
@@ -83,7 +88,7 @@ import { EvaluationScorer } from '../evaluation/evaluationScorer';
 // 1. MODULE CONSTANTS
 // ============================================================================
 
-export const GUARDED_TRANSPORT_MODULE_VERSION = '1.0.0-guarded' as const;
+export { GUARDED_TRANSPORT_MODULE_VERSION };
 export const GUARDED_DISPATCH_ENDPOINT = SEALED_ENDPOINT; // 'https://api.deepseek.com/v1/chat/completions'
 export const GUARDED_DISPATCH_METHOD = SEALED_METHOD;     // 'POST'
 export const GUARDED_DISPATCH_MODEL = SEALED_MODEL;       // 'deepseek-v4-flash'
@@ -763,13 +768,44 @@ export async function executeGuardedDeepSeekCertificationTransport(
     };
   }
 
-  // ==========================================================================
-  // GATE BARRIER 6: SEQUENTIAL EXECUTION OF 7 CANONICAL TASKS
-  // ==========================================================================
+  // Delegate to private canonical dispatch helper
+  return executeCanonicalDispatchAfterCredential(
+    {
+      pricingWindow: options.pricingWindow,
+      sourceCommitSha: options.authorization.sourceCommitSha,
+      sourceTreeSha: options.authorization.sourceTreeSha,
+      runNonce: options.authorization.runNonce,
+      maxBudgetMicroUsd: options.authorization.maxBudgetMicroUsd,
+      enforceFirstInvocationWindowCheck: false,
+    },
+    credential,
+    credentialReads
+  );
+}
+
+// ============================================================================
+// 4.5. PRIVATE CANONICAL DISPATCH HELPER (NOT EXPORTED)
+// ============================================================================
+
+interface InternalCanonicalDispatchContext {
+  readonly pricingWindow: 'OFF_PEAK' | 'PEAK';
+  readonly sourceCommitSha: string;
+  readonly sourceTreeSha: string;
+  readonly runNonce: string;
+  readonly maxBudgetMicroUsd: number;
+  readonly enforceFirstInvocationWindowCheck: boolean;
+}
+
+async function executeCanonicalDispatchAfterCredential(
+  context: InternalCanonicalDispatchContext,
+  credential: DeepSeekRuntimeCredential,
+  credentialReads: number
+): Promise<GuardedTransportExecutionResult> {
+  const options = { pricingWindow: context.pricingWindow };
   const candidateId =
-    options.pricingWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_CANDIDATE_ID : SEALED_PEAK_CANDIDATE_ID;
+    context.pricingWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_CANDIDATE_ID : SEALED_PEAK_CANDIDATE_ID;
   const targetProgram =
-    options.pricingWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_PROGRAM_ID : SEALED_PEAK_PROGRAM_ID;
+    context.pricingWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_PROGRAM_ID : SEALED_PEAK_PROGRAM_ID;
 
   const invocationResponses: DeepSeekParsedProviderResponse[] = [];
   const invocationRecords: InvocationRecordSummary[] = [];
@@ -784,8 +820,10 @@ export async function executeGuardedDeepSeekCertificationTransport(
     // Fresh UTC clock observation immediately before EACH invocation dispatch
     const taskClock = new Date();
 
-    // Window Crossing Check before invocation 2..7 using fresh taskClock
-    if (invocationIndex > 1) {
+    // Window Crossing Check before invocation dispatch
+    // In production path (enforceFirstInvocationWindowCheck === true), task 1 also checked.
+    // In legacy path, checked for invocationIndex > 1.
+    if (invocationIndex > 1 || context.enforceFirstInvocationWindowCheck) {
       const crossingCheck = checkWindowCrossing(
         options.pricingWindow,
         taskClock
@@ -796,7 +834,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
           status: 'WINDOW_CROSSING_TERMINATED',
           failureCategory: 'PRICING_WINDOW_CHANGED',
           errors: [
-            `PRICING_WINDOW_CHANGED: Pricing window shifted from '${options.pricingWindow}' to '${crossingCheck.currentWindow}' during task ${invocationIndex}. Fail-closed.`,
+            `PRICING_WINDOW_CHANGED: Pricing window shifted from '${context.pricingWindow}' to '${crossingCheck.currentWindow}' during task ${invocationIndex}. Fail-closed.`,
           ],
           providerNetworkCalls,
           credentialReads,
@@ -806,7 +844,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
           invocationResponses,
           invocationRecords,
           observedTotalCostMicroUsd,
-          authorizedBudgetMicroUsd: options.authorization.maxBudgetMicroUsd,
+          authorizedBudgetMicroUsd: context.maxBudgetMicroUsd,
           aggregateSemanticScore: 0,
           allTasksPassed: false,
           allSchemasValid: false,
@@ -819,7 +857,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
     const descriptor = buildSealedLiveRequestDescriptor({
       taskType,
       invocationIndex,
-      pricingWindow: options.pricingWindow,
+      pricingWindow: context.pricingWindow,
     });
 
     // Verify request payload SHA256 integrity before dispatch
@@ -840,7 +878,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
         invocationResponses,
         invocationRecords,
         observedTotalCostMicroUsd,
-        authorizedBudgetMicroUsd: options.authorization.maxBudgetMicroUsd,
+        authorizedBudgetMicroUsd: context.maxBudgetMicroUsd,
         aggregateSemanticScore: 0,
         allTasksPassed: false,
         allSchemasValid: false,
@@ -897,7 +935,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
         invocationResponses,
         invocationRecords,
         observedTotalCostMicroUsd,
-        authorizedBudgetMicroUsd: options.authorization.maxBudgetMicroUsd,
+        authorizedBudgetMicroUsd: context.maxBudgetMicroUsd,
         aggregateSemanticScore: 0,
         allTasksPassed: false,
         allSchemasValid: false,
@@ -923,7 +961,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
         invocationResponses,
         invocationRecords,
         observedTotalCostMicroUsd,
-        authorizedBudgetMicroUsd: options.authorization.maxBudgetMicroUsd,
+        authorizedBudgetMicroUsd: context.maxBudgetMicroUsd,
         aggregateSemanticScore: 0,
         allTasksPassed: false,
         allSchemasValid: false,
@@ -935,7 +973,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
     const recordResult = mapResponseToInvocationRecord({
       parsedResponse,
       taskType,
-      pricingWindow: options.pricingWindow,
+      pricingWindow: context.pricingWindow,
       durationMs: rawResponseInput.durationMs ?? 0,
       candidateId,
     });
@@ -944,13 +982,13 @@ export async function executeGuardedDeepSeekCertificationTransport(
     observedTotalCostMicroUsd += recordResult.observedCostMicroUsd;
 
     // Check budget ceiling breach after every single call
-    if (observedTotalCostMicroUsd > options.authorization.maxBudgetMicroUsd) {
+    if (observedTotalCostMicroUsd > context.maxBudgetMicroUsd) {
       return {
         success: false,
         status: 'BUDGET_BREACH_TERMINATED',
         failureCategory: 'BUDGET_BREACH',
         errors: [
-          `BUDGET_BREACH: Cumulative observed cost (${observedTotalCostMicroUsd} microUSD) exceeded authorized budget (${options.authorization.maxBudgetMicroUsd} microUSD).`,
+          `BUDGET_BREACH: Cumulative observed cost (${observedTotalCostMicroUsd} microUSD) exceeded authorized budget (${context.maxBudgetMicroUsd} microUSD).`,
         ],
         providerNetworkCalls,
         credentialReads,
@@ -960,7 +998,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
         invocationResponses,
         invocationRecords,
         observedTotalCostMicroUsd,
-        authorizedBudgetMicroUsd: options.authorization.maxBudgetMicroUsd,
+        authorizedBudgetMicroUsd: context.maxBudgetMicroUsd,
         aggregateSemanticScore: 0,
         allTasksPassed: false,
         allSchemasValid: false,
@@ -983,7 +1021,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
         invocationResponses,
         invocationRecords,
         observedTotalCostMicroUsd,
-        authorizedBudgetMicroUsd: options.authorization.maxBudgetMicroUsd,
+        authorizedBudgetMicroUsd: context.maxBudgetMicroUsd,
         aggregateSemanticScore: 0,
         allTasksPassed: false,
         allSchemasValid: false,
@@ -992,9 +1030,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
     }
   }
 
-  // ==========================================================================
-  // GATE BARRIER 5: POST-EXECUTION QUALITY GATE EVALUATION
-  // ==========================================================================
+  // POST-EXECUTION QUALITY GATE EVALUATION
   const allTasksPassed = invocationRecords.every((r) => r.success);
   const allSchemasValid = invocationRecords.every((r) => r.schemaValid);
   const aggregateSemanticScore =
@@ -1028,7 +1064,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
       invocationResponses,
       invocationRecords,
       observedTotalCostMicroUsd,
-      authorizedBudgetMicroUsd: options.authorization.maxBudgetMicroUsd,
+      authorizedBudgetMicroUsd: context.maxBudgetMicroUsd,
       aggregateSemanticScore,
       allTasksPassed,
       allSchemasValid,
@@ -1036,22 +1072,18 @@ export async function executeGuardedDeepSeekCertificationTransport(
     };
   }
 
-  // ==========================================================================
-  // GATE BARRIER 8: BUILD INTERMEDIATE EVIDENCE CANDIDATE (NOT CERTIFIED)
-  // Note: sourceCommitSha and sourceTreeSha originate from the future trusted
-  // authorization/attestation package rather than untrusted direct caller inputs.
-  // ==========================================================================
+  // BUILD INTERMEDIATE EVIDENCE CANDIDATE (NOT CERTIFIED)
   const candidate = buildLiveCertificationEvidenceCandidate({
-    pricingWindow: options.pricingWindow,
+    pricingWindow: context.pricingWindow,
     candidateId,
     targetProgram,
-    sourceCommitSha: options.authorization.sourceCommitSha,
-    sourceTreeSha: options.authorization.sourceTreeSha,
-    runNonce: options.authorization.runNonce,
+    sourceCommitSha: context.sourceCommitSha,
+    sourceTreeSha: context.sourceTreeSha,
+    runNonce: context.runNonce,
     invocationResponses,
     invocationRecords,
     observedTotalCostMicroUsd,
-    authorizedBudgetMicroUsd: options.authorization.maxBudgetMicroUsd,
+    authorizedBudgetMicroUsd: context.maxBudgetMicroUsd,
   });
 
   return {
@@ -1066,10 +1098,311 @@ export async function executeGuardedDeepSeekCertificationTransport(
     invocationResponses,
     invocationRecords,
     observedTotalCostMicroUsd,
-    authorizedBudgetMicroUsd: options.authorization.maxBudgetMicroUsd,
+    authorizedBudgetMicroUsd: context.maxBudgetMicroUsd,
     aggregateSemanticScore,
     allTasksPassed: true,
     allSchemasValid: true,
-    finalCertificationEligible: false, // Invariant: Execution cannot directly certify!
+    finalCertificationEligible: false,
   };
+}
+
+
+// ============================================================================
+// 5. REPLAY-PROTECTED PRODUCTION DISPATCH ENTRYPOINT (PHASE 5U.2)
+// ============================================================================
+
+/**
+ * Replay-Protected Production DeepSeek Certification Transport Dispatcher.
+ *
+ * CRITICAL ARCHITECTURAL CONSTRAINTS & EXECUTION ORDER:
+ * 1. Exactly 4 typed parameters: db, pkg, sourceReceipt, getRuntimeCredential.
+ * 2. Strictly fails closed if extra or missing arguments are provided.
+ * 3. Step 1: Authoritative global live gate MUST be evaluated FIRST.
+ *           If disabled, terminates immediately without calling coordinator or D1.
+ * 4. Step 2: Directly invokes coordinateProductionReplayReservation inside same invocation.
+ *           Does NOT accept caller-supplied replay result or trust tokens.
+ * 5. Step 3: Requires coordinator status === 'READY_FOR_CREDENTIAL_RESOLUTION'.
+ * 6. Step 4: Pre-credential runtime authorization expiry recheck.
+ * 7. Step 5: Pre-credential runtime pricing-window recheck.
+ * 8. Step 6: Evaluates getRuntimeCredential() exactly once (catches and wraps exceptions).
+ * 9. Step 7: Post-credential runtime authorization expiry recheck.
+ * 10. Step 8: Post-credential runtime pricing-window recheck.
+ * 11. Step 9: Delegates to private canonical dispatch helper with enforceFirstInvocationWindowCheck: true.
+ *
+ * Invariants:
+ * - NO caller options object.
+ * - NO caller pricingWindow, clock, expectedCommit, expectedTree, or backend.
+ * - Policy parameters derive exclusively from verified pkg.payload.
+ * - Single-attempt policy: zero retries, zero compensating queries, terminal replay denial.
+ */
+export async function executeProductionReplayProtectedDeepSeekCertificationTransport(
+  db: D1Database,
+  pkg: SignedHumanAuthorizationPackage,
+  sourceReceipt: RuntimeSourceProvenanceReceipt,
+  getRuntimeCredential:
+    () => Promise<DeepSeekRuntimeCredential> | DeepSeekRuntimeCredential
+): Promise<GuardedTransportExecutionResult> {
+  // 1. Strict argument count enforcement (fail closed before any side-effects)
+  if (arguments.length !== 4) {
+    return {
+      success: false,
+      status: 'PREFLIGHT_VALIDATION_FAILED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: [
+        `FORBIDDEN_CALLER_PARAMETER: executeProductionReplayProtectedDeepSeekCertificationTransport accepts exactly 4 parameters (got ${arguments.length})`,
+      ],
+      providerNetworkCalls: 0,
+      credentialReads: 0,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: pkg?.payload?.maxBudgetMicroUsd ?? 0,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // 2. Global Live Gate (FIRST DECISION MANDATE: do NOT invoke coordinator if live execution is false)
+  if (
+    !CANARY_LIVE_EXECUTION_ENABLED ||
+    (CANARY_LIVE_EXECUTION_STATE as string) !== 'LIVE_EXECUTION_ALLOWED'
+  ) {
+    return {
+      success: false,
+      status: 'LIVE_EXECUTION_BLOCKED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: [
+        'CANARY_LIVE_EXECUTION_BLOCKED: Live canary execution is categorically disabled (CANARY_LIVE_EXECUTION_ENABLED === false). Real provider dispatch unreachable.',
+      ],
+      providerNetworkCalls: 0,
+      credentialReads: 0,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: pkg?.payload?.maxBudgetMicroUsd ?? 0,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // 3. Directly invoke production replay coordinator inside the same invocation
+  const replayCoordination = await coordinateProductionReplayReservation(
+    db,
+    pkg,
+    sourceReceipt
+  );
+
+  if (replayCoordination.readyForCredentialResolution !== true) {
+    return {
+      success: false,
+      status: 'PREFLIGHT_VALIDATION_FAILED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: replayCoordination.errors && replayCoordination.errors.length > 0
+        ? replayCoordination.errors
+        : [replayCoordination.failureReason ?? 'REPLAY_COORDINATION_FAILED'],
+      providerNetworkCalls: 0,
+      credentialReads: 0,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: pkg?.payload?.maxBudgetMicroUsd ?? 0,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // 4. Pre-Credential Authorization Expiry Check
+  const preCredentialExpiryMs = Date.parse(pkg.payload.expiresAt);
+  const preCredentialNowMs = Date.now();
+  if (!Number.isFinite(preCredentialExpiryMs) || preCredentialExpiryMs <= preCredentialNowMs) {
+    return {
+      success: false,
+      status: 'PREFLIGHT_VALIDATION_FAILED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: [
+        `AUTHORIZATION_EXPIRED_PRE_CREDENTIAL: Authorization expired at ${pkg.payload.expiresAt} before credential resolution. Zero credential reads.`,
+      ],
+      providerNetworkCalls: 0,
+      credentialReads: 0,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // 5. Pre-Credential Pricing Window Check
+  const preCredentialWindow = getPricingWindow(new Date());
+  if (preCredentialWindow !== pkg.payload.pricingWindow) {
+    return {
+      success: false,
+      status: 'PREFLIGHT_VALIDATION_FAILED',
+      failureCategory: 'PRICING_WINDOW_CHANGED',
+      errors: [
+        `PRICING_WINDOW_CHANGED_PRE_CREDENTIAL: Current pricing window '${preCredentialWindow}' does not match authorized window '${pkg.payload.pricingWindow}'. Zero credential reads.`,
+      ],
+      providerNetworkCalls: 0,
+      credentialReads: 0,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // 6. Credential Resolution (evaluated exactly once after coordinator RESERVED)
+  let credentialReads = 0;
+  let credential: DeepSeekRuntimeCredential;
+
+  try {
+    credentialReads = 1;
+    credential = await getRuntimeCredential();
+  } catch (credErr: unknown) {
+    return {
+      success: false,
+      status: 'PREFLIGHT_VALIDATION_FAILED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: [
+        'CREDENTIAL_RESOLUTION_FAILED: Failed to resolve runtime credential capability.',
+      ],
+      providerNetworkCalls: 0,
+      credentialReads,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  if (
+    !credential ||
+    !credential.apiKey ||
+    typeof credential.apiKey !== 'string' ||
+    credential.apiKey.trim().length === 0
+  ) {
+    return {
+      success: false,
+      status: 'PREFLIGHT_VALIDATION_FAILED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: [
+        'CREDENTIAL_UNAVAILABLE: Valid runtime credential capability required after passing preflight.',
+      ],
+      providerNetworkCalls: 0,
+      credentialReads,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // 7. Post-Credential Authorization Expiry Recheck
+  const postCredentialExpiryMs = Date.parse(pkg.payload.expiresAt);
+  const postCredentialNowMs = Date.now();
+  if (!Number.isFinite(postCredentialExpiryMs) || postCredentialExpiryMs <= postCredentialNowMs) {
+    return {
+      success: false,
+      status: 'PREFLIGHT_VALIDATION_FAILED',
+      failureCategory: 'AUTHORIZATION_BINDING_FAILURE',
+      errors: [
+        `AUTHORIZATION_EXPIRED_POST_CREDENTIAL: Authorization expired at ${pkg.payload.expiresAt} after credential resolution. Provider dispatch blocked.`,
+      ],
+      providerNetworkCalls: 0,
+      credentialReads,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // 8. Post-Credential Pricing Window Recheck
+  const postCredentialWindow = getPricingWindow(new Date());
+  if (postCredentialWindow !== pkg.payload.pricingWindow) {
+    return {
+      success: false,
+      status: 'WINDOW_CROSSING_TERMINATED',
+      failureCategory: 'PRICING_WINDOW_CHANGED',
+      errors: [
+        `PRICING_WINDOW_CHANGED_POST_CREDENTIAL: Pricing window shifted from '${pkg.payload.pricingWindow}' to '${postCredentialWindow}' during credential resolution. Provider dispatch blocked.`,
+      ],
+      providerNetworkCalls: 0,
+      credentialReads,
+      transportAttempts: 0,
+      completedTasks: 0,
+      candidate: null,
+      invocationResponses: [],
+      invocationRecords: [],
+      observedTotalCostMicroUsd: 0,
+      authorizedBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      aggregateSemanticScore: 0,
+      allTasksPassed: false,
+      allSchemasValid: false,
+      finalCertificationEligible: false,
+    };
+  }
+
+  // 9. Execute Canonical 7-Task Dispatch with enforceFirstInvocationWindowCheck: true
+  return executeCanonicalDispatchAfterCredential(
+    {
+      pricingWindow: pkg.payload.pricingWindow,
+      sourceCommitSha: pkg.payload.sourceCommitSha,
+      sourceTreeSha: pkg.payload.sourceTreeSha,
+      runNonce: pkg.payload.runNonce,
+      maxBudgetMicroUsd: pkg.payload.maxBudgetMicroUsd,
+      enforceFirstInvocationWindowCheck: true,
+    },
+    credential,
+    credentialReads
+  );
 }
