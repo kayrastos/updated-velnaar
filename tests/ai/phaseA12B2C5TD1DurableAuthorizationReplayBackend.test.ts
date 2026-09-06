@@ -623,7 +623,7 @@ describe('Phase A.12B.2C-5T: Cloudflare D1 Durable Authorization Replay Backend 
   // 10. SUCCESSFUL RESERVATION (RESERVED)
   // ==========================================================================
   describe('10. Successful Reservation Classification (RESERVED)', () => {
-    it('60. returns RESERVED when success is true, 1 row returned, changes is 1', async () => {
+    it('60. returns RESERVED when success is true, 1 row returned', async () => {
       const req = createValidTestReservationRequest();
       const { db } = createMockD1Database({
         result: {
@@ -687,7 +687,7 @@ describe('Phase A.12B.2C-5T: Cloudflare D1 Durable Authorization Replay Backend 
   // 11. ALREADY RESERVED CLASSIFICATION (ALREADY_RESERVED)
   // ==========================================================================
   describe('11. Already Reserved Classification (ALREADY_RESERVED)', () => {
-    it('64. returns ALREADY_RESERVED when success is true, 0 rows returned, changes is 0', async () => {
+    it('64. returns ALREADY_RESERVED when success is true, 0 rows returned', async () => {
       const req = createValidTestReservationRequest();
       const { db } = createMockD1Database({
         result: {
@@ -755,44 +755,69 @@ describe('Phase A.12B.2C-5T: Cloudflare D1 Durable Authorization Replay Backend 
       { name: 'result is null', result: null },
       { name: 'result is undefined', result: undefined },
       { name: 'result is number', result: 42 },
-      { name: 'result.success is false', result: { success: false, results: [], meta: { changes: 0 } } },
-      { name: 'result.success is undefined', result: { results: [], meta: { changes: 0 } } },
-      { name: 'result.success is null', result: { success: null, results: [], meta: { changes: 0 } } },
-      { name: 'result.results is missing', result: { success: true, meta: { changes: 0 } } },
-      { name: 'result.results is null', result: { success: true, results: null, meta: { changes: 0 } } },
-      { name: 'result.results is object not array', result: { success: true, results: {}, meta: { changes: 0 } } },
+      { name: 'result.success is false', result: { success: false, results: [], meta: {} } },
+      { name: 'result.success is undefined', result: { results: [], meta: {} } },
+      { name: 'result.success is null', result: { success: null, results: [], meta: {} } },
+      { name: 'result.results is missing', result: { success: true, meta: {} } },
+      { name: 'result.results is null', result: { success: true, results: null, meta: {} } },
+      { name: 'result.results is object not array', result: { success: true, results: {}, meta: {} } },
       {
         name: 'result.results has 2 rows',
-        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }, { replay_key: 'a'.repeat(64) }], meta: { changes: 1 } },
+        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }, { replay_key: 'a'.repeat(64) }], meta: {} },
       },
       {
         name: 'result.results has 3 rows',
-        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }, { replay_key: 'b'.repeat(64) }, { replay_key: 'c'.repeat(64) }], meta: { changes: 1 } },
+        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }, { replay_key: 'b'.repeat(64) }, { replay_key: 'c'.repeat(64) }], meta: {} },
       },
-      { name: 'returned row is null', result: { success: true, results: [null], meta: { changes: 1 } } },
-      { name: 'returned row is non-object', result: { success: true, results: ['row_string'], meta: { changes: 1 } } },
+      { name: 'returned row is null', result: { success: true, results: [null], meta: {} } },
+      { name: 'returned row is non-object', result: { success: true, results: ['row_string'], meta: {} } },
+      { name: 'returned row is array', result: { success: true, results: [['row_array']], meta: {} } },
       {
         name: 'returned row has mismatched replay_key',
-        result: { success: true, results: [{ replay_key: 'f'.repeat(64) }], meta: { changes: 1 } },
+        result: { success: true, results: [{ replay_key: 'f'.repeat(64) }], meta: {} },
       },
       {
         name: 'returned row missing replay_key property',
-        result: { success: true, results: [{ other_col: 'val' }], meta: { changes: 1 } },
+        result: { success: true, results: [{ other_col: 'val' }], meta: {} },
+      },
+      {
+        name: 'returned row with extra property injected',
+        result: { success: true, results: [{ replay_key: 'a'.repeat(64), injected: true }], meta: {} },
       },
       { name: 'result.meta is missing', result: { success: true, results: [{ replay_key: 'a'.repeat(64) }] } },
       { name: 'result.meta is null', result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: null } },
-      { name: 'meta.changes is missing', result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: {} } },
-      { name: 'meta.changes is string 1', result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { changes: '1' } } },
-      { name: 'meta.changes is -1', result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { changes: -1 } } },
-      { name: 'meta.changes is 2', result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { changes: 2 } } },
-      { name: 'meta.changes is float 1.5', result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { changes: 1.5 } } },
+      { name: 'result.meta is array', result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: [] } },
       {
-        name: 'inconsistent: 1 row returned but meta.changes is 0',
-        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { changes: 0 } },
+        name: 'meta.changed_db is non-boolean string',
+        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { changed_db: 'true' } },
       },
       {
-        name: 'inconsistent: 0 rows returned but meta.changes is 1',
-        result: { success: true, results: [], meta: { changes: 1 } },
+        name: 'meta.rows_written is negative',
+        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { rows_written: -1 } },
+      },
+      {
+        name: 'meta.rows_written is float',
+        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { rows_written: 1.5 } },
+      },
+      {
+        name: 'meta.rows_written is string',
+        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { rows_written: '1' } },
+      },
+      {
+        name: 'contradiction: 1 row returned but meta.changed_db is false',
+        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { changed_db: false } },
+      },
+      {
+        name: 'contradiction: 1 row returned but meta.rows_written is 0',
+        result: { success: true, results: [{ replay_key: 'a'.repeat(64) }], meta: { rows_written: 0 } },
+      },
+      {
+        name: 'contradiction: 0 rows returned but meta.changed_db is true',
+        result: { success: true, results: [], meta: { changed_db: true } },
+      },
+      {
+        name: 'contradiction: 0 rows returned but meta.rows_written > 0 (1)',
+        result: { success: true, results: [], meta: { rows_written: 1 } },
       },
     ];
 
@@ -1120,6 +1145,275 @@ describe('Phase A.12B.2C-5T: Cloudflare D1 Durable Authorization Replay Backend 
       expect(artifact.successorActivated).toBe(false);
       expect(artifact.finalStatus).toBe(
         'A12B2C5T_D1_REPLAY_BACKEND_OFFLINE_FOUNDATION_PASS_PENDING_INDEPENDENT_SECURITY_REVIEW'
+      );
+    });
+  });
+
+  // ==========================================================================
+  // 18. PHASE A.12B.2C-5T.1: RETURNING-CARDINALITY & METADATA HARDENING
+  // ==========================================================================
+  describe('18. Phase A.12B.2C-5T.1: RETURNING-Cardinality & Metadata Hardening', () => {
+    it('A. 1 exact RETURNING replay_key row + meta.changes = 7 + changed_db = true + rows_written >= 1 still classifies RESERVED', async () => {
+      const req = createValidTestReservationRequest();
+      const { db } = createMockD1Database({
+        result: {
+          success: true,
+          results: [{ replay_key: req.replayKey }],
+          meta: { changes: 7, changed_db: true, rows_written: 1 },
+        },
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      const res = await backend.reserveIfAbsent(req);
+      expect(res.success).toBe(true);
+      expect(res.status).toBe('RESERVED');
+      expect(res.replayKey).toBe(req.replayKey);
+    });
+
+    it('B. 0 RETURNING rows + meta.changes = 7 + changed_db = false + rows_written = 0 classifies ALREADY_RESERVED', async () => {
+      const req = createValidTestReservationRequest();
+      const { db } = createMockD1Database({
+        result: {
+          success: true,
+          results: [],
+          meta: { changes: 7, changed_db: false, rows_written: 0 },
+        },
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      const res = await backend.reserveIfAbsent(req);
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('ALREADY_RESERVED');
+      expect(res.replayKey).toBe(req.replayKey);
+    });
+
+    it('C. 1 row + changed_db false -> BACKEND_UNAVAILABLE', async () => {
+      const req = createValidTestReservationRequest();
+      const { db } = createMockD1Database({
+        result: {
+          success: true,
+          results: [{ replay_key: req.replayKey }],
+          meta: { changed_db: false },
+        },
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      const res = await backend.reserveIfAbsent(req);
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('BACKEND_UNAVAILABLE');
+    });
+
+    it('D. 1 row + rows_written 0 -> BACKEND_UNAVAILABLE', async () => {
+      const req = createValidTestReservationRequest();
+      const { db } = createMockD1Database({
+        result: {
+          success: true,
+          results: [{ replay_key: req.replayKey }],
+          meta: { rows_written: 0 },
+        },
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      const res = await backend.reserveIfAbsent(req);
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('BACKEND_UNAVAILABLE');
+    });
+
+    it('E. 0 rows + changed_db true -> BACKEND_UNAVAILABLE', async () => {
+      const req = createValidTestReservationRequest();
+      const { db } = createMockD1Database({
+        result: {
+          success: true,
+          results: [],
+          meta: { changed_db: true },
+        },
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      const res = await backend.reserveIfAbsent(req);
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('BACKEND_UNAVAILABLE');
+    });
+
+    it('F. 0 rows + rows_written > 0 -> BACKEND_UNAVAILABLE', async () => {
+      const req = createValidTestReservationRequest();
+      const { db } = createMockD1Database({
+        result: {
+          success: true,
+          results: [],
+          meta: { rows_written: 2 },
+        },
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      const res = await backend.reserveIfAbsent(req);
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('BACKEND_UNAVAILABLE');
+    });
+
+    it('G. returned row with extra field -> BACKEND_UNAVAILABLE', async () => {
+      const req = createValidTestReservationRequest();
+      const { db } = createMockD1Database({
+        result: {
+          success: true,
+          results: [{ replay_key: req.replayKey, injected: true }],
+          meta: {},
+        },
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      const res = await backend.reserveIfAbsent(req);
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('BACKEND_UNAVAILABLE');
+      expect(res.errors[0]).toContain('D1_ROW_MALFORMED');
+    });
+
+    it('H. wrong replay_key -> BACKEND_UNAVAILABLE', async () => {
+      const req = createValidTestReservationRequest();
+      const { db } = createMockD1Database({
+        result: {
+          success: true,
+          results: [{ replay_key: '0'.repeat(64) }],
+          meta: {},
+        },
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      const res = await backend.reserveIfAbsent(req);
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('BACKEND_UNAVAILABLE');
+      expect(res.errors[0]).toContain('D1_REPLAY_KEY_MISMATCH');
+    });
+
+    it('I. missing meta -> BACKEND_UNAVAILABLE', async () => {
+      const req = createValidTestReservationRequest();
+      const { db } = createMockD1Database({
+        result: {
+          success: true,
+          results: [{ replay_key: req.replayKey }],
+        },
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      const res = await backend.reserveIfAbsent(req);
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('BACKEND_UNAVAILABLE');
+      expect(res.errors[0]).toContain('D1_META_INVALID');
+    });
+
+    it('J. weird/large meta.changes by itself cannot turn: RESERVED into ALREADY_RESERVED or vice-versa', async () => {
+      const req = createValidTestReservationRequest();
+      // 1 row + changes = 0 -> still RESERVED (not ALREADY_RESERVED)
+      const { db: db1 } = createMockD1Database({
+        result: {
+          success: true,
+          results: [{ replay_key: req.replayKey }],
+          meta: { changes: 0 },
+        },
+      });
+      const backend1 = new D1AuthorizationReplayBackend(db1);
+      const res1 = await backend1.reserveIfAbsent(req);
+      expect(res1.status).toBe('RESERVED');
+
+      // 0 rows + changes = 1 -> still ALREADY_RESERVED (not RESERVED)
+      const { db: db2 } = createMockD1Database({
+        result: {
+          success: true,
+          results: [],
+          meta: { changes: 1 },
+        },
+      });
+      const backend2 = new D1AuthorizationReplayBackend(db2);
+      const res2 = await backend2.reserveIfAbsent(req);
+      expect(res2.status).toBe('ALREADY_RESERVED');
+
+      // 1 row + changes = 999999 -> still RESERVED
+      const { db: db3 } = createMockD1Database({
+        result: {
+          success: true,
+          results: [{ replay_key: req.replayKey }],
+          meta: { changes: 999999 },
+        },
+      });
+      const backend3 = new D1AuthorizationReplayBackend(db3);
+      const res3 = await backend3.reserveIfAbsent(req);
+      expect(res3.status).toBe('RESERVED');
+    });
+
+    it('K. generic UNIQUE exception remains BACKEND_UNAVAILABLE', async () => {
+      const { db } = createMockD1Database({
+        allThrows: new Error('UNIQUE constraint failed: authorization_replay_ledger.replay_key'),
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      const res = await backend.reserveIfAbsent(createValidTestReservationRequest());
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('BACKEND_UNAVAILABLE');
+      expect(res.status).not.toBe('ALREADY_RESERVED');
+    });
+
+    it('L. only one prepared SQL statement remains executed', async () => {
+      const req = createValidTestReservationRequest();
+      const { db, prepareCalls, allCalls } = createMockD1Database({
+        result: {
+          success: true,
+          results: [{ replay_key: req.replayKey }],
+          meta: {},
+        },
+      });
+      const backend = new D1AuthorizationReplayBackend(db);
+      await backend.reserveIfAbsent(req);
+      expect(prepareCalls.length).toBe(1);
+      expect(allCalls.count).toBe(1);
+    });
+
+    it('M. SQL still contains no SELECT', () => {
+      expect(D1_AUTHORIZATION_REPLAY_RESERVATION_SQL).not.toMatch(/\bSELECT\b/i);
+    });
+
+    it('N. zero network/provider/real-D1 calls', () => {
+      expect(globalFetchCalls).toBe(0);
+    });
+
+    it('O. verifies Phase A.12B.2C-5T.1 repair artifact integrity', () => {
+      const artifactPath = path.resolve(
+        process.cwd(),
+        'execution/a12b2c5t1_d1_classifier_typescript_repair.json'
+      );
+      expect(fs.existsSync(artifactPath)).toBe(true);
+      const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+
+      expect(artifact.phase).toBe('A.12B.2C-5T.1');
+      expect(artifact.artifactType).toBe(
+        'D1_RETURNING_CARDINALITY_CLASSIFIER_AND_TYPESCRIPT_FIXTURE_REPAIR'
+      );
+      expect(artifact.baseCommit).toBe('b6591afd01f298114ea68b877fa76778ffd07404');
+      expect(artifact.baseTree).toBe('8af29d1fef2dc1c0528c93f1c0b17a87d39d5aa5');
+
+      expect(artifact.codexSecurityReviewPassSuperseded).toBe(true);
+      expect(artifact.returningCardinalityPrimaryClassifier).toBe(true);
+      expect(artifact.metaChangesUsedAsExactClassifier).toBe(false);
+      expect(artifact.changedDbUsedOnlyAsConsistencyEvidence).toBe(true);
+      expect(artifact.rowsWrittenUsedOnlyAsConsistencyEvidence).toBe(true);
+      expect(artifact.reservedRequiresExactReturnedReplayKey).toBe(true);
+      expect(artifact.alreadyReservedRequiresSuccessfulZeroReturningRows).toBe(true);
+      expect(artifact.genericDatabaseErrorsClassifiedAsDuplicate).toBe(false);
+      expect(artifact.ambiguousDatabaseOutcomeFailsClosed).toBe(true);
+      expect(artifact.signedAuthorizationPackageProductionSchemaModified).toBe(false);
+      expect(artifact.stalePublicKeyFingerprintTestFixturePropertiesRemoved).toBe(true);
+      expect(artifact.typescriptExcessPropertyRepairApplied).toBe(true);
+      expect(artifact.migration0008Modified).toBe(false);
+
+      expect(artifact.d1ProductionBindingProvisioned).toBe(false);
+      expect(artifact.durableBackendBound).toBe(false);
+      expect(artifact.productionReplayReservationReady).toBe(false);
+
+      expect(artifact.realD1ConcurrentRaceCertified).toBe(false);
+      expect(artifact.realD1DatabaseProvisioned).toBe(false);
+
+      expect(artifact.guardedTransportIntegrated).toBe(false);
+      expect(artifact.sourceAttestationReady).toBe(false);
+      expect(artifact.humanAuthorizationAttestationReady).toBe(false);
+      expect(artifact.liveExecutionEnabled).toBe(false);
+
+      expect(artifact.providerNetworkCalls).toBe(0);
+      expect(artifact.externalNetworkCalls).toBe(0);
+
+      expect(artifact.productionRoutingEnforcementAllowed).toBe(false);
+      expect(artifact.successorActivated).toBe(false);
+
+      expect(artifact.finalStatus).toBe(
+        'A12B2C5T1_D1_CLASSIFIER_TYPESCRIPT_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION'
       );
     });
   });

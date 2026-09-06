@@ -1658,7 +1658,6 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       const syntheticPkg: SignedHumanAuthorizationPackage = {
         payload,
         signatureBase64: Buffer.from('mock_signature').toString('base64'),
-        publicKeyFingerprintSha256: 'a'.repeat(64),
         algorithm: 'Ed25519',
         keyVersion: '2026-v1',
         authorityId: payload.authorityId,
@@ -1684,7 +1683,6 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       const syntheticPkg: SignedHumanAuthorizationPackage = {
         payload,
         signatureBase64: Buffer.from('mock_sig').toString('base64'),
-        publicKeyFingerprintSha256: 'b'.repeat(64),
         algorithm: 'Ed25519',
         keyVersion: '2026-v1',
         authorityId: payload.authorityId,
@@ -1709,7 +1707,6 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       const syntheticPkg: SignedHumanAuthorizationPackage = {
         payload,
         signatureBase64: Buffer.from('mock_sig').toString('base64'),
-        publicKeyFingerprintSha256: 'c'.repeat(64),
         algorithm: 'Ed25519',
         keyVersion: '2026-v1',
         authorityId: payload.authorityId,
@@ -1733,7 +1730,6 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       const syntheticPkg: SignedHumanAuthorizationPackage = {
         payload,
         signatureBase64: Buffer.from('mock_sig').toString('base64'),
-        publicKeyFingerprintSha256: 'd'.repeat(64),
         algorithm: 'Ed25519',
         keyVersion: '2026-v1',
         authorityId: payload.authorityId,
@@ -2056,7 +2052,6 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       const syntheticPkg: SignedHumanAuthorizationPackage = {
         payload,
         signatureBase64: Buffer.from('mock_sig').toString('base64'),
-        publicKeyFingerprintSha256: 'a'.repeat(64),
         algorithm: 'Ed25519',
         keyVersion: '2026-v1',
         authorityId: payload.authorityId,
@@ -2130,7 +2125,6 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       const pkg: SignedHumanAuthorizationPackage = {
         payload,
         signatureBase64: Buffer.from('mock_sig').toString('base64'),
-        publicKeyFingerprintSha256: 'b'.repeat(64),
         algorithm: 'Ed25519',
         keyVersion: '2026-v1',
         authorityId: payload.authorityId,
@@ -2170,7 +2164,6 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       const pkg: SignedHumanAuthorizationPackage = {
         payload,
         signatureBase64: Buffer.from('mock_sig').toString('base64'),
-        publicKeyFingerprintSha256: 'b'.repeat(64),
         algorithm: 'Ed25519',
         keyVersion: '2026-v1',
         authorityId: payload.authorityId,
@@ -2234,6 +2227,36 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       expect(artifact.finalStatus).toBe(
         'A12B2C5S11_EXACT_REPLAY_API_SURFACE_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION'
       );
+    });
+
+    // ------------------------------------------------------------------------
+    // J. SignedHumanAuthorizationPackage compile-time contract regression
+    // ------------------------------------------------------------------------
+    it('J. canonical SignedHumanAuthorizationPackage satisfies production interface with exact fields and no fingerprint', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const canonicalPackage = {
+        payload,
+        signatureBase64: Buffer.from('mock_sig').toString('base64'),
+        authorityId: payload.authorityId,
+        keyVersion: '2026-v1',
+        algorithm: 'Ed25519',
+      } satisfies SignedHumanAuthorizationPackage;
+
+      expect(canonicalPackage.payload).toBe(payload);
+      expect(canonicalPackage.signatureBase64).toBeDefined();
+      expect(canonicalPackage.authorityId).toBe(payload.authorityId);
+      expect(canonicalPackage.keyVersion).toBe('2026-v1');
+      expect(canonicalPackage.algorithm).toBe('Ed25519');
+
+      const pkgKeys = Object.keys(canonicalPackage).sort();
+      expect(pkgKeys).toEqual([
+        'algorithm',
+        'authorityId',
+        'keyVersion',
+        'payload',
+        'signatureBase64',
+      ]);
+      expect('publicKeyFingerprintSha256' in (canonicalPackage as any)).toBe(false);
     });
   });
 });

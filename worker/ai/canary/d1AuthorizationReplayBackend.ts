@@ -233,7 +233,7 @@ export class D1AuthorizationReplayBackend implements DurableAuthorizationReplayB
     const res = d1Result as {
       success?: unknown;
       results?: unknown;
-      meta?: { changes?: unknown; [key: string]: unknown };
+      meta?: Record<string, unknown>;
       error?: unknown;
     };
 
@@ -255,37 +255,84 @@ export class D1AuthorizationReplayBackend implements DurableAuthorizationReplayB
       };
     }
 
-    if (!res.meta || typeof res.meta !== 'object') {
+    if (!res.meta || typeof res.meta !== 'object' || Array.isArray(res.meta)) {
       return {
         success: false,
         status: 'BACKEND_UNAVAILABLE',
-        errors: ['D1_META_INVALID: meta must be a non-null object'],
+        errors: ['D1_META_INVALID: meta must be a non-null, non-array object'],
       };
     }
 
-    const changes = res.meta.changes;
-    if (typeof changes !== 'number' || !Number.isInteger(changes) || changes < 0 || changes > 1) {
-      return {
-        success: false,
-        status: 'BACKEND_UNAVAILABLE',
-        errors: [
-          `D1_CHANGES_INVALID: meta.changes must be 0 or 1 integer, received ${String(changes)}`,
-        ],
-      };
-    }
+    const meta = res.meta;
 
-    // Classification Case 1: Successfully Reserved
-    if (res.results.length === 1 && changes === 1) {
-      const row = res.results[0];
-      if (!row || typeof row !== 'object') {
+    // Optional metadata validation: if present, must match expected type
+    if ('changed_db' in meta && meta.changed_db !== undefined) {
+      if (typeof meta.changed_db !== 'boolean') {
         return {
           success: false,
           status: 'BACKEND_UNAVAILABLE',
-          errors: ['D1_ROW_MALFORMED: returned row must be an object'],
+          errors: ['D1_META_INVALID: meta.changed_db must be a boolean when present'],
+        };
+      }
+    }
+
+    if ('rows_written' in meta && meta.rows_written !== undefined) {
+      if (
+        typeof meta.rows_written !== 'number' ||
+        !Number.isInteger(meta.rows_written) ||
+        meta.rows_written < 0
+      ) {
+        return {
+          success: false,
+          status: 'BACKEND_UNAVAILABLE',
+          errors: ['D1_META_INVALID: meta.rows_written must be a non-negative integer when present'],
+        };
+      }
+    }
+
+    // Classification Case 1: Successfully Reserved (1 RETURNING row)
+    if (res.results.length === 1) {
+      // Contradiction detection using safer D1 metadata
+      if (meta.changed_db === false) {
+        return {
+          success: false,
+          status: 'BACKEND_UNAVAILABLE',
+          errors: ['D1_CONTRADICTION: meta.changed_db is false for successful reservation'],
         };
       }
 
-      const returnedReplayKey = (row as Record<string, unknown>).replay_key;
+      if (typeof meta.rows_written === 'number' && meta.rows_written < 1) {
+        return {
+          success: false,
+          status: 'BACKEND_UNAVAILABLE',
+          errors: [
+            `D1_CONTRADICTION: meta.rows_written (${meta.rows_written}) < 1 for successful reservation`,
+          ],
+        };
+      }
+
+      const row = res.results[0];
+      if (!row || typeof row !== 'object' || Array.isArray(row)) {
+        return {
+          success: false,
+          status: 'BACKEND_UNAVAILABLE',
+          errors: ['D1_ROW_MALFORMED: returned row must be a non-null, non-array object'],
+        };
+      }
+
+      const rowRecord = row as Record<string, unknown>;
+      const rowKeys = Object.keys(rowRecord);
+      if (rowKeys.length !== 1 || !Object.prototype.hasOwnProperty.call(rowRecord, 'replay_key')) {
+        return {
+          success: false,
+          status: 'BACKEND_UNAVAILABLE',
+          errors: [
+            'D1_ROW_MALFORMED: returned row must contain exactly the replay_key property and no unknown properties',
+          ],
+        };
+      }
+
+      const returnedReplayKey = rowRecord.replay_key;
       if (typeof returnedReplayKey !== 'string' || returnedReplayKey !== request.replayKey) {
         return {
           success: false,
@@ -305,8 +352,27 @@ export class D1AuthorizationReplayBackend implements DurableAuthorizationReplayB
       };
     }
 
-    // Classification Case 2: Already Reserved (Zero returned rows and changes === 0)
-    if (res.results.length === 0 && changes === 0) {
+    // Classification Case 2: Already Reserved (0 RETURNING rows)
+    if (res.results.length === 0) {
+      // Contradiction detection using safer D1 metadata
+      if (meta.changed_db === true) {
+        return {
+          success: false,
+          status: 'BACKEND_UNAVAILABLE',
+          errors: ['D1_CONTRADICTION: meta.changed_db is true for uninserted conflict'],
+        };
+      }
+
+      if (typeof meta.rows_written === 'number' && meta.rows_written !== 0) {
+        return {
+          success: false,
+          status: 'BACKEND_UNAVAILABLE',
+          errors: [
+            `D1_CONTRADICTION: meta.rows_written (${meta.rows_written}) !== 0 for uninserted conflict`,
+          ],
+        };
+      }
+
       return {
         success: false,
         status: 'ALREADY_RESERVED',
@@ -318,12 +384,12 @@ export class D1AuthorizationReplayBackend implements DurableAuthorizationReplayB
       };
     }
 
-    // Classification Case 3: Ambiguous or inconsistent combination (e.g. 1 row + 0 changes, 0 rows + 1 change, >1 rows)
+    // Classification Case 3: Ambiguous outcome (e.g. results.length > 1)
     return {
       success: false,
       status: 'BACKEND_UNAVAILABLE',
       errors: [
-        `D1_OUTCOME_AMBIGUOUS: inconsistent results length (${res.results.length}) and meta.changes (${changes})`,
+        `D1_OUTCOME_AMBIGUOUS: unexpected results length (${res.results.length})`,
       ],
     };
   }
