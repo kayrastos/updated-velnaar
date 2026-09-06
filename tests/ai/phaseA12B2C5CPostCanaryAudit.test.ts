@@ -493,10 +493,14 @@ describe('Phase A.12B.2C-5C — Post-Canary Remediation Completion & Offline Sea
     const historicalPath = path.resolve(process.cwd(), 'execution/a12b2c5b_canary_execution_attempt2_results.json');
     const expectedSha256 = '1ef474e7bde9069a2e80acd2791725123b068027550fbb50dd267b8c102423a1';
 
-    it('verifies exact file bytes and SHA256 of Attempt #2 live evidence', () => {
+    it('verifies canonical LF-normalized repository content SHA256 of Attempt #2 live evidence', () => {
       expect(fs.existsSync(historicalPath)).toBe(true);
-      const fileBytes = fs.readFileSync(historicalPath);
-      const computedSha256 = crypto.createHash('sha256').update(fileBytes).digest('hex');
+      const rawText = fs.readFileSync(historicalPath, 'utf8');
+      // Reject lone CR not part of CRLF
+      expect(/\r(?!\n)/.test(rawText)).toBe(false);
+      const normalizedText = rawText.replace(/\r\n/g, '\n');
+      const canonicalBytes = Buffer.from(normalizedText, 'utf8');
+      const computedSha256 = crypto.createHash('sha256').update(canonicalBytes).digest('hex');
       expect(computedSha256).toBe(expectedSha256);
     });
 

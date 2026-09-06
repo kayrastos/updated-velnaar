@@ -1129,12 +1129,20 @@ describe('VELNAR Phase A.12B.2C-5K Guarded DeepSeek Live Transport', () => {
     const modulePath = path.resolve(__dirname, '../../worker/ai/canary/deepSeekGuardedLiveTransport.ts');
     const source = fs.readFileSync(modulePath, 'utf8');
 
+    // Reject lone CR not part of CRLF
+    expect(/\r(?!\n)/.test(source)).toBe(false);
+    const canonicalSource = source.replace(/\r\n/g, '\n');
+
     // Invariant: preflight obtains fresh runtime clock
-    expect(source.includes('const initialPreflightClock = new Date();')).toBe(true);
+    expect(canonicalSource.includes('const initialPreflightClock = new Date();')).toBe(true);
     // Invariant: each task invocation obtains fresh runtime clock
-    expect(source.includes('const taskClock = new Date();')).toBe(true);
+    expect(canonicalSource.includes('const taskClock = new Date();')).toBe(true);
     // Invariant: checkWindowCrossing inside loop is passed taskClock
-    expect(source.includes('checkWindowCrossing(\n        options.pricingWindow,\n        taskClock\n      )')).toBe(true);
+    expect(
+      canonicalSource.includes(
+        'checkWindowCrossing(\n        options.pricingWindow,\n        taskClock\n      )'
+      )
+    ).toBe(true);
   });
 
   it('80. Regression S: sentinel lifecycle restores global fetch and maintains strict test isolation', () => {

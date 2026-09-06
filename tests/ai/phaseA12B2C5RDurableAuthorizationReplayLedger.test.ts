@@ -62,6 +62,7 @@ import {
   validateRunNonce,
   type CanonicalHumanAuthorizationPayload,
   type SignedHumanAuthorizationPackage,
+  type TrustedSourceAttestation,
 } from '../../worker/ai/canary/deepSeekCertificationAttestation';
 
 import {
@@ -2040,8 +2041,10 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     });
 
     it('B. production orchestration has no typed third parameter', () => {
-      type OrchestrationParams = Parameters<typeof buildProductionReplayReservationAfterAuthorizationVerification>;
-      type HasThirdParam = 2 extends keyof OrchestrationParams ? true : false;
+      type OrchestrationParams =
+        Parameters<typeof buildProductionReplayReservationAfterAuthorizationVerification>;
+      type HasThirdParam =
+        OrchestrationParams['length'] extends 2 ? false : true;
       const hasThird: HasThirdParam = false;
       expect(hasThird).toBe(false);
       expect(buildProductionReplayReservationAfterAuthorizationVerification.length).toBe(2);
@@ -2087,8 +2090,10 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
     });
 
     it('E. canonical builder has no typed second parameter', () => {
-      type BuilderParams = Parameters<typeof buildAuthorizationReplayReservationRequestFromCanonicalAuthorization>;
-      type HasSecondParam = 1 extends keyof BuilderParams ? true : false;
+      type BuilderParams =
+        Parameters<typeof buildAuthorizationReplayReservationRequestFromCanonicalAuthorization>;
+      type HasSecondParam =
+        BuilderParams['length'] extends 1 ? false : true;
       const hasSecond: HasSecondParam = false;
       expect(hasSecond).toBe(false);
       expect(buildAuthorizationReplayReservationRequestFromCanonicalAuthorization.length).toBe(1);

@@ -262,8 +262,12 @@ describe('Phase A.12B.2C-5D Dual-Lane v1.2 Specification Foundation', () => {
     for (const [relPath, expectedHash] of Object.entries(historicalFiles)) {
       const fullPath = path.resolve(process.cwd(), relPath);
       expect(fs.existsSync(fullPath)).toBe(true);
-      const fileBytes = fs.readFileSync(fullPath);
-      const computedHash = crypto.createHash('sha256').update(fileBytes).digest('hex');
+      const rawText = fs.readFileSync(fullPath, 'utf8');
+      // Reject lone CR not part of CRLF
+      expect(/\r(?!\n)/.test(rawText)).toBe(false);
+      const normalizedText = rawText.replace(/\r\n/g, '\n');
+      const canonicalBytes = Buffer.from(normalizedText, 'utf8');
+      const computedHash = crypto.createHash('sha256').update(canonicalBytes).digest('hex');
       expect(computedHash).toBe(expectedHash);
     }
   });

@@ -290,6 +290,7 @@ export type ProductionReplayReservationOrchestrationResult =
       readonly ready: true;
       readonly status: 'READY_FOR_DURABLE_RESERVATION';
       readonly request: AuthorizationReplayReservationRequest;
+      readonly failureReason?: never;
     };
 
 // ============================================================================
@@ -935,7 +936,7 @@ export function buildProductionReplayReservationAfterAuthorizationVerification(
 
   // Reject caller override fields on pkg
   if (pkg && typeof pkg === 'object') {
-    const pkgRecord = pkg as Record<string, unknown>;
+    const pkgRecord = pkg as unknown as Record<string, unknown>;
     for (const forbiddenKey of FORBIDDEN_PRODUCTION_ORCHESTRATION_KEYS) {
       if (forbiddenKey in pkgRecord) {
         return {
@@ -949,7 +950,7 @@ export function buildProductionReplayReservationAfterAuthorizationVerification(
 
   // Reject caller override fields on sourceAttestation
   if (sourceAttestation && typeof sourceAttestation === 'object') {
-    const sourceRecord = sourceAttestation as Record<string, unknown>;
+    const sourceRecord = sourceAttestation as unknown as Record<string, unknown>;
     for (const forbiddenKey of FORBIDDEN_PRODUCTION_ORCHESTRATION_KEYS) {
       if (forbiddenKey in sourceRecord) {
         return {

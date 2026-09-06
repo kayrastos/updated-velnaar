@@ -126,7 +126,7 @@ export class D1AuthorizationReplayBackend implements DurableAuthorizationReplayB
       };
     }
 
-    const requestRecord = request as Record<string, unknown>;
+    const requestRecord = request as unknown as Record<string, unknown>;
 
     // 4. Reject forbidden caller override keys (from 5R contract)
     for (const forbiddenKey of FORBIDDEN_CALLER_OVERRIDE_KEYS) {
