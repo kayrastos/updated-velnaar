@@ -1,163 +1,383 @@
 {
-  "phase": "A.12B.2C-5U.3.3A",
-  "artifactType": "PRODUCTION_PROVISIONING_AND_ACTIVATION_READINESS_AUDIT",
-  "auditDate": "2026-09-06T20:45:00Z",
+  "phase": "A.12B.2C-5U.3.3A-R",
+  "artifactType": "PRODUCTION_PROVISIONING_AND_ACTIVATION_READINESS_AUDIT_REPAIR",
+  "auditDate": "2026-09-06T21:15:00Z",
   "repository": "https://github.com/kayrastos/updated-velnaar",
-  "baseCommit": "54fd4a1744913d5d06845896cae2bcf36a3f3e39",
-  "baseTree": "d28b9be5fa3f3a94b5e0a7d0335ebb4fdea9004f",
+  "canonicalRemoteBaseHead": "39dfe50c3ea83195112e7b82e2df5ad1c252df7b",
+  "canonicalRemoteBaseTree": "f7651c977c78191942488cf6128c249a2d1bce65",
+  "parentCommit": "54fd4a1744913d5d06845896cae2bcf36a3f3e39",
   "branch": "main",
-  "executionMode": "STRICTLY_OFFLINE_READ_ONLY_AUDIT",
+  "executionMode": "STRICTLY_OFFLINE_READ_ONLY_AUDIT_REPAIR",
   "sealedPriorPhase": "A12B2C5U32_HOST_WORKER_BINDING_FOUNDATION_SEAL_APPROVED",
   "sealedPriorPhaseIntact": true,
   "overallReadinessStatus": "BLOCKED_PENDING_PROVISIONING_AND_ACTIVATION_LIFECYCLE",
-  "sourceModificationsMade": false,
-  "testModificationsMade": false,
-  "infrastructureModificationsMade": false,
-  "networkCallsAttempted": 0,
-  "providerCredentialsObservedOrExposed": 0,
-  "privateKeysGeneratedOrImported": 0,
+  "finalVerdict": "A12B2C5U33AR_PROVISIONING_ACTIVATION_READINESS_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW",
+  "nonNegotiableZeroActionInvariants": {
+    "providerCalls": 0,
+    "realD1Calls": 0,
+    "externalProvisioningCalls": 0,
+    "productionInfrastructureChanges": 0,
+    "productionDeployments": 0,
+    "productionSecretOperations": 0,
+    "productionKeyGenerationOperations": 0,
+    "productionKeyImportOperations": 0,
+    "trustAnchorProvisioningOperations": 0,
+    "gateFlipOperations": 0,
+    "networkCallsAttempted": 0,
+    "sourceModificationsMade": false,
+    "testModificationsMade": false,
+    "infrastructureModificationsMade": false,
+    "providerCredentialsObservedOrExposed": 0,
+    "privateKeysGeneratedOrImported": 0
+  },
   "canonicalSafetyBaseline": {
-    "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
-    "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
-    "CANARY_LIVE_EXECUTION_ENABLED": false,
-    "GUARDED_SOURCE_ATTESTATION_READY": false,
-    "GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
-    "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
-    "PRODUCTION_TRUST_ANCHOR_SLOT_READY": false,
-    "PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED": false,
-    "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
-    "TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY": false,
-    "D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED": true,
-    "D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
-    "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
-    "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
-    "PRODUCTION_ROUTING_ENFORCEMENT_ALLOWED": false
+    "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "CANARY_LIVE_EXECUTION_ENABLED": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "CANARY_LIVE_EXECUTION_STATE": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": "BLOCKED_PENDING_CERTIFICATION"
+    },
+    "GUARDED_SOURCE_ATTESTATION_READY": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "GUARDED_HUMAN_AUTH_ATTESTATION_READY": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "PRODUCTION_TRUST_ANCHOR_SLOT_READY": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": true
+    },
+    "D1_REPLAY_BACKEND_PRODUCTION_BOUND": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": {
+      "type": "CANONICAL_RUNTIME_GATE",
+      "value": false
+    },
+    "productionRoutingEnforcementAllowed": {
+      "type": "CANONICAL_EVIDENCE_PROPERTY",
+      "value": false
+    }
   },
   "auditAreas": {
-    "area1_realD1ProvisioningReadiness": {
-      "realD1Exists": false,
+    "area1_realD1ProvisioningAndTruthStates": {
+      "truthStates": {
+        "AUDIT_CONCEPT_REAL_D1_RESOURCE_EXISTS": {
+          "status": "NOT_PROVEN",
+          "value": false,
+          "description": "True remote Cloudflare D1 database resource does not exist in production account"
+        },
+        "AUDIT_CONCEPT_D1_DATABASE_ID_RECORDED_AND_VERIFIED": {
+          "status": "NOT_PROVEN",
+          "value": false,
+          "description": "wrangler.jsonc contains placeholder UUID xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+        },
+        "AUDIT_CONCEPT_D1_MIGRATION_0008_APPLIED": {
+          "status": "NOT_PROVEN",
+          "value": false,
+          "description": "Migration 0008 has never been executed against Cloudflare remote D1"
+        },
+        "AUDIT_CONCEPT_D1_SCHEMA_POST_VERIFIED": {
+          "status": "NOT_PROVEN",
+          "value": false,
+          "description": "Table and index schema have not been verified against remote database"
+        },
+        "AUDIT_CONCEPT_WORKER_D1_BINDING_CONFIGURED": {
+          "status": "NOT_PROVEN",
+          "value": false,
+          "description": "wrangler.jsonc has not been updated with verified production database UUID"
+        },
+        "AUDIT_CONCEPT_WORKER_D1_BINDING_DEPLOYED": {
+          "status": "NOT_PROVEN",
+          "value": false,
+          "description": "Worker bundle with bound production D1 has not been deployed"
+        },
+        "AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED": {
+          "status": "NOT_PROVEN",
+          "value": false,
+          "description": "Runtime access to env.DB targeting recorded database UUID has not been proven"
+        }
+      },
+      "canonicalSourceGates": {
+        "D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED": {
+          "type": "CANONICAL_RUNTIME_GATE",
+          "value": true,
+          "status": "IMPLEMENTED_AND_OFFLINE_TESTED"
+        },
+        "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": {
+          "type": "CANONICAL_RUNTIME_GATE",
+          "value": false,
+          "status": "BLOCKED",
+          "definition": "Requires REAL_D1_RESOURCE_EXISTS, D1_DATABASE_ID_RECORDED_AND_VERIFIED, D1_MIGRATION_0008_APPLIED, and D1_SCHEMA_POST_VERIFIED. Must not mean merely wrangler d1 create succeeded."
+        },
+        "D1_REPLAY_BACKEND_PRODUCTION_BOUND": {
+          "type": "CANONICAL_RUNTIME_GATE",
+          "value": false,
+          "status": "BLOCKED",
+          "definition": "Requires WORKER_D1_BINDING_CONFIGURED, WORKER_D1_BINDING_DEPLOYED, and WORKER_D1_BINDING_RUNTIME_VERIFIED. Must not mean merely wrangler.jsonc was edited."
+        },
+        "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": {
+          "type": "CANONICAL_RUNTIME_GATE",
+          "value": false,
+          "status": "BLOCKED",
+          "definition": "Requires empirical multi-client concurrency certification against remote D1 under provider-free test protocol."
+        }
+      },
       "wranglerConfigStatus": "PLACEHOLDER_DATABASE_ID",
       "wranglerDatabaseId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
       "wranglerDatabaseName": "velnar-production-db",
       "exactBindingName": "DB",
       "migrationFile": "migrations/0008_authorization_replay_ledger.sql",
       "tableName": "authorization_replay_ledger",
-      "schemaColumns": [
-        "replay_key TEXT PRIMARY KEY NOT NULL",
-        "ledger_version TEXT NOT NULL",
-        "authorization_payload_digest_sha256 TEXT NOT NULL",
-        "authority_id TEXT NOT NULL",
-        "key_version TEXT NOT NULL",
-        "run_nonce TEXT NOT NULL",
-        "expires_at TEXT NOT NULL",
-        "expires_at_epoch_ms INTEGER NOT NULL",
-        "reserved_at TEXT NOT NULL"
-      ],
-      "secondaryIndexes": [
-        "idx_authorization_replay_ledger_expires_at_epoch_ms ON authorization_replay_ledger(expires_at_epoch_ms)"
-      ],
-      "migrationExecutedAgainstCloudflare": false,
-      "migrationIdempotency": "SINGLE_EXECUTION_SAFE_TRACKED_VIA_WRANGLER_MIGRATIONS_TABLE",
-      "provisioningCommand": "npx wrangler d1 create velnar-production-db",
-      "migrationApplicationCommand": "npx wrangler d1 migrations apply velnar-production-db --remote",
-      "filesToEditPostProvisioning": [
-        "wrangler.jsonc",
-        "worker/ai/canary/d1AuthorizationReplayBackend.ts"
-      ],
-      "backendGates": {
-        "D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED": true,
-        "D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
-        "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
-        "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false
+      "migrationSemantics": {
+        "sqlLevelIdempotency": false,
+        "classification": "MIGRATION_HISTORY_GUARDED_NOT_SQL_IDEMPOTENT",
+        "rationale": "CREATE TABLE and CREATE INDEX statements lack IF NOT EXISTS clauses. Running the SQL raw a second time causes SQLite error 'table authorization_replay_ledger already exists'. Wrangler tracks applied migrations in the d1_migrations table and executes pending migrations once."
       },
-      "readinessVerdict": "UNPROVISIONED_BLOCKER"
+      "plannedFutureCommands": {
+        "status": "PLAN_EXAMPLES_ONLY_NOT_AUTHORIZED_FOR_EXECUTION",
+        "createCommand": "npx wrangler d1 create velnar-production-db",
+        "migrateCommand": "npx wrangler d1 migrations apply velnar-production-db --remote",
+        "mandatoryExecutionGuardrails": [
+          "Explicit human approval",
+          "Exact Cloudflare account ID confirmation",
+          "Exact Wrangler config/environment confirmation",
+          "wrangler whoami / account identity confirmation",
+          "Returned database UUID recorded",
+          "Returned database UUID compared to intended resource",
+          "Pre-migration schema inspection",
+          "D1 Time Travel/bookmark or equivalent recovery point recording where applicable",
+          "Restore/recovery procedure recorded",
+          "Post-migration schema verification",
+          "Post-migration index verification",
+          "Zero automatic gate flips"
+        ]
+      }
     },
-    "area2_realConcurrencyCertification": {
+    "area2_d1ConcurrencyCertification": {
       "certified": false,
-      "definition": "Empirical verification under concurrent multi-client load that D1 atomic INSERT ON CONFLICT DO NOTHING RETURNING replay_key guarantees exactly 1 winner (RESERVED) and N-1 losers (ALREADY_RESERVED) across simultaneous worker requests",
-      "syntheticTestsSufficient": false,
-      "syntheticLimitations": [
-        "In-memory SQLite mocks cannot replicate Cloudflare edge-to-D1 transaction routing",
-        "Mocks cannot simulate real SQLite WAL lock contention and network latency variance",
-        "Edge runtime race conditions and metadata delivery differences cannot be verified synthetically"
-      ],
-      "requiredHarness": "Dedicated load script dispatching concurrent asynchronous reservation requests with identical replayKey against provisioned remote D1",
-      "gate": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED",
-      "canGateBeFlippedBeforeRealD1": false,
-      "readinessVerdict": "UNPROVISIONED_BLOCKER"
+      "canonicalRuntimeGate": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED",
+      "status": "NOT_PROVEN",
+      "definition": "Empirical multi-client verification that atomic INSERT ON CONFLICT DO NOTHING RETURNING guarantees exactly 1 winner and N-1 losers under contention",
+      "preciseClassification": {
+        "singleDatabaseQuerySerialization": "CLOUDFLARE_DOCUMENTATION_DEPENDENT",
+        "exactConflictReturningBehaviorUnderContention": "EMPIRICAL_CERTIFICATION_REQUIRED",
+        "velnarClassificationBehaviorUnderAmbiguity": "EMPIRICAL_CERTIFICATION_REQUIRED",
+        "syntheticTestLimitations": "Mocks cannot simulate distributed edge routing, network variance, or Cloudflare D1 serialization semantics. Internal desktop SQLite WAL lock contention claims are rejected as overstatements."
+      },
+      "providerFreeHarnessConcept": {
+        "status": "FUTURE_PLAN_ONLY_DO_NOT_IMPLEMENT_NOW",
+        "isolationRequirements": [
+          "D1 binding only (env.DB)",
+          "No provider credential",
+          "Zero access to DEEPSEEK_API_KEY",
+          "No provider transport imports",
+          "Zero customer data",
+          "Synthetic replay keys only",
+          "Independently protected test endpoint or bounded test worker",
+          "Harness destroyed or disabled post-certification",
+          "Explicit human approval before deployment",
+          "Public operational canary endpoint strictly forbidden for D1 concurrency certification"
+        ],
+        "experimentDesign": {
+          "contendersPerContestedRound": 32,
+          "contestedRounds": 20,
+          "contestedRoundKeyPolicy": "Fresh synthetic replay key per round",
+          "expectedContestedRoundOutcome": {
+            "reservedCount": 1,
+            "alreadyReservedCount": 31,
+            "databaseRowCountForKey": 1
+          },
+          "controlRounds": 20,
+          "independentKeysPerControlRound": 32,
+          "expectedControlRoundOutcome": {
+            "reservedCount": 32,
+            "databaseRowCount": 32
+          },
+          "startBarrier": "Synchronized start barrier across contenders",
+          "clientDistribution": "At least two geographically distinct clients if Cloudflare topology permits",
+          "retryPolicy": "Automatic per-request retry disabled",
+          "ambiguityHandling": "Timeouts or ambiguous transport errors classified as BACKEND_UNAVAILABLE or AMBIGUOUS_UNCERTIFIED_OUTCOME, never ALREADY_RESERVED. Inspect database directly. Retry complete round with new synthetic replay key."
+        }
+      },
+      "concurrencyEvidenceSchema": {
+        "mandatoryFields": [
+          "certificationRunId",
+          "roundId",
+          "replayKeyHashOrSyntheticKey",
+          "requestId",
+          "clientRegion",
+          "requestStartTimestamp",
+          "requestEndTimestamp",
+          "httpResultClassification",
+          "reservationClassification",
+          "databaseRowCount",
+          "exactStoredReplayRecordFields",
+          "d1ErrorMetadata",
+          "transportAmbiguity",
+          "retryCount",
+          "providerCalls",
+          "credentialReads"
+        ],
+        "captureIfExposedByRuntime": [
+          "rows_written",
+          "served_by_region",
+          "served_by_primary",
+          "total_attempts"
+        ]
+      }
     },
-    "area3_humanAuthorizationTrustAnchor": {
+    "area3_humanAuthorizationTrustAnchorCeremony": {
       "provisioned": false,
+      "canonicalRuntimeGate": "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED",
+      "slotGates": {
+        "PRODUCTION_TRUST_ANCHOR_SLOT_READY": false,
+        "PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED": false
+      },
       "registry": "PRODUCTION_HUMAN_AUTHORITY_REGISTRY",
       "registryLength": 0,
       "targetAuthorityId": "velnar-lead-ops-prod",
       "targetKeyVersion": "2026-v1",
       "targetAlgorithm": "Ed25519",
-      "privateKeyGenerationLocation": "STRICTLY_OFFLINE_SECURE_HARDWARE_OR_ENCLAVE_OUTSIDE_REPOSITORY",
-      "materialEnteringRepository": [
-        "publicKeyPem (SPKI format)",
-        "publicKeyFingerprintSha256 (64 hex)",
-        "canonicalProvisioningRecord",
-        "manualHandoffReceipt"
+      "publicRepresentation": "SPKI_PEM",
+      "expandedCeremonyRequirements": [
+        "Hardware-backed or strongly isolated key generation",
+        "Private key non-exportability preferred",
+        "Documented backup policy: encrypted/offline backup OR explicit no-backup policy",
+        "Dual control",
+        "Minimum witness requirements from canonical ceremony contract",
+        "Independent-channel fingerprint confirmation",
+        "Recorded public-key SHA-256 fingerprint",
+        "Authority ID confirmation",
+        "Key-version confirmation",
+        "Rotation procedure",
+        "Overlap policy",
+        "Revocation procedure",
+        "Emergency suspension",
+        "Compromise response",
+        "Destruction procedure",
+        "Audit ownership",
+        "Public trust-anchor rollback procedure"
       ],
-      "materialStrictlyProhibitedFromRepository": [
-        "privateKeyPem",
-        "privateKeyRawBytes",
-        "seedPhrases",
-        "keyDerivationParameters"
-      ],
-      "verificationFunction": "verifyProductionHumanAuthorizationPackage",
-      "gate": "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED",
-      "slotGates": {
-        "PRODUCTION_TRUST_ANCHOR_SLOT_READY": false,
-        "PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED": false
-      },
-      "readinessVerdict": "UNPROVISIONED_BLOCKER"
+      "prohibitedLocationsForPrivateMaterial": [
+        "git",
+        "repo",
+        "application runtime",
+        "AI context",
+        "ChatGPT",
+        "Codex",
+        "Antigravity",
+        "logs",
+        "screenshots",
+        "execution evidence",
+        "fixtures",
+        ".env files"
+      ]
     },
-    "area4_runtimeSourceProvenanceTrustAnchor": {
+    "area4_runtimeSourceProvenanceProofChain": {
       "provisioned": false,
-      "ready": false,
+      "canonicalRuntimeGates": {
+        "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+        "TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY": false
+      },
       "registry": "PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES",
       "registryLength": 0,
+      "classification": {
+        "foundation": "SIGNED_PROVENANCE_ASSERTION_FOUNDATION_IMPLEMENTED",
+        "deployedProvenance": "DEPLOYED_BUNDLE_PROVENANCE_NOT_PROVEN"
+      },
       "targetRepositoryFullName": "kayrastos/updated-velnaar",
       "targetEnvironment": "production",
       "targetAlgorithm": "Ed25519",
       "receiptRequiredFieldsCount": 14,
-      "receiptFields": [
-        "provenanceVersion",
-        "repositoryFullName",
-        "sourceCommitSha",
-        "sourceTreeSha",
-        "buildArtifactSha256",
-        "buildId",
-        "deploymentId",
-        "environment",
-        "issuedAt",
-        "expiresAt",
-        "issuerId",
-        "issuerKeyVersion",
-        "algorithm",
-        "signatureBase64"
-      ],
-      "coordinatorIntegration": "Receipt is cryptographically verified against PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES, internally derives TrustedSourceAttestation with sealed repository identity, and strictly verifies sourceCommitSha and sourceTreeSha match the human authorization package",
-      "gate": "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED",
-      "readinessVerdict": "UNPROVISIONED_BLOCKER"
+      "fullProvenanceProofChainRequirements": [
+        "Approved source commit/tree",
+        "Controlled build environment",
+        "Bundle creation",
+        "SHA-256 of exact deployment artifact",
+        "Immutable artifact storage",
+        "Signed provenance receipt",
+        "Cloudflare Worker version/deployment ID capture",
+        "Upload/deployment evidence",
+        "Verification that uploaded artifact equals signed artifact",
+        "Active deployment/version verification",
+        "Post-deploy receipt comparison",
+        "Reproducible builds as additional strengthening control where feasible"
+      ]
     },
-    "area5_productionAuthenticationProvider": {
-      "providerStatus": "NOT_CONFIGURED",
-      "currentResolveSessionUserBehavior": "Fails closed returning null for all production tokens",
-      "productionProtectedRoutesBehavior": "Always returns HTTP 401 UNAUTHORIZED",
-      "isSuperAdminResolution": "No mechanism exists in production to establish isSuperAdmin === true",
-      "requiredImplementation": "Cryptographic JWT/session verifier resolving verified user identity and checking signed superadmin claims/roles",
-      "readinessVerdict": "UNIMPLEMENTED_BLOCKER"
+    "area5_productionAuthenticationArchitecture": {
+      "status": "NOT_IMPLEMENTED_NOT_PROVEN",
+      "currentBehavior": "AuthContextService.resolveSessionUser returns null in production; protected routes return 401 UNAUTHORIZED; superAdmin cannot be resolved",
+      "layeredArchitecture": {
+        "layer1_edgeIngress": "Cloudflare Access on dedicated operational hostname/path enforcing IdP authentication and multi-factor authorization",
+        "layer2_cryptographicAppIdentity": "Worker cryptographically validates Access JWT (signature, expected issuer, expected audience, expiry, not-before, immutable verified identity claim)",
+        "layer3_operationalSuperAdminAuth": "Map verified immutable identity to a narrowly scoped operational-superadmin allowlist/registry. No tenant OWNER/ADMIN inheritance. No request-supplied role field.",
+        "layer4_perRunAuthorization": "Signed, short-lived (<= 15 min), commit/tree-bound human authorization package verifying authority signature, budget, and single-use replay key"
+      },
+      "ingressOptionsEvaluation": {
+        "optionA": {
+          "description": "Cloudflare Access + app identity + explicit superadmin",
+          "evaluation": "RECOMMENDED_MINIMUM_FOR_HUMAN_OPERATIONS"
+        },
+        "optionB": {
+          "description": "Access service token + explicit application authorization",
+          "evaluation": "ACCEPTABLE_FOR_MACHINE_ONLY_TEMPORARY_D1_HARNESS_NEVER_SUPERADMIN"
+        },
+        "optionC": {
+          "description": "mTLS + explicit application authorization",
+          "evaluation": "HIGH_DEVICE_OVERHEAD"
+        },
+        "optionD": {
+          "description": "Access + mTLS + application authorization",
+          "evaluation": "FUTURE_HARDENING_IF_JUSTIFIED"
+        }
+      },
+      "rule": "Cloudflare Access alone is not sufficient application authorization"
     },
-    "area6_operationalIngressRouteAndSuperadminActivation": {
+    "area6_operationalIngressRouteAndGates": {
       "routePath": "/api/ops/canary/deepseek-certification",
-      "status": "DORMANT_FOUNDATION",
-      "gates": {
+      "canonicalRuntimeGates": {
         "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
         "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false
       },
+      "status": "DORMANT_FOUNDATION",
       "dormantDirectResponse": "HTTP 404 NOT_FOUND before body or env access",
       "pipelineResponseToday": "HTTP 401 UNAUTHORIZED at worker/index.ts auth boundary",
       "futureActiveRequirements": [
@@ -170,167 +390,148 @@
         "scanTopLevelJsonEnvelope exact 2 keys: authorizationPackage and sourceProvenanceReceipt without duplicate members (HTTP 400 otherwise)",
         "Pass-through of exact host env reference to capability boundary",
         "Public error sanitization via mapToPublicOperationalErrors allowlist"
-      ],
-      "readinessVerdict": "DORMANT_GATE_BLOCKED"
-    },
-    "area7_gateDependencyDag": {
-      "layer1_storage": [
-        { "gate": "D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED", "value": true, "dependsOn": [] },
-        { "gate": "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED", "value": false, "dependsOn": ["wrangler d1 create", "wrangler.jsonc update"] },
-        { "gate": "D1_MIGRATION_0008_APPLIED", "value": false, "dependsOn": ["D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED", "wrangler d1 migrations apply"] },
-        { "gate": "D1_REPLAY_BACKEND_PRODUCTION_BOUND", "value": false, "dependsOn": ["D1_MIGRATION_0008_APPLIED", "Cloudflare Worker deployment"] },
-        { "gate": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED", "value": false, "dependsOn": ["D1_REPLAY_BACKEND_PRODUCTION_BOUND", "real concurrency load test harness"] }
-      ],
-      "layer2_trustAnchors": [
-        { "gate": "PRODUCTION_TRUST_ANCHOR_SLOT_READY", "value": false, "dependsOn": ["D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED"] },
-        { "gate": "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED", "value": false, "dependsOn": ["offline human key ceremony", "PRODUCTION_HUMAN_AUTHORITY_REGISTRY population"] },
-        { "gate": "PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED", "value": false, "dependsOn": ["PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED"] },
-        { "gate": "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED", "value": false, "dependsOn": ["CI/CD source signer provisioning", "PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES population"] },
-        { "gate": "TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY", "value": false, "dependsOn": ["RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED"] }
-      ],
-      "layer3_attestationReadiness": [
-        { "gate": "GUARDED_HUMAN_AUTH_ATTESTATION_READY", "value": false, "dependsOn": ["PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED"] },
-        { "gate": "GUARDED_SOURCE_ATTESTATION_READY", "value": false, "dependsOn": ["TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY"] }
-      ],
-      "layer4_ingressAuth": [
-        { "gate": "PRODUCTION_AUTH_PROVIDER_CONFIGURED", "value": false, "dependsOn": ["Cloudflare Access or production JWT/session verification"] },
-        { "gate": "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY", "value": false, "dependsOn": ["PRODUCTION_AUTH_PROVIDER_CONFIGURED", "isSuperAdmin verification"] }
-      ],
-      "layer5_operationalRoute": [
-        { "gate": "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED", "value": false, "dependsOn": ["PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY", "GUARDED_HUMAN_AUTH_ATTESTATION_READY", "GUARDED_SOURCE_ATTESTATION_READY", "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED"] }
-      ],
-      "layer6_liveExecution": [
-        { "gate": "CANARY_LIVE_EXECUTION_ENABLED", "value": false, "dependsOn": ["PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED", "Cloudflare Worker DEEPSEEK_API_KEY secret provisioning", "signed human authorization package", "signed runtime source provenance receipt"] },
-        { "gate": "PRODUCTION_ROUTING_ENFORCEMENT_ALLOWED", "value": false, "dependsOn": ["CANARY_LIVE_EXECUTION_ENABLED", "7-task canary certification pass", "human architectural review approval"] }
       ]
     },
-    "area8_recommendedActivationOrder": [
-      {
-        "step": 1,
-        "name": "REAL_D1_PROVISIONING_AND_MIGRATION",
-        "actions": [
-          "Execute: npx wrangler d1 create velnar-production-db",
-          "Update wrangler.jsonc with the generated database_id UUID",
-          "Execute: npx wrangler d1 migrations apply velnar-production-db --remote",
-          "Verify schema and index creation in remote database",
-          "Set D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED = true",
-          "Set D1_REPLAY_BACKEND_PRODUCTION_BOUND = true"
-        ]
-      },
-      {
-        "step": 2,
-        "name": "REAL_CONCURRENCY_CERTIFICATION",
-        "actions": [
-          "Execute dedicated concurrent load test against remote D1",
-          "Assert exactly 1 RESERVED outcome and N-1 ALREADY_RESERVED outcomes under simultaneous execution",
-          "Verify 0 uncaught errors and database row count = 1",
-          "Set D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED = true"
-        ]
-      },
-      {
-        "step": 3,
-        "name": "HUMAN_AUTHORIZATION_TRUST_ANCHOR_PROVISIONING",
-        "actions": [
-          "Perform manual offline Ed25519 ceremony outside repository",
-          "Compute SHA-256 public key fingerprint",
-          "Populate PRODUCTION_HUMAN_AUTHORITY_REGISTRY with public material only",
-          "Commit canonical provisioning record and manual handoff receipt",
-          "Set PRODUCTION_TRUST_ANCHOR_SLOT_READY = true",
-          "Set PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED = true",
-          "Set PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED = true",
-          "Set GUARDED_HUMAN_AUTH_ATTESTATION_READY = true"
-        ]
-      },
-      {
-        "step": 4,
-        "name": "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONING",
-        "actions": [
-          "Provision CI/CD build provenance signer Ed25519 keypair in trusted pipeline",
-          "Populate PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES with public key",
-          "Set RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED = true",
-          "Set TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY = true",
-          "Set GUARDED_SOURCE_ATTESTATION_READY = true"
-        ]
-      },
-      {
-        "step": 5,
-        "name": "PRODUCTION_INGRESS_AUTHENTICATION",
-        "actions": [
-          "Implement verified JWT/session authentication in worker/auth/authContext.ts",
-          "Implement verified isSuperAdmin extraction",
-          "Set PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = true"
-        ]
-      },
-      {
-        "step": 6,
-        "name": "OPERATIONAL_ROUTE_ACTIVATION",
-        "actions": [
-          "Set PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = true",
-          "Deploy Worker to Cloudflare",
-          "Provision env.DEEPSEEK_API_KEY in Cloudflare Worker secret store"
-        ]
-      },
-      {
-        "step": 7,
-        "name": "SINGLE_USE_CANARY_CERTIFICATION_DISPATCH",
-        "actions": [
-          "Human operator issues SignedHumanAuthorizationPackage for current commit/tree with <= 15 min expiry",
-          "CI/CD pipeline issues RuntimeSourceProvenanceReceipt for current commit/tree",
-          "Superadmin dispatches single authorized POST request to /api/ops/canary/deepseek-certification",
-          "Worker executes 7-task certification under bounded budget and timeout"
-        ]
-      },
-      {
-        "step": 8,
-        "name": "POST_CERTIFICATION_PRODUCTION_ROUTING_PROMOTION",
-        "actions": [
-          "Audit evidence and certification candidate",
-          "Conduct human architecture review",
-          "Conditionally enable production routing policy if certified"
+    "area7_expandedGateDependencyDag": {
+      "statesAndNodes": [
+        { "id": "D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED", "type": "CANONICAL_RUNTIME_GATE", "value": true, "dependsOn": [] },
+        { "id": "AUDIT_CONCEPT_REAL_D1_RESOURCE_EXISTS", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["human approval", "wrangler d1 create"] },
+        { "id": "AUDIT_CONCEPT_D1_DATABASE_ID_RECORDED_AND_VERIFIED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_REAL_D1_RESOURCE_EXISTS"] },
+        { "id": "AUDIT_CONCEPT_D1_MIGRATION_0008_APPLIED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_D1_DATABASE_ID_RECORDED_AND_VERIFIED", "wrangler d1 migrations apply"] },
+        { "id": "AUDIT_CONCEPT_D1_SCHEMA_POST_VERIFIED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_D1_MIGRATION_0008_APPLIED"] },
+        { "id": "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_D1_SCHEMA_POST_VERIFIED"] },
+        { "id": "AUDIT_CONCEPT_WORKER_D1_BINDING_CONFIGURED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED", "wrangler.jsonc update"] },
+        { "id": "AUDIT_CONCEPT_WORKER_D1_BINDING_DEPLOYED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_WORKER_D1_BINDING_CONFIGURED", "worker deployment"] },
+        { "id": "AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_WORKER_D1_BINDING_DEPLOYED"] },
+        { "id": "D1_REPLAY_BACKEND_PRODUCTION_BOUND", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED"] },
+        { "id": "AUDIT_CONCEPT_PROVIDER_FREE_D1_HARNESS_DEPLOYED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["D1_REPLAY_BACKEND_PRODUCTION_BOUND"] },
+        { "id": "AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_RECORDED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_PROVIDER_FREE_D1_HARNESS_DEPLOYED", "concurrency test protocol"] },
+        { "id": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_RECORDED"] },
+        { "id": "AUDIT_CONCEPT_HUMAN_KEY_CEREMONY_COMPLETED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["offline ceremony outside repository"] },
+        { "id": "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_HUMAN_KEY_CEREMONY_COMPLETED"] },
+        { "id": "PRODUCTION_TRUST_ANCHOR_SLOT_READY", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["POLICY_ORDERING: independent of D1 concurrency, prepared via ceremony"] },
+        { "id": "PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED"] },
+        { "id": "GUARDED_HUMAN_AUTH_ATTESTATION_READY", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED", "PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED"] },
+        { "id": "AUDIT_CONCEPT_SOURCE_PROVENANCE_SIGNER_PROVISIONED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["CI/CD pipeline key setup"] },
+        { "id": "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_SOURCE_PROVENANCE_SIGNER_PROVISIONED"] },
+        { "id": "AUDIT_CONCEPT_PROVENANCE_PIPELINE_VERIFIED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["FULL_BUILD_ARTIFACT_DEPLOYMENT_PROOF_CHAIN"] },
+        { "id": "TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED", "AUDIT_CONCEPT_PROVENANCE_PIPELINE_VERIFIED"] },
+        { "id": "GUARDED_SOURCE_ATTESTATION_READY", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY"] },
+        { "id": "AUDIT_CONCEPT_PRODUCTION_AUTH_IMPLEMENTED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["authContext.ts Access JWT validator"] },
+        { "id": "AUDIT_CONCEPT_PRODUCTION_AUTH_VERIFIED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_PRODUCTION_AUTH_IMPLEMENTED"] },
+        { "id": "AUDIT_CONCEPT_ACCESS_INGRESS_CONFIGURED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["Cloudflare Access application on ops path"] },
+        { "id": "AUDIT_CONCEPT_ACCESS_INGRESS_VERIFIED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_ACCESS_INGRESS_CONFIGURED"] },
+        { "id": "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_ACCESS_INGRESS_VERIFIED", "AUDIT_CONCEPT_PRODUCTION_AUTH_VERIFIED"] },
+        { "id": "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY", "GUARDED_HUMAN_AUTH_ATTESTATION_READY", "GUARDED_SOURCE_ATTESTATION_READY", "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED"] },
+        { "id": "AUDIT_CONCEPT_PROVIDER_SECRET_PROVISIONED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["wrangler secret put DEEPSEEK_API_KEY into non-live Worker"] },
+        { "id": "AUDIT_CONCEPT_PRE_ACTIVATION_SECURITY_REVIEW", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_PROVIDER_SECRET_PROVISIONED", "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED"] },
+        { "id": "CANARY_LIVE_EXECUTION_ENABLED", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_PRE_ACTIVATION_SECURITY_REVIEW"] },
+        { "id": "CANARY_LIVE_EXECUTION_STATE", "type": "CANONICAL_RUNTIME_GATE", "value": "BLOCKED_PENDING_CERTIFICATION", "dependsOn": ["CANARY_LIVE_EXECUTION_ENABLED"] },
+        { "id": "AUDIT_CONCEPT_BOUNDED_LIVE_CANARY_EXECUTED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["CANARY_LIVE_EXECUTION_ENABLED", "CANARY_LIVE_EXECUTION_STATE: LIVE_EXECUTION_ALLOWED", "signed human authorization package"] },
+        { "id": "AUDIT_CONCEPT_POST_CANARY_INDEPENDENT_REVIEW", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_BOUNDED_LIVE_CANARY_EXECUTED"] },
+        { "id": "productionRoutingEnforcementAllowed", "type": "CANONICAL_EVIDENCE_PROPERTY", "value": false, "dependsOn": ["AUDIT_CONCEPT_POST_CANARY_INDEPENDENT_REVIEW", "human architectural review approval"] }
+      ]
+    },
+    "area8_safeActivationOrder": {
+      "steps": [
+        { "step": 0, "name": "PHASE_5U33AR_INDEPENDENT_APPROVAL", "prerequisite": "Independent review and approval of repair audit" },
+        { "step": 1, "name": "IMPLEMENT_PRODUCTION_AUTH_ACCESS_JWT", "prerequisite": "Step 0 complete; all operational and live gates remain strictly false" },
+        { "step": 2, "name": "INDEPENDENT_REVIEW_PRODUCTION_AUTH", "prerequisite": "Step 1 complete" },
+        { "step": 3, "name": "CONFIGURE_CLOUDFLARE_ACCESS_INGRESS", "prerequisite": "Step 2 complete; operational route remains dormant" },
+        { "step": 4, "name": "VERIFY_ACCESS_INGRESS_BEHAVIOR", "prerequisite": "Step 3 complete; route remains dormant" },
+        { "step": 5, "name": "CREATE_REAL_D1_UNDER_EXPLICIT_HUMAN_APPROVAL", "prerequisite": "Step 4 complete; verified Cloudflare account and wrangler whoami" },
+        { "step": 6, "name": "RECORD_AND_VERIFY_D1_DATABASE_ID", "prerequisite": "Step 5 complete" },
+        { "step": 7, "name": "APPLY_MIGRATION_0008_WITH_RECOVERY_EVIDENCE", "prerequisite": "Step 6 complete; backup/Time Travel bookmark recorded" },
+        { "step": 8, "name": "CONFIGURE_WORKER_D1_BINDING", "prerequisite": "Step 7 complete; separate reviewed commit" },
+        { "step": 9, "name": "DEPLOY_BOUND_WORKER_NON_LIVE", "prerequisite": "Step 8 complete; operational route false, ingress false, live execution false" },
+        { "step": 10, "name": "VERIFY_DEPLOYED_RUNTIME_DB_BINDING", "prerequisite": "Step 9 complete" },
+        { "step": 11, "name": "DEPLOY_PROVIDER_FREE_D1_HARNESS", "prerequisite": "Step 10 complete; temporary bounded harness" },
+        { "step": 12, "name": "RUN_D1_CONCURRENCY_CERTIFICATION", "prerequisite": "Step 11 complete; 20 contested + 20 control rounds" },
+        { "step": 13, "name": "DISABLE_OR_REMOVE_D1_HARNESS", "prerequisite": "Step 12 complete" },
+        { "step": 14, "name": "INDEPENDENT_REVIEW_CONCURRENCY_EVIDENCE", "prerequisite": "Step 13 complete" },
+        { "step": 15, "name": "PERFORM_HUMAN_TRUST_ANCHOR_CEREMONY", "prerequisite": "Step 14 complete; offline ceremony outside repo" },
+        { "step": 16, "name": "INDEPENDENT_VERIFICATION_HUMAN_TRUST_ANCHOR", "prerequisite": "Step 15 complete" },
+        { "step": 17, "name": "PROVISION_SOURCE_SIGNER_AND_TRUST_ANCHOR", "prerequisite": "Step 16 complete" },
+        { "step": 18, "name": "VERIFY_FULL_PROVENANCE_PROOF_CHAIN", "prerequisite": "Step 17 complete; commit to artifact comparison" },
+        { "step": 19, "name": "PROVISION_PRODUCTION_PROVIDER_SECRET", "prerequisite": "Step 18 complete; non-live Worker version" },
+        { "step": 20, "name": "CONDUCT_INDEPENDENT_PRE_ACTIVATION_SECURITY_REVIEW", "prerequisite": "Step 19 complete" },
+        { "step": 21, "name": "ATOMIC_INDEPENDENT_GATE_FLIPS", "prerequisite": "Step 20 complete; one logical truth claim per reviewed commit/deployment" },
+        { "step": 22, "name": "EXECUTE_SINGLE_BOUNDED_LIVE_PROVIDER_CANARY", "prerequisite": "Step 21 complete; signed human package <= 15 min" },
+        { "step": 23, "name": "INDEPENDENT_POST_CANARY_SECURITY_REVIEW", "prerequisite": "Step 22 complete" },
+        { "step": 24, "name": "CONSIDER_PRODUCTION_ROUTING_PROMOTION", "prerequisite": "Step 23 complete; separate explicit human architectural review" }
+      ]
+    },
+    "area9_humanApprovalMatrix": {
+      "actionsRequiringExplicitHumanApproval": [
+        "D1 database creation (wrangler d1 create)",
+        "Remote production migration (wrangler d1 migrations apply)",
+        "Production D1 binding configuration",
+        "Worker production upload and deployment",
+        "Cloudflare Access policy creation or change",
+        "mTLS configuration or change",
+        "Service token creation or change",
+        "Cloudflare or infrastructure IAM change",
+        "Production secret provisioning or rotation (wrangler secret put)",
+        "Human trust-anchor enrollment in registry",
+        "Source trust-anchor enrollment in registry",
+        "Production signing-key ceremony execution",
+        "Any readiness gate change",
+        "Any attestation gate change",
+        "Operational route enablement",
+        "Live-state change (CANARY_LIVE_EXECUTION_STATE)",
+        "Global live enablement (CANARY_LIVE_EXECUTION_ENABLED)",
+        "Remote D1 concurrency certification execution",
+        "First provider live canary execution",
+        "Production routing policy promotion (productionRoutingEnforcementAllowed)"
+      ],
+      "automationBoundaries": {
+        "allowedForAutomation": [
+          "Preparing execution plans",
+          "Generating code and configuration diffs",
+          "Drafting CLI commands",
+          "Designing test harnesses",
+          "Formatting evidence templates"
+        ],
+        "strictlyProhibitedFromAutomation": [
+          "Autonomous execution of real infrastructure commands",
+          "Autonomous database migration application",
+          "Autonomous secret injection or provisioning",
+          "Autonomous gate flipping without human review",
+          "Autonomous provider dispatch or routing promotion"
         ]
       }
-    ],
-    "area9_humanApprovalBoundaries": {
-      "mandatoryHumanActions": [
-        "Generation of Ed25519 human authorization keypair (offline hardware/enclave ceremony)",
-        "Signing of human authorization packages for specific certification windows",
-        "Applying production database migrations and provisioning Cloudflare D1",
-        "Provisioning production API keys in Cloudflare Worker secret store",
-        "Promoting certified models to live production routing policy"
-      ],
-      "strictlyProhibitedFromAutomation": [
-        "Autonomous private key generation or signing",
-        "Autonomous secret provisioning or key rotation",
-        "Automatic route enablement without human review",
-        "Bypass of superadmin ingress authorization"
-      ]
     },
-    "area10_currentClaimsRegister": {
-      "verifiedToday": [
-        "Offline-verified, atomic D1 authorization replay ledger backend adapter (D1AuthorizationReplayBackend)",
-        "Production replay coordinator orchestrating source provenance -> attestation -> human auth -> D1 reservation (coordinateProductionReplayReservation)",
-        "Worker ambient capability boundary binding env.DB and env.DEEPSEEK_API_KEY with zero leakage (executeProductionWorkerCanaryCertification)",
-        "Hardened dormant operational route handler with true 65,536-byte streaming limit, public error allowlist, and duplicate JSON member rejection (handleProductionCanaryOperationalRoute)",
-        "Strict fail-closed behavior across all barriers and 100% typecheck compliance"
-      ],
-      "strictlyProhibitedClaims": [
-        "Real D1 database is provisioned",
-        "Migration 0008 has been applied to production",
-        "D1 concurrency certification has been executed on Cloudflare",
-        "Human authorization trust anchor has been provisioned",
-        "Runtime source-provenance trust anchor has been provisioned",
-        "Production ingress authentication is configured",
-        "Live DeepSeek network execution is enabled",
-        "Production routing policy is active"
+    "area10_currentNarrowClaimsRegister": {
+      "claims": [
+        { "component": "D1 authorization replay adapter", "classification": "IMPLEMENTED_AND_OFFLINE_TESTED" },
+        { "component": "Production replay coordinator", "classification": "IMPLEMENTED_AND_OFFLINE_TESTED" },
+        { "component": "Worker ambient capability boundary", "classification": "IMPLEMENTED_AND_OFFLINE_TESTED" },
+        { "component": "Dormant operational route handler", "classification": "IMPLEMENTED_AND_OFFLINE_TESTED" },
+        { "component": "Request byte streaming limit (65536)", "classification": "IMPLEMENTED_AND_OFFLINE_TESTED" },
+        { "component": "Public operational error sanitization", "classification": "IMPLEMENTED_AND_OFFLINE_TESTED" },
+        { "component": "Top-level duplicate JSON member rejection", "classification": "IMPLEMENTED_AND_OFFLINE_TESTED" },
+        { "component": "Production authentication provider", "classification": "NOT_IMPLEMENTED_NOT_PROVEN" },
+        { "component": "Operational ingress protection (Access)", "classification": "NOT_PROVISIONED" },
+        { "component": "Real Cloudflare D1 database", "classification": "NOT_PROVISIONED" },
+        { "component": "Migration 0008 on real D1", "classification": "NOT_APPLIED_NOT_PROVEN" },
+        { "component": "Configured Worker D1 binding", "classification": "NOT_PROVEN" },
+        { "component": "Deployed Worker D1 binding", "classification": "NOT_PROVEN" },
+        { "component": "D1 atomic concurrency under contention", "classification": "NOT_PROVEN" },
+        { "component": "Human authorization trust anchor", "classification": "NOT_PROVISIONED" },
+        { "component": "Runtime source-provenance trust anchor", "classification": "NOT_PROVISIONED" },
+        { "component": "Deployed-source provenance proof chain", "classification": "NOT_PROVEN" },
+        { "component": "Provider live execution", "classification": "DISABLED_NOT_VERIFIED" },
+        { "component": "Production success path", "classification": "NOT_CERTIFIED" },
+        { "component": "Production model routing promotion", "classification": "BLOCKED" }
       ]
     },
     "area11_sealed5U32Boundary": {
       "sealStatus": "A12B2C5U32_HOST_WORKER_BINDING_FOUNDATION_SEAL_APPROVED",
       "boundaryIntact": true,
       "unauthorizedModificationsDetected": false,
-      "baseCommit": "54fd4a1744913d5d06845896cae2bcf36a3f3e39",
-      "baseTree": "d28b9be5fa3f3a94b5e0a7d0335ebb4fdea9004f"
+      "canonicalBaseCommit": "39dfe50c3ea83195112e7b82e2df5ad1c252df7b",
+      "canonicalBaseTree": "f7651c977c78191942488cf6128c249a2d1bce65",
+      "priorParentCommit": "54fd4a1744913d5d06845896cae2bcf36a3f3e39"
     }
-  },
-  "finalVerdict": "A12B2C5U33A_AUDIT_COMPLETE_ALL_PRODUCTION_PROVISIONING_AND_ACTIVATION_BLOCKED"
+  }
 }

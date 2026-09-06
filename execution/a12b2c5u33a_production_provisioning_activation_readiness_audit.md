@@ -1,343 +1,479 @@
-# VELNAR — A.12B.2C-5U.3.3A
-# PRODUCTION PROVISIONING & ACTIVATION READINESS AUDIT
+# VELNAR — A.12B.2C-5U.3.3A-R
+# TARGETED PRODUCTION READINESS AUDIT REPAIR REPORT
 
-**Phase**: VELNAR — A.12B.2C-5U.3.3A  
-**Artifact Type**: `PRODUCTION_PROVISIONING_AND_ACTIVATION_READINESS_AUDIT`  
-**Base Commit**: `54fd4a1744913d5d06845896cae2bcf36a3f3e39`  
-**Base Tree**: `d28b9be5fa3f3a94b5e0a7d0335ebb4fdea9004f`  
-**Branch**: `main`  
-**Audit Date**: `2026-09-06T20:45:00Z`  
-**Execution Mode**: STRICTLY OFFLINE / READ-ONLY INFRASTRUCTURE AUDIT  
-**Prior Seal Status**: `A12B2C5U32_HOST_WORKER_BINDING_FOUNDATION_SEAL_APPROVED` (SEALED & INTACT)  
-**Overall Readiness Status**: `BLOCKED_PENDING_PROVISIONING_AND_ACTIVATION_LIFECYCLE`  
-
----
-
-## 1. EXECUTIVE SUMMARY & AUDIT PURPOSE
-
-Phase `A.12B.2C-5U.3.3A` is an authoritative, strictly offline, read-only audit of the production readiness posture for future phase `5U.3.3` (which will eventually cover real Cloudflare D1 provisioning, production D1 binding, migration application, real concurrency certification, human authorization trust-anchor provisioning, runtime source-provenance trust-anchor provisioning, operational ingress authentication, and production secret configuration).
-
-### Non-Negotiable Operational Constraints Enforced During This Audit
-1. **Zero Infrastructure Actions**: No real Cloudflare D1 databases have been created, modified, bound, or queried. No migrations have been executed.
-2. **Zero Network / External Calls**: No DeepSeek calls, no Gemini calls, no Cloudflare API calls, no network dispatch.
-3. **Zero Cryptographic Key Generation**: No real production private keys or trust anchors were generated, imported, or embedded.
-4. **Zero Live Activation**: All runtime live execution gates (`CANARY_LIVE_EXECUTION_ENABLED`, `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED`, `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY`, etc.) remain strictly `false`.
-5. **Zero Modifications to Source or Test Code**: No `.ts`, `.sql`, or `.jsonc` files were modified.
+**Phase**: VELNAR — A.12B.2C-5U.3.3A-R
+**Artifact Type**: `PRODUCTION_PROVISIONING_AND_ACTIVATION_READINESS_AUDIT_REPAIR`
+**Base Commit**: `39dfe50c3ea83195112e7b82e2df5ad1c252df7b`
+**Base Tree**: `f7651c977c78191942488cf6128c249a2d1bce65`
+**Parent Commit**: `54fd4a1744913d5d06845896cae2bcf36a3f3e39`
+**Branch**: `main`
+**Audit Repair Date**: `2026-09-06T21:15:00Z`
+**Execution Mode**: STRICTLY OFFLINE / READ-ONLY AUDIT REPAIR
+**Prior Seal Status**: `A12B2C5U32_HOST_WORKER_BINDING_FOUNDATION_SEAL_APPROVED` (SEALED & INTACT)
+**Overall Readiness Status**: `BLOCKED_PENDING_PROVISIONING_AND_ACTIVATION_LIFECYCLE`
+**Final Verdict**: `A12B2C5U33AR_PROVISIONING_ACTIVATION_READINESS_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW`
 
 ---
 
-## 2. AUDIT AREA 1 — REAL D1 PROVISIONING READINESS
+## 1. EXECUTIVE SUMMARY & ZERO-ACTION INVARIANTS
 
-### 2.1 Current D1 State & Configuration
-- **Real D1 Database Exists**: **NO**. No real D1 database has been provisioned.
-- **`wrangler.jsonc` Database Configuration**:
-  - `binding`: `"DB"`
-  - `database_name`: `"velnar-production-db"`
-  - `database_id`: `"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"` (strictly placeholder UUID format)
-  - `migrations_dir`: `"migrations"`
-- **Worker Environment Interface**:
-  - `worker/env.ts` declares `DB?: D1Database;` as an optional Worker binding handle.
-- **Code Binding References**:
-  - Sourced by `worker/index.ts` (lines 124, 182, 195) and passed ambiently to the capability boundary in `worker/ai/canary/deepSeekProductionWorkerCapabilityBoundary.ts`.
+Phase `A.12B.2C-5U.3.3A-R` is a targeted audit repair executing strictly in DOCUMENTATION and EVIDENCE mode in response to independent Codex High review feedback on phase `5U.3.3A`.
 
-### 2.2 Migration 0008 Schema & Idempotency Analysis
+This phase introduces **zero source code, test code, configuration, or infrastructure changes**. All runtime execution gates remain strictly `false` or blocked.
+
+### 1.1 Machine-Readable Zero-Action Invariant Register
+| Metric Category | Value | Status |
+| :--- | :---: | :--- |
+| `providerCalls` | **0** | No DeepSeek, Gemini, or external LLM provider calls attempted |
+| `realD1Calls` | **0** | Zero queries, commands, or connections to Cloudflare D1 |
+| `externalProvisioningCalls` | **0** | No Cloudflare, cloud, or edge provisioning APIs called |
+| `productionInfrastructureChanges` | **0** | Zero infrastructure resources added, deleted, or edited |
+| `productionDeployments` | **0** | Zero Worker uploads or deployments to Cloudflare |
+| `productionSecretOperations` | **0** | Zero secrets read, injected, or modified (`wrangler secret`) |
+| `productionKeyGenerationOperations` | **0** | Zero cryptographic keys generated |
+| `productionKeyImportOperations` | **0** | Zero cryptographic keys imported |
+| `trustAnchorProvisioningOperations` | **0** | Zero trust anchors added to production registries |
+| `gateFlipOperations` | **0** | Zero runtime gate constants or evidence properties modified |
+| `networkCallsAttempted` | **0** | Completely offline execution |
+| `sourceModificationsMade` | **false** | `worker/**` directory strictly untouched (0 diff) |
+| `testModificationsMade` | **false** | `tests/**` directory strictly untouched (0 diff) |
+| `infrastructureModificationsMade` | **false** | `migrations/**` and `wrangler.jsonc` strictly untouched |
+| `providerCredentialsObservedOrExposed`| **0** | Zero API keys leaked, accessed, or embedded |
+| `privateKeysGeneratedOrImported` | **0** | Zero private key material in repository or runtime |
+
+---
+
+## 2. REPAIR 2 & 3 — REAL D1 TRUTH STATES & MIGRATION SEMANTICS
+
+### 2.1 Separation of Distinct D1 Audit Concepts
+Readiness is not a single binary switch. Future phase 5U.3.3 requires establishing and proving seven separate truth concepts before runtime gates can be altered:
+
+1. **`AUDIT_CONCEPT_REAL_D1_RESOURCE_EXISTS`** (`false`): A true Cloudflare D1 database resource does not exist in the production account.
+2. **`AUDIT_CONCEPT_D1_DATABASE_ID_RECORDED_AND_VERIFIED`** (`false`): `wrangler.jsonc` currently contains a placeholder UUID (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`).
+3. **`AUDIT_CONCEPT_D1_MIGRATION_0008_APPLIED`** (`false`): `migrations/0008_authorization_replay_ledger.sql` has never been executed against remote Cloudflare D1.
+4. **`AUDIT_CONCEPT_D1_SCHEMA_POST_VERIFIED`** (`false`): Schema and index presence have not been inspected or proven on a real instance.
+5. **`AUDIT_CONCEPT_WORKER_D1_BINDING_CONFIGURED`** (`false`): `wrangler.jsonc` has not been committed with the real database UUID.
+6. **`AUDIT_CONCEPT_WORKER_D1_BINDING_DEPLOYED`** (`false`): A Worker version configured with the live D1 binding has not been uploaded to Cloudflare.
+7. **`AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED`** (`false`): Runtime verification that ambient `env.DB` correctly communicates with the designated database ID has not been performed.
+
+### 2.2 Canonical Source Gate Definitions
+The codebase defines three authoritative D1 runtime gates in `worker/ai/canary/d1AuthorizationReplayBackend.ts`:
+- **`D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED`** (`true as const`): Structural adapter implementation verified via offline in-memory tests.
+- **`D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED`** (`false as const`):
+  * **Strict Definition**: Must **not** mean merely that `wrangler d1 create` completed. It requires that the resource exists, the database ID is verified, migration 0008 is applied, and post-migration schema verification passes.
+- **`D1_REPLAY_BACKEND_PRODUCTION_BOUND`** (`false as const`):
+  * **Strict Definition**: Must **not** mean merely that `wrangler.jsonc` was edited. It requires evidence from an uploaded/deployed Worker version and runtime verification that `env.DB` targets the recorded database.
+- **`D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED`** (`false as const`):
+  * **Strict Definition**: Requires empirical multi-client verification under concurrent load using the dedicated provider-free certification protocol.
+
+### 2.3 Migration 0008 Semantics & Correct Idempotency Classification
 - **Migration File**: `migrations/0008_authorization_replay_ledger.sql`
-- **Target Table Name**: `authorization_replay_ledger`
-- **Schema Columns & Check Constraints**:
-  - `replay_key TEXT PRIMARY KEY NOT NULL CHECK (length(replay_key) = 64 AND replay_key NOT GLOB '*[^0-9a-f]*')`
-  - `ledger_version TEXT NOT NULL CHECK (ledger_version = 'a12b2c5r-v1')`
-  - `authorization_payload_digest_sha256 TEXT NOT NULL CHECK (length(authorization_payload_digest_sha256) = 64 AND authorization_payload_digest_sha256 NOT GLOB '*[^0-9a-f]*')`
-  - `authority_id TEXT NOT NULL CHECK (length(authority_id) >= 1 AND length(authority_id) <= 128 AND authority_id NOT GLOB '*[^A-Za-z0-9_-]*')`
-  - `key_version TEXT NOT NULL CHECK (length(key_version) >= 1 AND length(key_version) <= 64 AND key_version NOT GLOB '*[^A-Za-z0-9_.-]*')`
-  - `run_nonce TEXT NOT NULL CHECK (length(run_nonce) >= 16 AND length(run_nonce) <= 128 AND run_nonce NOT GLOB '*[^A-Za-z0-9_-]*')`
-  - `expires_at TEXT NOT NULL CHECK (strftime('%Y-%m-%dT%H:%M:%fZ', expires_at) IS NOT NULL AND expires_at LIKE '%Z')`
-  - `expires_at_epoch_ms INTEGER NOT NULL CHECK (typeof(expires_at_epoch_ms) = 'integer' AND expires_at_epoch_ms > 0)`
-  - `reserved_at TEXT NOT NULL CHECK (strftime('%Y-%m-%dT%H:%M:%fZ', reserved_at) IS NOT NULL AND reserved_at LIKE '%Z')`
-- **Secondary Index**:
-  - `idx_authorization_replay_ledger_expires_at_epoch_ms ON authorization_replay_ledger(expires_at_epoch_ms)`
-- **Cloudflare Execution Status**: **NEVER EXECUTED**. Migration 0008 has not been applied to any Cloudflare D1 instance.
-- **Idempotency Posture**:
-  - Migration 0008 uses standard DDL statements (`CREATE TABLE` and `CREATE INDEX` without `IF NOT EXISTS`).
-  - It is designed to be tracked and applied exactly once by Wrangler’s canonical migration tracking table (`d1_migrations`). Running the migration twice outside Wrangler's ledger would fail closed with `table authorization_replay_ledger already exists`.
-
-### 2.3 Future Provisioning Commands & Code Edits
-When approved for execution in future Phase 5U.3.3:
-1. **Provision Command**:
-   ```bash
-   npx wrangler d1 create velnar-production-db
-   ```
-2. **Apply Migration Command**:
-   ```bash
-   npx wrangler d1 migrations apply velnar-production-db --remote
-   ```
-3. **Files That Must Be Updated Post-Provisioning**:
-   - `wrangler.jsonc`: Replace `"database_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"` with the actual database UUID emitted by Cloudflare.
-   - `worker/ai/canary/d1AuthorizationReplayBackend.ts`:
-     - Flip `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED` from `false` to `true`.
-     - Flip `D1_REPLAY_BACKEND_PRODUCTION_BOUND` from `false` to `true`.
-
-### 2.4 D1 Backend Adapter Gates
-Located in `worker/ai/canary/d1AuthorizationReplayBackend.ts`:
-- `D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED`: `true as const` (implemented & sealed in Phase 5T)
-- `D1_REPLAY_BACKEND_PRODUCTION_BOUND`: `false as const` (unbound)
-- `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED`: `false as const` (unprovisioned)
-- `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED`: `false as const` (uncertified)
+- **Table Created**: `authorization_replay_ledger`
+- **Index Created**: `idx_authorization_replay_ledger_expires_at_epoch_ms`
+- **SQL-Level Idempotency**: **`FALSE`**.
+  * The SQL statements (`CREATE TABLE` and `CREATE INDEX`) do **not** use `IF NOT EXISTS`.
+  * If executed raw twice against the database, the second execution will fail with a fatal SQLite error: `table authorization_replay_ledger already exists`.
+- **Wrangler Migration History Behavior**:
+  * Wrangler tracks applied migrations in its internal `d1_migrations` table and applies only unapplied migration versions.
+- **Authoritative Classification**: **`MIGRATION_HISTORY_GUARDED_NOT_SQL_IDEMPOTENT`**.
 
 ---
 
-## 3. AUDIT AREA 2 — CONCURRENCY CERTIFICATION
+## 3. REPAIR 4 — D1 COMMAND GUARDRAILS
 
-### 3.1 Definition & Requirements
-Real concurrency certification requires empirical, multi-client proof against a real, provisioned Cloudflare D1 database that single-statement atomic conflict resolution:
-```sql
-INSERT INTO authorization_replay_ledger (...)
-VALUES (...)
-ON CONFLICT(replay_key) DO NOTHING
-RETURNING replay_key;
+### 3.1 Future Commands Are Examples Only
+The CLI invocations referenced in planning documents:
+```bash
+npx wrangler d1 create velnar-production-db
+npx wrangler d1 migrations apply velnar-production-db --remote
 ```
-strictly preserves mutual exclusion under true distributed execution.
-Specifically:
-- Under $N$ simultaneous concurrent requests attempting to reserve the identical `replay_key`, exactly 1 request MUST receive `status: 'RESERVED'` (with 1 returning row and `meta.rows_written === 1`).
-- The remaining $N-1$ requests MUST receive `status: 'ALREADY_RESERVED'` (with 0 returning rows and `meta.rows_written === 0`).
-- Zero unhandled exceptions or 500 errors may occur.
-- Exactly 1 row may exist in `authorization_replay_ledger` post-execution.
+are **PLAN EXAMPLES ONLY**, **NOT** an authorization to execute.
 
-### 3.2 Inadequacy of Synthetic Unit Tests
-- In synthetic unit tests (such as `vitest`), the D1 interface is mocked in-memory or executed against a local single-threaded SQLite instance.
-- Mocks cannot replicate Cloudflare edge-to-D1 network latency variance, SQLite WAL write lock contention, distributed request scheduling, or edge worker isolate concurrency.
-- Synthetic passing proves code structure only, not distributed Cloudflare D1 storage semantics.
-
-### 3.3 Test Harness Requirements & Gate
-- **Required Harness**: An automated concurrency test script running $N$ parallel fetch requests against the deployed Worker endpoint or remote D1 binding, evaluating win/loss distribution and asserting deterministic collision rejection.
-- **Authoritative Gate**: `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` in `worker/ai/canary/d1AuthorizationReplayBackend.ts`.
-- **Precondition**: This gate CANNOT be flipped until a real remote D1 database exists, has migration 0008 applied, and passes live concurrency evaluation.
+### 3.2 Mandatory Pre-Execution Guardrails
+Before any Cloudflare D1 commands may be executed in future phases, the following 12 conditions must be satisfied:
+1. Explicit human approval recorded for database creation.
+2. Exact Cloudflare account ID verified and matched against intended production account.
+3. Exact Wrangler environment and config file confirmed.
+4. Active identity confirmed via `npx wrangler whoami`.
+5. Returned database UUID captured and verified.
+6. Returned database UUID compared against intended architecture resource target.
+7. Pre-migration schema inspection performed on the freshly created database.
+8. D1 Time Travel / bookmark or equivalent recovery point recorded prior to migration.
+9. Explicit rollback and recovery procedure documented.
+10. Post-migration schema verification executed (`PRAGMA table_info`).
+11. Post-migration index verification executed (`PRAGMA index_list`).
+12. Zero automatic gate flips; all code edits require separate reviewed commits.
 
 ---
 
-## 4. AUDIT AREA 3 — HUMAN AUTHORIZATION TRUST ANCHOR
+## 4. REPAIR 5 — REMOVAL OF WAL OVERSTATEMENT & PRECISE CLASSIFICATION
 
-### 4.1 Current Status & Registry Contents
-- **Provisioning Status**: **UNPROVISIONED**.
-- **Gate Status**: `PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED = false as const` in `worker/ai/canary/deepSeekProductionAuthorizationTrust.ts`.
-- **Registry State**: `PRODUCTION_HUMAN_AUTHORITY_REGISTRY` is `Object.freeze([])` (length 0).
-- **Slot Readiness**:
-  - `PRODUCTION_TRUST_ANCHOR_SLOT_READY = false as const`
-  - `PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED = false as const`
+Prior documentation stated that D1 concurrency certification was required to reproduce "SQLite WAL lock contention." This claim is removed as an unsupported assumption regarding Cloudflare D1's distributed internal architecture.
 
-### 4.2 Target Authority Specification
+### Precise Technical Classification
+1. **Single-Database Query Serialization Semantics**: `CLOUDFLARE_DOCUMENTATION_DEPENDENT`.
+   * Cloudflare D1 routes writes through a primary database coordinator. Developers must not assume desktop SQLite file locking or standard multi-process WAL behaviors.
+2. **Atomic `INSERT ... ON CONFLICT ... RETURNING` Under Contention**: `EMPIRICAL_CERTIFICATION_REQUIRED`.
+   * Real-world edge concurrency must empirically demonstrate that exactly 1 request reserves the key and all competing concurrent requests are rejected cleanly.
+3. **VELNAR Classification Behavior Under Transport / Timeout Ambiguity**: `EMPIRICAL_CERTIFICATION_REQUIRED`.
+   * Edge workers must classify dropped connections or transaction timeouts deterministically without corrupting the replay ledger.
+
+---
+
+## 5. REPAIR 6 & 7 — PROVIDER-FREE D1 CONCURRENCY PROTOCOL
+
+### 5.1 Prohibition of Public Operational Endpoint
+The public operational route (`/api/ops/canary/deepseek-certification`) **MUST NOT** be used for D1 concurrency testing:
+- When live execution is disabled (`CANARY_LIVE_EXECUTION_ENABLED === false`), the endpoint aborts before reaching D1 reservation.
+- When live execution is enabled, a successful reservation causes the Worker to attempt live provider dispatch and secret access.
+
+### 5.2 Provider-Free D1 Certification Harness (Future Plan Only — DO NOT IMPLEMENT NOW)
+A temporary, isolated, provider-free test harness must be utilized for concurrency certification:
+- **Binding Scope**: Accesses `env.DB` only.
+- **Provider Isolation**: Zero imports of DeepSeek or provider transports; zero access to `env.DEEPSEEK_API_KEY`.
+- **Zero Customer Data**: Employs strictly synthetic replay keys.
+- **Deployment Lifecycle**: Separately protected test worker or dedicated temporary endpoint, completely removed/disabled post-certification.
+- **Human Approval**: Explicit human authorization required before deploying the harness.
+
+### 5.3 Canonical Experiment Design
+1. **Contested Collision Benchmark**:
+   - **Rounds**: 20 rounds.
+   - **Contenders**: 32 concurrent requests per round.
+   - **Key Policy**: 1 fresh synthetic replay key per round shared across all 32 contenders.
+   - **Expected Outcome per Round**:
+     * Exactly **1** request returns `RESERVED`.
+     * Exactly **31** requests return `ALREADY_RESERVED`.
+     * Database row count for the key equals exactly **1**.
+2. **Uncontested Control Benchmark**:
+   - **Rounds**: 20 rounds.
+   - **Contenders**: 32 concurrent requests per round.
+   - **Key Policy**: 32 distinct synthetic replay keys per round (1 per contender).
+   - **Expected Outcome per Round**:
+     * Exactly **32** requests return `RESERVED`.
+     * Database row count increases by exactly **32**.
+3. **Execution Constraints**:
+   - Synchronized start barrier across contenders.
+   - Multi-client geographical distribution across at least two distinct regions (if topology permits).
+   - Automatic per-request retries **disabled**.
+   - Network timeout or ambiguous transport results must be classified as `BACKEND_UNAVAILABLE` or `AMBIGUOUS_UNCERTIFIED_OUTCOME` (never `ALREADY_RESERVED`). The database must be inspected directly, and the entire round retried with a new synthetic key.
+
+### 5.4 Concurrency Evidence Schema
+Future test runs must capture the following schema:
+- **Mandatory Fields**:
+  * `certificationRunId`
+  * `roundId`
+  * `replayKeyHashOrSyntheticKey`
+  * `requestId`
+  * `clientRegion`
+  * `requestStartTimestamp`
+  * `requestEndTimestamp`
+  * `httpResultClassification`
+  * `reservationClassification`
+  * `databaseRowCount`
+  * `exactStoredReplayRecordFields`
+  * `d1ErrorMetadata`
+  * `transportAmbiguity`
+  * `retryCount`
+  * `providerCalls` (= 0)
+  * `credentialReads` (= 0)
+- **Runtime-Dependent Fields** (`CAPTURE_IF_EXPOSED_BY_RUNTIME`):
+  * `rows_written`
+  * `served_by_region`
+  * `served_by_primary`
+  * `total_attempts`
+
+---
+
+## 6. REPAIR 8 — EXPANDED HUMAN TRUST-ANCHOR CEREMONY
+
+### 6.1 Canonical Target Identity
 - **Authority ID**: `'velnar-lead-ops-prod'` (`CANONICAL_TARGET_AUTHORITY_ID`)
 - **Key Version**: `'2026-v1'` (`CANONICAL_TARGET_KEY_VERSION`)
 - **Algorithm**: `'Ed25519'` (`CANONICAL_TARGET_ALGORITHM`)
+- **Public Format**: SubjectPublicKeyInfo (SPKI) PEM
+- **Current State**: Registry is empty (`length === 0`); `PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED = false as const`.
 
-### 4.3 Key Ceremony & Repository Boundaries
-- **Private Key Generation Location**: Strictly outside the git repository, outside CI/CD, and outside AI agent context (e.g., in an offline hardware security module, hardware token, or air-gapped secure enclave) by an authorized human operator.
-- **Allowed Repository Artifacts**:
-  - Public key in SPKI PEM format (`publicKeyPem`)
-  - Computed SHA-256 fingerprint (`publicKeyFingerprintSha256`)
-  - Canonical provisioning record (`ProductionTrustAnchorProvisioningRecord`)
-  - Manual handoff receipt (`ProductionTrustAnchorManualHandoffReceipt`)
-- **Strictly Prohibited**:
-  - Private key bytes, seed phrases, or private key PEMs must NEVER enter git, source code, execution logs, environment variables, or prompts.
+### 6.2 Ceremony Requirements & Operational Controls
+1. **Key Generation Isolation**: Key generation must take place in an offline, air-gapped environment (hardware security module, YubiKey / PIV, or dedicated secure enclave).
+2. **Private Key Non-Exportability**: The private key must be generated with non-exportable attributes where supported.
+3. **Documented Backup Policy**: Formal decision between an encrypted, split-knowledge offline backup or an explicit, documented no-backup / re-key policy.
+4. **Dual Control & Witnessing**: Ceremony must involve dual control and satisfy canonical witness requirements.
+5. **Fingerprint Verification**: SHA-256 public key fingerprint must be verified across independent out-of-band communication channels.
+6. **Lifecycle Procedures**: Documented procedures for key rotation, overlap periods, emergency revocation, compromise response, secure destruction, audit logging, and trust-anchor rollback.
 
-### 4.4 Verification Integration
-- Production human authorization packages are validated by `verifyProductionHumanAuthorizationPackage` in `deepSeekProductionAuthorizationTrust.ts`.
-- In its current unprovisioned state, any verification attempt immediately fails closed with `PRODUCTION_AUTHORITY_TRUST_ANCHOR_NOT_PROVISIONED`.
-
----
-
-## 5. AUDIT AREA 4 — RUNTIME SOURCE-PROVENANCE TRUST ANCHOR
-
-### 5.1 Current Status & Registry Contents
-- **Provisioning Status**: **UNPROVISIONED**.
-- **Gate Status**:
-  - `RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED = false as const`
-  - `TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY = false as const`
-- **Registry State**: `PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES` is `Object.freeze([])` (length 0).
-
-### 5.2 Target Specifications & Receipt Schema
-- **Target Repository**: Strictly `'kayrastos/updated-velnaar'` (`CANONICAL_REPOSITORY_FULL_NAME`)
-- **Target Environment**: Strictly `'production'` (`CANONICAL_ENVIRONMENT`)
-- **Algorithm**: Strictly `'Ed25519'` (`CANONICAL_ALGORITHM`)
-- **Receipt Schema**: Exact 14 required properties in `RuntimeSourceProvenanceReceipt`:
-  1. `provenanceVersion`
-  2. `repositoryFullName`
-  3. `sourceCommitSha`
-  4. `sourceTreeSha`
-  5. `buildArtifactSha256`
-  6. `buildId`
-  7. `deploymentId`
-  8. `environment`
-  9. `issuedAt`
-  10. `expiresAt`
-  11. `issuerId`
-  12. `issuerKeyVersion`
-  13. `algorithm`
-  14. `signatureBase64`
-
-### 5.3 Coordinator Integration & Fail-Closed Behavior
-- In `deepSeekProductionReplayCoordinator.ts`, the receipt is verified via `verifyProductionRuntimeSourceProvenanceReceipt`.
-- Because the registry is empty and the trust anchor gate is `false`, verification fails closed with `RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_NOT_PROVISIONED`.
-- Only after successful source receipt verification does the coordinator derive `TrustedSourceAttestation` and bind it against the human authorization package’s `sourceCommitSha` and `sourceTreeSha`.
+### 6.3 Absolute Private Key Quarantine
+Private key bytes, seed phrases, or private key PEMs **MUST NEVER ENTER**:
+- Git repository or commit history
+- Pull requests or code diffs
+- Cloudflare Worker bundles or environment variables
+- AI context windows, prompts, training pipelines, or logs (ChatGPT, Codex, Antigravity)
+- Test fixtures, test logs, or debug screenshots
+- Local `.env` files or temporary scratch files
 
 ---
 
-## 6. AUDIT AREA 5 — PRODUCTION AUTHENTICATION PROVIDER
+## 7. REPAIR 9 — REMOVAL OF ARTIFICIAL D1 → TRUST ANCHOR DEPENDENCY
 
-### 6.1 Current AuthContextService Implementation
-In `worker/auth/authContext.ts`:
-```typescript
-// 4. Production JWT / server session token resolution
-// In this runtime, unverified external tokens return null (fail-closed)
-return null;
-```
-- In production (`environment === 'production'`), `AuthContextService.resolveSessionUser`:
-  - Rejects all `test_user:...` tokens (returns `null`).
-  - Rejects all development fixture tokens (returns `null`).
-  - Returns `null` for all other bearer tokens.
-- **Consequence**: Every production HTTP request to protected endpoints receives HTTP `401 UNAUTHORIZED` at line 162 of `worker/index.ts`.
-- **SuperAdmin Identity**: Because `resolveSessionUser` returns `null` in production, `user.isSuperAdmin === true` can never be resolved.
-- **Required Implementation**: A production JWT or session verification provider (e.g. Cloudflare Access JWT validation or cryptographic token verification) must be integrated into `authContext.ts` before any operational route ingress is possible.
+Prior documentation coupled `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` directly to `PRODUCTION_TRUST_ANCHOR_SLOT_READY`.
+
+### Classification: Policy Ordering vs Source Dependency
+- **Source Code Verification**: In `deepSeekProductionAuthorizationTrust.ts`, `PRODUCTION_TRUST_ANCHOR_SLOT_READY` evaluates trust registry slot availability and is completely independent of D1 runtime code.
+- **Correction**: The sequencing of D1 concurrency certification before trust anchor activation is classified strictly as a **`POLICY ORDERING`**, **not** a `SOURCE-ENFORCED DEPENDENCY`. Both controls are independently preparable and verifiable.
 
 ---
 
-## 7. AUDIT AREA 6 — OPERATIONAL INGRESS ROUTE & SUPERADMIN ACTIVATION
+## 8. REPAIR 10 — SOURCE PROVENANCE PROOF CHAIN
 
-### 7.1 Current Route State & Dual Barriers
-- **Path**: `/api/ops/canary/deepseek-certification` (`PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH`)
-- **Policy Gates** (`worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts`):
-  - `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = false as const`
-  - `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = false as const`
-- **Direct Invocation Behavior**:
-  - The handler evaluates arguments and dual barriers before reading any request body or accessing any environment capability.
-  - Returns HTTP `404 NOT_FOUND` immediately.
-- **End-to-End Pipeline Behavior Today**:
-  - Requests arriving via `worker/index.ts` are intercepted by the host authentication boundary (`AuthContextService.resolveSessionUser`), returning HTTP `401 UNAUTHORIZED`.
+### 8.1 Correct Current State Classification
+- **Implemented Foundation**: `SIGNED_PROVENANCE_ASSERTION_FOUNDATION_IMPLEMENTED`.
+  * The receipt verification logic in `deepSeekProductionReplayCoordinator.ts` confirms that an Ed25519 signature over JSON provenance fields is mathematically valid against configured public keys.
+- **Unproven Production State**: `DEPLOYED_BUNDLE_PROVENANCE_NOT_PROVEN`.
+  * Signature verification alone does **not** prove that the currently running Worker JavaScript bytecode in Cloudflare was compiled from the audited commit and tree SHA.
 
-### 7.2 Future Active Operational Path Invariants
-If both operational route gates are approved and flipped to `true`:
-1. **HTTP Method**: Must be `POST` (HTTP `405` otherwise).
-2. **SuperAdmin Authorization**: Evaluates `user.isSuperAdmin === true`. Standard tenant roles (`OWNER`, `ADMIN`, `MANAGER`, `STAFF`, `VIEWER`) fail closed with HTTP `403 FORBIDDEN`.
-3. **MIME Type**: Must be `application/json` (HTTP `400` otherwise).
-4. **Header Validation**: `Content-Length` must be unsigned decimal $\le 65,536$ bytes.
-5. **Stream Bounding**: Incrementally reads `request.body.getReader()`, aborting at 65,537 bytes with HTTP `413 PAYLOAD_TOO_LARGE`.
-6. **Envelope Scanning**: `scanTopLevelJsonEnvelope` enforces exactly two top-level keys: `authorizationPackage` and `sourceProvenanceReceipt`, rejecting duplicate keys and prototype smuggling.
-7. **Host Capability Binding**: Passes the exact ambient `env` reference to `executeProductionWorkerCanaryCertification`.
-8. **Error Sanitization**: Downstream errors are filtered strictly through `mapToPublicOperationalErrors`, completely redacting internal SQL, D1, or provider messages.
+### 8.2 Full Required 12-Stage Provenance Proof Chain
+To claim true end-to-end provenance in production, the following proof chain must be established:
+1. Audited and approved Git source commit SHA and tree SHA.
+2. Controlled, hermetic CI/CD build runner.
+3. Production bundle compilation.
+4. Cryptographic SHA-256 hash calculation of the final deployment artifact.
+5. Immutable artifact archiving in secure storage.
+6. Signed runtime source-provenance receipt generation referencing the artifact SHA.
+7. Cloudflare Worker deployment ID / version ID capture.
+8. Cloudflare upload receipts and deployment metadata verification.
+9. Proof that the uploaded bundle equals the signed artifact SHA.
+10. Active Cloudflare deployment version verification.
+11. Runtime receipt comparison at request execution boundary.
+12. Verification of deterministic / reproducible builds as an additional hardening control.
 
 ---
 
-## 8. AUDIT AREA 7 — COMPLETE GATE DEPENDENCY DAG
+## 9. REPAIR 11 & 12 — PRODUCTION AUTHENTICATION ARCHITECTURE
 
-The entire system is structured as a strict multi-tier directed acyclic graph (DAG) of fail-closed gates. A failure or `false` value at any layer blocks all downstream capabilities:
+### 9.1 Recommended 4-Layer Security Architecture
+Vague references to "Cloudflare Access or JWT" are replaced with an explicit defense-in-depth model:
 
 ```
-[ Layer 1: Storage Infrastructure ]
-├── D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED (true)
-├── D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED (false) ─────────┐
-├── D1 Migration 0008 Applied (false)                           │
-├── D1_REPLAY_BACKEND_PRODUCTION_BOUND (false)                  │
-└── D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED (false) ◄──────┤
-                                                                │
-[ Layer 2: Cryptographic Trust Anchors ]                        │
-├── PRODUCTION_TRUST_ANCHOR_SLOT_READY (false)                  │
-├── PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED (false) ──────┼──┐
-├── PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED (false)              │  │
-├── RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED (false) ─┼──┼──┐
-└── TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY (false)             │  │  │
-                                                                │  │  │
-[ Layer 3: Attestation Readiness ]                              │  │  │
-├── GUARDED_HUMAN_AUTH_ATTESTATION_READY (false) ───────────────┼──┘  │
-└── GUARDED_SOURCE_ATTESTATION_READY (false) ───────────────────┼─────┘
-                                                                │
-[ Layer 4: Ingress Authentication ]                             │
-├── PRODUCTION_AUTH_PROVIDER_CONFIGURED (false)                 │
-└── PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY (false) ───┤
-                                                                │
-[ Layer 5: Operational Ingress Route ]                          │
-└── PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED (false) ◄───────┤
-                                                                │
-[ Layer 6: Live Execution & Routing Policy ]                    │
-├── CANARY_LIVE_EXECUTION_ENABLED (false) ◄─────────────────────┘
-└── PRODUCTION_ROUTING_ENFORCEMENT_ALLOWED (false)
+[ Layer 1: Edge Ingress ]
+└── Cloudflare Access on dedicated operational hostname/path (/api/ops/*)
+    ├── IdP Authentication (Single Sign-On / MFA)
+    └── Cloudflare Edge Policy Check
+        │
+[ Layer 2: Cryptographic Application Identity ]
+└── Cloudflare Worker Ingress Validation (worker/auth/authContext.ts)
+    ├── Validates Cf-Access-Jwt-Assertion signature via Cloudflare Access public certs
+    ├── Verifies expected AUD (Audience tag)
+    ├── Verifies expected ISS (Issuer URL)
+    ├── Validates EXP (Expiration) and NBF (Not Before)
+    └── Extracts immutable verified user identity (email / subject)
+        │
+[ Layer 3: Operational SuperAdmin Authorization ]
+└── Dedicated Operational Authorization Allowlist (Zero Tenant Bleed)
+    ├── Matches verified identity against hardcoded/configured SuperAdmin allowlist
+    ├── Rejects standard tenant roles (OWNER, ADMIN, MANAGER, VIEWER)
+    └── Rejects any request-supplied role or header claims
+        │
+[ Layer 4: Per-Run Cryptographic Authorization ]
+└── Single-Use Signed Human Authorization Package
+    ├── Authority Ed25519 signature verification
+    ├── Bounded financial budget check
+    ├── Commit and tree SHA binding check
+    └── Single-use atomic replay key reservation in D1
+```
+
+*Rule: Cloudflare Access alone is not sufficient application authorization.*
+
+### 9.2 Comparative Evaluation of Ingress Options
+- **Option A: Cloudflare Access + App Identity Validation + SuperAdmin Mapping**:
+  * **Evaluation**: **`RECOMMENDED_MINIMUM_FOR_HUMAN_OPERATIONS`**. Provides strong MFA, browser-based auditing, and cryptographic token verification in the Worker.
+- **Option B: Access Service Token + Explicit Application Authorization**:
+  * **Evaluation**: `ACCEPTABLE_FOR_MACHINE_ONLY_TEMPORARY_D1_HARNESS`. May be used for the automated concurrency test harness, but must never be granted human superadmin authority.
+- **Option C: mTLS + Explicit Application Authorization**:
+  * **Evaluation**: High device-certificate lifecycle overhead; viable for specialized air-gapped terminals.
+- **Option D: Cloudflare Access + mTLS + Application Authorization**:
+  * **Evaluation**: Future defense-in-depth hardening if organizational risk justifies client certificate maintenance.
+
+---
+
+## 10. REPAIR 13, 14 & 15 — EXPANDED DAG & CANONICAL GATE AUDIT
+
+### 10.1 Canonical Gate vs Audit Concept Classification
+Every node in the dependency graph is categorized strictly by its architectural type:
+- **`CANONICAL_RUNTIME_GATE`**: An actual exported constant or variable in the TypeScript source code that gates execution.
+- **`CANONICAL_EVIDENCE_PROPERTY`**: An authoritative property in evidence schemas (`productionRoutingEnforcementAllowed: false`).
+- **`AUDIT_CONCEPT`**: An infrastructure or operational state required for readiness evaluation.
+- **`POLICY_ORDERING`**: A procedural dependency imposed by operational policy rather than runtime code.
+
+### 10.2 Expanded 36-Node Dependency Graph
+```
+[ Category: D1 Storage & Concurrency ]
+├── D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED (CANONICAL_RUNTIME_GATE: true)
+├── AUDIT_CONCEPT_REAL_D1_RESOURCE_EXISTS (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_D1_DATABASE_ID_RECORDED_AND_VERIFIED (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_D1_MIGRATION_0008_APPLIED (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_D1_SCHEMA_POST_VERIFIED (AUDIT_CONCEPT: false)
+├── D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED (CANONICAL_RUNTIME_GATE: false)
+├── AUDIT_CONCEPT_WORKER_D1_BINDING_CONFIGURED (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_WORKER_D1_BINDING_DEPLOYED (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED (AUDIT_CONCEPT: false)
+├── D1_REPLAY_BACKEND_PRODUCTION_BOUND (CANONICAL_RUNTIME_GATE: false)
+├── AUDIT_CONCEPT_PROVIDER_FREE_D1_HARNESS_DEPLOYED (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_RECORDED (AUDIT_CONCEPT: false)
+└── D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED (CANONICAL_RUNTIME_GATE: false)
+
+[ Category: Human Authority Trust Anchor ]
+├── AUDIT_CONCEPT_HUMAN_KEY_CEREMONY_COMPLETED (AUDIT_CONCEPT: false)
+├── PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED (CANONICAL_RUNTIME_GATE: false)
+├── PRODUCTION_TRUST_ANCHOR_SLOT_READY (CANONICAL_RUNTIME_GATE: false) [POLICY_ORDERING]
+├── PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED (CANONICAL_RUNTIME_GATE: false)
+└── GUARDED_HUMAN_AUTH_ATTESTATION_READY (CANONICAL_RUNTIME_GATE: false)
+
+[ Category: Source Provenance Trust Anchor ]
+├── AUDIT_CONCEPT_SOURCE_PROVENANCE_SIGNER_PROVISIONED (AUDIT_CONCEPT: false)
+├── RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED (CANONICAL_RUNTIME_GATE: false)
+├── AUDIT_CONCEPT_PROVENANCE_PIPELINE_VERIFIED (AUDIT_CONCEPT: false)
+├── TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY (CANONICAL_RUNTIME_GATE: false)
+└── GUARDED_SOURCE_ATTESTATION_READY (CANONICAL_RUNTIME_GATE: false)
+
+[ Category: Ingress Authentication & Operational Route ]
+├── AUDIT_CONCEPT_PRODUCTION_AUTH_IMPLEMENTED (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_PRODUCTION_AUTH_VERIFIED (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_ACCESS_INGRESS_CONFIGURED (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_ACCESS_INGRESS_VERIFIED (AUDIT_CONCEPT: false)
+├── PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY (CANONICAL_RUNTIME_GATE: false)
+└── PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED (CANONICAL_RUNTIME_GATE: false)
+
+[ Category: Live Canary Execution & Routing Promotion ]
+├── AUDIT_CONCEPT_PROVIDER_SECRET_PROVISIONED (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_PRE_ACTIVATION_SECURITY_REVIEW (AUDIT_CONCEPT: false)
+├── CANARY_LIVE_EXECUTION_ENABLED (CANONICAL_RUNTIME_GATE: false)
+├── CANARY_LIVE_EXECUTION_STATE (CANONICAL_RUNTIME_GATE: 'BLOCKED_PENDING_CERTIFICATION')
+├── AUDIT_CONCEPT_BOUNDED_LIVE_CANARY_EXECUTED (AUDIT_CONCEPT: false)
+├── AUDIT_CONCEPT_POST_CANARY_INDEPENDENT_REVIEW (AUDIT_CONCEPT: false)
+└── productionRoutingEnforcementAllowed (CANONICAL_EVIDENCE_PROPERTY: false)
 ```
 
 ---
 
-## 9. AUDIT AREA 8 — RECOMMENDED STEP-BY-STEP ACTIVATION ORDER
+## 11. REPAIR 16 & 17 — SAFE 25-STEP ACTIVATION ORDER & ATOMIC GATE FLIPS
 
-Activation must follow this exact sequential order; no step may be reordered or bypassed:
+### 11.1 Mandatory Atomic Gate Flip Rule
+**No future commit or release may combine unrelated truth transitions.** Each gate flip must correspond to exactly one logical truth claim verified by independent evidence.
 
-1. **Step 1 — Cloudflare D1 Provisioning & Schema Migration**:
-   - Run `npx wrangler d1 create velnar-production-db`
-   - Update `wrangler.jsonc` with the assigned `database_id`
-   - Run `npx wrangler d1 migrations apply velnar-production-db --remote`
-   - Flip `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED = true` and `D1_REPLAY_BACKEND_PRODUCTION_BOUND = true`
-2. **Step 2 — Remote Concurrency Certification**:
-   - Execute the multi-request concurrency certification harness against remote D1
-   - Verify single-winner mutual exclusion and zero collisions
-   - Flip `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED = true`
-3. **Step 3 — Human Authorization Trust Anchor Provisioning**:
-   - Execute offline key ceremony to generate Ed25519 keypair outside the repository
-   - Register public key in `PRODUCTION_HUMAN_AUTHORITY_REGISTRY`
-   - Flip `PRODUCTION_TRUST_ANCHOR_SLOT_READY = true`, `PRODUCTION_TRUST_ANCHOR_SLOT_POPULATED = true`, `PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED = true`, and `GUARDED_HUMAN_AUTH_ATTESTATION_READY = true`
-4. **Step 4 — Runtime Source-Provenance Trust Anchor Provisioning**:
-   - Establish CI/CD provenance signer and register public key in `PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES`
-   - Flip `RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED = true`, `TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY = true`, and `GUARDED_SOURCE_ATTESTATION_READY = true`
-5. **Step 5 — Production Ingress Authentication Implementation**:
-   - Implement cryptographic session token / JWT verification in `worker/auth/authContext.ts`
-   - Enable verified `isSuperAdmin` claim extraction
-   - Flip `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = true`
-6. **Step 6 — Operational Route Enablement**:
-   - Deploy Worker with `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = true`
-   - Configure `DEEPSEEK_API_KEY` via `wrangler secret put`
-7. **Step 7 — Single-Use Live Canary Certification Dispatch**:
-   - Issue single-use human authorization package (lifetime $\le 15$ minutes)
-   - Issue matching runtime source provenance receipt for active commit/tree SHA
-   - Dispatch `POST /api/ops/canary/deepseek-certification`
-   - Execute 7-task certification under bounded budget and timeout
-8. **Step 8 — Post-Certification Review & Routing Promotion**:
-   - Audit persisted execution evidence
-   - Conduct human architectural review
-   - Conditionally enable production routing policy
+### 11.2 Step-by-Step Activation Sequence (Steps 0–24)
+- **Step 0**: Phase `5U.3.3A-R` independently approved.
+- **Step 1**: Implement production Access JWT validation + explicit operational-superadmin mapping while all operational/live gates remain false.
+- **Step 2**: Independently review production authentication implementation.
+- **Step 3**: Configure Cloudflare Access ingress while operational route remains dormant.
+- **Step 4**: Verify Access ingress behavior while route remains dormant.
+- **Step 5**: Under separate explicit human approval, create real D1 in exact verified account.
+- **Step 6**: Record and independently verify returned D1 identity.
+- **Step 7**: Under separate approval, apply migration 0008 with pre/post schema + recovery evidence.
+- **Step 8**: Configure Worker D1 binding in a separate reviewed commit.
+- **Step 9**: Upload/deploy bound Worker with operational route false, ingress readiness false, attestation readiness false, and live execution false.
+- **Step 10**: Verify deployed runtime DB binding.
+- **Step 11**: Deploy/use separately protected provider-free D1-only certification harness.
+- **Step 12**: Run D1 concurrency certification (20 contested + 20 control rounds).
+- **Step 13**: Disable/remove the temporary D1-only harness.
+- **Step 14**: Independently review concurrency evidence.
+- **Step 15**: Perform human authorization public trust-anchor ceremony and enrollment outside repository.
+- **Step 16**: Independently verify human trust-anchor evidence.
+- **Step 17**: Provision source signer + source public trust anchor.
+- **Step 18**: Implement and verify full build -> artifact -> deployment provenance chain.
+- **Step 19**: Provision required production provider secret into a NON-LIVE Worker version under separate approval.
+- **Step 20**: Conduct independent pre-activation security review.
+- **Step 21**: Flip readiness/attestation/route/live controls separately (one logical truth claim per reviewed commit/deployment).
+- **Step 22**: Execute exactly one bounded live provider canary under signed human package (lifetime $\le 15$ min).
+- **Step 23**: Independent post-canary security and evidence review.
+- **Step 24**: Only then consider production routing promotion under separate explicit human architectural review approval.
 
 ---
 
-## 10. AUDIT AREA 9 — HUMAN APPROVAL BOUNDARIES
+## 12. REPAIR 18 — HUMAN APPROVAL MATRIX
 
-The following actions are strictly reserved for human operators and CANNOT be automated:
-1. **Generating the Human Authorization Keypair**: Private keys must be created in an offline human ceremony; AI agents, automated scripts, and CI runners are prohibited from generating or holding this key.
-2. **Signing Authorization Packages**: Each certification run requires an explicit human authorization package signed by the human operator for a specific commit and tree SHA with an explicit budget limit.
-3. **Provisioning Production Secrets**: Setting `DEEPSEEK_API_KEY` in Cloudflare Worker secret storage.
-4. **Deploying D1 Migrations**: Authorizing and running schema migrations on the live production database.
-5. **Promoting to Live Production Routing**: Deciding whether to activate DeepSeek for customer tenant traffic post-certification.
+### 12.1 Mandatory Human Approval Boundaries
+The following actions strictly require explicit human approval and verification before execution:
+1. `wrangler d1 create` (database creation)
+2. `wrangler d1 migrations apply` (remote migration application)
+3. Production D1 binding configuration in `wrangler.jsonc`
+4. Worker production upload and deployment
+5. Cloudflare Access application / policy creation or change
+6. mTLS configuration or change
+7. Service token creation or change
+8. IAM permission changes in Cloudflare or CI/CD
+9. `wrangler secret put` (production secret injection or rotation)
+10. Human trust-anchor enrollment in `PRODUCTION_HUMAN_AUTHORITY_REGISTRY`
+11. Source trust-anchor enrollment in `PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES`
+12. Execution of the offline Ed25519 signing-key ceremony
+13. Any readiness gate code change
+14. Any attestation gate code change
+15. Operational route enablement (`PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED`)
+16. Live-state change (`CANARY_LIVE_EXECUTION_STATE`)
+17. Global live enablement (`CANARY_LIVE_EXECUTION_ENABLED`)
+18. Remote D1 concurrency certification execution
+19. First provider live canary execution
+20. Production routing policy promotion (`productionRoutingEnforcementAllowed`)
+
+### 12.2 Automation Boundaries
+- **Permitted for Automation**: Preparing plans, generating diffs, drafting CLI command strings, designing test harnesses, formatting evidence templates, and running offline unit test suites.
+- **Strictly Prohibited from Automation**: Autonomous execution of infrastructure commands, autonomous migration deployment, autonomous secret injection, autonomous key generation, autonomous gate flipping, and autonomous provider dispatch.
 
 ---
 
-## 11. AUDIT AREA 10 — CURRENT CLAIM REGISTER
+## 13. REPAIR 19 & 20 — NARROW CLAIM REGISTER & CURRENT TRUTH STATUS
 
-### 11.1 What CAN Be Claimed Today
-- **Robust Offline Foundation**: A fully implemented, offline-tested D1 durable replay backend adapter (`D1AuthorizationReplayBackend`) utilizing single-statement atomic conflict resolution.
-- **Complete Replay Coordinator**: A verified coordinator (`coordinateProductionReplayReservation`) orchestrating source provenance verification, trusted attestation derivation, human authorization verification, and atomic reservation.
-- **Encapsulated Capability Boundary**: An internal Worker capability boundary (`executeProductionWorkerCanaryCertification`) binding `env.DB` and `env.DEEPSEEK_API_KEY` strictly post-reservation with zero ambient leakage.
-- **Hardened Dormant Operational Route**: An operational route handler (`handleProductionCanaryOperationalRoute`) implementing true 65,536-byte streaming limits, public-safe error allowlisting, and duplicate JSON member scanning.
-- **Fail-Closed Security Posture**: 100% fail-closed verification across all components with clean TypeScript compilation (`npm run typecheck`).
+### 13.1 Precise Component Classification
+| Component / Capability | Architectural Classification |
+| :--- | :--- |
+| D1 authorization replay adapter | `IMPLEMENTED_AND_OFFLINE_TESTED` |
+| Production replay coordinator | `IMPLEMENTED_AND_OFFLINE_TESTED` |
+| Worker capability boundary | `IMPLEMENTED_AND_OFFLINE_TESTED` |
+| Dormant operational route handler | `IMPLEMENTED_AND_OFFLINE_TESTED` |
+| 65,536-byte streaming body limit | `IMPLEMENTED_AND_OFFLINE_TESTED` |
+| Public error sanitization allowlist | `IMPLEMENTED_AND_OFFLINE_TESTED` |
+| Top-level duplicate JSON member scanner | `IMPLEMENTED_AND_OFFLINE_TESTED` |
+| Production authentication provider | `NOT_IMPLEMENTED_NOT_PROVEN` |
+| Operational ingress protection (Access) | `NOT_PROVISIONED` |
+| Real Cloudflare D1 database | `NOT_PROVISIONED` |
+| Migration 0008 on real D1 | `NOT_APPLIED_NOT_PROVEN` |
+| Configured Worker D1 binding | `NOT_PROVEN` |
+| Deployed Worker D1 binding | `NOT_PROVEN` |
+| D1 atomic concurrency under contention | `NOT_PROVEN` |
+| Human authorization trust anchor | `NOT_PROVISIONED` |
+| Runtime source-provenance trust anchor | `NOT_PROVISIONED` |
+| Deployed-source provenance proof chain | `NOT_PROVEN` |
+| Provider live execution | `DISABLED_NOT_VERIFIED` |
+| Production success path | `NOT_CERTIFIED` |
+| Production model routing promotion | `BLOCKED` |
 
-### 11.2 What CANNOT Be Claimed Today
-- Cloudflare D1 is NOT provisioned or bound.
-- Migration 0008 is NOT applied to Cloudflare.
-- Concurrency is NOT certified against live infrastructure.
-- Human authorization trust anchor is NOT provisioned.
-- Runtime source-provenance trust anchor is NOT provisioned.
-- Production superadmin ingress authentication is NOT configured.
-- Live DeepSeek execution is NOT enabled.
-- Production model routing is NOT active.
+### 13.2 Unambiguous Required Current Claims
+- **Real D1**: `NOT PROVISIONED`
+- **Migration on real D1**: `NOT APPLIED / NOT PROVEN`
+- **Deployed D1 binding**: `NOT PROVEN`
+- **D1 concurrency**: `NOT PROVEN`
+- **Production auth**: `NOT IMPLEMENTED / NOT PROVEN`
+- **Operational ingress**: `NOT PROVISIONED`
+- **Human trust anchor**: `NOT PROVISIONED`
+- **Source trust anchor**: `NOT PROVISIONED`
+- **Deployed-source provenance**: `NOT PROVEN`
+- **Provider live execution**: `DISABLED / NOT VERIFIED`
+- **Production success path**: `NOT CERTIFIED`
+- **Routing promotion**: `BLOCKED`
 
 ---
 
-## 12. AUDIT AREA 11 — SEALED 5U.3.2 BOUNDARY VERIFICATION
+## 14. SEALED 5U.3.2 BOUNDARY VERIFICATION
 
-- **Prior Phase Status**: `A12B2C5U32_HOST_WORKER_BINDING_FOUNDATION_SEAL_APPROVED`
-- **Base Commit**: `54fd4a1744913d5d06845896cae2bcf36a3f3e39`
-- **Base Tree**: `d28b9be5fa3f3a94b5e0a7d0335ebb4fdea9004f`
-- **Working Tree State**: Clean. Zero modifications to source files, test files, migration files, or configuration files.
-- **Verdict**: The `5U.3.2` host worker binding foundation seal remains completely verified, intact, and untampered.
+- **Canonical Base Commit**: `39dfe50c3ea83195112e7b82e2df5ad1c252df7b`
+- **Canonical Base Tree**: `f7651c977c78191942488cf6128c249a2d1bce65`
+- **Prior Parent Commit**: `54fd4a1744913d5d06845896cae2bcf36a3f3e39`
+- **Modifications to Source / Test Code**: **ZERO**.
+- **Verdict**: The `A12B2C5U32_HOST_WORKER_BINDING_FOUNDATION_SEAL_APPROVED` seal remains completely verified, intact, and untampered.
+
+---
+
+## 15. FINAL AUDIT STATUS & VERDICT
+
+This audit repair is complete in accordance with all 20 specific recommendations of the independent Codex High review.
+
+**Final Status**:
+`A12B2C5U33AR_PROVISIONING_ACTIVATION_READINESS_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW`
