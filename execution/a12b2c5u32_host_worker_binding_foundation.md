@@ -1,152 +1,94 @@
-# VELNAR — A.12B.2C-5U.3.2
-# HOST WORKER ENV BINDING & DORMANT OPERATIONAL ROUTE FOUNDATION
+# VELNAR — A.12B.2C-5U.3.2R
+# TARGETED SECURITY REPAIR REPORT AFTER INDEPENDENT CODEX HIGH REVIEW
+# HOST WORKER ENV BINDING & HARDENED DORMANT OPERATIONAL ROUTE FOUNDATION
 
-**Phase**: VELNAR — A.12B.2C-5U.3.2  
+**Phase**: VELNAR — A.12B.2C-5U.3.2R  
 **Artifact Type**: `HOST_WORKER_ENV_BINDING_DORMANT_OPERATIONAL_ROUTE_FOUNDATION`  
-**Base Commit**: `7a3dd2540d80cbedc151e4b4247ff5a850d24c92`  
-**Base Tree**: `6682bfd144e4ed197a9350941faa4195bf1d4232`  
+**Base Commit**: `046b9eb75793b3279a4a85be006f5a43884cc937`  
+**Base Tree**: `9098a82e03ccfd619f617987417c7d0b0e8415a7`  
 **Execution Mode**: STRICTLY OFFLINE IMPLEMENTATION & VERIFICATION  
-**Authoritative Final Status**: `A12B2C5U32_HOST_WORKER_BINDING_FOUNDATION_PASS_PENDING_INDEPENDENT_SECURITY_REVIEW`  
+**Authoritative Final Status**: `A12B2C5U32_TARGETED_SECURITY_REPAIR_PASS_PENDING_INDEPENDENT_REREVIEW`  
 
 ---
 
-## 1. EXECUTIVE SUMMARY & OBJECTIVE
+## 1. EXECUTIVE SUMMARY & SECURITY RE-AUDIT CONTEXT
 
-Phase A.12B.2C-5U.3.2 establishes the host-level binding of the Cloudflare Worker runtime environment:
-```
-Cloudflare Host
-  → worker/index.ts default.fetch(request, env, ctx)
-    → dedicated operational route handler (handleProductionCanaryOperationalRoute)
-      → exact same env reference
-        → executeProductionWorkerCanaryCertification(env, pkg, receipt)
-          → env.DB captured internally
-          → credential resolver closure constructed internally
-          → replay-protected transport execution
-```
+An independent Codex High architectural and security review of phase `A.12B.2C-5U.3.2` identified three seal-blocking vulnerabilities in the operational route handler:
+1. **Unbounded Request Body Buffering & UTF-16 Code-Unit Counting**: Calling `await request.text()` buffered the entire unconstrained payload before checking size, and checked JavaScript string `.length` (UTF-16 code units) rather than actual UTF-8 request bytes.
+2. **Public Response Information Leakage via Raw `result.errors`**: Forwarding downstream `result.errors` directly into the public HTTP response risked exposing internal SQLite/D1 diagnostics, provider error messages, tokens, SHAs, and nonces.
+3. **Duplicate Top-Level JSON Member Collisions**: Standard `JSON.parse` silently overwrote duplicate keys with the final value, allowing attackers to bypass two-key envelope restrictions via duplicate member smuggling.
 
-This satisfies the remaining capability requirement classified by Codex as `HOST_WORKER_ROUTE_BINDING_REQUIRED` by proving that the host-provided `WorkerEnv` is passed by direct reference from the Worker entrypoint through the operational route handler to the capability boundary without intermediate synthesis, spreading, cloning, or caller mutation.
-
-Critically, the operational certification route is **strictly dormant and disabled** in the canonical codebase, protected by dual readiness barriers.
+Phase `A.12B.2C-5U.3.2R` remediates **ONLY** these three seal-blocking findings in place while strictly preserving all existing `5U.3.2` and `5U.3.1` architectural invariants.
 
 ---
 
-## 2. DUAL ROUTE BARRIERS & DORMANT BEHAVIOR
+## 2. REPAIR SPECIFICATIONS
 
-The operational route is governed by immutable constants in the zero-dependency leaf module:
-`worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts`
+### 2.1 Repair 1 — True 65,536-Byte Incremental Stream Limiting
+- **Incremental Stream Consumption**: Rather than buffering via `request.text()`, the handler acquires `request.body.getReader()` and incrementally tallies received bytes via chunk `byteLength`.
+- **Immediate Rejection & Cancellation**: The moment cumulative bytes exceed 65,536, the reader is cancelled (`reader.cancel()`), execution terminates immediately, and HTTP `413 PAYLOAD_TOO_LARGE` is returned. The capability boundary is **never** invoked.
+- **Strict Content-Length Header Pre-Validation**:
+  - Validated strictly with canonical unsigned decimal syntax (`/^[0-9]+$/`).
+  - Negative values (`-1`), fractional numbers (`12.5`), junk suffixes (`12abc`), and non-safe integers fail closed with `400 INVALID_REQUEST`.
+  - Content-Length values exceeding 65,536 reject with `413` prior to any body stream acquisition.
+  - Content-Length is treated strictly as an early rejection optimization; actual streamed bytes are always counted to prevent understated header bypasses.
+- **Deterministic Fatal UTF-8 Decoding**: The bounded `Uint8Array` buffer is decoded with `new TextDecoder('utf-8', { fatal: true })`. Malformed byte sequences fail closed with `400 INVALID_REQUEST`.
 
+### 2.2 Repair 2 — Public-Safe Error Sanitization Boundary
+- **Zero Exposure of Downstream Errors**: Raw `result.errors` from the capability boundary or transport are **strictly prohibited** from crossing the HTTP boundary.
+- **Deterministic Public Allowlist**: All errors are mapped exclusively from structural state (`result.status` and `result.failureCategory`) to a route-owned public allowlist:
+  - `CANARY_LIVE_EXECUTION_BLOCKED`
+  - `CANARY_AUTHORIZATION_REJECTED`
+  - `CANARY_SOURCE_BINDING_REJECTED`
+  - `CANARY_REPLAY_REJECTED`
+  - `CANARY_PROVIDER_EXECUTION_FAILED`
+  - `CANARY_VALIDATION_FAILED`
+  - `CANARY_BUDGET_REJECTED`
+  - `CANARY_INTERNAL_FAILURE`
+- **Redaction of Diagnostics**: Diagnostic strings containing sentinels, SQL tables, stack traces, provider URLs, source SHAs, or replay keys are completely excluded.
+- **Sanitized Failure Categories**: Only known canonical failure categories from `TRANSPORT_FAILURE_CATEGORIES` are reflected; unknown or arbitrary strings are omitted.
+
+### 2.3 Repair 3 — Duplicate Top-Level JSON Member Rejection
+- **Deterministic Top-Level Member Scanner**: A bounded, duplicate-aware tokenizer (`scanTopLevelJsonEnvelope`) parses the raw JSON string before `JSON.parse`.
+- **Exact Member Enforcement**: The top-level envelope must contain **exactly** `authorizationPackage` and `sourceProvenanceReceipt`.
+- **Rejection of Duplicate Keys**: If either key appears more than once at top level, it fails closed with `400 INVALID_REQUEST`.
+- **Prototype Poisoning & Third Key Rejection**: Keys including `__proto__`, `constructor`, `prototype`, `env`, `db`, `apiKey`, and Unicode lookalikes are rejected.
+- **Value Isolation**: The tokenizer parses values without recursing or materializing attacker objects, ensuring strings with escaped quotes or nested objects with matching keys do not trigger false positive rejections.
+
+---
+
+## 3. PRESERVED HOST WORKER CAPABILITY INVARIANTS
+
+The call signature to the capability boundary remains completely untouched:
 ```typescript
-export const PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH =
-  '/api/ops/canary/deepseek-certification' as const;
-
-export const PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED =
-  false as const;
-
-export const PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY =
-  false as const;
+const result = await executeProductionWorkerCanaryCertification(
+  env,
+  bodyRecord.authorizationPackage,
+  bodyRecord.sourceProvenanceReceipt
+);
 ```
-
-### Rationale for Two Barriers:
-1. **`PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED`**: Platform toggle signaling operational route activation intent.
-2. **`PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY`**: Security readiness barrier guaranteeing that dedicated ingress controls (mTLS, Cloudflare Access, service tokens) have been audited and deployed.
-
-Unless **BOTH** barriers are true, the handler terminates immediately:
-- Returns `404 NOT_FOUND` with `{ "error": "NOT_FOUND" }`.
-- Exactly **ZERO** request body bytes are read (`request.text()` is never called).
-- Exactly **ZERO** `env.DB` property accesses occur.
-- Exactly **ZERO** `env.DEEPSEEK_API_KEY` property accesses occur.
-- Exactly **ZERO** invocations of the capability boundary or transport occur.
-- No information is leaked regarding canary, DeepSeek, route existence, live gates, or capabilities.
+- The `env` reference passed to the capability boundary is the exact, un-cloned, un-spread object reference received by `handleProductionCanaryOperationalRoute` from `worker/index.ts`.
+- The operational route performs zero property accesses on `env.DB` or `env.DEEPSEEK_API_KEY`.
+- Sourced capabilities remain encapsulated within the 5U.3.1 capability boundary after its authoritative global live gate.
 
 ---
 
-## 3. WORKER/INDEX.TS INTEGRATION & ORDERING RATIONALE
+## 4. DORMANT STATE & READINESS BARRIERS
 
-The operational route handler is wired into `worker/index.ts` at an exact architectural junction:
-```typescript
-// 3. Resolve Authenticated Identity (Fail-Closed)
-const user = AuthContextService.resolveSessionUser(authHeader, environment);
+The operational route remains strictly dormant and unreachable in production:
+- `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = false`
+- `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = false`
 
-if (!user) {
-  return addCorsAndSecurityHeaders(unauthorizedResp, validatedOrigin);
-}
-
-// Dedicated Production Canary Operational Route (Dormant Foundation)
-if (url.pathname === PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH) {
-  const operationalResponse = await handleProductionCanaryOperationalRoute(
-    request,
-    user,
-    env
-  );
-  return addCorsAndSecurityHeaders(operationalResponse, validatedOrigin);
-}
-
-// If in production and DB binding is missing, fail-closed with 503
-if (environment === 'production' && !env.DB) {
-  ...
-}
-```
-
-### Ordering Rationale:
-1. **AFTER Public Health & Dev Demo**: Health and CORS preflights are processed prior to authentication.
-2. **AFTER AuthContextService & 401 Rejection**: Anonymous callers without valid session tokens fail closed immediately.
-3. **BEFORE Generic Production `!env.DB` Check**:
-   - The generic check in `worker/index.ts` checks `env.DB` for standard multi-tenant routes.
-   - However, the operational certification route is governed by its own 5U.3.1 capability boundary, which enforces the global live gate **before** any `env.DB` property read.
-   - Placing the operational branch before the generic check prevents `worker/index.ts` from pre-reading `env.DB` when the operational live gate or route barriers are closed.
-4. **Direct Host Env Passing**: The third parameter passed to `handleProductionCanaryOperationalRoute` is the exact `env` parameter received by `default.fetch(request, env, ctx)`.
+Under canonical conditions, any request to `/api/ops/canary/deepseek-certification` returns `404 NOT_FOUND` with:
+- Zero request body reads
+- Zero reader acquisitions
+- Zero `env.DB` accesses
+- Zero `env.DEEPSEEK_API_KEY` accesses
+- Zero capability boundary calls
 
 ---
 
-## 4. FUTURE-PATH SECURITY & REQUEST ENVELOPE
-
-When simulating open route barriers in isolated test harnesses, the handler enforces strict platform-grade controls:
-
-### 4.1 Superadmin Operational Privilege:
-- Requires `user && user.isSuperAdmin === true`.
-- Tenant roles—including `OWNER`, `ADMIN`, `MANAGER`, `STAFF`, and `VIEWER`—are strictly insufficient. Non-superadmins receive `403 FORBIDDEN` with zero boundary calls.
-
-### 4.2 Strict Top-Level HTTP Envelope:
-- Method must be `POST` (non-POST yields `405 METHOD_NOT_ALLOWED`).
-- Content-Type must be `application/json` (invalid yields `400 INVALID_REQUEST`).
-- Content-Length and body text must not exceed 65,536 bytes (exceeding yields `413 PAYLOAD_TOO_LARGE`).
-- JSON payload must be a non-null, non-array object.
-- Payload must contain **EXACTLY two top-level keys**:
-  `authorizationPackage` and `sourceProvenanceReceipt`.
-- Any extra keys (such as `env`, `db`, `apiKey`, `credential`, `getRuntimeCredential`, `resolver`, `options`) are rejected with `400 INVALID_REQUEST`.
-
-### 4.3 Inner Payload Passivity:
-- The route handler does not inspect, parse, or validate fields within `authorizationPackage` or `sourceProvenanceReceipt`. Those fields represent untrusted caller data and are passed directly to the capability boundary for cryptographic snapshotting and verification.
-
----
-
-## 5. RESPONSE MINIMIZATION & HYGIENE
-
-The operational handler does not return raw transport objects, candidates, or execution transcripts. It formats an operational summary containing only allowlisted fields:
-- `success` (boolean)
-- `status` (string)
-- `failureCategory` (optional string)
-- `errors` (readonly string[])
-- `providerNetworkCalls` (number)
-- `credentialReads` (number)
-- `transportAttempts` (number)
-- `completedTasks` (number)
-- `observedTotalCostMicroUsd` (number)
-- `authorizedBudgetMicroUsd` (number)
-- `aggregateSemanticScore` (number)
-- `allTasksPassed` (boolean)
-- `allSchemasValid` (boolean)
-- `finalCertificationEligible` (boolean)
-
-**Explicitly Stripped & Redacted**:
-- `candidate` (intermediate candidate structure)
-- `invocationResponses` (raw DeepSeek responses)
-- `invocationRecords` (task execution transcripts)
-- Source SHAs, run nonces, replay keys, database connection details, and credentials.
-
----
-
-## 6. COMPLETE STATUS OF AUTHORITATIVE CANARY GATES
+## 5. COMPLETE STATUS OF AUTHORITATIVE CANARY GATES
 
 All 11 authoritative canary readiness and operational gates remain strictly `false`:
 
@@ -161,16 +103,18 @@ All 11 authoritative canary readiness and operational gates remain strictly `fal
 | `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED` | `false` | Real Cloudflare D1 database provisioning |
 | `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` | `false` | Real D1 concurrency certification |
 | `productionRoutingEnforcementAllowed` | `false` | Production router enforcement gate |
-| `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED` | `false` | **NEW**: Operational route activation toggle |
-| `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY` | `false` | **NEW**: Ingress auth readiness toggle |
+| `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED` | `false` | Operational route activation toggle |
+| `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY` | `false` | Ingress auth readiness toggle |
 
 ---
 
-## 7. REMAINING PREREQUISITES FOR FUTURE ACTIVATION
+## 6. EXPLICIT NON-CLAIMS & REMAINING ACTIVATION PREREQUISITES
 
-Before live production certification can be enabled in a future release:
-1. Operational ingress authentication (mTLS / Cloudflare Access / Service Tokens) must be provisioned and verified.
-2. Real Cloudflare D1 database provisioning and concurrency certification.
-3. Production human authorization trust anchor provisioning.
-4. Runtime source provenance trust anchor provisioning.
-5. Independent multi-party security review approval.
+This repair phase makes **NO** claims of production readiness:
+- **Cloudflare Production Deployment**: NOT verified.
+- **Operational Ingress Authentication**: STILL NOT provisioned (mTLS / Cloudflare Access / Service Tokens).
+- **Production Superadmin Authentication**: STILL NOT proven.
+- **Real Cloudflare D1 Database**: NOT provisioned.
+- **Real D1 Concurrency**: NOT certified.
+- **Live Execution**: NOT enabled.
+- **Production Success-Path**: NOT certified.

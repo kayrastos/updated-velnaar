@@ -1,8 +1,17 @@
 {
-  "phase": "A.12B.2C-5U.3.2",
+  "phase": "A.12B.2C-5U.3.2R",
   "artifactType": "HOST_WORKER_ENV_BINDING_DORMANT_OPERATIONAL_ROUTE_FOUNDATION",
-  "baseCommit": "7a3dd2540d80cbedc151e4b4247ff5a850d24c92",
-  "baseTree": "6682bfd144e4ed197a9350941faa4195bf1d4232",
+  "baseCommit": "046b9eb75793b3279a4a85be006f5a43884cc937",
+  "baseTree": "9098a82e03ccfd619f617987417c7d0b0e8415a7",
+  "independentCodexReviewFoundThreeBlockers": true,
+  "targetedSecurityRepairsApplied": true,
+  "requestBodyByteLimitEnforcedAsActualBytes": true,
+  "requestBodyByteLimit": 65536,
+  "bodyAcquisitionIncrementallyBoundedBeforeMaterialization": true,
+  "malformedContentLengthFailsClosed": true,
+  "topLevelDuplicateJsonMembersRejected": true,
+  "downstreamDiagnosticStringsNeverCrossPublicBoundary": true,
+  "publicErrorAllowlistEnforced": true,
   "phase5U31Sealed": true,
   "workerIndexIntegrated": true,
   "hostWorkerEnvDirectReferenceWiringImplemented": true,
@@ -36,5 +45,5 @@
   "productionSuccessPathBehaviorallyExercised": false,
   "futurePathHostBindingBehaviorallyExercisedWithMocks": true,
   "codexReviewRequiredBeforeSeal": true,
-  "finalStatus": "A12B2C5U32_HOST_WORKER_BINDING_FOUNDATION_PASS_PENDING_INDEPENDENT_SECURITY_REVIEW"
+  "finalStatus": "A12B2C5U32_TARGETED_SECURITY_REPAIR_PASS_PENDING_INDEPENDENT_REREVIEW"
 }

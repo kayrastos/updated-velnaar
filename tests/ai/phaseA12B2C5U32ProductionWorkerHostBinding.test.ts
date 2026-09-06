@@ -1,7 +1,7 @@
 /**
  * @file phaseA12B2C5U32ProductionWorkerHostBinding.test.ts
- * @description Comprehensive Offline Test Suite for VELNAR — A.12B.2C-5U.3.2
- * Host Worker Env Binding & Dormant Operational Route Foundation
+ * @description Comprehensive Offline Test Suite for VELNAR — A.12B.2C-5U.3.2R
+ * Host Worker Env Binding & Hardened Operational Route Foundation
  * 
  * STRICTLY OFFLINE — ZERO real provider calls, ZERO real D1 calls, ZERO network calls.
  * 
@@ -18,6 +18,10 @@
  * Suite 10: Response Minimization & Data Hygiene
  * Suite 11: Single Boundary Invocation & Exact Signature Contract
  * Suite 12: Tenant AI Isolation & Authoritative Dormant Gates Audit
+ * Suite 13: True 65,536-Byte Incremental Stream Boundary & Content-Length Audits
+ * Suite 14: Public-Safe Error Sanitization & Secret Redaction
+ * Suite 15: Duplicate Top-Level JSON Member & Prototype Poisoning Rejection
+ * Suite 16: Integrated Real-Boundary Offline Regression (Unmocked 5U.3.1 Boundary)
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -29,7 +33,12 @@ import {
   PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED,
   PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY,
 } from '../../worker/ai/canary/deepSeekProductionOperationalRoutePolicy';
-import { handleProductionCanaryOperationalRoute } from '../../worker/ai/canary/deepSeekProductionWorkerOperationalRoute';
+import {
+  handleProductionCanaryOperationalRoute,
+  scanTopLevelJsonEnvelope,
+  MAX_REQUEST_BODY_BYTES,
+  PUBLIC_OPERATIONAL_ERROR_CODES,
+} from '../../worker/ai/canary/deepSeekProductionWorkerOperationalRoute';
 import type { AuthenticatedUser } from '../../worker/auth/authContext';
 import type { WorkerEnv } from '../../worker/env';
 import {
@@ -48,6 +57,7 @@ import {
   D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED,
   D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED,
 } from '../../worker/ai/canary/d1AuthorizationReplayBackend';
+import { executeProductionWorkerCanaryCertification } from '../../worker/ai/canary/deepSeekProductionWorkerCapabilityBoundary';
 
 function createDummySuperadmin(): AuthenticatedUser {
   return {
@@ -175,7 +185,7 @@ async function importFuturePathRouteForTest(options?: FuturePathHarnessOptions) 
   };
 }
 
-describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operational Route Foundation', () => {
+describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operational Route Foundation', () => {
 
   // ==========================================================================
   // SUITE 1: Canonical Operational Policy Constants
@@ -219,18 +229,18 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
       const response = await handleProductionCanaryOperationalRoute(request, user, env as any);
 
       expect(response.status).toBe(404);
-      const json = await response.json();
+      const json = (await response.json()) as any;
       expect(json).toEqual({ error: 'NOT_FOUND' });
     });
 
-    it('2.2 dormant route causes exactly ZERO body reads', async () => {
-      let textCalls = 0;
+    it('2.2 dormant route causes exactly ZERO body reads or stream access', async () => {
+      let bodyGetterCalls = 0;
       const throwingRequest = {
         method: 'POST',
         url: 'https://velnar.studio/api/ops/canary/deepseek-certification',
         headers: new Headers({ 'Content-Type': 'application/json' }),
-        text: async () => {
-          textCalls++;
+        get body() {
+          bodyGetterCalls++;
           throw new Error('MALICIOUS_BODY_READ');
         },
       } as unknown as Request;
@@ -245,7 +255,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
       const response = await handleProductionCanaryOperationalRoute(throwingRequest, user, env as any);
 
       expect(response.status).toBe(404);
-      expect(textCalls).toBe(0);
+      expect(bodyGetterCalls).toBe(0);
     });
 
     it('2.3 dormant route causes exactly ZERO env.DB and env.DEEPSEEK_API_KEY reads', async () => {
@@ -307,7 +317,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
       const fn = handleProductionCanaryOperationalRoute as any;
       const response = await fn();
       expect(response.status).toBe(404);
-      const json = await response.json();
+      const json = (await response.json()) as any;
       expect(json).toEqual({ error: 'NOT_FOUND' });
     });
 
@@ -315,7 +325,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
       const fn = handleProductionCanaryOperationalRoute as any;
       const response = await fn({} as any);
       expect(response.status).toBe(404);
-      const json = await response.json();
+      const json = (await response.json()) as any;
       expect(json).toEqual({ error: 'NOT_FOUND' });
     });
 
@@ -323,7 +333,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
       const fn = handleProductionCanaryOperationalRoute as any;
       const response = await fn({} as any, {} as any);
       expect(response.status).toBe(404);
-      const json = await response.json();
+      const json = (await response.json()) as any;
       expect(json).toEqual({ error: 'NOT_FOUND' });
     });
 
@@ -331,7 +341,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
       const fn = handleProductionCanaryOperationalRoute as any;
       const response = await fn({} as any, {} as any, {} as any, { injectedCapability: true });
       expect(response.status).toBe(404);
-      const json = await response.json();
+      const json = (await response.json()) as any;
       expect(json).toEqual({ error: 'NOT_FOUND' });
     });
 
@@ -511,7 +521,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
       const response = await handleRoute(request, user, env as any);
 
       expect(response.status).toBe(403);
-      const json = await response.json();
+      const json = (await response.json()) as any;
       expect(json).toEqual({ error: 'FORBIDDEN' });
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -590,7 +600,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
 
         const response = await handleRoute(request, user, env as any);
         expect(response.status).toBe(405);
-        const json = await response.json();
+        const json = (await response.json()) as any;
         expect(json).toEqual({ error: 'METHOD_NOT_ALLOWED' });
       }
 
@@ -629,7 +639,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
 
         const response = await handleRoute(request, user, env as any);
         expect(response.status).toBe(400);
-        const json = await response.json();
+        const json = (await response.json()) as any;
         expect(json).toEqual({ error: 'INVALID_REQUEST' });
       }
 
@@ -672,7 +682,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
       cleanup();
     });
 
-    it('7.6 rejects body text exceeding 65536 bytes with 413 PAYLOAD_TOO_LARGE', async () => {
+    it('7.6 rejects body bytes exceeding 65536 bytes with 413 PAYLOAD_TOO_LARGE', async () => {
       const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
       const user = createDummySuperadmin();
       const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
@@ -802,7 +812,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
       ];
 
       for (const evilKey of maliciousKeys) {
-        const body: Record<string, unknown> = {
+        const body = {
           authorizationPackage: createDummyPayloads().authorizationPackage,
           sourceProvenanceReceipt: createDummyPayloads().sourceProvenanceReceipt,
           [evilKey]: 'hostile_value',
@@ -816,7 +826,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
 
         const response = await handleRoute(request, user, env as any);
         expect(response.status).toBe(400);
-        const json = await response.json();
+        const json = (await response.json()) as any;
         expect(json).toEqual({ error: 'INVALID_REQUEST' });
       }
 
@@ -1018,7 +1028,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
         method: 'POST',
         url: 'https://velnar.studio/api/ops/canary/deepseek-certification',
         headers: new Headers({ 'Content-Type': 'application/json' }),
-        text: async () => {
+        get body() {
           throw new Error('DATABASE_PASSWORD_LEAK_SECRET_XYZ');
         },
       } as unknown as Request;
@@ -1029,7 +1039,7 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
       const response = await handleRoute(throwingRequest, user, env as any);
       expect(response.status).toBe(500);
 
-      const json = await response.json();
+      const json = (await response.json()) as any;
       expect(json).toEqual({ error: 'INTERNAL_ERROR' });
       expect(JSON.stringify(json)).not.toContain('DATABASE_PASSWORD_LEAK');
 
@@ -1113,6 +1123,644 @@ describe('VELNAR — A.12B.2C-5U.3.2 Host Worker Env Binding & Dormant Operation
 
       expect(policyContent).not.toContain('import ');
       expect(policyContent).not.toContain('require(');
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 13: True 65,536-Byte Incremental Stream Boundary & Content-Length Audits
+  // ==========================================================================
+  describe('13. True 65,536-Byte Incremental Stream Boundary & Content-Length Audits', () => {
+    it('13.1 ASCII body <= 65536 bytes is accepted by byte-size layer', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      // Create payload that is exactly 60,000 bytes
+      const basePayload = createDummyPayloads();
+      const padding = 'A'.repeat(50000);
+      const jsonBody = JSON.stringify({
+        authorizationPackage: { ...basePayload.authorizationPackage, padding },
+        sourceProvenanceReceipt: basePayload.sourceProvenanceReceipt,
+      });
+      const byteLen = new TextEncoder().encode(jsonBody).byteLength;
+      expect(byteLen).toBeLessThanOrEqual(65536);
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonBody,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(200);
+      expect(getBoundaryCalls().length).toBe(1);
+      cleanup();
+    });
+
+    it('13.2 ASCII body > 65536 bytes is rejected with 413 PAYLOAD_TOO_LARGE', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      const basePayload = createDummyPayloads();
+      const padding = 'A'.repeat(66000);
+      const jsonBody = JSON.stringify({
+        authorizationPackage: { ...basePayload.authorizationPackage, padding },
+        sourceProvenanceReceipt: basePayload.sourceProvenanceReceipt,
+      });
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonBody,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(413);
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('13.3 UTF-8 multibyte body whose JS .length < 65536 but byteLength > 65536 is rejected with 413', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      // Character '世' is 3 UTF-8 bytes each. 25,000 chars = 25,000 JS code units, but 75,000 bytes!
+      const multibyteStr = '世'.repeat(25000);
+      expect(multibyteStr.length).toBe(25000); // JS string length is well below 65536!
+      const encodedBytes = new TextEncoder().encode(multibyteStr).byteLength;
+      expect(encodedBytes).toBe(75000); // Actual UTF-8 byteLength exceeds 65536!
+
+      const jsonBody = JSON.stringify({
+        authorizationPackage: { ...createDummyPayloads().authorizationPackage, multibyteStr },
+        sourceProvenanceReceipt: createDummyPayloads().sourceProvenanceReceipt,
+      });
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonBody,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(413);
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('13.4 non-BMP / emoji body whose JS .length < 65536 but byteLength > 65536 is rejected with 413', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      // Emoji '🚀' is 2 JS surrogate code units (.length = 2), but 4 UTF-8 bytes!
+      // 18,000 emojis = 36,000 JS length (< 65536), but 72,000 UTF-8 bytes (> 65536)!
+      const emojiStr = '🚀'.repeat(18000);
+      expect(emojiStr.length).toBe(36000);
+      const byteLen = new TextEncoder().encode(emojiStr).byteLength;
+      expect(byteLen).toBe(72000);
+
+      const jsonBody = JSON.stringify({
+        authorizationPackage: { ...createDummyPayloads().authorizationPackage, emojiStr },
+        sourceProvenanceReceipt: createDummyPayloads().sourceProvenanceReceipt,
+      });
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonBody,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(413);
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('13.5 exactly 65536 bytes is NOT rejected for size', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      // Construct a body that is exactly 65,536 bytes long
+      const prefix = '{"authorizationPackage":{"payload":{"p":"';
+      const suffix = '"}},"sourceProvenanceReceipt":{"provenanceVersion":"a12b2c5q-v1"}}';
+      const paddingNeeded = 65536 - new TextEncoder().encode(prefix + suffix).byteLength;
+      const jsonBody = prefix + 'x'.repeat(paddingNeeded) + suffix;
+
+      expect(new TextEncoder().encode(jsonBody).byteLength).toBe(65536);
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonBody,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(200);
+      expect(getBoundaryCalls().length).toBe(1);
+      cleanup();
+    });
+
+    it('13.6 exactly 65537 bytes is rejected with 413 PAYLOAD_TOO_LARGE', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      const prefix = '{"authorizationPackage":{"payload":{"p":"';
+      const suffix = '"}},"sourceProvenanceReceipt":{"provenanceVersion":"a12b2c5q-v1"}}';
+      const paddingNeeded = 65537 - new TextEncoder().encode(prefix + suffix).byteLength;
+      const jsonBody = prefix + 'x'.repeat(paddingNeeded) + suffix;
+
+      expect(new TextEncoder().encode(jsonBody).byteLength).toBe(65537);
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonBody,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(413);
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('13.7 missing Content-Length is still incrementally bounded by streamed bytes', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      const oversizedBody = 'x'.repeat(70000);
+      // Create request without Content-Length
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(oversizedBody));
+          controller.close();
+        },
+      });
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: stream,
+        duplex: 'half',
+      } as any);
+
+      expect(request.headers.get('Content-Length')).toBeNull();
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(413);
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('13.8 malformed Content-Length values fail closed with 400 INVALID_REQUEST', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      const malformedHeaders = ['12abc', 'abc', '-1', '-500', '12.5', '100px', 'NaN', ''];
+
+      for (const badCl of malformedHeaders) {
+        const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': badCl,
+          },
+          body: JSON.stringify(createDummyPayloads()),
+        });
+
+        const response = await handleRoute(request, user, env as any);
+        expect(response.status).toBe(400);
+      }
+
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('13.9 understated Content-Length cannot bypass actual stream byte counting', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      // Declares Content-Length: 100, but actually sends 70,000 bytes!
+      const oversized = 'x'.repeat(70000);
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': '100',
+        },
+        body: oversized,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(413);
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('13.10 multi-chunk stream crosses threshold and stops/cancels without consuming remainder', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      let chunk3Read = false;
+      let streamCancelled = false;
+
+      const chunk1 = new Uint8Array(40000);
+      const chunk2 = new Uint8Array(30000); // 40,000 + 30,000 = 70,000 > 65,536!
+      const chunk3 = new Uint8Array(50000);
+
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(chunk1);
+          controller.enqueue(chunk2);
+          // Third chunk should never be processed
+          controller.enqueue(chunk3);
+          controller.close();
+        },
+        cancel() {
+          streamCancelled = true;
+        },
+      });
+
+      // Wrap reader to monitor whether chunk 3 was pulled
+      const originalGetReader = stream.getReader.bind(stream);
+      stream.getReader = () => {
+        const reader = originalGetReader();
+        const origRead = reader.read.bind(reader);
+        let readIdx = 0;
+        reader.read = async () => {
+          readIdx++;
+          if (readIdx === 3) {
+            chunk3Read = true;
+          }
+          return origRead();
+        };
+        return reader;
+      };
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: stream,
+        duplex: 'half',
+      } as any);
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(413);
+      expect(chunk3Read).toBe(false);
+      expect(streamCancelled).toBe(true);
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('13.11 invalid UTF-8 bytes fail closed with 400 INVALID_REQUEST', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      // Invalid UTF-8 sequence: single 0xFF byte
+      const invalidUtf8 = new Uint8Array([0x7b, 0x22, 0xff, 0x22, 0x3a, 0x31, 0x7d]);
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(invalidUtf8);
+          controller.close();
+        },
+      });
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: stream,
+        duplex: 'half',
+      } as any);
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(400);
+      const json = (await response.json()) as any;
+      expect(json).toEqual({ error: 'INVALID_REQUEST' });
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 14: Public-Safe Error Sanitization & Secret Redaction
+  // ==========================================================================
+  describe('14. Public-Safe Error Sanitization & Secret Redaction', () => {
+    it('14.1 sensitive sentinel strings in result.errors never appear in response', async () => {
+      const sensitiveSentinels = [
+        'SUPER_SECRET_SENTINEL',
+        'SQL_INTERNAL_DIAGNOSTIC_ERR_007',
+        'sourceCommitSha-secret-12345',
+        'replay-key-secret-99999',
+        'sk-live-secret-deepseek-api-key',
+        'D1_ERROR: table users column password corrupted',
+      ];
+
+      const { handleRoute, cleanup } = await importFuturePathRouteForTest({
+        mockBoundaryResult: {
+          success: false,
+          status: 'TRANSPORT_EXECUTION_FAILED',
+          failureCategory: 'NETWORK_TRANSPORT_FAILURE',
+          errors: sensitiveSentinels,
+        },
+      });
+
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createDummyPayloads()),
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(200);
+
+      const json = (await response.json()) as any;
+      const responseString = JSON.stringify(json);
+
+      for (const sentinel of sensitiveSentinels) {
+        expect(responseString).not.toContain(sentinel);
+      }
+
+      expect(json.errors).toEqual(['CANARY_PROVIDER_EXECUTION_FAILED']);
+      cleanup();
+    });
+
+    it('14.2 unknown downstream failure category maps to CANARY_INTERNAL_FAILURE', async () => {
+      const { handleRoute, cleanup } = await importFuturePathRouteForTest({
+        mockBoundaryResult: {
+          success: false,
+          status: 'CUSTOM_UNKNOWN_STATUS' as any,
+          failureCategory: 'UNRECOGNIZED_STRANGE_CATEGORY' as any,
+          errors: ['Some arbitrary internal error'],
+        },
+      });
+
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createDummyPayloads()),
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(200);
+
+      const json = (await response.json()) as any;
+      expect(json.errors).toEqual(['CANARY_INTERNAL_FAILURE']);
+      // Unknown failureCategory is NOT reflected in public response
+      expect(json.failureCategory).toBeUndefined();
+      cleanup();
+    });
+
+    it('14.3 all possible mapped errors come strictly from PUBLIC_OPERATIONAL_ERROR_CODES allowlist', async () => {
+      const testCases = [
+        { status: 'LIVE_EXECUTION_BLOCKED', expected: 'CANARY_LIVE_EXECUTION_BLOCKED' },
+        { status: 'PREFLIGHT_VALIDATION_FAILED', failureCategory: 'AUTHORIZATION_BINDING_FAILURE', expected: 'CANARY_AUTHORIZATION_REJECTED' },
+        { status: 'PREFLIGHT_VALIDATION_FAILED', failureCategory: 'RUNTIME_SOURCE_PROVENANCE_FAILURE', expected: 'CANARY_SOURCE_BINDING_REJECTED' },
+        { status: 'REQUEST_INTEGRITY_FAILED', failureCategory: 'REPLAY_RESERVATION_CONFLICT', expected: 'CANARY_REPLAY_REJECTED' },
+        { status: 'BUDGET_BREACH_TERMINATED', failureCategory: 'BUDGET_BREACH', expected: 'CANARY_BUDGET_REJECTED' },
+        { status: 'QUALITY_GATE_FAILED', failureCategory: 'QUALITY_GATE_REJECTED', expected: 'CANARY_VALIDATION_FAILED' },
+        { status: 'TRANSPORT_EXECUTION_FAILED', failureCategory: 'NETWORK_TRANSPORT_FAILURE', expected: 'CANARY_PROVIDER_EXECUTION_FAILED' },
+      ];
+
+      for (const tc of testCases) {
+        const { handleRoute, cleanup } = await importFuturePathRouteForTest({
+          mockBoundaryResult: {
+            success: false,
+            status: tc.status as any,
+            failureCategory: tc.failureCategory as any,
+            errors: ['secret_error_data'],
+          },
+        });
+
+        const user = createDummySuperadmin();
+        const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+        const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(createDummyPayloads()),
+        });
+
+        const response = await handleRoute(request, user, env as any);
+        const json = (await response.json()) as any;
+
+        expect(json.errors).toEqual([tc.expected]);
+        expect(PUBLIC_OPERATIONAL_ERROR_CODES).toContain(json.errors[0]);
+        expect(JSON.stringify(json)).not.toContain('secret_error_data');
+
+        cleanup();
+      }
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 15: Duplicate Top-Level JSON Member & Prototype Poisoning Rejection
+  // ==========================================================================
+  describe('15. Duplicate Top-Level JSON Member & Prototype Poisoning Rejection', () => {
+    it('15.1 duplicate authorizationPackage is rejected with 400 INVALID_REQUEST', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      const duplicatePkgJson = '{"authorizationPackage":{},"authorizationPackage":{},"sourceProvenanceReceipt":{}}';
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: duplicatePkgJson,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(400);
+      const json = (await response.json()) as any;
+      expect(json).toEqual({ error: 'INVALID_REQUEST' });
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('15.2 duplicate sourceProvenanceReceipt is rejected with 400 INVALID_REQUEST', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      const duplicateReceiptJson = '{"authorizationPackage":{},"sourceProvenanceReceipt":{},"sourceProvenanceReceipt":{}}';
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: duplicateReceiptJson,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(400);
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('15.3 prototype poisoning keys (__proto__, constructor, prototype) are rejected with 400', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      const poisonKeys = ['__proto__', 'constructor', 'prototype', 'proto'];
+
+      for (const poison of poisonKeys) {
+        const poisonJson = `{"${poison}":{"evil":1},"authorizationPackage":{},"sourceProvenanceReceipt":{}}`;
+
+        const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: poisonJson,
+        });
+
+        const response = await handleRoute(request, user, env as any);
+        expect(response.status).toBe(400);
+      }
+
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('15.4 Unicode lookalike key names are rejected with 400', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      // Cyrillic 'а' (\u0430) instead of Latin 'a'
+      const lookalikeJson = '{"\u0430uthorizationPackage":{},"sourceProvenanceReceipt":{}}';
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: lookalikeJson,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(400);
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('15.5 escaped string values containing "authorizationPackage" do NOT trigger duplicate detection', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      const validWithNestedString = JSON.stringify({
+        authorizationPackage: { note: 'authorizationPackage inside value' },
+        sourceProvenanceReceipt: { note: 'sourceProvenanceReceipt inside value' },
+      });
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: validWithNestedString,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(200);
+      expect(getBoundaryCalls().length).toBe(1);
+      cleanup();
+    });
+
+    it('15.6 nested object members with matching names do NOT count as top-level duplicates', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+      const user = createDummySuperadmin();
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+
+      const validWithNestedKeys = JSON.stringify({
+        authorizationPackage: {
+          authorizationPackage: 'nested_val_1',
+          sourceProvenanceReceipt: 'nested_val_2',
+        },
+        sourceProvenanceReceipt: {
+          sourceProvenanceReceipt: 'nested_val_3',
+        },
+      });
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: validWithNestedKeys,
+      });
+
+      const response = await handleRoute(request, user, env as any);
+      expect(response.status).toBe(200);
+      expect(getBoundaryCalls().length).toBe(1);
+      cleanup();
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 16: Integrated Real-Boundary Offline Regression (Unmocked 5U.3.1 Boundary)
+  // ==========================================================================
+  describe('16. Integrated Real-Boundary Offline Regression (Unmocked 5U.3.1 Boundary)', () => {
+    it('16.1 real unmocked 5U.3.1 boundary fails closed with LIVE_EXECUTION_BLOCKED without touching env capabilities', async () => {
+      vi.resetModules();
+
+      // Mock ONLY operational route policy to simulate future open route barriers
+      vi.doMock('../../worker/ai/canary/deepSeekProductionOperationalRoutePolicy', () => ({
+        PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH: '/api/ops/canary/deepseek-certification',
+        PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED: true,
+        PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY: true,
+      }));
+
+      // NOTE: executeProductionWorkerCanaryCertification is NOT mocked! We test the real boundary!
+      const routeMod = await import('../../worker/ai/canary/deepSeekProductionWorkerOperationalRoute');
+
+      let dbReadCount = 0;
+      let secretReadCount = 0;
+
+      const hostEnv = {
+        ENVIRONMENT: 'production',
+        get DB() {
+          dbReadCount++;
+          throw new Error('UNEXPECTED_REAL_DB_ACCESS');
+        },
+        get DEEPSEEK_API_KEY() {
+          secretReadCount++;
+          throw new Error('UNEXPECTED_REAL_SECRET_ACCESS');
+        },
+      };
+
+      const user = createDummySuperadmin();
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createDummyPayloads()),
+      });
+
+      const response = await routeMod.handleProductionCanaryOperationalRoute(request, user, hostEnv as any);
+
+      // Successfully reached real boundary and returned minimized operational response
+      expect(response.status).toBe(200);
+      const json = (await response.json()) as any;
+
+      expect(json.success).toBe(false);
+      expect(json.status).toBe('LIVE_EXECUTION_BLOCKED');
+      expect(json.errors).toEqual(['CANARY_LIVE_EXECUTION_BLOCKED']);
+
+      // Live gate is canonical false, so zero reads of env.DB or env.DEEPSEEK_API_KEY
+      expect(dbReadCount).toBe(0);
+      expect(secretReadCount).toBe(0);
+
+      // Real provider calls and D1 calls are strictly 0
+      expect(json.providerNetworkCalls).toBe(0);
+      expect(json.credentialReads).toBe(0);
+      expect(json.transportAttempts).toBe(0);
+
+      vi.doUnmock('../../worker/ai/canary/deepSeekProductionOperationalRoutePolicy');
+      vi.resetModules();
     });
   });
 });
