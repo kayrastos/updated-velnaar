@@ -75,16 +75,34 @@ const result = await executeProductionWorkerCanaryCertification(
 
 ## 4. DORMANT STATE & READINESS BARRIERS
 
-The operational route remains strictly dormant and unreachable in production:
+The operational route remains strictly dormant and protected by multi-layered barriers in production:
 - `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = false`
 - `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = false`
 
-Under canonical conditions, any request to `/api/ops/canary/deepseek-certification` returns `404 NOT_FOUND` with:
+### 4.1 Direct Operational Handler Behavior
+When `handleProductionCanaryOperationalRoute(...)` is directly invoked or reached under canonical policy:
+- `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED === false`
+- `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY === false`
+
+Because these canonical operational route barriers are `false`, the handler returns HTTP `404 NOT_FOUND` immediately, with:
 - Zero request body reads
 - Zero reader acquisitions
 - Zero `env.DB` accesses
 - Zero `env.DEEPSEEK_API_KEY` accesses
-- Zero capability boundary calls
+- Zero capability-boundary invocations
+
+### 4.2 Current End-to-End Worker Production Behavior
+In the complete Worker pipeline (`worker/index.ts`), session and user authentication are resolved before dispatching to the operational route branch:
+- `worker/index.ts` invokes `AuthContextService.resolveSessionUser(request, env)` before operational route routing.
+- Because verified production session authentication and production superadmin authentication are not yet implemented or proven in the canonical runtime, ordinary end-to-end production requests do not reach the operational route handler. Instead, they fail closed at the host authentication boundary with HTTP `401 UNAUTHORIZED`.
+- If a request were ever authenticated in the future, it would then encounter the dormant handler-level barrier and return HTTP `404 NOT_FOUND` as long as operational route gates remain closed.
+
+### 4.3 Evidence Precision Note
+This distinction between handler-level canonical behavior (`404 NOT_FOUND`) and current end-to-end Worker request behavior (`401 UNAUTHORIZED`) is an evidence-precision correction only. It accurately models the current multi-layer fail-closed defense without weakening dormant safety or altering the reviewed security implementation:
+- No claim is made that every end-to-end production request receives `404` (unauthenticated requests receive `401` first).
+- No claim is made that production superadmin authentication exists or is proven.
+- No claim is made that operational ingress authentication exists or is provisioned.
+- No claim is made that production success-path execution exists or has been certified.
 
 ---
 
