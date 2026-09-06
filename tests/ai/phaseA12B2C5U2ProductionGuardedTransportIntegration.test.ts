@@ -2822,10 +2822,37 @@ describe('VELNAR — A.12B.2C-5U.2 / 5U.2.1 Replay-Protected Guarded Transport I
         },
       });
 
-      let requestedEndpoint = '';
-      globalThis.fetch = ((url: string) => {
-        requestedEndpoint = url;
-        throw new Error('SENTINEL_FIRST_DISPATCH_HALT');
+      let fetchInvocations = 0;
+      globalThis.fetch = (async (_url: string, _init: any) => {
+        fetchInvocations++;
+        const taskIndex = fetchInvocations - 1;
+        const taskType = CERTIFIED_A12B2C_TASK_TYPES[taskIndex];
+        const fixture = CANARY_SYNTHETIC_FIXTURES[taskType];
+        const validContent = generateStrongOutput(fixture);
+        const rawJson = JSON.stringify({
+          id: `chatcmpl-test-20-5-${taskIndex}`,
+          object: 'chat.completion',
+          created: 1720000000,
+          model: 'deepseek-v4-flash',
+          choices: [
+            {
+              index: 0,
+              message: { role: 'assistant', content: validContent },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            total_tokens: 150,
+            prompt_cache_hit_tokens: 50,
+            prompt_cache_miss_tokens: 50,
+          },
+        });
+        return new Response(rawJson, {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
       }) as any;
 
       const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
@@ -2838,13 +2865,31 @@ describe('VELNAR — A.12B.2C-5U.2 / 5U.2.1 Replay-Protected Guarded Transport I
       });
 
       const { db } = createStrictMockD1();
-      await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
+      const result = await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
         (origPkg.payload as any).candidateId = 'attacker_mutated_candidate_id';
         (origPkg.payload as any).targetProgram = 'attacker_mutated_program_id';
         return { apiKey: 'valid_test_key' };
       });
 
-      expect(requestedEndpoint).toBe('https://api.deepseek.com/v1/chat/completions');
+      expect(fetchInvocations).toBe(7);
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('TRANSPORT_COMPLETED_PENDING_FINALIZATION');
+      expect(result.candidate).not.toBeNull();
+
+      const expectedCandidateId =
+        currentWindow === 'OFF_PEAK'
+          ? SEALED_OFF_PEAK_CANDIDATE_ID
+          : SEALED_PEAK_CANDIDATE_ID;
+      const expectedProgram =
+        currentWindow === 'OFF_PEAK'
+          ? SEALED_OFF_PEAK_PROGRAM_ID
+          : SEALED_PEAK_PROGRAM_ID;
+
+      expect(result.candidate.candidateId).toBe(expectedCandidateId);
+      expect(result.candidate.targetProgram).toBe(expectedProgram);
+      expect(result.candidate.candidateId).not.toBe('attacker_mutated_candidate_id');
+      expect(result.candidate.targetProgram).not.toBe('attacker_mutated_program_id');
+
       cleanup();
     });
   });
@@ -2916,6 +2961,8 @@ describe('VELNAR — A.12B.2C-5U.2 / 5U.2.1 Replay-Protected Guarded Transport I
         (origPkg.payload as any).sourceTreeSha = 'ATTACKER_MUTATED_TREE_SHA';
         (origPkg.payload as any).runNonce = 'ATTACKER_MUTATED_NONCE';
         (origPkg.payload as any).maxBudgetMicroUsd = 999999999;
+        (origPkg.payload as any).candidateId = 'attacker_mutated_candidate_id';
+        (origPkg.payload as any).targetProgram = 'attacker_mutated_program_id';
         return { apiKey: 'valid_test_key' };
       });
 
@@ -2948,6 +2995,8 @@ describe('VELNAR — A.12B.2C-5U.2 / 5U.2.1 Replay-Protected Guarded Transport I
       const expectedProgram = currentWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_PROGRAM_ID : SEALED_PEAK_PROGRAM_ID;
       expect(result.candidate.candidateId).toBe(expectedCandidateId);
       expect(result.candidate.targetProgram).toBe(expectedProgram);
+      expect(result.candidate.candidateId).not.toBe('attacker_mutated_candidate_id');
+      expect(result.candidate.targetProgram).not.toBe('attacker_mutated_program_id');
 
       cleanup();
     });
@@ -3076,18 +3125,34 @@ describe('VELNAR — A.12B.2C-5U.2 / 5U.2.1 Replay-Protected Guarded Transport I
     });
 
     it('23.4 legacy credential resolver is called 0 times', async () => {
-      let credResolverCalls = 0;
-      const result = await executeGuardedDeepSeekCertificationTransport({
-        pricingWindow: 'OFF_PEAK',
-        authorization: {
-          get maxBudgetMicroUsd() {
-            credResolverCalls++;
-            return 50000;
+      let credentialResolverCalls = 0;
+      let localFetchCalls = 0;
+      const origFetch = globalThis.fetch;
+      globalThis.fetch = (() => {
+        localFetchCalls++;
+        throw new Error('SENTINEL');
+      }) as any;
+
+      try {
+        const result = await executeGuardedDeepSeekCertificationTransport({
+          pricingWindow: 'OFF_PEAK',
+          authorization: createSampleAuthPackage(),
+          getRuntimeCredential: () => {
+            credentialResolverCalls++;
+            return { apiKey: 'must_not_be_read' };
           },
-        },
-      } as any);
-      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
-      expect(credResolverCalls).toBe(0);
+        } as any);
+
+        expect(result.success).toBe(false);
+        expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+        expect(result.authorizedBudgetMicroUsd).toBe(0);
+        expect(credentialResolverCalls).toBe(0);
+        expect(result.credentialReads).toBe(0);
+        expect(localFetchCalls).toBe(0);
+        expect(result.providerNetworkCalls).toBe(0);
+      } finally {
+        globalThis.fetch = origFetch;
+      }
     });
 
     it('23.5 legacy fetch is called 0 times', async () => {
