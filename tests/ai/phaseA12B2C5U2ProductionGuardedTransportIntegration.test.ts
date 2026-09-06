@@ -23,7 +23,16 @@
  *  13. Global fetch sentinel proves exactly zero provider network calls.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { generateStrongOutput } from '../../worker/ai/evaluation/evaluationFixtures';
+import { CANARY_SYNTHETIC_FIXTURES } from '../../worker/ai/canary/canarySpecification';
+import { CERTIFIED_A12B2C_TASK_TYPES } from '../../worker/ai/providers/certifiedProviderTypes';
+import {
+  SEALED_OFF_PEAK_CANDIDATE_ID,
+  SEALED_PEAK_CANDIDATE_ID,
+  SEALED_OFF_PEAK_PROGRAM_ID,
+  SEALED_PEAK_PROGRAM_ID,
+} from '../../worker/ai/canary/deepSeekLiveCertificationTransportContract';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -91,6 +100,7 @@ function createStrictMockD1(options?: {
  * Minimal sample SignedHumanAuthorizationPackage fixture.
  */
 function createSampleAuthPackage(overrides?: Partial<any>): SignedHumanAuthorizationPackage {
+  const { payload: payloadOverrides, ...outerOverrides } = overrides || {};
   return {
     payload: {
       authorizationVersion: 'a12b2c5m-v1',
@@ -112,13 +122,13 @@ function createSampleAuthPackage(overrides?: Partial<any>): SignedHumanAuthoriza
       transportContractVersion: '1.0.0-live-cert',
       guardedTransportModuleVersion: '1.0.0-guarded',
       sourceAttestationDigest: 'e'.repeat(64),
-      ...(overrides?.payload || {}),
+      ...(payloadOverrides || {}),
     },
     signatureBase64: Buffer.alloc(64, 0x01).toString('base64'),
     authorityId: 'auth_prod_root_01',
     keyVersion: 'v1',
     algorithm: 'Ed25519',
-    ...overrides,
+    ...outerOverrides,
   };
 }
 
@@ -142,6 +152,45 @@ function createSampleSourceReceipt(overrides?: Partial<RuntimeSourceProvenanceRe
     algorithm: 'Ed25519',
     signatureBase64: Buffer.alloc(64, 0x02).toString('base64'),
     ...overrides,
+  };
+}
+
+
+/**
+ * Test-only isolated import helper for simulating future-path live gate state
+ * without altering source constants or persisting mock state on disk.
+ */
+interface FuturePathTestOptions {
+  mockCoordinator?: (db: any, pkg: any, receipt: any) => Promise<any> | any;
+}
+
+async function importFuturePathTransportForOfflineTest(options?: FuturePathTestOptions) {
+  vi.resetModules();
+
+  const actualCanarySpec = await vi.importActual<any>('../../worker/ai/canary/canarySpecification');
+  vi.doMock('../../worker/ai/canary/canarySpecification', () => ({
+    ...actualCanarySpec,
+    CANARY_LIVE_EXECUTION_ENABLED: true,
+    CANARY_LIVE_EXECUTION_STATE: 'LIVE_EXECUTION_ALLOWED',
+  }));
+
+  if (options?.mockCoordinator) {
+    vi.doMock('../../worker/ai/canary/deepSeekProductionReplayCoordinator', () => ({
+      coordinateProductionReplayReservation: options.mockCoordinator,
+    }));
+  }
+
+  const transportMod = await import('../../worker/ai/canary/deepSeekGuardedLiveTransport');
+  return {
+    executeProductionTransport: transportMod.executeProductionReplayProtectedDeepSeekCertificationTransport,
+    executeLegacyTransport: transportMod.executeGuardedDeepSeekCertificationTransport,
+    cleanup: () => {
+      vi.doUnmock('../../worker/ai/canary/canarySpecification');
+      if (options?.mockCoordinator) {
+        vi.doUnmock('../../worker/ai/canary/deepSeekProductionReplayCoordinator');
+      }
+      vi.resetModules();
+    },
   };
 }
 
@@ -1449,7 +1498,8 @@ describe('VELNAR — A.12B.2C-5U.2 / 5U.2.1 Replay-Protected Guarded Transport I
   // ==========================================================================
   describe('12. Materialization & Malformed Object Rejection (Static & Structural)', () => {
     it('12.1 safeInspectObject rejects non-object or null input', () => {
-      expect(guardedTransportSource.includes("if (input === null || typeof input !== 'object' || Array.isArray(input))")).toBe(true);
+      expect(guardedTransportSource.includes("if (input === null || typeof input !== 'object')")).toBe(true);
+      expect(guardedTransportSource.includes('isArr = Array.isArray(input);')).toBe(true);
     });
 
     it('12.2 safeInspectObject rejects prototypes other than Object.prototype or null', () => {
@@ -1457,8 +1507,8 @@ describe('VELNAR — A.12B.2C-5U.2 / 5U.2.1 Replay-Protected Guarded Transport I
     });
 
     it('12.3 safeInspectObject rejects objects containing Symbol keys', () => {
-      expect(guardedTransportSource.includes('Object.getOwnPropertySymbols(input)')).toBe(true);
-      expect(guardedTransportSource.includes('symbols.length > 0')).toBe(true);
+      expect(guardedTransportSource.includes('Reflect.ownKeys(descriptors)')).toBe(true);
+      expect(guardedTransportSource.includes("typeof key === 'symbol'")).toBe(true);
     });
 
     it('12.4 safeInspectObject reads descriptors with getOwnPropertyDescriptors without property access', () => {
@@ -1716,4 +1766,1344 @@ describe('VELNAR — A.12B.2C-5U.2 / 5U.2.1 Replay-Protected Guarded Transport I
       expect(prodFnBody.includes('LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED')).toBe(false);
     });
   });
+
+
+
+  // ==========================================================================
+  // SUITE 16: Behavioral Malformed-Object & Invalid Input Rejection (Section 11)
+  // ==========================================================================
+  describe('16. Behavioral Malformed-Object & Invalid Input Rejection', () => {
+    let mockCoordinatorCalls = 0;
+    let mockCredentialCalls = 0;
+    let mockFetchCalls = 0;
+    let executeProductionTransport: any;
+    let cleanup: any;
+
+    beforeEach(async () => {
+      mockCoordinatorCalls = 0;
+      mockCredentialCalls = 0;
+      mockFetchCalls = 0;
+      globalThis.fetch = (() => {
+        mockFetchCalls++;
+        throw new Error('SENTINEL_DISPATCH_BLOCKED');
+      }) as any;
+
+      const isolated = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => {
+          mockCoordinatorCalls++;
+          return {
+            readyForCredentialResolution: true,
+            status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+            replayKey: 'r'.repeat(64),
+            expiresAt: '2026-09-06T18:00:00.000Z',
+          };
+        },
+      });
+      executeProductionTransport = isolated.executeProductionTransport;
+      cleanup = isolated.cleanup;
+    });
+
+    afterEach(() => {
+      cleanup?.();
+    });
+
+    const mockCred = () => {
+      mockCredentialCalls++;
+      return { apiKey: 'dummy_key' };
+    };
+
+    it('16.1 outer package getter accessor fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const validPkg = createSampleAuthPackage();
+      const badPkg = {
+        ...validPkg,
+        get signatureBase64() { return 'evil'; },
+      };
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.2 payload field getter accessor fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const validPkg = createSampleAuthPackage();
+      const badPkg = {
+        ...validPkg,
+        payload: {
+          ...validPkg.payload,
+          get maxBudgetMicroUsd() { return 50000; },
+        },
+      };
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.3 source receipt getter accessor fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const validReceipt = createSampleSourceReceipt();
+      const badReceipt = {
+        ...validReceipt,
+        get sourceCommitSha() { return 'evil'; },
+      };
+      const result = await executeProductionTransport(db, createSampleAuthPackage(), badReceipt as any, mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.4 outer package setter fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const badPkg = createSampleAuthPackage();
+      Object.defineProperty(badPkg, 'signatureBase64', {
+        set: () => {},
+        configurable: true,
+        enumerable: true,
+      });
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.5 payload setter fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const badPkg = createSampleAuthPackage();
+      Object.defineProperty(badPkg.payload, 'expiresAt', {
+        set: () => {},
+        configurable: true,
+        enumerable: true,
+      });
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.6 source receipt setter fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const badReceipt = createSampleSourceReceipt();
+      Object.defineProperty(badReceipt, 'buildId', {
+        set: () => {},
+        configurable: true,
+        enumerable: true,
+      });
+      const result = await executeProductionTransport(db, createSampleAuthPackage(), badReceipt as any, mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.7 unknown outer package key fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const badPkg = { ...createSampleAuthPackage(), injectedProp: 'untrusted' };
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.8 unknown payload key fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const validPkg = createSampleAuthPackage();
+      const badPkg = { ...validPkg, payload: { ...validPkg.payload, injectedProp: 'untrusted' } };
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.9 unknown receipt key fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const badReceipt = { ...createSampleSourceReceipt(), injectedProp: 'untrusted' };
+      const result = await executeProductionTransport(db, createSampleAuthPackage(), badReceipt as any, mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.10 missing outer package key fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const badPkg = { ...createSampleAuthPackage() };
+      delete (badPkg as any).signatureBase64;
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.11 missing payload key fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const validPkg = createSampleAuthPackage();
+      const badPayload = { ...validPkg.payload };
+      delete (badPayload as any).runNonce;
+      const badPkg = { ...validPkg, payload: badPayload };
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.12 missing receipt key fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const badReceipt = { ...createSampleSourceReceipt() };
+      delete (badReceipt as any).deploymentId;
+      const result = await executeProductionTransport(db, createSampleAuthPackage(), badReceipt as any, mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.13 symbol outer key fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const badPkg = { ...createSampleAuthPackage(), [Symbol('evilOuter')]: 'bad' };
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.14 symbol payload key fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const validPkg = createSampleAuthPackage();
+      const badPkg = { ...validPkg, payload: { ...validPkg.payload, [Symbol('evilPayload')]: 'bad' } };
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.15 symbol receipt key fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const badReceipt = { ...createSampleSourceReceipt(), [Symbol('evilReceipt')]: 'bad' };
+      const result = await executeProductionTransport(db, createSampleAuthPackage(), badReceipt as any, mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.16 array as package fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const result = await executeProductionTransport(db, ['payload', 'signature'] as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.17 array as payload fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const badPkg = { ...createSampleAuthPackage(), payload: ['item'] };
+      const result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.18 array as receipt fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const result = await executeProductionTransport(db, createSampleAuthPackage(), ['sourceCommitSha'] as any, mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.19 primitive string as package fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const result = await executeProductionTransport(db, 'not_an_object' as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.20 primitive number as receipt fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const result = await executeProductionTransport(db, createSampleAuthPackage(), 12345 as any, mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.21 custom-prototype package fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const validPkg = createSampleAuthPackage();
+      const customProtoPkg = Object.create({ customPrototypeMethod() {} }, Object.getOwnPropertyDescriptors(validPkg));
+      const result = await executeProductionTransport(db, customProtoPkg, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.22 custom-prototype payload fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const validPkg = createSampleAuthPackage();
+      const customProtoPayload = Object.create({ customPrototypeMethod() {} }, Object.getOwnPropertyDescriptors(validPkg.payload));
+      const badPkg = { ...validPkg, payload: customProtoPayload };
+      const result = await executeProductionTransport(db, badPkg, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.23 custom-prototype receipt fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const validReceipt = createSampleSourceReceipt();
+      const customProtoReceipt = Object.create({ customPrototypeMethod() {} }, Object.getOwnPropertyDescriptors(validReceipt));
+      const result = await executeProductionTransport(db, createSampleAuthPackage(), customProtoReceipt, mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('16.24 inherited-only required property fails closed before coordinator/fetch', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const validReceipt = createSampleSourceReceipt();
+      const { buildId, ...ownProps } = validReceipt;
+      const protoWithProp = { buildId };
+      const inheritedOnlyReceipt = Object.create(protoWithProp, Object.getOwnPropertyDescriptors(ownProps));
+      const result = await executeProductionTransport(db, createSampleAuthPackage(), inheritedOnlyReceipt, mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 17: Revoked Proxy Behavioral Execution (Section 12)
+  // ==========================================================================
+  describe('17. Revoked Proxy Behavioral Execution', () => {
+    let mockCoordinatorCalls = 0;
+    let mockCredentialCalls = 0;
+    let mockFetchCalls = 0;
+    let executeProductionTransport: any;
+    let cleanup: any;
+
+    beforeEach(async () => {
+      mockCoordinatorCalls = 0;
+      mockCredentialCalls = 0;
+      mockFetchCalls = 0;
+      globalThis.fetch = (() => {
+        mockFetchCalls++;
+        throw new Error('SENTINEL_DISPATCH_BLOCKED');
+      }) as any;
+
+      const isolated = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => {
+          mockCoordinatorCalls++;
+          return {
+            readyForCredentialResolution: true,
+            status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+            replayKey: 'r'.repeat(64),
+            expiresAt: '2026-09-06T18:00:00.000Z',
+          };
+        },
+      });
+      executeProductionTransport = isolated.executeProductionTransport;
+      cleanup = isolated.cleanup;
+    });
+
+    afterEach(() => {
+      cleanup?.();
+    });
+
+    const mockCred = () => {
+      mockCredentialCalls++;
+      return { apiKey: 'dummy_key' };
+    };
+
+    it('17.1 revoked package Proxy resolves to PREFLIGHT_VALIDATION_FAILED without throwing', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const { proxy: revokedPkg, revoke } = Proxy.revocable(createSampleAuthPackage(), {});
+      revoke();
+
+      let didThrow = false;
+      let result: any;
+      try {
+        result = await executeProductionTransport(db, revokedPkg as any, createSampleSourceReceipt(), mockCred);
+      } catch {
+        didThrow = true;
+      }
+      expect(didThrow).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('17.2 revoked payload Proxy resolves to PREFLIGHT_VALIDATION_FAILED without throwing', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const { proxy: revokedPayload, revoke } = Proxy.revocable(createSampleAuthPackage().payload, {});
+      revoke();
+      const badPkg = { ...createSampleAuthPackage(), payload: revokedPayload };
+
+      let didThrow = false;
+      let result: any;
+      try {
+        result = await executeProductionTransport(db, badPkg as any, createSampleSourceReceipt(), mockCred);
+      } catch {
+        didThrow = true;
+      }
+      expect(didThrow).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('17.3 revoked sourceReceipt Proxy resolves to PREFLIGHT_VALIDATION_FAILED without throwing', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const { proxy: revokedReceipt, revoke } = Proxy.revocable(createSampleSourceReceipt(), {});
+      revoke();
+
+      let didThrow = false;
+      let result: any;
+      try {
+        result = await executeProductionTransport(db, createSampleAuthPackage(), revokedReceipt as any, mockCred);
+      } catch {
+        didThrow = true;
+      }
+      expect(didThrow).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+
+    it('17.4 revoked proxy with throwing revocation handler resolves fail-closed with 0 coordinator/credential/fetch calls', async () => {
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const handler = {
+        get() { throw new Error('TRAP_ERROR'); },
+        getPrototypeOf() { throw new Error('TRAP_PROTO_ERROR'); },
+      };
+      const { proxy: revokedPkg, revoke } = Proxy.revocable(createSampleAuthPackage(), handler);
+      revoke();
+
+      const result = await executeProductionTransport(db, revokedPkg as any, createSampleSourceReceipt(), mockCred);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(result.errors[0]).toContain('PRODUCTION_INPUT_MATERIALIZATION_FAILED');
+      expect(mockCoordinatorCalls).toBe(0);
+      expect(getPrepareCalls()).toBe(0);
+      expect(mockCredentialCalls).toBe(0);
+      expect(mockFetchCalls).toBe(0);
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 18: Behavioral Snapshot Identity & Immutability (Section 13 & 14)
+  // ==========================================================================
+  describe('18. Behavioral Snapshot Identity & Immutability', () => {
+    let capturedPkg: any = null;
+    let capturedReceipt: any = null;
+    let executeProductionTransport: any;
+    let cleanup: any;
+
+    beforeEach(async () => {
+      capturedPkg = null;
+      capturedReceipt = null;
+      const isolated = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: (_db, p, r) => {
+          capturedPkg = p;
+          capturedReceipt = r;
+          return {
+            readyForCredentialResolution: true,
+            status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+            replayKey: 'r'.repeat(64),
+            expiresAt: '2026-09-06T18:00:00.000Z',
+          };
+        },
+      });
+      executeProductionTransport = isolated.executeProductionTransport;
+      cleanup = isolated.cleanup;
+    });
+
+    afterEach(() => {
+      cleanup?.();
+    });
+
+    it('18.1 receivedPkg is a new object reference distinct from originalPkg', async () => {
+      const { db } = createStrictMockD1();
+      const origPkg = createSampleAuthPackage();
+      await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => { throw new Error('STOP'); });
+      expect(capturedPkg).not.toBeNull();
+      expect(capturedPkg).not.toBe(origPkg);
+    });
+
+    it('18.2 receivedPkg.payload is a new object reference distinct from originalPkg.payload', async () => {
+      const { db } = createStrictMockD1();
+      const origPkg = createSampleAuthPackage();
+      await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => { throw new Error('STOP'); });
+      expect(capturedPkg.payload).not.toBe(origPkg.payload);
+    });
+
+    it('18.3 receivedSourceReceipt is a new object reference distinct from originalSourceReceipt', async () => {
+      const { db } = createStrictMockD1();
+      const origReceipt = createSampleSourceReceipt();
+      await executeProductionTransport(db, createSampleAuthPackage(), origReceipt, () => { throw new Error('STOP'); });
+      expect(capturedReceipt).not.toBe(origReceipt);
+    });
+
+    it('18.4 Object.isFrozen(receivedPkg) === true', async () => {
+      const { db } = createStrictMockD1();
+      await executeProductionTransport(db, createSampleAuthPackage(), createSampleSourceReceipt(), () => { throw new Error('STOP'); });
+      expect(Object.isFrozen(capturedPkg)).toBe(true);
+    });
+
+    it('18.5 Object.isFrozen(receivedPkg.payload) === true', async () => {
+      const { db } = createStrictMockD1();
+      await executeProductionTransport(db, createSampleAuthPackage(), createSampleSourceReceipt(), () => { throw new Error('STOP'); });
+      expect(Object.isFrozen(capturedPkg.payload)).toBe(true);
+    });
+
+    it('18.6 Object.isFrozen(receivedSourceReceipt) === true', async () => {
+      const { db } = createStrictMockD1();
+      await executeProductionTransport(db, createSampleAuthPackage(), createSampleSourceReceipt(), () => { throw new Error('STOP'); });
+      expect(Object.isFrozen(capturedReceipt)).toBe(true);
+    });
+
+    it('18.7 original caller objects remain unfrozen after transport execution', async () => {
+      const { db } = createStrictMockD1();
+      const origPkg = createSampleAuthPackage();
+      const origReceipt = createSampleSourceReceipt();
+      await executeProductionTransport(db, origPkg, origReceipt, () => { throw new Error('STOP'); });
+      expect(Object.isFrozen(origPkg)).toBe(false);
+      expect(Object.isFrozen(origPkg.payload)).toBe(false);
+      expect(Object.isFrozen(origReceipt)).toBe(false);
+    });
+
+    it('18.8 zero string normalization: trailing/leading whitespace is preserved exactly', async () => {
+      const { db } = createStrictMockD1();
+      const origPkg = createSampleAuthPackage();
+      (origPkg.payload as any).authorityId = '  auth_with_spaces  ';
+      (origPkg as any).authorityId = '  auth_with_spaces  ';
+      await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => { throw new Error('STOP'); });
+      expect(capturedPkg.payload.authorityId).toBe('  auth_with_spaces  ');
+      expect(capturedPkg.authorityId).toBe('  auth_with_spaces  ');
+    });
+
+    it('18.9 zero casing normalization: mixed casing is preserved exactly without alteration', async () => {
+      const { db } = createStrictMockD1();
+      const origPkg = createSampleAuthPackage();
+      (origPkg.payload as any).runNonce = 'NoNcE_Mixed_CaSe_123';
+      await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => { throw new Error('STOP'); });
+      expect(capturedPkg.payload.runNonce).toBe('NoNcE_Mixed_CaSe_123');
+    });
+
+    it('18.10 zero timestamp normalization: ISO timestamp string format is preserved byte-for-byte', async () => {
+      const { db } = createStrictMockD1();
+      const origPkg = createSampleAuthPackage();
+      const exactIso = '2026-09-06T12:34:56.789Z';
+      (origPkg.payload as any).issuedAt = exactIso;
+      await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => { throw new Error('STOP'); });
+      expect(capturedPkg.payload.issuedAt).toBe(exactIso);
+    });
+
+    it('18.11 zero numeric or boolean coercion: types are preserved strictly without type conversion', async () => {
+      const { db } = createStrictMockD1();
+      const origPkg = createSampleAuthPackage();
+      (origPkg.payload as any).maxBudgetMicroUsd = 42000;
+      (origPkg.payload as any).canonicalTaskCount = 7;
+      (origPkg.payload as any).singleUse = true;
+      await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => { throw new Error('STOP'); });
+      expect(typeof capturedPkg.payload.maxBudgetMicroUsd).toBe('number');
+      expect(capturedPkg.payload.maxBudgetMicroUsd).toBe(42000);
+      expect(typeof capturedPkg.payload.canonicalTaskCount).toBe('number');
+      expect(capturedPkg.payload.canonicalTaskCount).toBe(7);
+      expect(typeof capturedPkg.payload.singleUse).toBe('boolean');
+      expect(capturedPkg.payload.singleUse).toBe(true);
+    });
+
+    it('18.12 signatureBase64 copied byte-for-byte without alteration', async () => {
+      const { db } = createStrictMockD1();
+      const origPkg = createSampleAuthPackage();
+      const sig = Buffer.from('exact_signature_bytes_never_re-encoded').toString('base64');
+      (origPkg as any).signatureBase64 = sig;
+      await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => { throw new Error('STOP'); });
+      expect(capturedPkg.signatureBase64).toBe(sig);
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 19: Coordinator-Await TOCTOU Mutation Resistance (Section 15 & 16)
+  // ==========================================================================
+  describe('19. Coordinator-Await TOCTOU Mutation Resistance', () => {
+    it('19.1 coordinator snapshot captures pre-mutation values during deferred await', async () => {
+      let resolveCoord: (v: any) => void;
+      const coordPromise = new Promise((resolve) => { resolveCoord = resolve; });
+      let capturedPkg: any = null;
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: (_db, p) => {
+          capturedPkg = p;
+          return coordPromise;
+        },
+      });
+
+      const { db } = createStrictMockD1();
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+        },
+      });
+      const origReceipt = createSampleSourceReceipt();
+
+      const transportPromise = executeProductionTransport(db, origPkg, origReceipt, () => {
+        throw new Error('STOP_AT_CREDENTIAL');
+      });
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      (origPkg.payload as any).expiresAt = '2020-01-01T00:00:00.000Z';
+      (origPkg.payload as any).pricingWindow = currentWindow === 'OFF_PEAK' ? 'PEAK' : 'OFF_PEAK';
+      (origPkg.payload as any).maxBudgetMicroUsd = 999999999;
+      (origPkg.payload as any).sourceCommitSha = 'mutated_sha';
+      (origReceipt as any).sourceCommitSha = 'mutated_receipt_sha';
+
+      expect(capturedPkg.payload.expiresAt).toBe(futureExpiry);
+      expect(capturedPkg.payload.pricingWindow).toBe(currentWindow);
+      expect(capturedPkg.payload.maxBudgetMicroUsd).toBe(50000);
+
+      resolveCoord!({
+        readyForCredentialResolution: true,
+        status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+        replayKey: 'k'.repeat(64),
+        expiresAt: futureExpiry,
+      });
+
+      await transportPromise;
+      cleanup();
+    });
+
+    it('19.2 continuation does not adopt mutated expiresAt (passes pre-credential expiry against snapshot)', async () => {
+      let resolveCoord: (v: any) => void;
+      const coordPromise = new Promise((resolve) => { resolveCoord = resolve; });
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => coordPromise,
+      });
+
+      const { db } = createStrictMockD1();
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+        },
+      });
+
+      let credentialCalls = 0;
+      const transportPromise = executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
+        credentialCalls++;
+        throw new Error('STOP_AT_CREDENTIAL');
+      });
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      (origPkg.payload as any).expiresAt = '2020-01-01T00:00:00.000Z';
+
+      resolveCoord!({
+        readyForCredentialResolution: true,
+        status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+        replayKey: 'k'.repeat(64),
+        expiresAt: futureExpiry,
+      });
+
+      const result = await transportPromise;
+      expect(credentialCalls).toBe(1);
+      expect(result.errors[0]).toContain('CREDENTIAL_RESOLUTION_FAILED');
+      cleanup();
+    });
+
+    it('19.3 continuation does not adopt mutated pricingWindow (passes pre-credential window against snapshot)', async () => {
+      let resolveCoord: (v: any) => void;
+      const coordPromise = new Promise((resolve) => { resolveCoord = resolve; });
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => coordPromise,
+      });
+
+      const { db } = createStrictMockD1();
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+        },
+      });
+
+      let credentialCalls = 0;
+      const transportPromise = executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
+        credentialCalls++;
+        throw new Error('STOP_AT_CREDENTIAL');
+      });
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      (origPkg.payload as any).pricingWindow = currentWindow === 'OFF_PEAK' ? 'PEAK' : 'OFF_PEAK';
+
+      resolveCoord!({
+        readyForCredentialResolution: true,
+        status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+        replayKey: 'k'.repeat(64),
+        expiresAt: futureExpiry,
+      });
+
+      const result = await transportPromise;
+      expect(credentialCalls).toBe(1);
+      expect(result.errors[0]).toContain('CREDENTIAL_RESOLUTION_FAILED');
+      cleanup();
+    });
+
+    it('19.4 controlled failure after coordinator await returns pre-mutation authorizedBudgetMicroUsd (Section 16)', async () => {
+      let resolveCoord: (v: any) => void;
+      const coordPromise = new Promise((resolve) => { resolveCoord = resolve; });
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => coordPromise,
+      });
+
+      const { db } = createStrictMockD1();
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+        },
+      });
+
+      const transportPromise = executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
+        throw new Error('CONTROLLED_CREDENTIAL_FAILURE');
+      });
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      (origPkg.payload as any).maxBudgetMicroUsd = 999999999;
+
+      resolveCoord!({
+        readyForCredentialResolution: true,
+        status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+        replayKey: 'k'.repeat(64),
+        expiresAt: futureExpiry,
+      });
+
+      const result = await transportPromise;
+      expect(result.success).toBe(false);
+      expect(result.authorizedBudgetMicroUsd).toBe(50000);
+      cleanup();
+    });
+
+    it('19.5 source receipt mutation during await does not affect coordinator snapshot', async () => {
+      let resolveCoord: (v: any) => void;
+      const coordPromise = new Promise((resolve) => { resolveCoord = resolve; });
+      let capturedReceipt: any = null;
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: (_db, _p, r) => {
+          capturedReceipt = r;
+          return coordPromise;
+        },
+      });
+
+      const { db } = createStrictMockD1();
+      const origReceipt = createSampleSourceReceipt({ sourceCommitSha: 'commit_original_123' });
+      const origPkg = createSampleAuthPackage();
+
+      const transportPromise = executeProductionTransport(db, origPkg, origReceipt, () => {
+        throw new Error('STOP');
+      });
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      (origReceipt as any).sourceCommitSha = 'commit_attacker_tampered';
+
+      expect(capturedReceipt.sourceCommitSha).toBe('commit_original_123');
+
+      resolveCoord!({
+        readyForCredentialResolution: true,
+        status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+        replayKey: 'k'.repeat(64),
+        expiresAt: '2026-09-06T18:00:00.000Z',
+      });
+
+      await transportPromise;
+      cleanup();
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 20: Credential-Resolver TOCTOU Mutation Resistance (Section 17, 18, 19, 21)
+  // ==========================================================================
+  describe('20. Credential-Resolver TOCTOU Mutation Resistance & Post-Credential Integrity', () => {
+    it('20.1 credential-resolver mutation of expiresAt does not trigger post-credential expiry rejection', async () => {
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+        },
+      });
+
+      let localFetchCalls = 0;
+      globalThis.fetch = (() => {
+        localFetchCalls++;
+        throw new Error('SENTINEL_FETCH_CALLED');
+      }) as any;
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => ({
+          readyForCredentialResolution: true,
+          status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+          replayKey: 'k'.repeat(64),
+          expiresAt: futureExpiry,
+        }),
+      });
+
+      const { db } = createStrictMockD1();
+      const result = await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
+        (origPkg.payload as any).expiresAt = '2020-01-01T00:00:00.000Z';
+        return { apiKey: 'valid_test_key' };
+      });
+
+      expect(result.errors.some((e: string) => e.includes('AUTHORIZATION_EXPIRED_POST_CREDENTIAL'))).toBe(false);
+      expect(localFetchCalls).toBe(1);
+      cleanup();
+    });
+
+    it('20.2 credential-resolver mutation of pricingWindow does not trigger post-credential window crossing', async () => {
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+        },
+      });
+
+      let localFetchCalls = 0;
+      globalThis.fetch = (() => {
+        localFetchCalls++;
+        throw new Error('SENTINEL_FETCH_CALLED');
+      }) as any;
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => ({
+          readyForCredentialResolution: true,
+          status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+          replayKey: 'k'.repeat(64),
+          expiresAt: futureExpiry,
+        }),
+      });
+
+      const { db } = createStrictMockD1();
+      const result = await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
+        (origPkg.payload as any).pricingWindow = currentWindow === 'OFF_PEAK' ? 'PEAK' : 'OFF_PEAK';
+        return { apiKey: 'valid_test_key' };
+      });
+
+      expect(result.errors.some((e: string) => e.includes('PRICING_WINDOW_CHANGED_POST_CREDENTIAL'))).toBe(false);
+      expect(localFetchCalls).toBe(1);
+      cleanup();
+    });
+
+    it('20.3 function proceeds past credential resolution to first fetch dispatch (fetchCalls === 1) (Section 18)', async () => {
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+        },
+      });
+
+      let localFetchCalls = 0;
+      globalThis.fetch = (() => {
+        localFetchCalls++;
+        throw new Error('SENTINEL_DETERMINISTIC_LOCAL_FAIL');
+      }) as any;
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => ({
+          readyForCredentialResolution: true,
+          status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+          replayKey: 'k'.repeat(64),
+          expiresAt: futureExpiry,
+        }),
+      });
+
+      const { db } = createStrictMockD1();
+      const result = await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
+        (origPkg.payload as any).expiresAt = '2020-01-01T00:00:00.000Z';
+        (origPkg.payload as any).pricingWindow = currentWindow === 'OFF_PEAK' ? 'PEAK' : 'OFF_PEAK';
+        return { apiKey: 'valid_test_key' };
+      });
+
+      expect(localFetchCalls).toBe(1);
+      expect(result.status).toBe('TRANSPORT_EXECUTION_FAILED');
+      cleanup();
+    });
+
+    it('20.4 controlled first-dispatch failure returns authorizedBudgetMicroUsd === pre-mutation budget (Section 19)', async () => {
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+        },
+      });
+
+      globalThis.fetch = (() => {
+        throw new Error('SENTINEL_DETERMINISTIC_LOCAL_FAIL');
+      }) as any;
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => ({
+          readyForCredentialResolution: true,
+          status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+          replayKey: 'k'.repeat(64),
+          expiresAt: futureExpiry,
+        }),
+      });
+
+      const { db } = createStrictMockD1();
+      const result = await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
+        (origPkg.payload as any).maxBudgetMicroUsd = 88888888;
+        return { apiKey: 'valid_test_key' };
+      });
+
+      expect(result.authorizedBudgetMicroUsd).toBe(50000);
+      cleanup();
+    });
+
+    it('20.5 candidateId and targetProgram caller mutations do not affect sealed dispatch policy (Section 21)', async () => {
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+        },
+      });
+
+      let requestedEndpoint = '';
+      globalThis.fetch = ((url: string) => {
+        requestedEndpoint = url;
+        throw new Error('SENTINEL_FIRST_DISPATCH_HALT');
+      }) as any;
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => ({
+          readyForCredentialResolution: true,
+          status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+          replayKey: 'k'.repeat(64),
+          expiresAt: futureExpiry,
+        }),
+      });
+
+      const { db } = createStrictMockD1();
+      await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
+        (origPkg.payload as any).candidateId = 'attacker_mutated_candidate_id';
+        (origPkg.payload as any).targetProgram = 'attacker_mutated_program_id';
+        return { apiKey: 'valid_test_key' };
+      });
+
+      expect(requestedEndpoint).toBe('https://api.deepseek.com/v1/chat/completions');
+      cleanup();
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 21: Behavioral Context Binding & Intermediate Candidate Integrity (Section 20)
+  // ==========================================================================
+  describe('21. Behavioral Context Binding & Intermediate Candidate Integrity', () => {
+    it('21.1 executes 7-task dispatch with valid responses and asserts candidate fields match pre-mutation snapshot', async () => {
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+          sourceCommitSha: '276f127e88f34aab5dee80b153f2d784b5d4ef58',
+          sourceTreeSha: '8a7b291df30cdbf8b022c809408ef58639c54819',
+          runNonce: 'NONCE-PRE-MUTATION-CANONICAL-001',
+        },
+      });
+
+      let fetchInvocations = 0;
+      globalThis.fetch = (async (_url: string, _init: any) => {
+        fetchInvocations++;
+        const taskIndex = fetchInvocations - 1;
+        const taskType = CERTIFIED_A12B2C_TASK_TYPES[taskIndex];
+        const fixture = CANARY_SYNTHETIC_FIXTURES[taskType];
+        const validContent = generateStrongOutput(fixture);
+        const rawJson = JSON.stringify({
+          id: `chatcmpl-test-${taskIndex}`,
+          object: 'chat.completion',
+          created: 1720000000,
+          model: 'deepseek-v4-flash',
+          choices: [
+            {
+              index: 0,
+              message: { role: 'assistant', content: validContent },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            total_tokens: 150,
+            prompt_cache_hit_tokens: 50,
+            prompt_cache_miss_tokens: 50,
+          },
+        });
+        return new Response(rawJson, {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }) as any;
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: () => ({
+          readyForCredentialResolution: true,
+          status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+          replayKey: 'k'.repeat(64),
+          expiresAt: futureExpiry,
+        }),
+      });
+
+      const { db } = createStrictMockD1();
+      const result = await executeProductionTransport(db, origPkg, createSampleSourceReceipt(), () => {
+        (origPkg.payload as any).sourceCommitSha = 'ATTACKER_MUTATED_COMMIT_SHA';
+        (origPkg.payload as any).sourceTreeSha = 'ATTACKER_MUTATED_TREE_SHA';
+        (origPkg.payload as any).runNonce = 'ATTACKER_MUTATED_NONCE';
+        (origPkg.payload as any).maxBudgetMicroUsd = 999999999;
+        return { apiKey: 'valid_test_key' };
+      });
+
+      // 21.1 7 canonical tasks dispatch sequentially
+      expect(fetchInvocations).toBe(7);
+
+      // 21.2 result succeeds pending finalization
+      expect(result.success).toBe(true);
+      expect(result.status).toBe('TRANSPORT_COMPLETED_PENDING_FINALIZATION');
+      expect(result.candidate).not.toBeNull();
+
+      // 21.3 candidate.sourceCommitSha strictly matches pre-mutation snapshot SHA
+      expect(result.candidate.sourceCommitSha).toBe('276f127e88f34aab5dee80b153f2d784b5d4ef58');
+      expect(result.candidate.sourceCommitSha).not.toBe('ATTACKER_MUTATED_COMMIT_SHA');
+
+      // 21.4 candidate.sourceTreeSha strictly matches pre-mutation snapshot tree SHA
+      expect(result.candidate.sourceTreeSha).toBe('8a7b291df30cdbf8b022c809408ef58639c54819');
+      expect(result.candidate.sourceTreeSha).not.toBe('ATTACKER_MUTATED_TREE_SHA');
+
+      // 21.5 candidate.runNonce strictly matches pre-mutation snapshot runNonce
+      expect(result.candidate.runNonce).toBe('NONCE-PRE-MUTATION-CANONICAL-001');
+      expect(result.candidate.runNonce).not.toBe('ATTACKER_MUTATED_NONCE');
+
+      // 21.6 candidate.authorizedBudgetMicroUsd strictly matches pre-mutation snapshot budget
+      expect(result.candidate.authorizedBudgetMicroUsd).toBe(50000);
+      expect(result.candidate.authorizedBudgetMicroUsd).not.toBe(999999999);
+
+      // 21.7 candidate.candidateId and targetProgram derive from pricingWindow, ignoring caller mutations
+      const expectedCandidateId = currentWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_CANDIDATE_ID : SEALED_PEAK_CANDIDATE_ID;
+      const expectedProgram = currentWindow === 'OFF_PEAK' ? SEALED_OFF_PEAK_PROGRAM_ID : SEALED_PEAK_PROGRAM_ID;
+      expect(result.candidate.candidateId).toBe(expectedCandidateId);
+      expect(result.candidate.targetProgram).toBe(expectedProgram);
+
+      cleanup();
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 22: Same-Authorization Reentrancy & Concurrency Defense (Section 22)
+  // ==========================================================================
+  describe('22. Same-Authorization Reentrancy & Concurrency Defense', () => {
+    it('22.1 reentrant second call fails closed before credential resolution on terminal replay denial', async () => {
+      let coordinatorInvocations = 0;
+      const statefulCoordinator = (_db: any, _pkg: any, _receipt: any) => {
+        coordinatorInvocations++;
+        if (coordinatorInvocations === 1) {
+          return {
+            readyForCredentialResolution: true,
+            status: 'READY_FOR_CREDENTIAL_RESOLUTION',
+            replayKey: 'k1'.repeat(32),
+            expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+          };
+        }
+        return {
+          readyForCredentialResolution: false,
+          status: 'REPLAY_ALREADY_RESERVED',
+          errors: ['TERMINAL_REPLAY_CONFLICT: Authorization token already reserved.'],
+        };
+      };
+
+      const { executeProductionTransport, cleanup } = await importFuturePathTransportForOfflineTest({
+        mockCoordinator: statefulCoordinator,
+      });
+
+      const { db } = createStrictMockD1();
+      const now = new Date();
+      const currentWindow = getPricingWindow(now);
+      const futureExpiry = new Date(Date.now() + 3600_000).toISOString();
+      const origPkg = createSampleAuthPackage({
+        payload: {
+          expiresAt: futureExpiry,
+          pricingWindow: currentWindow,
+          maxBudgetMicroUsd: 50000,
+        },
+      });
+      const origReceipt = createSampleSourceReceipt();
+
+      let reentrantCallResult: any = null;
+      let reentrantCredCalls = 0;
+
+      await executeProductionTransport(db, origPkg, origReceipt, async () => {
+        reentrantCallResult = await executeProductionTransport(db, origPkg, origReceipt, () => {
+          reentrantCredCalls++;
+          return { apiKey: 'reentrant_key' };
+        });
+        return { apiKey: 'first_call_key' };
+      });
+
+      // 22.1 Reentrant second call failed
+      expect(reentrantCallResult).not.toBeNull();
+      expect(reentrantCallResult.success).toBe(false);
+      expect(reentrantCallResult.status).toBe('PREFLIGHT_VALIDATION_FAILED');
+      expect(reentrantCallResult.errors[0]).toContain('TERMINAL_REPLAY_CONFLICT');
+
+      // 22.2 Reentrant call has 0 credential reads and 0 fetch calls
+      expect(reentrantCredCalls).toBe(0);
+      expect(reentrantCallResult.credentialReads).toBe(0);
+      expect(reentrantCallResult.providerNetworkCalls).toBe(0);
+
+      // 22.3 No legacy fallback occurred: coordinator was called twice
+      expect(coordinatorInvocations).toBe(2);
+
+      cleanup();
+    });
+  });
+
+  // ==========================================================================
+  // SUITE 23: Legacy Closed-Gate Passivity (Section 23)
+  // ==========================================================================
+  describe('23. Legacy Closed-Gate Passivity', () => {
+    it('23.1 returns LIVE_EXECUTION_BLOCKED with authorizedBudgetMicroUsd === 0 under closed gate', async () => {
+      const result = await executeGuardedDeepSeekCertificationTransport({
+        pricingWindow: 'OFF_PEAK',
+      } as any);
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+    });
+
+    it('23.2 counting getter on options.authorization is never called when live gate is closed', async () => {
+      let getterCalls = 0;
+      const maliciousOptions = {
+        pricingWindow: 'OFF_PEAK',
+        get authorization() {
+          getterCalls++;
+          return { maxBudgetMicroUsd: 50000 } as any;
+        },
+      };
+
+      const result = await executeGuardedDeepSeekCertificationTransport(maliciousOptions as any);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+      expect(getterCalls).toBe(0);
+    });
+
+    it('23.3 throwing getter on options.authorization does not throw or reject', async () => {
+      const maliciousOptions = {
+        pricingWindow: 'OFF_PEAK',
+        get authorization() {
+          throw new Error('MALICIOUS_AUTHORIZATION_GETTER_TRIGGERED');
+        },
+      };
+
+      let didThrow = false;
+      let result: any;
+      try {
+        result = await executeGuardedDeepSeekCertificationTransport(maliciousOptions as any);
+      } catch {
+        didThrow = true;
+      }
+
+      expect(didThrow).toBe(false);
+      expect(result.success).toBe(false);
+      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+      expect(result.authorizedBudgetMicroUsd).toBe(0);
+    });
+
+    it('23.4 legacy credential resolver is called 0 times', async () => {
+      let credResolverCalls = 0;
+      const result = await executeGuardedDeepSeekCertificationTransport({
+        pricingWindow: 'OFF_PEAK',
+        authorization: {
+          get maxBudgetMicroUsd() {
+            credResolverCalls++;
+            return 50000;
+          },
+        },
+      } as any);
+      expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+      expect(credResolverCalls).toBe(0);
+    });
+
+    it('23.5 legacy fetch is called 0 times', async () => {
+      let localFetchCalls = 0;
+      const origFetch = globalThis.fetch;
+      globalThis.fetch = (() => { localFetchCalls++; throw new Error('SENTINEL'); }) as any;
+      try {
+        const result = await executeGuardedDeepSeekCertificationTransport({
+          pricingWindow: 'OFF_PEAK',
+        } as any);
+        expect(result.status).toBe('LIVE_EXECUTION_BLOCKED');
+        expect(localFetchCalls).toBe(0);
+      } finally {
+        globalThis.fetch = origFetch;
+      }
+    });
+  });
+
 });

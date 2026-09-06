@@ -650,7 +650,7 @@ export async function executeGuardedDeepSeekCertificationTransport(
       invocationResponses: [],
       invocationRecords: [],
       observedTotalCostMicroUsd: 0,
-      authorizedBudgetMicroUsd: options.authorization?.maxBudgetMicroUsd ?? 0,
+      authorizedBudgetMicroUsd: 0,
       aggregateSemanticScore: 0,
       allTasksPassed: false,
       allSchemasValid: false,
@@ -1164,36 +1164,49 @@ async function executeCanonicalDispatchAfterCredential(
 // ============================================================================
 
 /**
- * Safely inspects an untrusted input object without executing getters or proxies.
- * Requires plain Object.prototype or null prototype, no symbol keys, no getters/setters.
+ * Safely inspects an untrusted input object using fail-closed reflection.
+ *
+ * Security Invariants:
+ * - Reflection operations (Array.isArray, getPrototypeOf, getOwnPropertyDescriptors)
+ *   are wrapped in a fail-closed try/catch block so proxy reflection traps (or revoked proxies)
+ *   cannot throw out of materialization.
+ * - Property GETTERS are never evaluated for trusted value acquisition; only captured
+ *   DATA PROPERTY descriptors are accepted.
+ * - The captured descriptor map is validated via Reflect.ownKeys(descriptors); if any key
+ *   is a symbol, inspection fails closed immediately.
+ * - Prototype must be strictly plain Object.prototype or null.
+ * - Values are copied strictly from captured data property descriptors.
+ * - After successful snapshot creation, original caller objects are never reread.
  */
 function safeInspectObject(input: unknown): PropertyDescriptorMap | null {
-  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+  if (input === null || typeof input !== 'object') {
     return null;
   }
+  let isArr: boolean;
   let proto: unknown;
+  let descriptors: PropertyDescriptorMap;
   try {
+    isArr = Array.isArray(input);
+    if (isArr) {
+      return null;
+    }
     proto = Object.getPrototypeOf(input);
+    if (proto !== Object.prototype && proto !== null) {
+      return null;
+    }
+    descriptors = Object.getOwnPropertyDescriptors(input);
   } catch {
     return null;
   }
-  if (proto !== Object.prototype && proto !== null) {
-    return null;
+
+  const ownDescriptorKeys = Reflect.ownKeys(descriptors);
+  for (const key of ownDescriptorKeys) {
+    if (typeof key === 'symbol') {
+      return null;
+    }
   }
-  let symbols: symbol[];
-  try {
-    symbols = Object.getOwnPropertySymbols(input);
-  } catch {
-    return null;
-  }
-  if (symbols.length > 0) {
-    return null;
-  }
-  try {
-    return Object.getOwnPropertyDescriptors(input);
-  } catch {
-    return null;
-  }
+
+  return descriptors;
 }
 
 /**
