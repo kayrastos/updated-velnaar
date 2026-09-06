@@ -1,12 +1,15 @@
-# VELNAR — A.12B.2C-5U.3
+# VELNAR — A.12B.2C-5U.3 / A.12B.2C-5U.3.0.1
 # WORKER CAPABILITY BINDING READINESS AUDIT
+## CREDENTIAL-ORDER & SECRET-NORMALIZATION REPAIR
 
 **Phase**: VELNAR — A.12B.2C-5U.3  
+**Audit Repair Phase**: VELNAR — A.12B.2C-5U.3.0.1  
 **Artifact Type**: `WORKER_CAPABILITY_BINDING_READINESS_AUDIT`  
 **Base Commit**: `737c9f8e5c335cbe8985c745915ffcdd8e7cc5ae`  
-**Base Tree**: `f33d2963dba1d62a64a601553ef06ef31eee234a`  
+**Repair Base Commit**: `0a97a0072a46df3f32492d8d8fb9b4b4936bc68c`  
+**Repair Base Tree**: `f31489788345d76b7b9a3e356a6c7db17a2109ac`  
 **Execution Mode**: STRICTLY OFFLINE AUDIT & ARCHITECTURAL DESIGN ONLY  
-**Authoritative Final Status**: `A12B2C5U3_WORKER_CAPABILITY_BINDING_AUDIT_PASS_DESIGN_READY`  
+**Authoritative Final Status**: `A12B2C5U301_WORKER_CAPABILITY_BINDING_AUDIT_REPAIR_PASS_DESIGN_READY`  
 
 ---
 
@@ -27,14 +30,20 @@ export async function executeProductionReplayProtectedDeepSeekCertificationTrans
   getRuntimeCredential: () => Promise<DeepSeekRuntimeCredential> | DeepSeekRuntimeCredential
 ): Promise<GuardedTransportExecutionResult>
 ```
-currently accepts `db: D1Database` and `getRuntimeCredential` directly as parameters. In a raw HTTP environment, accepting capabilities as caller-provided parameters would allow malicious callers or insecure routes to inject mock databases, bypass replay tracking, or supply arbitrary API keys.
+currently accepts `db: D1Database` and `getRuntimeCredential` directly as parameters. In an HTTP runtime environment, accepting capabilities as caller-provided parameters would allow callers or insecure routes to inject mock databases, bypass replay tracking, or supply arbitrary API keys.
 
-### Objective of Phase A.12B.2C-5U.3
+### Objective of Phase A.12B.2C-5U.3 & 5U.3.0.1 Repair
 Design the exact, safest Cloudflare Worker runtime capability binding to supply:
 - **Cloudflare Runtime D1 Database Binding**: `env.DB`
 - **Cloudflare Runtime Secret Binding**: `env.DEEPSEEK_API_KEY`
 
 such that these capabilities are sourced **exclusively** from the authenticated Cloudflare Worker runtime environment (`WorkerEnv`), completely isolated from HTTP request bodies, query strings, headers, tenant AI envelopes, caller options, or external caller callbacks.
+
+### Critical Credential-Order & Secret-Normalization Repair (5U.3.0.1)
+The initial 5U.3 audit draft contained two design flaws that conflicted with sealed 5U.2 invariants:
+1. **Flaw A (Credential Preflight Read)**: Attempted to validate `env.DEEPSEEK_API_KEY` prior to calling the replay-protected transport. In 5U.2, credentials **MUST NOT be read before durable replay reservation confirms `RESERVED`**. The capability boundary must construct an internal resolver closure without reading the secret. The secret property is evaluated strictly after replay reservation succeeds.
+2. **Flaw B (Secret Normalization)**: Recommended returning `apiKey: rawKey.trim()`. Credentials must never be mutated or normalized. Whitespace must be strictly rejected (`rawKey.trim() !== rawKey`), and valid secrets must preserve exact original bytes (`apiKey: rawKey`).
+3. **Flaw C (Post-Reservation Failure Semantics)**: If `DEEPSEEK_API_KEY` is missing or invalid when the resolver is evaluated post-reservation, the single-use authorization **remains consumed in D1**. This is an intentional fail-closed security guarantee: zero retries, zero compensating queries, and no claim that missing secrets fail before replay.
 
 ### Strict Non-Modification Mandates
 - **ZERO production code modified** in this audit phase.
@@ -79,11 +88,11 @@ export default {
 ```
 This object is instantiated by the V8 isolate runtime before request dispatch. Its properties (`env.DB`, `env.DEEPSEEK_API_KEY`, `env.ENVIRONMENT`) represent ambient infrastructure capabilities configured in `wrangler.jsonc` or Cloudflare encrypted secrets.
 
-### B. Request-Controlled Value Separation
+### B. Request-Controlled Value Separation & TOCTOU Clarification
 Audit confirms that standard HTTP request components (JSON body, query parameters, URL path, headers) are parsed locally within individual route handlers. 
 - There is **NO automatic prototype pollution** or merge between `request` and `env`.
 - `env.DB` and `env.DEEPSEEK_API_KEY` cannot be replaced by incoming HTTP headers or JSON bodies unless application code explicitly performs an unsafe assignment (e.g. `Object.assign(env, body)`). No such assignment exists in the codebase.
-- **Security Mandate**: Future capability binding must never expose a parameter that accepts an external `db` or external `credentialResolver` in any reachable route.
+- **Critical Trust Clarification**: The TypeScript type `WorkerEnv` does **NOT** cryptographically prove host origin. For Phase 5U.3.1, the capability boundary remains un-routed and accepts `env: WorkerEnv` as an internal/test primitive. When route wiring occurs in Phase 5U.3.2, `worker/index.ts` must pass its host-supplied `env` object directly to the boundary without constructing or overriding it from request data.
 
 ### C. Current `env.DB` Handling in `worker/index.ts`
 `worker/index.ts` already treats `env.DB` strictly as a runtime-only capability:
@@ -142,59 +151,68 @@ Audit Question: *Should existing `/api/ai/run` or any `/api/ai/*` route be used 
 
 ## 5. TARGET PRODUCTION CAPABILITY ORDER
 
-When invoked in the future production runtime, execution MUST follow this strict 14-step deterministic order:
+When invoked in the future production runtime, the capability boundary MUST follow this strict 11-step deterministic order:
 
 ```
-Step 1:  Host Runtime Initialization
-         └── Cloudflare Workers host provides real, immutable 'env: WorkerEnv'.
+Step 1:  Exact Argument Count Validation (Fail-closed prior to any evaluation)
+         └── arguments.length === 3: (env, untrustedPkg, untrustedSourceReceipt)
+         └── If arguments.length !== 3 -> FAIL CLOSED
 
-Step 2:  Authoritative Global Live Gate Check
+Step 2:  Authoritative Global Live Gate Check (FIRST DECISION MANDATE)
          └── CANARY_LIVE_EXECUTION_ENABLED === true && CANARY_LIVE_EXECUTION_STATE === 'LIVE_EXECUTION_ALLOWED'
+         └── Evaluated BEFORE reading env.DB, BEFORE reading env.DEEPSEEK_API_KEY, and BEFORE reading payload.
          └── If false -> FAIL CLOSED (status: 'LIVE_EXECUTION_BLOCKED')
 
-Step 3:  Runtime Environment Validation
+Step 3:  Runtime Environment Identity & Policy Check
          └── env.ENVIRONMENT === 'production'
+         └── Sourced strictly from runtime env; caller cannot select environment.
          └── If non-production -> FAIL CLOSED (status: 'PREFLIGHT_VALIDATION_FAILED', error: 'WORKER_ENVIRONMENT_INVALID')
 
-Step 4:  Runtime D1 Database Capability Verification
-         └── typeof env.DB === 'object' && env.DB !== null
+Step 4:  Capture Trusted D1 Capability Reference
+         └── const capturedDb = env.DB
+         └── Require typeof capturedDb === 'object' && capturedDb !== null
          └── If missing -> FAIL CLOSED (status: 'PREFLIGHT_VALIDATION_FAILED', error: 'WORKER_D1_DATABASE_UNAVAILABLE')
 
-Step 5:  Runtime DeepSeek Credential Capability Verification
-         └── typeof env.DEEPSEEK_API_KEY === 'string' && env.DEEPSEEK_API_KEY.trim().length > 0
-         └── If missing/blank -> FAIL CLOSED (status: 'PREFLIGHT_VALIDATION_FAILED', error: 'WORKER_DEEPSEEK_API_KEY_UNAVAILABLE')
+Step 5:  Construct Internal Credential Resolver Closure (WITHOUT READING SECRET)
+         └── Construct private closure: getRuntimeCredential = () => { ... }
+         └── MANDATE: Constructing this closure causes ZERO reads of env.DEEPSEEK_API_KEY.
+         └── Sourced strictly from ambient runtimeEnv reference.
 
-Step 6:  Untrusted Operational Payload Ingestion
-         ├── Receive untrusted SignedHumanAuthorizationPackage (caller JSON)
-         └── Receive untrusted RuntimeSourceProvenanceReceipt (caller JSON)
+Step 6:  Invoke Replay-Protected Guarded Production Transport
+         └── executeProductionReplayProtectedDeepSeekCertificationTransport(capturedDb, untrustedPkg, untrustedSourceReceipt, getRuntimeCredential)
+         └── Exactly 4 parameters passed to raw transport.
 
-Step 7:  Materialization of Immutable Snapshots
-         └── Deep-freeze and strip prototype/accessors/symbols from caller inputs before first await.
+Step 7:  Transport Performs Cryptographic Verifications & Replay Reservation
+         ├── Materializes immutable snapshots of pkg and sourceReceipt before first await.
+         ├── Verifies RuntimeSourceProvenanceReceipt against sealed build authority.
+         ├── Verifies SignedHumanAuthorizationPackage against sealed human authority.
+         ├── Performs pre-reservation expiry & pricing window checks.
+         ├── Executes single-statement atomic D1 replay reservation: INSERT ... ON CONFLICT DO NOTHING RETURNING replay_key.
+         ├── Requires reservation status === 'RESERVED'.
+         └── Performs post-reservation expiry & pricing window checks.
 
-Step 8:  Internal Credential Closure Construction
-         └── Construct private, non-serializable, non-exported closure reading env.DEEPSEEK_API_KEY.
+Step 8:  Raw Transport Evaluates Internal Credential Resolver (ONLY AFTER RESERVED)
+         └── Reached ONLY after D1 confirms RESERVED and fresh post-reservation checks pass.
 
-Step 9:  Invoke Production Guarded Transport
-         └── executeProductionReplayProtectedDeepSeekCertificationTransport(env.DB, pkg, receipt, internalClosure)
+Step 9:  Resolver Reads & Validates env.DEEPSEEK_API_KEY Exactly Once
+         ├── Reads const rawKey = runtimeEnv.DEEPSEEK_API_KEY
+         ├── Rejects non-string or empty string: typeof rawKey !== 'string' || rawKey.length === 0
+         ├── Rejects whitespace/non-canonical string: rawKey.trim() !== rawKey
+         └── Returns Object.freeze({ apiKey: rawKey }) preserving exact bytes without normalization.
 
-Step 10: Verified Runtime Source Provenance Verification
-         └── verifyProductionRuntimeSourceProvenanceReceipt against sealed authority registry.
+Step 10: Fail-Closed Post-Reservation Handling on Credential Failure
+         └── If secret is missing/blank/non-canonical, resolver throws WORKER_DEEPSEEK_API_KEY_UNAVAILABLE.
+         └── Transport catches exception, maps to AUTHORIZATION_BINDING_FAILURE, and halts.
+         └── Invariant: The D1 replay reservation REMAINS CONSUMED. Zero retries, zero compensating DELETE queries.
 
-Step 11: Production Human Authorization Signature Verification
-         └── verifyHumanAuthorizationPackage against sealed human authority registry.
-
-Step 12: Atomic Single-Statement D1 Replay Reservation
-         └── backend.reserveIfAbsent(request) via INSERT ... ON CONFLICT DO NOTHING RETURNING replay_key.
-         └── Require status === 'RESERVED'.
-
-Step 13: Fresh Expiry & Pricing Window Rechecks
-         └── Pre-credential and post-credential runtime clock checks.
-
-Step 14: Evaluate Credential Closure Exactly Once & Dispatch
-         └── Resolve DeepSeekRuntimeCredential internally and execute 7 canonical tasks sequentially.
+Step 11: Canonical 7-Task Provider Dispatch
+         └── Dispatches 7 canonical tasks sequentially using exact validated apiKey.
 ```
 
-**Critical Invariant**: At NO point may a caller supply `db`, `backend`, `reserveIfAbsent`, `credentialResolver`, `apiKey`, `replayKey`, `verified: true`, or `authorizationReady: true`.
+**Critical Invariants**:
+- The capability boundary **NEVER reads `env.DEEPSEEK_API_KEY` during preflight**.
+- The secret property is accessed **EXCLUSIVELY inside the resolver closure**, which is evaluated **ONLY after durable replay reservation succeeds**.
+- At NO point may a caller supply `db`, `backend`, `reserveIfAbsent`, `credentialResolver`, `apiKey`, `replayKey`, `verified: true`, or `authorizationReady: true`.
 
 ---
 
@@ -203,7 +221,7 @@ Step 14: Evaluate Credential Closure Exactly Once & Dispatch
 Four candidate architectures were evaluated for binding `env.DB` and `env.DEEPSEEK_API_KEY`:
 
 ### Option A: Direct In-Line Invocation in `worker/index.ts`
-`worker/index.ts` directly imports `executeProductionReplayProtectedDeepSeekCertificationTransport`, reads `env.DB` and `env.DEEPSEEK_API_KEY`, and calls the transport inline.
+`worker/index.ts` directly imports `executeProductionReplayProtectedDeepSeekCertificationTransport`, reads `env.DB`, creates a closure, and calls the transport inline.
 - **Drawbacks**: Bloats `worker/index.ts` with canary-specific validation and error mapping. Exposes raw transport construction directly inside the primary routing file. Difficult to unit-test without running full worker integration tests. Violates single-responsibility principle.
 
 ### Option B: Dedicated Capability Boundary Module (`deepSeekProductionWorkerCapabilityBoundary.ts`) [RECOMMENDED]
@@ -216,10 +234,13 @@ export async function executeProductionWorkerCanaryCertification(
 ): Promise<GuardedTransportExecutionResult>
 ```
 Inside this module:
-1. Validates `env` presence, `env.ENVIRONMENT === 'production'`, `env.DB`, and `env.DEEPSEEK_API_KEY`.
-2. Creates the private, un-exported credential resolver closure.
-3. Invokes `executeProductionReplayProtectedDeepSeekCertificationTransport(env.DB, untrustedPkg as any, untrustedSourceReceipt as any, internalClosure)`.
-4. Returns the standardized `GuardedTransportExecutionResult`.
+1. Enforces `arguments.length === 3`.
+2. Evaluates authoritative live gate first.
+3. Validates `env.ENVIRONMENT === 'production'`.
+4. Captures `capturedDb = env.DB` and verifies non-null.
+5. Creates private `getRuntimeCredential` closure without reading `env.DEEPSEEK_API_KEY`.
+6. Invokes `executeProductionReplayProtectedDeepSeekCertificationTransport(capturedDb, untrustedPkg as any, untrustedSourceReceipt as any, getRuntimeCredential)`.
+7. Returns the standardized `GuardedTransportExecutionResult`.
 - **Advantages**: 
   - **Zero Caller-Supplied Capabilities**: API signature strictly requires `env: WorkerEnv` and accepts data payloads only.
   - **Full Offline Testability**: Can be tested comprehensively using simulated `WorkerEnv` objects in pure offline Vitest suites without touching `worker/index.ts`.
@@ -241,30 +262,44 @@ Introduces a dynamic DI container (e.g. `ServiceContainer.get('D1Database')`).
 
 ## 7. CREDENTIAL CAPABILITY BINDING & SECRET HYGIENE
 
-The future externally reachable capability boundary must construct the credential closure internally:
+The future externally reachable capability boundary must construct the credential closure internally **without preflight secret evaluation**:
 
 ```typescript
 const createWorkerDeepSeekCredentialResolver = (
   env: WorkerEnv
 ): (() => DeepSeekRuntimeCredential) => {
+  const runtimeEnv = env;
+
+  // IMPORTANT: Construction of this closure causes ZERO reads of runtimeEnv.DEEPSEEK_API_KEY.
   return () => {
-    const rawKey = env?.DEEPSEEK_API_KEY;
-    if (typeof rawKey !== 'string' || rawKey.trim().length === 0) {
+    // Evaluated EXCLUSIVELY when raw transport invokes resolver post-replay reservation.
+    const rawKey = runtimeEnv?.DEEPSEEK_API_KEY;
+
+    if (typeof rawKey !== 'string' || rawKey.length === 0) {
       throw new Error(
         'WORKER_DEEPSEEK_API_KEY_UNAVAILABLE: DEEPSEEK_API_KEY is missing or empty in Worker environment.'
       );
     }
+
+    // Strict non-normalization: reject leading/trailing/only whitespace.
+    if (rawKey.trim() !== rawKey) {
+      throw new Error(
+        'WORKER_DEEPSEEK_API_KEY_NON_CANONICAL: DEEPSEEK_API_KEY contains invalid leading or trailing whitespace.'
+      );
+    }
+
+    // Preserve exact original string bytes. NO silent trimming or normalization.
     return Object.freeze({
-      apiKey: rawKey.trim(),
+      apiKey: rawKey,
     });
   };
 };
 ```
 
 ### Secret Hygiene Rules:
-1. **Missing Secret Handling**: Fails closed. The raw transport catches the exception and classifies it under `AUTHORIZATION_BINDING_FAILURE` with zero network calls.
-2. **Blank / Whitespace Secret**: Trimmed immediately; if `rawKey.trim().length === 0`, rejected.
-3. **No Getters or Proxies**: The returned credential is a frozen plain object: `Object.freeze({ apiKey })`. No dynamic property getters.
+1. **Deferred Evaluation**: `DEEPSEEK_API_KEY` is NOT read during preflight or closure creation. It is read strictly on-demand after replay reservation confirms `RESERVED`.
+2. **Zero Normalization / Mutation**: The boundary does NOT call `rawKey.trim()` on returned credentials. If a key has whitespace, it fails closed (`WORKER_DEEPSEEK_API_KEY_NON_CANONICAL`). If valid, exact original string bytes are preserved.
+3. **No Getters or Proxies**: The returned credential is a frozen plain object: `Object.freeze({ apiKey: rawKey })`.
 4. **Zero Secret Serialization**: `apiKey` is never returned in `GuardedTransportExecutionResult`, never logged to `SafeLogger`, never serialized to JSON, and never included in invocation evidence or audit records.
 5. **Raw Transport Callback API**: Remains exported as an internal primitive under `worker/ai/canary/` for offline testing, while the Worker capability boundary exposes an API that completely omits the callback parameter.
 
@@ -277,7 +312,7 @@ It is critical to distinguish between **untrusted caller data** and **trusted ru
 | Element | Classification | Trust Status | Enforcement Mechanism |
 | :--- | :--- | :--- | :--- |
 | `env.DB` | Runtime Capability | Ambient Trusted | Injected by Cloudflare host. Verified non-null by boundary. |
-| `env.DEEPSEEK_API_KEY` | Runtime Secret | Ambient Trusted | Injected by Cloudflare secrets. Sealed in private closure. |
+| `env.DEEPSEEK_API_KEY` | Runtime Secret | Ambient Trusted | Injected by Cloudflare secrets. Sealed in private closure, read post-reservation. |
 | `env.ENVIRONMENT` | Runtime Var | Ambient Trusted | Injected by Wrangler vars. Verified `=== 'production'`. |
 | `SignedHumanAuthorizationPackage` | Caller Data | Untrusted Payload | Cryptographically verified with Ed25519 against sealed public keys. |
 | `RuntimeSourceProvenanceReceipt` | Caller Data | Untrusted Payload | Cryptographically verified with Ed25519 against sealed build authority. |
@@ -447,24 +482,24 @@ This audit explicitly decouples:
 
 ## 17. FAIL-CLOSED ERROR TAXONOMY & FAILURE SEMANTICS
 
-The future capability boundary will enforce exact fail-closed semantics:
+The capability boundary enforces exact fail-closed semantics across preflight, coordination, and post-reservation stages:
 
-| Failure Scenario | Transport Status | Failure Category | Error Message Structure |
-| :--- | :--- | :--- | :--- |
-| Missing `env` object | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `WORKER_ENV_MISSING: Worker execution environment is undefined.` |
-| `env.ENVIRONMENT !== 'production'` | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `WORKER_ENVIRONMENT_INVALID: Capability boundary requires ENVIRONMENT === 'production'` |
-| Missing `env.DB` | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `WORKER_D1_DATABASE_UNAVAILABLE: Cloudflare D1 binding (env.DB) is missing.` |
-| Missing/blank `DEEPSEEK_API_KEY` | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `WORKER_DEEPSEEK_API_KEY_UNAVAILABLE: DEEPSEEK_API_KEY is missing or empty.` |
-| Live gate false | `LIVE_EXECUTION_BLOCKED` | `AUTHORIZATION_BINDING_FAILURE` | `CANARY_LIVE_EXECUTION_BLOCKED: Live canary execution is categorically disabled.` |
-| Malformed authorization package | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `PRODUCTION_INPUT_MATERIALIZATION_FAILED: Safe snapshot acquisition failed.` |
-| Replay conflict (`ALREADY_RESERVED`) | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `REPLAY_RESERVATION_DENIED: Single-use authorization already reserved.` |
+| Failure Scenario | Evaluation Timing | Transport Status | Failure Category | Error Message Structure | Authorization Consumed in D1? |
+| :--- | :--- | :--- | :--- | :--- | :---: |
+| Arguments length !== 3 | Preflight (Immediate) | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `FORBIDDEN_CALLER_PARAMETER: accepts exactly 3 parameters` | NO |
+| Live gate false | Preflight (Pre-DB) | `LIVE_EXECUTION_BLOCKED` | `AUTHORIZATION_BINDING_FAILURE` | `CANARY_LIVE_EXECUTION_BLOCKED: Live canary execution is categorically disabled.` | NO |
+| Missing `env` object | Preflight (Pre-DB) | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `WORKER_ENV_MISSING: Worker execution environment is undefined.` | NO |
+| `env.ENVIRONMENT !== 'production'` | Preflight (Pre-DB) | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `WORKER_ENVIRONMENT_INVALID: Capability boundary requires ENVIRONMENT === 'production'` | NO |
+| Missing `env.DB` | Preflight (Pre-DB) | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `WORKER_D1_DATABASE_UNAVAILABLE: Cloudflare D1 binding (env.DB) is missing.` | NO |
+| Malformed authorization package | Snapshot materialization | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `PRODUCTION_INPUT_MATERIALIZATION_FAILED: Safe snapshot acquisition failed.` | NO |
+| Replay conflict (`ALREADY_RESERVED`) | D1 reservation | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `REPLAY_RESERVATION_DENIED: Single-use authorization already reserved.` | YES (Prior) |
+| Missing `DEEPSEEK_API_KEY` | **Post-Reservation** (Resolver) | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `CREDENTIAL_RESOLUTION_FAILED: Failed to resolve runtime credential capability.` | **YES** |
+| Blank / whitespace `DEEPSEEK_API_KEY` | **Post-Reservation** (Resolver) | `PREFLIGHT_VALIDATION_FAILED` | `AUTHORIZATION_BINDING_FAILURE` | `CREDENTIAL_RESOLUTION_FAILED: Failed to resolve runtime credential capability.` | **YES** |
 
-**Security Guarantee**: All failure responses return:
-- `providerNetworkCalls: 0`
-- `credentialReads: 0`
-- `authorizedBudgetMicroUsd: 0`
-- `candidate: null`
-- **Zero secret leakage** in error arrays or diagnostic strings.
+**Security Guarantees**:
+- **Zero Preflight Credential Reads**: `DEEPSEEK_API_KEY` is NEVER evaluated before replay reservation confirms `RESERVED`.
+- **Permanent Consumption on Credential Failure**: If the secret is missing, blank, or contains whitespace when the resolver is evaluated post-reservation, execution halts with `providerNetworkCalls: 0`, and the reservation **remains consumed in D1**. There are zero retries and zero compensating deletions.
+- **Zero Secret Exposure**: All failure responses return zero credential leakage.
 
 ---
 
@@ -473,24 +508,30 @@ The future capability boundary will enforce exact fail-closed semantics:
 The upcoming implementation in Phase 5U.3.1 will be verified via a dedicated test file:
 `tests/ai/phaseA12B2C5U3ProductionWorkerCapabilityBoundary.test.ts`
 
-### Required Test Suites:
-1. **Suite 1: Environment & Capability Preflight**:
-   - Reject undefined `env`.
+### Required Test Suites & Invariants:
+1. **Suite 1: Argument Count & Preflight Gate Ordering**:
+   - Enforce exact 3 arguments; reject 0, 1, 2, or 4+ parameters fail-closed.
+   - Authoritative global live gate evaluated FIRST: closed live gate causes 0 `env.DB` access and 0 secret reads.
    - Reject non-production environments (`development`, `test`, `preview`, arbitrary strings).
    - Reject missing or null `env.DB`.
-   - Reject undefined, empty, or whitespace `env.DEEPSEEK_API_KEY`.
-2. **Suite 2: Anti-Injection & Ambient Immutability**:
-   - Verify that caller-supplied `db` inside `pkg` or options is ignored.
-   - Verify that caller-supplied `getRuntimeCredential` is ignored.
-   - Verify that caller-supplied `apiKey` in headers/body is ignored.
-   - Prove `env.DB` reference passed to transport matches `env.DB` from Worker environment.
-3. **Suite 3: Secret Hygiene**:
+2. **Suite 2: Deferred Credential Resolution & Zero Preflight Secret Reads**:
+   - Prove that constructing the internal credential resolver closure causes **EXACTLY ZERO reads** of `env.DEEPSEEK_API_KEY`.
+   - Prove that secret is accessed strictly when the raw transport invokes the resolver post-reservation.
+3. **Suite 3: Strict Non-Normalization & Exact Secret Preservation**:
+   - Prove that leading whitespace (e.g. `"  key"`) throws `WORKER_DEEPSEEK_API_KEY_NON_CANONICAL` and is NOT silently trimmed.
+   - Prove that trailing whitespace (e.g. `"key  "`) throws `WORKER_DEEPSEEK_API_KEY_NON_CANONICAL` and is NOT silently trimmed.
+   - Prove that whitespace-only (e.g. `"   "`) throws `WORKER_DEEPSEEK_API_KEY_NON_CANONICAL`.
+   - Prove that valid secret bytes (e.g. `"sk-valid-key-12345"`) are returned **completely unchanged** (`apiKey === rawKey`).
+4. **Suite 4: Anti-Injection & Ambient Immutability**:
+   - Verify that caller-supplied `db` inside `untrustedPkg` or options is ignored.
+   - Verify that caller-supplied `getRuntimeCredential` or `apiKey` is ignored.
+   - Prove `capturedDb` reference passed to transport strictly matches host `env.DB`.
+5. **Suite 5: Post-Reservation Credential Failure & Ledger Preservation**:
+   - Simulate successful D1 reservation followed by missing/blank secret during resolver invocation.
+   - Assert `providerNetworkCalls === 0`, `success === false`, and verify zero compensating queries or rollback operations.
+6. **Suite 6: Secret Hygiene**:
    - Verify that `env.DEEPSEEK_API_KEY` is never present in return value, error messages, or logs.
-   - Verify that credential resolver throws clean error on blank key.
-4. **Suite 4: Fail-Closed Gate Enforcement**:
-   - Verify that canonical closed live gate (`CANARY_LIVE_EXECUTION_ENABLED === false`) immediately returns `LIVE_EXECUTION_BLOCKED`.
-   - Verify 0 D1 prepare calls and 0 credential reads on closed live gate.
-5. **Suite 5: Isolated Mock Dispatch Execution**:
+7. **Suite 7: Isolated Mock Dispatch Execution**:
    - Using isolated Vitest module mocks (simulating future open gate and mock D1), prove that `executeProductionWorkerCanaryCertification` orchestrates the full 7-task dispatch without real network calls.
    - Assert `providerNetworkCalls === 0` (real) and `realD1Calls === 0`.
 
@@ -528,6 +569,6 @@ The implementation of `deepSeekProductionWorkerCapabilityBoundary.ts` in Phase 5
 
 ## 21. AUDIT CONCLUSION & READINESS VERDICT
 
-The Cloudflare Worker capability binding architecture has been fully analyzed and specified. The path forward is clean, modular, and completely protected against request injection and secret leakage.
+The Cloudflare Worker capability binding architecture has been repaired to fully align with sealed Phase 5U.2 invariants. Credential evaluation is strictly deferred post-reservation, secret normalization is eradicated in favor of strict canonical byte preservation, and fail-closed ledger retention on secret failure is formally specified.
 
-**Final Audit Verdict**: `A12B2C5U3_WORKER_CAPABILITY_BINDING_AUDIT_PASS_DESIGN_READY`
+**Final Audit Verdict**: `A12B2C5U301_WORKER_CAPABILITY_BINDING_AUDIT_REPAIR_PASS_DESIGN_READY`

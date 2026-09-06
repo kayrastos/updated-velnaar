@@ -1,5 +1,6 @@
 {
   "phase": "A.12B.2C-5U.3",
+  "auditRepairPhase": "A.12B.2C-5U.3.0.1",
   "artifactType": "WORKER_CAPABILITY_BINDING_READINESS_AUDIT",
   "baseCommit": "737c9f8e5c335cbe8985c745915ffcdd8e7cc5ae",
   "baseTree": "f33d2963dba1d62a64a601553ef06ef31eee234a",
@@ -23,9 +24,17 @@
   "sourceTrustAnchorProvisioningRequired": true,
   "liveExecutionEnabled": false,
   "productionRoutingEnforcementAllowed": false,
+  "credentialReadOccursOnlyAfterReplayReservation": true,
+  "credentialSecretPreflightReadAllowed": false,
+  "credentialSecretNormalizationAllowed": false,
+  "credentialSecretWhitespaceRejected": true,
+  "credentialSecretExactBytesPreserved": true,
+  "workerCapabilityBoundaryLiveGateFirst": true,
+  "workerEnvRuntimeOriginMustBeProvenAtRouteWiring": true,
+  "authorizationMayRemainConsumedOnCredentialFailure": true,
   "providerNetworkCalls": 0,
   "realD1Calls": 0,
   "codexEscalation": "CODEX_REQUIRED_AFTER_IMPLEMENTATION",
   "implementationReady": true,
-  "finalStatus": "A12B2C5U3_WORKER_CAPABILITY_BINDING_AUDIT_PASS_DESIGN_READY"
+  "finalStatus": "A12B2C5U301_WORKER_CAPABILITY_BINDING_AUDIT_REPAIR_PASS_DESIGN_READY"
 }
