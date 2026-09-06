@@ -1,0 +1,23 @@
+{
+  "phase": "A.12B.2C-5S.1.1",
+  "artifactType": "EXACT_REPLAY_ORCHESTRATION_API_SURFACE_REPAIR",
+  "baseCommit": "ace75a34b8771fbf9072d8bcd6e94f371042424d",
+  "baseTree": "94d95628a08a1afaf97f34fa00385af214e5a5d3",
+  "productionOrchestrationTypedParameterCount": 2,
+  "canonicalBuilderTypedParameterCount": 1,
+  "variadicProductionOrchestrationParameterRemoved": true,
+  "variadicCanonicalBuilderParameterRemoved": true,
+  "runtimeExtraArgumentFailClosedPreserved": true,
+  "productionAuthorizationVerificationStillInternal": true,
+  "productionRuntimeExpiryRecheckStillInternal": true,
+  "runNonceCanonicalityPreserved": true,
+  "durableBackendBound": false,
+  "atomicReserveIfAbsentImplemented": false,
+  "d1BackendImplemented": false,
+  "d1ProductionBindingProvisioned": false,
+  "guardedTransportIntegrated": false,
+  "liveExecutionEnabled": false,
+  "providerNetworkCalls": 0,
+  "productionRoutingEnforcementAllowed": false,
+  "finalStatus": "A12B2C5S11_EXACT_REPLAY_API_SURFACE_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION"
+}

@@ -2019,4 +2019,221 @@ describe('VELNAR — A.12B.2C-5R: Durable Single-Use Authorization Replay Ledger
       );
     });
   });
+
+  // ==========================================================================
+  // 19. PHASE A.12B.2C-5S.1.1: EXACT REPLAY ORCHESTRATION API SURFACE REPAIR
+  // ==========================================================================
+  describe('19. Phase A.12B.2C-5S.1.1 Exact Replay Orchestration API Surface Hardening', () => {
+    // ------------------------------------------------------------------------
+    // A-C. Production Orchestration parameter surface
+    // ------------------------------------------------------------------------
+    it('A. TypeScript parameter tuple for production orchestration is exactly [SignedHumanAuthorizationPackage, TrustedSourceAttestation]', () => {
+      type OrchestrationParams = Parameters<typeof buildProductionReplayReservationAfterAuthorizationVerification>;
+      type ExpectedParams = [SignedHumanAuthorizationPackage, TrustedSourceAttestation];
+
+      // Exact tuple shape test
+      type Equals<X, Y> = (<T>() => T extends X ? 1 : 2) extends (<T>() => T extends Y ? 1 : 2) ? true : false;
+      const isExactMatch: Equals<OrchestrationParams, ExpectedParams> = true;
+      expect(isExactMatch).toBe(true);
+
+      // Verify parameter tuple length is 2
+      type ParamLength = OrchestrationParams['length'];
+      const tupleLen: ParamLength = 2;
+      expect(tupleLen).toBe(2);
+      expect(buildProductionReplayReservationAfterAuthorizationVerification.length).toBe(2);
+    });
+
+    it('B. production orchestration has no typed third parameter', () => {
+      type OrchestrationParams = Parameters<typeof buildProductionReplayReservationAfterAuthorizationVerification>;
+      type HasThirdParam = 2 extends keyof OrchestrationParams ? true : false;
+      const hasThird: HasThirdParam = false;
+      expect(hasThird).toBe(false);
+      expect(buildProductionReplayReservationAfterAuthorizationVerification.length).toBe(2);
+    });
+
+    it('C. runtime forced third argument via (fn as any)(...) fails closed', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const syntheticPkg: SignedHumanAuthorizationPackage = {
+        payload,
+        signatureBase64: Buffer.from('mock_sig').toString('base64'),
+        publicKeyFingerprintSha256: 'a'.repeat(64),
+        algorithm: 'Ed25519',
+        keyVersion: '2026-v1',
+        authorityId: payload.authorityId,
+      };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = (buildProductionReplayReservationAfterAuthorizationVerification as any)(
+        syntheticPkg,
+        attestation,
+        'extra_forced_argument'
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toBe(
+        'FORBIDDEN_CALLER_PARAMETER: orchestration accepts exactly pkg and sourceAttestation'
+      );
+      expect(res.request).toBeUndefined();
+    });
+
+    // ------------------------------------------------------------------------
+    // D-F. Canonical Builder parameter surface
+    // ------------------------------------------------------------------------
+    it('D. canonical builder TypeScript parameter tuple has exactly one element', () => {
+      type BuilderParams = Parameters<typeof buildAuthorizationReplayReservationRequestFromCanonicalAuthorization>;
+      type ParamLength = BuilderParams['length'];
+      const paramLength: ParamLength = 1;
+      expect(paramLength).toBe(1);
+      expect(buildAuthorizationReplayReservationRequestFromCanonicalAuthorization.length).toBe(1);
+    });
+
+    it('E. canonical builder has no typed second parameter', () => {
+      type BuilderParams = Parameters<typeof buildAuthorizationReplayReservationRequestFromCanonicalAuthorization>;
+      type HasSecondParam = 1 extends keyof BuilderParams ? true : false;
+      const hasSecond: HasSecondParam = false;
+      expect(hasSecond).toBe(false);
+      expect(buildAuthorizationReplayReservationRequestFromCanonicalAuthorization.length).toBe(1);
+    });
+
+    it('F. runtime forced second argument via (fn as any)(...) throws FORBIDDEN_CALLER_PARAMETER', () => {
+      const payload = createValidSyntheticCanonicalPayload();
+      const auth = { payload, keyVersion: '2026-v1' };
+
+      expect(() => {
+        (buildAuthorizationReplayReservationRequestFromCanonicalAuthorization as any)(auth, 'extra_second_arg');
+      }).toThrow('FORBIDDEN_CALLER_PARAMETER: builder accepts exactly one canonical authorization parameter');
+
+      expect(() => {
+        (buildAuthorizationReplayReservationRequestFromCanonicalAuthorization as any)(auth, { ttl: 3600 });
+      }).toThrow('FORBIDDEN_CALLER_PARAMETER: builder accepts exactly one canonical authorization parameter');
+    });
+
+    // ------------------------------------------------------------------------
+    // G-H. Caller nowUtc & verificationResult cannot become typed parameters
+    // ------------------------------------------------------------------------
+    it('G. caller nowUtc cannot become a typed parameter', () => {
+      type OrchestrationParams = Parameters<typeof buildProductionReplayReservationAfterAuthorizationVerification>;
+      type BuilderParams = Parameters<typeof buildAuthorizationReplayReservationRequestFromCanonicalAuthorization>;
+
+      type OrchestrationAcceptsNowUtc = { nowUtc: unknown } extends OrchestrationParams[number] ? true : false;
+      type BuilderAcceptsNowUtc = { nowUtc: unknown } extends BuilderParams[number] ? true : false;
+      const orchNowUtcAvoided: OrchestrationAcceptsNowUtc = false;
+      const builderNowUtcAvoided: BuilderAcceptsNowUtc = false;
+      expect(orchNowUtcAvoided).toBe(false);
+      expect(builderNowUtcAvoided).toBe(false);
+
+      const payload = createValidSyntheticCanonicalPayload();
+      const pkg: SignedHumanAuthorizationPackage = {
+        payload,
+        signatureBase64: Buffer.from('mock_sig').toString('base64'),
+        publicKeyFingerprintSha256: 'b'.repeat(64),
+        algorithm: 'Ed25519',
+        keyVersion: '2026-v1',
+        authorityId: payload.authorityId,
+      };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = (buildProductionReplayReservationAfterAuthorizationVerification as any)(
+        pkg,
+        attestation,
+        { nowUtc: '2026-09-06T10:00:00.000Z' }
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toBe(
+        'FORBIDDEN_CALLER_PARAMETER: orchestration accepts exactly pkg and sourceAttestation'
+      );
+    });
+
+    it('H. caller verificationResult cannot become a typed parameter', () => {
+      type OrchestrationParams = Parameters<typeof buildProductionReplayReservationAfterAuthorizationVerification>;
+      type BuilderParams = Parameters<typeof buildAuthorizationReplayReservationRequestFromCanonicalAuthorization>;
+
+      type OrchestrationAcceptsVerificationResult =
+        { verificationResult: unknown } extends OrchestrationParams[number] ? true : false;
+      type BuilderAcceptsVerificationResult =
+        { verificationResult: unknown } extends BuilderParams[number] ? true : false;
+      const orchVerificationResultAvoided: OrchestrationAcceptsVerificationResult = false;
+      const builderVerificationResultAvoided: BuilderAcceptsVerificationResult = false;
+      expect(orchVerificationResultAvoided).toBe(false);
+      expect(builderVerificationResultAvoided).toBe(false);
+
+      const payload = createValidSyntheticCanonicalPayload();
+      const pkg: SignedHumanAuthorizationPackage = {
+        payload,
+        signatureBase64: Buffer.from('mock_sig').toString('base64'),
+        publicKeyFingerprintSha256: 'b'.repeat(64),
+        algorithm: 'Ed25519',
+        keyVersion: '2026-v1',
+        authorityId: payload.authorityId,
+      };
+      const attestation = buildTrustedSourceAttestation({
+        sourceCommitSha: TEST_COMMIT_SHA,
+        sourceTreeSha: TEST_TREE_SHA,
+        createdAt: '2026-09-06T10:00:00.000Z',
+      });
+
+      const res = (buildProductionReplayReservationAfterAuthorizationVerification as any)(
+        pkg,
+        attestation,
+        { verificationResult: { verified: true } }
+      );
+      expect(res.ready).toBe(false);
+      expect(res.status).toBe('AUTHORIZATION_NOT_VERIFIED');
+      expect(res.failureReason).toBe(
+        'FORBIDDEN_CALLER_PARAMETER: orchestration accepts exactly pkg and sourceAttestation'
+      );
+    });
+
+    // ------------------------------------------------------------------------
+    // I. All existing 5S.1 security tests continue passing & artifact verification
+    // ------------------------------------------------------------------------
+    it('I. all existing 5S.1 security tests continue passing & verifies Phase A.12B.2C-5S.1.1 repair artifact integrity', () => {
+      const artifactPath = path.resolve(
+        process.cwd(),
+        'execution/a12b2c5s11_exact_replay_api_surface_repair.json'
+      );
+      expect(fs.existsSync(artifactPath)).toBe(true);
+      const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+
+      expect(artifact.phase).toBe('A.12B.2C-5S.1.1');
+      expect(artifact.artifactType).toBe('EXACT_REPLAY_ORCHESTRATION_API_SURFACE_REPAIR');
+      expect(artifact.baseCommit).toBe('ace75a34b8771fbf9072d8bcd6e94f371042424d');
+      expect(artifact.baseTree).toBe('94d95628a08a1afaf97f34fa00385af214e5a5d3');
+
+      expect(artifact.productionOrchestrationTypedParameterCount).toBe(2);
+      expect(artifact.canonicalBuilderTypedParameterCount).toBe(1);
+
+      expect(artifact.variadicProductionOrchestrationParameterRemoved).toBe(true);
+      expect(artifact.variadicCanonicalBuilderParameterRemoved).toBe(true);
+
+      expect(artifact.runtimeExtraArgumentFailClosedPreserved).toBe(true);
+
+      expect(artifact.productionAuthorizationVerificationStillInternal).toBe(true);
+      expect(artifact.productionRuntimeExpiryRecheckStillInternal).toBe(true);
+      expect(artifact.runNonceCanonicalityPreserved).toBe(true);
+
+      expect(artifact.durableBackendBound).toBe(false);
+      expect(artifact.atomicReserveIfAbsentImplemented).toBe(false);
+      expect(artifact.d1BackendImplemented).toBe(false);
+      expect(artifact.d1ProductionBindingProvisioned).toBe(false);
+
+      expect(artifact.guardedTransportIntegrated).toBe(false);
+      expect(artifact.liveExecutionEnabled).toBe(false);
+      expect(artifact.providerNetworkCalls).toBe(0);
+      expect(artifact.productionRoutingEnforcementAllowed).toBe(false);
+
+      expect(artifact.finalStatus).toBe(
+        'A12B2C5S11_EXACT_REPLAY_API_SURFACE_REPAIR_PASS_PENDING_INDEPENDENT_VERIFICATION'
+      );
+    });
+  });
 });

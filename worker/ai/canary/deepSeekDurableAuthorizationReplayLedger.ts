@@ -719,12 +719,11 @@ export function buildAuthorizationReplayReservationRequestFromCanonicalAuthoriza
         payload: CanonicalHumanAuthorizationPayload;
         keyVersion: string;
         authorityId?: string;
-      },
-  ...rest: unknown[]
+      }
 ): AuthorizationReplayReservationRequest {
-  if (rest.length > 0) {
+  if (arguments.length !== 1) {
     throw new Error(
-      'FORBIDDEN_CALLER_PARAMETER: builder accepts only a single canonical authorization parameter'
+      'FORBIDDEN_CALLER_PARAMETER: builder accepts exactly one canonical authorization parameter'
     );
   }
 
@@ -923,14 +922,14 @@ export function validateReplayReservationAgainstCanonicalAuthorization(
  */
 export function buildProductionReplayReservationAfterAuthorizationVerification(
   pkg: SignedHumanAuthorizationPackage,
-  sourceAttestation: TrustedSourceAttestation,
-  ...rest: unknown[]
+  sourceAttestation: TrustedSourceAttestation
 ): ProductionReplayReservationOrchestrationResult {
-  if (rest.length > 0) {
+  if (arguments.length !== 2) {
     return {
       ready: false,
       status: 'AUTHORIZATION_NOT_VERIFIED',
-      failureReason: 'FORBIDDEN_CALLER_PARAMETER: orchestration accepts only pkg and sourceAttestation',
+      failureReason:
+        'FORBIDDEN_CALLER_PARAMETER: orchestration accepts exactly pkg and sourceAttestation',
     };
   }
 
