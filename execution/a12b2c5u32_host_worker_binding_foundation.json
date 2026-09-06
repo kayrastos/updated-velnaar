@@ -44,6 +44,12 @@
   "realD1Calls": 0,
   "productionSuccessPathBehaviorallyExercised": false,
   "futurePathHostBindingBehaviorallyExercisedWithMocks": true,
-  "codexReviewRequiredBeforeSeal": true,
-  "finalStatus": "A12B2C5U32_TARGETED_SECURITY_REPAIR_PASS_PENDING_INDEPENDENT_REREVIEW"
+  "codexReviewRequiredBeforeSeal": false,
+  "independentFinalSecurityReviewPassed": true,
+  "remainingSecurityFindings": 0,
+  "remainingEvidenceFindings": 0,
+  "sealed": true,
+  "sealApprovedAtCommit": "eb275efc6b41da6f6b2ca8c563060a291423c2d1",
+  "sealApprovedAtTree": "69f4096c32f33741c832263b67c315871a63186c",
+  "finalStatus": "A12B2C5U32_HOST_WORKER_BINDING_FOUNDATION_SEAL_APPROVED"
 }
