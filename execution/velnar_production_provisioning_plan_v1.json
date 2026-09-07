@@ -1,13 +1,23 @@
 {
   "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
-  "segment": "B — PRODUCTION PROVISIONING PLAN",
+  "segment": "B — PRODUCTION PROVISIONING PLAN (RECONCILED)",
   "documentType": "DETERMINISTIC_PRODUCTION_PROVISIONING_SPECIFICATION",
-  "version": "v1.0",
+  "version": "v1.1",
   "status": "APPROVED_FOR_REVIEW_NOT_EXECUTED",
-  "executionPrerequisite": "EXPLICIT_HUMAN_APPROVAL_HARD_GATE_1",
+  "executionPrerequisite": "SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED",
+  "segmentBExecutionAllowed": false,
   "targetRepository": "kayrastos/updated-velnaar",
-  "targetCommitBinding": "05a136b76342f3514ec6c69a3064763adbd54bf4",
+  "targetCommitBinding": "5f19cbc2f3a8be9ba68f5404c437392a70db4245",
   "zeroActionGuaranteeSegmentA": "Strictly 0 Cloudflare, D1, Worker, or Identity writes performed during preparation",
+  "securityBoundaryEnforcement": {
+    "routeGateStatusInSegmentB": "STRICTLY_FALSE (PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = false)",
+    "ingressGateStatusInSegmentB": "STRICTLY_FALSE (PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = false)",
+    "liveExecutionGateStatusInSegmentB": "STRICTLY_FALSE (CANARY_LIVE_EXECUTION_ENABLED = false)",
+    "routingEnforcementStatusInSegmentB": "STRICTLY_FALSE (productionRoutingEnforcementAllowed = false)",
+    "providerCallsInSegmentB": 0,
+    "aiSpendInSegmentB": "$0.00",
+    "boundaryMandate": "Segment B is PROVISIONING + VERIFICATION ONLY. Resource existence does NOT equal route activation or ingress readiness. Any proposed route/ingress transition moves strictly to HARD GATE 2."
+  },
   "provisioningPlan": {
     "step1_operationalHostname": {
       "action": "CONFIRM_OR_PROVISION_OPERATIONAL_HOSTNAME",
@@ -127,7 +137,7 @@
           "issuerId": "velnar-source-provenance-builder-01",
           "keyVersion": "v1",
           "boundRepository": "kayrastos/updated-velnaar",
-          "boundCommit": "05a136b76342f3514ec6c69a3064763adbd54bf4"
+          "boundCommit": "5f19cbc2f3a8be9ba68f5404c437392a70db4245"
         },
         "guardedHumanAuthAttestation": {
           "flag": "GUARDED_HUMAN_AUTH_ATTESTATION_READY",
@@ -174,15 +184,16 @@
       },
       "rollback": "Revert database_id in wrangler.jsonc to placeholder; drop canary test tables if needed"
     },
-    "step10_preflightRouteGates": {
-      "action": "FLIP_OPERATIONAL_ROUTE_GATES",
-      "gates": {
-        "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": true,
-        "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": true
-      },
-      "targetFile": "worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts",
-      "mandatoryGuardrail": "CANARY_LIVE_EXECUTION_ENABLED REMAINS FALSE. Zero provider calls permitted in Segment B.",
-      "rollback": "Reset both gates to false in worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts"
+    "step10_dormantRoutePassivityVerification": {
+      "action": "VERIFY_DORMANT_ROUTE_PASSIVITY",
+      "mandate": "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED and PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY MUST REMAIN FALSE throughout entire Segment B",
+      "verificationSteps": [
+        "Verify GET /api/ops/canary/deepseek-certification returns 404 NOT_FOUND",
+        "Verify POST /api/ops/canary/deepseek-certification returns 404 NOT_FOUND",
+        "Verify OPTIONS /api/ops/canary/deepseek-certification returns 404 NOT_FOUND",
+        "Verify CANARY_LIVE_EXECUTION_ENABLED is strictly false"
+      ],
+      "routeActivationPolicy": "Route activation moves strictly to HARD GATE 2 and requires explicit human approval."
     }
   },
   "preMutationEvidenceSnapshotProcedure": {
@@ -194,9 +205,10 @@
     ]
   },
   "expectedCostImpact": {
-    "cloudflareAccess": "Free tier (up to 50 Zero Trust users) / $0.00",
-    "cloudflareD1": "Included in Worker paid tier / $0.00 additional for migration schema",
-    "providerCallsSegmentB": "$0.00 (Zero calls permitted in Segment B)"
+    "infrastructureCostStatus": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
+    "providerCallsSegmentB": 0,
+    "aiProviderSpendSegmentB": "$0.00 (Zero calls by design)",
+    "pricingConfirmationRequirement": "Cloudflare Access, DNS, and D1 pricing terms must be verified immediately prior to provisioning."
   },
   "firstExternalIrreversibleAction": "Creation of the self-hosted Cloudflare Access Application via Cloudflare Zero Trust API / Dashboard"
 }

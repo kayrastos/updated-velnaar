@@ -1,71 +1,79 @@
 # VELNAR — Prelive to Controlled Live Mission V1
-## Pre-Live Master Review Package (Segment A Completion)
+## Pre-Live Master Review Package (Reconciled with Sealed 5U.3.3D)
 
 - **Mission**: VELNAR — Prelive to Controlled Live Mission V1
-- **Document**: Pre-Live Master Review Package
-- **Segment Completed**: **Segment A: Pre-Live Master Readiness**
+- **Document**: Pre-Live Master Review Package (Reconciled)
+- **Segment**: Segment A — Pre-Live Master Readiness
 - **Repository**: `kayrastos/updated-velnaar`
 - **Branch**: `feat/prelive-to-controlled-live-mission-v1`
-- **Starting Canonical Commit**: `05a136b76342f3514ec6c69a3064763adbd54bf4`
-- **Starting Canonical Tree**: `d9fa32bab8dbd8201cc4351a3b13223a97b8a4ca`
-- **Verification Timestamp**: `2026-09-07T14:40:00.000Z`
-- **Next Hard Gate**: **HARD GATE 1 (Between Segment A and Segment B)**
-- **Approval Directive Required**: `SEGMENT_B_EXECUTION_APPROVAL_REQUIRED`
+- **Historical Segment A Base Commit**: `05a136b76342f3514ec6c69a3064763adbd54bf4`
+- **Historical Segment A Base Tree**: `d9fa32bab8dbd8201cc4351a3b13223a97b8a4ca`
+- **Original Segment A Commit**: `a0f4335baaff4eeec7a9921d6290933b172cf806`
+- **Original Segment A Tree**: `b16a298bf1fe4a97f1c1cb681be5e7d09d786d93`
+- **Latest Canonical Main Commit**: `5f19cbc2f3a8be9ba68f5404c437392a70db4245`
+- **Latest Canonical Main Tree**: `773a46fbef64095ec45037d04e4c25ebfa22ec4a`
+- **Current Hard Gate Status**: `SEGMENT_B_PRODUCTION_PROVISIONING_APPROVAL_REQUIRED`
+- **Required Gate 1 Approval Token**: `SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED`
+- **Segment B Execution Allowed**: **`false`**
 
 ---
 
 ### 1. Executive Summary
 
-Segment A (Pre-Live Master Readiness) has been executed strictly offline and read-only. All 28 pre-live operational and security gates have been consolidated, tested, and confirmed **CLOSED / FALSE / FAIL-CLOSED**. 
+This reconciled review package synchronizes Segment A with latest canonical `origin/main` (`5f19cbc2f3a8be9ba68f5404c437392a70db4245`), incorporating the official independent review and seal of Phase 5U.3.3D.
 
-All 10 required artifacts have been generated in `execution/`:
-1. `execution/velnar_prelive_master_readiness_v1.json`
-2. `execution/velnar_prelive_master_readiness_v1.md`
-3. `execution/velnar_production_provisioning_plan_v1.json`
-4. `execution/velnar_production_provisioning_plan_v1.md`
-5. `execution/velnar_controlled_live_canary_plan_v1.json`
-6. `execution/velnar_controlled_live_canary_plan_v1.md`
-7. `execution/velnar_provider_live_readiness_matrix_v1.json`
-8. `execution/velnar_provider_live_readiness_matrix_v1.md`
-9. `execution/velnar_prelive_master_review_package_v1.json`
-10. `execution/velnar_prelive_master_review_package_v1.md`
-
-A dedicated deterministic master test suite (`tests/security/phaseA12B2C5U33PreLiveMasterReadiness.test.ts`) has been implemented, adding 47 exhaustive assertions proving the integrity of the 28 gates.
+All 28 pre-live operational and security gates are confirmed **CLOSED / FALSE / FAIL-CLOSED**.
 
 ---
 
-### 2. Actual Offline Test Results
+### 2. Sealed Lineage & 5U.3.3D Reconciliation
 
-| Test Suite / Verification Step | Command | Actual Result |
-|---|---|---|
-| **TypeScript Typecheck / Lint** | `npm run lint` | **PASSED (0 errors)** |
-| **Dedicated Pre-Live Master Suite** | `npx vitest run tests/security/phaseA12B2C5U33PreLiveMasterReadiness.test.ts` | **PASSED (47/47 tests)** |
-| **Existing 5U.3.3B Auth Suite** | `npx vitest run tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts` | **PASSED (67/67 tests)** |
-| **Existing 5U.3.3C Runtime Suite** | `npx vitest run tests/security/phaseA12B2C5U33CProductionOperationalAuthRuntimeIntegration.test.ts` | **PASSED (60/60 tests)** |
-| **Full Vitest Regression Suite** | `npx vitest run` | **PASSED (63 files, 2,555 tests)** |
-| **Git Diff Whitespace Check** | `git diff --check` | **CLEAN (0 issues)** |
+1. **Phase 5U.3.3B**: **SEALED** (`A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED`).
+2. **Phase 5U.3.3B-R2**: **SEALED** (`A12B2C5U33BR2_HISTORICAL_CERTIFICATION_CLOSURE_SEALED`).
+3. **Phase 5U.3.3C**: **SEALED** (`A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_APPROVED`).
+4. **Phase 5U.3.3D**: **SEALED & APPROVED** on latest canonical main (`5f19cbc2f3a8be9ba68f5404c437392a70db4245`).
 
----
-
-### 3. Master 28-Gate Status (All Closed)
-
-| Gate Category | Gate Count | Current State | Live Calls / Writes Allowed |
-|---|---|---|---|
-| **Cloudflare Access & Hostname** | 5 | `UNPROVISIONED / UNRESOLVED` | **0** |
-| **Identity & Superadmin Registry** | 2 | `UNENROLLED / EMPTY & FROZEN` | **0** |
-| **Trust Anchors & Provenance** | 3 | `UNPROVISIONED (false)` | **0** |
-| **D1 Production Database & Replay** | 3 | `PLACEHOLDER_ID / NOT_CERTIFIED` | **0** |
-| **Runtime Route & Ingress Gates** | 3 | `CLOSED (false)` | **0** |
-| **Provider Credentials & Live Execution** | 3 | `UNCONFIGURED / BLOCKED (false)` | **0** |
-| **Canary Ceilings, Budget & Timeout** | 4 | `BOUNDED / CONSTRAINED` | **0** |
-| **Kill Switch & Sovereign Boundary** | 2 | `ACTIVE & ENFORCED` | **0** |
-| **Verification & Approval Gates** | 3 | `REQUIRED / MANDATORY_UNGRANTED` | **0** |
+> [!CAUTION]
+> **5U.3.3D APPROVAL DOES NOT PROVISION RESOURCES OR ACTIVATE ROUTES.**
+> The seal of 5U.3.3D certifies that the dormant provisioning specification is complete and accurate. It does **NOT**:
+> - create Cloudflare Access applications
+> - create Cloudflare Access policies
+> - provision hostnames/DNS
+> - enroll human operators
+> - flip route gates
+> - mark ingress ready
+> - permit live provider invocations
+>
+> Cloudflare resources remain **UNPROVISIONED**, `humanProvisioningApprovalGranted` remains **`false`**, and all operational route barriers remain **`false`**.
 
 ---
 
-### 4. Planned Segment B Production Mutations (Upon Human Approval)
+### 3. Corrected Segment B Security Boundary
 
-If human approval (`SEGMENT_B_EXECUTION_APPROVAL_REQUIRED`) is granted, Segment B will perform the following bounded operations:
+Segment B is strictly bounded to **PROVISIONING + VERIFICATION ONLY**:
+- **`PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED`**: MUST REMAIN **`false`** throughout the entire Segment B.
+- **`PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY`**: MUST REMAIN **`false`** throughout the entire Segment B.
+- **`CANARY_LIVE_EXECUTION_ENABLED`**: MUST REMAIN **`false`** throughout the entire Segment B.
+- **`productionRoutingEnforcementAllowed`**: MUST REMAIN **`false`** throughout the entire Segment B.
+- **Provider Calls in Segment B**: Strictly **0**.
+- **Google AI Studio / Gemini / DeepSeek Calls**: Categorically prohibited in Segment B.
+
+Resource existence does **NOT** equal route activation or ingress readiness. Any proposed route or ingress gate transition moves strictly to **HARD GATE 2** and requires explicit human authorization alongside the bounded live canary boundary.
+
+---
+
+### 4. Infrastructure Pricing State
+
+Exact zero-dollar infrastructure cost claims have been removed:
+- **Cloudflare / D1 Infrastructure Cost**: Classified as `UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION`. Free-tier allowances and terms must be confirmed immediately prior to provisioning.
+- **Provider Calls in Segment B**: Strictly **0**.
+- **AI Provider Spend in Segment B**: **$0.00 (Zero calls by design)**.
+
+---
+
+### 5. Planned Segment B Mutations (Upon Human Approval)
+
+If explicit human approval is granted via the required token, Segment B will execute:
 1. **Cloudflare Zero Trust**:
    - Create self-hosted Access Application: `ops.velnar.studio/api/ops/canary/deepseek-certification` (15m session, no wildcard).
    - Create Access Policy: Allow only vetted engineer emails; require hardware MFA (FIDO2).
@@ -89,36 +97,33 @@ If human approval (`SEGMENT_B_EXECUTION_APPROVAL_REQUIRED`) is granted, Segment 
    - Apply migrations 0001 through 0008.
    - Certify atomic reservation against `authorization_replay_ledger`.
    - Set `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED = true`.
-6. **Operational Route Preflight**:
-   - Set `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = true`.
-   - Set `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = true`.
-   - **MANDATORY**: `CANARY_LIVE_EXECUTION_ENABLED` remains **STRICTLY FALSE**. Zero provider calls in Segment B.
+6. **Dormant Route Passivity Verification (NO ROUTE FLIP)**:
+   - Confirm `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED` remains `false`.
+   - Confirm `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY` remains `false`.
+   - Confirm `CANARY_LIVE_EXECUTION_ENABLED` remains `false`.
+   - Verify `/api/ops/canary/deepseek-certification` returns HTTP 404 `NOT_FOUND`.
 
 ---
 
-### 5. Cost Impact & First Irreversible Action
+### 6. First Irreversible Action & Rollback Plan
 
-- **Expected Segment B Cost**: **$0.00**.
 - **First Irreversible / Externally Visible Mutation**: Creation of the self-hosted Cloudflare Access application in Cloudflare Zero Trust.
+- **Rollback Readiness**:
+  1. Delete Cloudflare Access application and policy via API.
+  2. Unset `CLOUDFLARE_ACCESS_TEAM_DOMAIN` and `CLOUDFLARE_ACCESS_AUD` in Worker environment.
+  3. Revert `database_id` in `wrangler.jsonc` to placeholder.
+  4. Reset trust flags to false and clear superadmin registry.
 
 ---
 
-### 6. Rollback Readiness Plan
+### 7. Human Approval Token Contract
 
-In the event of an anomaly or abort decision during Segment B:
-1. Delete Cloudflare Access application and policy via API.
-2. Unset `CLOUDFLARE_ACCESS_TEAM_DOMAIN` and `CLOUDFLARE_ACCESS_AUD` in Worker environment.
-3. Revert `database_id` in `wrangler.jsonc` to placeholder.
-4. Reset route flags, trust flags, and superadmin registry in git repository.
+Current Status:
+`SEGMENT_B_PRODUCTION_PROVISIONING_APPROVAL_REQUIRED`
 
----
+To authorize proceeding to Segment B:
 
-### 7. Hard Gate 1 Directive
+`SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED`
 
-> [!CAUTION]
-> **HARD GATE 1 — STOP BEFORE PRODUCTION MUTATION**
-> Segment A is complete. All pre-live gates are verified closed.
-> **DO NOT EXECUTE SEGMENT B UNTIL THE HUMAN EXPLICITLY APPROVES.**
->
-> Exact required approval phrase:
-> `SEGMENT_B_EXECUTION_APPROVAL_REQUIRED`
+Until that exact token is explicitly supplied:
+`SEGMENT_B_EXECUTION_ALLOWED = false`

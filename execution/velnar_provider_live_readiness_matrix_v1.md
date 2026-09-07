@@ -1,17 +1,18 @@
 # VELNAR — Prelive to Controlled Live Mission V1
-## Provider Live Readiness Matrix
+## Provider Live Readiness Matrix (Reconciled)
 
 - **Mission**: VELNAR — Prelive to Controlled Live Mission V1
-- **Artifact**: Provider Live Readiness Matrix
-- **Timestamp**: `2026-09-07T14:35:00.000Z`
+- **Artifact**: Provider Live Readiness Matrix (Reconciled)
+- **Timestamp**: `2026-09-07T15:15:00.000Z`
+- **Canonical Main Commit Binding**: `5f19cbc2f3a8be9ba68f5404c437392a70db4245`
 - **Global Live Execution Gate**: `CANARY_LIVE_EXECUTION_ENABLED = false` (`BLOCKED_PENDING_CERTIFICATION`)
-- **Live Calls Permitted**: **0**
+- **Live Provider Calls in Segment A**: **0**
+- **Live Provider Calls in Segment B**: **0**
+- **First Live Provider Call Boundary**: **Segment C after Hard Gate 2**
 
 ---
 
 ### 1. Provider Live Readiness Overview
-
-This matrix formalizes the technical and operational posture of all prospective AI providers for the VELNAR platform under Canary Specification v1.2.
 
 ```
                     +----------------------------------------------------+
@@ -29,7 +30,8 @@ This matrix formalizes the technical and operational posture of all prospective 
       | Model: deepseek-v4-flash     |                  | Model: gemini-3.5-flash-lite |
       | Tier: offpeak ($0.22/$0.66)  |                  | Tier: flex (Google AI Studio)|
       | Host: api.deepseek.com       |                  | Host: generativelanguage.    |
-      | Status: READY FOR CANARY     |                  |       googleapis.com         |
+      | Calls in Seg B: 0            |                  |       googleapis.com         |
+      | Status: READY FOR CANARY     |                  | Calls in Seg B: 0            |
       |         (BLOCKED AT GATE 2)  |                  | Status: DORMANT STANDBY      |
       +------------------------------+                  +------------------------------+
 ```
@@ -56,15 +58,16 @@ This matrix formalizes the technical and operational posture of all prospective 
 | **Credential Binding** | `env.DEEPSEEK_API_KEY` | `env.GEMINI_API_KEY` | `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION` |
 | **Credential Resolution Scope** | Post-D1 reservation only | Ambient Worker env | Unbound |
 | **Credential Logging / Export** | Strictly $0$ (Never logged/exported) | Strictly $0$ (Never logged/exported) | Strictly $0$ |
+| **Calls Permitted in Segment B** | **0** | **0** | **0** |
 | **Max Invocations in Canary** | 7 calls (sequential) | 7 calls (if active) | 0 calls (network disallowed) |
 | **Code Implementation** | **SEALED & TESTED** | **SEALED & TESTED** | **NOT INTEGRATED** |
 | **Current Live Readiness** | **BLOCKED AT HARD GATE 2** | **DORMANT / BLOCKED AT GATE 2** | **UNCERTIFIED / DISALLOWED** |
 
 ---
 
-### 3. Provider Contract & Boundary Enforcement
+### 3. Boundary & Invocations Mandates
 
-1. **Host Allowlist Enforced**: Outbound requests are strictly limited to `api.deepseek.com` and `generativelanguage.googleapis.com`. Any attempt to dispatch to arbitrary IP addresses, alternate ports, or uncertified domains triggers `NETWORK_DESTINATION_MISMATCH` and aborts fail-closed.
-2. **Sequential Concurrency**: Concurrency is strictly clamped to $1$. No parallel batches or asynchronous fire-and-forget calls are allowed during canary execution.
-3. **No Autonomous Expansion**: The runner is bounded to the 7 certified tasks. Once the 7 tasks complete (or fail), execution halts immediately and triggers the closure/kill path.
-4. **Credential Isolation Invariant**: Credentials are read directly from `env.DEEPSEEK_API_KEY` exactly once per invocation, strictly after D1 replay reservation succeeds. Private key bytes are never exported, never passed to logging utilities, and never recorded in artifacts.
+1. **Zero Provider Calls in Segment B**: Both Google AI Studio / Gemini and DeepSeek are categorically prohibited from invocation during Segment B.
+2. **First Live Provider Call**: The first point where Gemini or DeepSeek can be called is strictly in Segment C, following explicit human approval at Hard Gate 2 (`SEGMENT_C_FIRST_LIVE_PROVIDER_CALL_APPROVAL_REQUIRED`).
+3. **Host Allowlist**: Outbound requests are strictly limited to `api.deepseek.com` and `generativelanguage.googleapis.com`.
+4. **Credential Isolation**: Credentials are read from ambient Worker environment post-reservation; never printed, logged, or exported.

@@ -1,12 +1,13 @@
 {
   "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
-  "segment": "C — CONTROLLED LIVE PROVIDER CANARY PLAN",
+  "segment": "C — CONTROLLED LIVE PROVIDER CANARY PLAN (RECONCILED)",
   "documentType": "CONTROLLED_LIVE_CANARY_SPECIFICATION",
-  "version": "v1.0",
+  "version": "v1.1",
   "status": "APPROVED_FOR_REVIEW_NOT_EXECUTED",
+  "targetCommitBinding": "5f19cbc2f3a8be9ba68f5404c437392a70db4245",
   "executionPrerequisite": "EXPLICIT_HUMAN_APPROVAL_HARD_GATE_2",
-  "firstCallAuthorizationState": "SEGMENT_C_FIRST_LIVE_PROVIDER_CALL_APPROVAL_REQUIRED",
-  "providerCallsCurrentlyPermitted": 0,
+  "firstCallAuthorizationDirective": "SEGMENT_C_FIRST_LIVE_PROVIDER_CALL_APPROVAL_REQUIRED",
+  "firstCallBoundary": "Segment C is the FIRST point where real AI provider calls (Google AI Studio / Gemini, DeepSeek) may occur. Segment B calls remain strictly 0.",
   "participatingProviders": {
     "deepseek": {
       "lane": "INTERACTIVE",

@@ -213,10 +213,18 @@ describe('Phase A.12B.2C-5U.3.3 Pre-Live Master Readiness Test Suite', () => {
       expect(cData.operationalIngressAuthReady).toBe(false);
 
       expect(dData.phase).toBe('A.12B.2C-5U.3.3D');
+      expect(dData.sealed).toBe(true);
+      expect(dData.phase5U33DSealed).toBe(true);
+      expect(dData.independentFinalReviewPassed).toBe(true);
+      expect(dData.independentFinalReviewVerdict).toBe('A12B2C5U33D_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS_APPROVED');
       expect(dData.sealedPredecessors.phase5U33B.status).toBe('SEALED');
       expect(dData.sealedPredecessors.phase5U33C.status).toBe('SEALED');
       expect(dData.humanProvisioningApprovalGranted).toBe(false);
       expect(dData.cloudflareMutationAllowed).toBe(false);
+      expect(dData.nonClaims.cloudflareAccessApplicationCreated).toBe(false);
+      expect(dData.nonClaims.operationalRouteEnabled).toBe(false);
+      expect(dData.nonClaims.canaryLiveExecutionEnabled).toBe(false);
+      expect(dData.nonClaims.productionRoutingEnforcementAllowed).toBe(false);
     });
   });
 
@@ -710,6 +718,108 @@ describe('Phase A.12B.2C-5U.3.3 Pre-Live Master Readiness Test Suite', () => {
       expect(MAX_REQUEST_BODY_BYTES).toBe(65536);
       expect(MAX_ACCESS_JWT_LENGTH_BYTES).toBe(16384);
       expect(CLOCK_TOLERANCE_SECONDS).toBe(5);
+    });
+  });
+
+  // ==========================================================================
+  // GROUP 10: SEGMENT A TO B BOUNDARY RECONCILIATION & GATE 1 INVARIANTS
+  // ==========================================================================
+  describe('Group 10: Segment A to B Boundary Reconciliation & Gate 1 Invariants', () => {
+    it('10.1 confirms 5U.3.3D is sealed on latest canonical lineage without provisioning resources', () => {
+      const dPath = path.resolve(process.cwd(), 'execution/a12b2c5u33d_cloudflare_access_dormant_provisioning_readiness.json');
+      const dData = JSON.parse(fs.readFileSync(dPath, 'utf-8'));
+
+      expect(dData.sealed).toBe(true);
+      expect(dData.independentFinalReviewVerdict).toBe('A12B2C5U33D_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS_APPROVED');
+      expect(dData.cloudflareMutationAllowed).toBe(false);
+      expect(dData.humanProvisioningApprovalGranted).toBe(false);
+      expect(dData.nonClaims.cloudflareAccessApplicationCreated).toBe(false);
+      expect(dData.nonClaims.operationalRouteEnabled).toBe(false);
+      expect(dData.nonClaims.canaryLiveExecutionEnabled).toBe(false);
+      expect(dData.nonClaims.productionRoutingEnforcementAllowed).toBe(false);
+    });
+
+    it('10.2 confirms route gate, ingress gate, live execution gate, and routing enforcement remain false', () => {
+      expect(PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED).toBe(false);
+      expect(PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY).toBe(false);
+      expect(CANARY_LIVE_EXECUTION_ENABLED).toBe(false);
+      expect(CANARY_LIVE_EXECUTION_STATE).toBe('BLOCKED_PENDING_CERTIFICATION');
+    });
+
+    it('10.3 confirms Segment B provisioning plan strictly forbids flipping route gate or ingress gate', () => {
+      const planBPath = path.resolve(process.cwd(), 'execution/velnar_production_provisioning_plan_v1.json');
+      const planB = JSON.parse(fs.readFileSync(planBPath, 'utf-8'));
+
+      expect(planB.segmentBExecutionAllowed).toBe(false);
+      expect(planB.securityBoundaryEnforcement.routeGateStatusInSegmentB).toContain('STRICTLY_FALSE');
+      expect(planB.securityBoundaryEnforcement.ingressGateStatusInSegmentB).toContain('STRICTLY_FALSE');
+      expect(planB.securityBoundaryEnforcement.liveExecutionGateStatusInSegmentB).toContain('STRICTLY_FALSE');
+      expect(planB.securityBoundaryEnforcement.routingEnforcementStatusInSegmentB).toContain('STRICTLY_FALSE');
+      expect(planB.provisioningPlan.step10_dormantRoutePassivityVerification.mandate).toContain('MUST REMAIN FALSE throughout entire Segment B');
+    });
+
+    it('10.4 confirms Segment B plan prohibits AI provider calls and records zero AI spend', () => {
+      const planBPath = path.resolve(process.cwd(), 'execution/velnar_production_provisioning_plan_v1.json');
+      const planB = JSON.parse(fs.readFileSync(planBPath, 'utf-8'));
+
+      expect(planB.securityBoundaryEnforcement.providerCallsInSegmentB).toBe(0);
+      expect(planB.securityBoundaryEnforcement.aiSpendInSegmentB).toBe('$0.00');
+      expect(planB.expectedCostImpact.providerCallsSegmentB).toBe(0);
+      expect(planB.expectedCostImpact.aiProviderSpendSegmentB).toContain('$0.00');
+    });
+
+    it('10.5 confirms exact infrastructure cost is not falsely asserted as $0', () => {
+      const planBPath = path.resolve(process.cwd(), 'execution/velnar_production_provisioning_plan_v1.json');
+      const planB = JSON.parse(fs.readFileSync(planBPath, 'utf-8'));
+      const reviewPkgPath = path.resolve(process.cwd(), 'execution/velnar_prelive_master_review_package_v1.json');
+      const reviewPkg = JSON.parse(fs.readFileSync(reviewPkgPath, 'utf-8'));
+
+      expect(planB.expectedCostImpact.infrastructureCostStatus).toBe('UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION');
+      expect(reviewPkg.costImpact.infrastructureCostStatus).toBe('UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION');
+    });
+
+    it('10.6 confirms Hard Gate 2 owns any later route, ingress, or live execution transition', () => {
+      const planBPath = path.resolve(process.cwd(), 'execution/velnar_production_provisioning_plan_v1.json');
+      const planB = JSON.parse(fs.readFileSync(planBPath, 'utf-8'));
+      const planCPath = path.resolve(process.cwd(), 'execution/velnar_controlled_live_canary_plan_v1.json');
+      const planC = JSON.parse(fs.readFileSync(planCPath, 'utf-8'));
+
+      expect(planB.provisioningPlan.step10_dormantRoutePassivityVerification.routeActivationPolicy).toContain('HARD GATE 2');
+      expect(planB.securityBoundaryEnforcement.boundaryMandate).toContain('HARD GATE 2');
+      expect(planC.executionPrerequisite).toBe('EXPLICIT_HUMAN_APPROVAL_HARD_GATE_2');
+      expect(planC.firstCallAuthorizationDirective).toBe('SEGMENT_C_FIRST_LIVE_PROVIDER_CALL_APPROVAL_REQUIRED');
+      expect(planC.firstCallBoundary).toContain('Segment C is the FIRST point where real AI provider calls');
+    });
+
+    it('10.7 confirms Gemini and DeepSeek first live invocation boundary is strictly Segment C after Gate 2', () => {
+      const matrixPath = path.resolve(process.cwd(), 'execution/velnar_provider_live_readiness_matrix_v1.json');
+      const matrix = JSON.parse(fs.readFileSync(matrixPath, 'utf-8'));
+
+      const deepseek = matrix.providers.find((p: any) => p.providerId === 'deepseek');
+      const gemini = matrix.providers.find((p: any) => p.providerId === 'gemini');
+
+      expect(deepseek).toBeDefined();
+      expect(deepseek.readinessState.callsPermittedInSegmentB).toBe(0);
+      expect(deepseek.readinessState.verdict).toBe('READY_FOR_CONTROLLED_CANARY_BLOCKED_BY_HARD_GATE_2');
+
+      expect(gemini).toBeDefined();
+      expect(gemini.readinessState.callsPermittedInSegmentB).toBe(0);
+      expect(gemini.readinessState.verdict).toBe('STANDBY_DORMANT_BLOCKED_BY_HARD_GATE_2');
+
+      expect(matrix.matrixInvariants.totalLiveCallsPermittedSegmentB).toBe(0);
+      expect(matrix.matrixInvariants.firstProviderCallBoundary).toBe('Segment C after Hard Gate 2');
+    });
+
+    it('10.8 confirms explicit Gate 1 approval token is SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED with status SEGMENT_B_PRODUCTION_PROVISIONING_APPROVAL_REQUIRED', () => {
+      const planBPath = path.resolve(process.cwd(), 'execution/velnar_production_provisioning_plan_v1.json');
+      const planB = JSON.parse(fs.readFileSync(planBPath, 'utf-8'));
+      const reviewPkgPath = path.resolve(process.cwd(), 'execution/velnar_prelive_master_review_package_v1.json');
+      const reviewPkg = JSON.parse(fs.readFileSync(reviewPkgPath, 'utf-8'));
+
+      expect(planB.executionPrerequisite).toBe('SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED');
+      expect(reviewPkg.approvalTokenContract.currentStatus).toBe('SEGMENT_B_PRODUCTION_PROVISIONING_APPROVAL_REQUIRED');
+      expect(reviewPkg.approvalTokenContract.requiredApprovalToken).toBe('SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED');
+      expect(reviewPkg.approvalTokenContract.segmentBExecutionAllowed).toBe(false);
     });
   });
 });

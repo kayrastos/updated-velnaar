@@ -1,16 +1,29 @@
 # VELNAR — Prelive to Controlled Live Mission V1
-## Segment C: Controlled Live Provider Canary Plan
+## Segment C: Controlled Live Provider Canary Plan (Reconciled)
 
 - **Mission**: VELNAR — Prelive to Controlled Live Mission V1
-- **Segment**: C — Controlled Live Provider Canary Plan
-- **Status**: **PREPARED_FOR_REVIEW — NOT EXECUTED IN SEGMENT A**
+- **Segment**: C — Controlled Live Provider Canary Plan (Reconciled)
+- **Status**: **PREPARED_FOR_REVIEW — NOT EXECUTED**
 - **Prerequisite**: Explicit Human Approval at **HARD GATE 2**
 - **Authorization Directive**: `SEGMENT_C_FIRST_LIVE_PROVIDER_CALL_APPROVAL_REQUIRED`
 - **Current Live Provider Calls**: **0 (Strictly Prohibited)**
+- **Target Commit Binding**: `5f19cbc2f3a8be9ba68f5404c437392a70db4245`
 
 ---
 
-### 1. Architectural Guardrails & Sovereign Boundary
+### 1. First Live Provider Call Boundary
+
+> [!CAUTION]
+> **SEGMENT C IS THE FIRST POINT WHERE AI PROVIDERS MAY BE INVOKED.**
+> Throughout Segment A and Segment B, AI provider invocations are strictly forbidden (provider calls = 0, spend = $0.00).
+>
+> Only upon arriving at **HARD GATE 2** and receiving the explicit directive:
+> `SEGMENT_C_FIRST_LIVE_PROVIDER_CALL_APPROVAL_REQUIRED`
+> may any bounded, approved invocation to Google AI Studio / Gemini or DeepSeek occur.
+
+---
+
+### 2. Architectural Guardrails & Sovereign Boundary
 
 > [!IMPORTANT]
 > **CUSTOMER CODE = DATA, NOT AUTHORITY.**
@@ -39,7 +52,7 @@
 
 ---
 
-### 2. Participating Provider Specifications
+### 3. Participating Provider Specifications
 
 #### Lane 1: DeepSeek (Primary Interactive Provider)
 - **Role**: Primary Interactive Certified Lane.
@@ -76,7 +89,7 @@
 
 ---
 
-### 3. Certified Canonical Task Set (7 Tasks)
+### 4. Certified Canonical Task Set (7 Tasks)
 
 The canary runs strictly sequential execution over the 7 certified tasks using canonical synthetic fixtures from `VELNAR_SHADOW_EVAL_V1`:
 
@@ -92,7 +105,7 @@ The canary runs strictly sequential execution over the 7 certified tasks using c
 
 ---
 
-### 4. Hard Execution Safety Envelopes
+### 5. Hard Execution Safety Envelopes
 
 - **Execution Concurrency**: Strictly sequential (`maxConcurrentInvocations = 1`). No parallel execution.
 - **Request Ceilings**:
@@ -109,7 +122,7 @@ The canary runs strictly sequential execution over the 7 certified tasks using c
 
 ---
 
-### 5. Kill-Switch Architecture (17 Event Categories)
+### 6. Kill-Switch Architecture (17 Event Categories)
 
 Any occurrence of the following triggers results in immediate, fail-closed execution abort:
 1. `PROVENANCE_MISMATCH`: Returned model identifier does not match expected model.
@@ -132,7 +145,7 @@ Any occurrence of the following triggers results in immediate, fail-closed execu
 
 ---
 
-### 6. Verification & Post-Canary Promotion Boundaries
+### 7. Verification & Post-Canary Promotion Boundaries
 
 1. **Deterministic Schema Validation**: Every output must parse and strictly validate against the task's JSON schema via `OutputValidator`.
 2. **Fulgor Ray Verification**: Output evaluated against deterministic criteria; aggregate semantic score must meet or exceed threshold:

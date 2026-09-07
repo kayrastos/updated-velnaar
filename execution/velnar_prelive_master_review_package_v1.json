@@ -1,56 +1,26 @@
 {
   "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
   "documentType": "PRELIVE_MASTER_REVIEW_PACKAGE",
-  "segment": "A — PRE-LIVE MASTER READINESS",
-  "version": "v1.0",
-  "timestamp": "2026-09-07T14:40:00.000Z",
-  "canonicalStartingCommit": "05a136b76342f3514ec6c69a3064763adbd54bf4",
-  "canonicalStartingTree": "d9fa32bab8dbd8201cc4351a3b13223a97b8a4ca",
-  "gitProvenance": {
+  "segment": "A — PRE-LIVE MASTER READINESS (RECONCILED)",
+  "version": "v1.1",
+  "timestamp": "2026-09-07T15:15:00.000Z",
+  "provenance": {
+    "historicalSegmentAGenerationBaseCommit": "05a136b76342f3514ec6c69a3064763adbd54bf4",
+    "historicalSegmentAGenerationBaseTree": "d9fa32bab8dbd8201cc4351a3b13223a97b8a4ca",
+    "latestCanonicalMainCommit": "5f19cbc2f3a8be9ba68f5404c437392a70db4245",
+    "latestCanonicalMainTree": "773a46fbef64095ec45037d04e4c25ebfa22ec4a",
     "repository": "kayrastos/updated-velnaar",
     "branch": "feat/prelive-to-controlled-live-mission-v1",
     "cleanWorkingTree": true
   },
-  "testExecutionSummary": {
-    "lint": {
-      "command": "npm run lint",
-      "exitCode": 0,
-      "status": "PASSED"
-    },
-    "masterPreLiveSuite": {
-      "command": "npx vitest run tests/security/phaseA12B2C5U33PreLiveMasterReadiness.test.ts",
-      "testsPassed": 47,
-      "testsFailed": 0,
-      "exitCode": 0,
-      "status": "PASSED"
-    },
-    "priorFoundationSuites": {
-      "u33bAuthFoundation": {
-        "file": "tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts",
-        "testsPassed": 67,
-        "testsFailed": 0,
-        "status": "PASSED"
-      },
-      "u33cRuntimeIntegration": {
-        "file": "tests/security/phaseA12B2C5U33CProductionOperationalAuthRuntimeIntegration.test.ts",
-        "testsPassed": 60,
-        "testsFailed": 0,
-        "status": "PASSED"
-      }
-    },
-    "fullVitestSuite": {
-      "command": "npx vitest run",
-      "testFilesPassed": 63,
-      "totalTestsPassed": 2555,
-      "totalTestsFailed": 0,
-      "exitCode": 0,
-      "status": "PASSED"
-    },
-    "gitDiffCheck": {
-      "command": "git diff --check",
-      "exitCode": 0,
-      "status": "CLEAN"
-    }
+  "lineageStatus": {
+    "phase5U33B": "SEALED",
+    "phase5U33BR2": "SEALED (Scope: HISTORICAL_CERTIFICATION_CLOSURE_ONLY)",
+    "phase5U33C": "SEALED",
+    "phase5U33D": "SEALED_ON_LATEST_CANONICAL_MAIN",
+    "dApprovalProvisionsResources": false,
+    "dApprovalActivatesRoutes": false,
+    "dApprovalEnablesLiveCalls": false
   },
   "masterGateState": {
     "totalGates": 28,
@@ -58,6 +28,15 @@
     "liveCallsPermitted": 0,
     "productionMutationsPermitted": 0,
     "summary": "ALL_GATES_CONFIRMED_CLOSED_FAIL_CLOSED"
+  },
+  "segmentBSecurityBoundary": {
+    "operationalRouteGate": "STRICTLY_FALSE (PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = false)",
+    "operationalIngressGate": "STRICTLY_FALSE (PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = false)",
+    "liveExecutionGate": "STRICTLY_FALSE (CANARY_LIVE_EXECUTION_ENABLED = false)",
+    "routingEnforcement": "STRICTLY_FALSE (productionRoutingEnforcementAllowed = false)",
+    "providerCallsInSegmentB": 0,
+    "aiProviderSpendInSegmentB": "$0.00",
+    "routeIngressActivationBoundary": "Moves strictly to HARD GATE 2 and requires explicit human authorization"
   },
   "plannedSegmentBProductionMutations": {
     "cloudflareResources": [
@@ -90,15 +69,18 @@
       "Execute atomic replay reservation test and certify D1 concurrency",
       "Set D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED = true"
     ],
-    "routePreflightOperations": [
-      "Set PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = true",
-      "Set PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = true",
-      "CANARY_LIVE_EXECUTION_ENABLED REMAINS FALSE (Zero provider calls in Segment B)"
+    "dormantRouteVerification": [
+      "Confirm PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED remains false",
+      "Confirm PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY remains false",
+      "Confirm CANARY_LIVE_EXECUTION_ENABLED remains false",
+      "Verify /api/ops/canary/deepseek-certification returns 404 NOT_FOUND"
     ]
   },
   "costImpact": {
-    "estimatedSegmentBCost": "$0.00",
-    "details": "Cloudflare Zero Trust free tier; D1 included in Worker paid plan; zero provider calls in Segment B"
+    "infrastructureCostStatus": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
+    "providerCallsInSegmentB": 0,
+    "aiProviderSpendInSegmentB": "$0.00 (Zero calls by design)",
+    "details": "Cloudflare Access, DNS, and D1 pricing must be confirmed immediately prior to mutation."
   },
   "firstIrreversibleMutation": "Creation of Cloudflare Access self-hosted application in Zero Trust",
   "rollbackPlan": {
@@ -107,13 +89,13 @@
       "Delete Access Application and Policy via Cloudflare API",
       "Unset CLOUDFLARE_ACCESS_TEAM_DOMAIN and CLOUDFLARE_ACCESS_AUD in Worker environment",
       "Revert wrangler.jsonc database_id to placeholder",
-      "Reset operational route gates and trust-anchor constants to false",
+      "Reset trust-anchor constants to false",
       "Empty PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY"
     ]
   },
-  "nextHardGate": {
-    "gateName": "HARD GATE 1: PRE-LIVE TO PRODUCTION PROVISIONING BOUNDARY",
-    "status": "HALTED_AWAITING_APPROVAL",
-    "requiredApprovalPhrase": "SEGMENT_B_EXECUTION_APPROVAL_REQUIRED"
+  "approvalTokenContract": {
+    "currentStatus": "SEGMENT_B_PRODUCTION_PROVISIONING_APPROVAL_REQUIRED",
+    "requiredApprovalToken": "SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED",
+    "segmentBExecutionAllowed": false
   }
 }

@@ -1,8 +1,9 @@
 {
   "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
   "documentType": "PROVIDER_LIVE_READINESS_MATRIX",
-  "version": "v1.0",
-  "timestamp": "2026-09-07T14:35:00.000Z",
+  "version": "v1.1",
+  "timestamp": "2026-09-07T15:15:00.000Z",
+  "canonicalCommitBinding": "5f19cbc2f3a8be9ba68f5404c437392a70db4245",
   "authoritativeLiveExecutionGate": {
     "flag": "CANARY_LIVE_EXECUTION_ENABLED",
     "value": false,
@@ -46,6 +47,7 @@
         "offlineTested": true,
         "credentialProvisioned": false,
         "liveGateEnabled": false,
+        "callsPermittedInSegmentB": 0,
         "verdict": "READY_FOR_CONTROLLED_CANARY_BLOCKED_BY_HARD_GATE_2"
       }
     },
@@ -80,6 +82,7 @@
         "offlineTested": true,
         "credentialProvisioned": false,
         "liveGateEnabled": false,
+        "callsPermittedInSegmentB": 0,
         "verdict": "STANDBY_DORMANT_BLOCKED_BY_HARD_GATE_2"
       }
     },
@@ -112,6 +115,7 @@
         "offlineTested": false,
         "credentialProvisioned": false,
         "liveGateEnabled": false,
+        "callsPermittedInSegmentB": 0,
         "verdict": "UNCERTIFIED_BENCHMARK_CANDIDATE_NETWORK_DISALLOWED"
       }
     }
@@ -120,6 +124,7 @@
     "totalLiveCallsPermittedSegmentA": 0,
     "totalLiveCallsPermittedSegmentB": 0,
     "liveCallsPermittedSegmentC": "Bounded strictly to certified candidates upon Hard Gate 2 human approval",
+    "firstProviderCallBoundary": "Segment C after Hard Gate 2",
     "sovereignBoundaryEnforced": true,
     "blackDataTransmissionProhibited": true
   }
