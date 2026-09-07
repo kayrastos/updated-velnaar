@@ -5,13 +5,15 @@
   "repository": "https://github.com/kayrastos/updated-velnaar",
   "canonicalRemoteBaseHead": "39dfe50c3ea83195112e7b82e2df5ad1c252df7b",
   "canonicalRemoteBaseTree": "f7651c977c78191942488cf6128c249a2d1bce65",
-  "parentCommit": "54fd4a1744913d5d06845896cae2bcf36a3f3e39",
+  "parentCommit": "39dfe50c3ea83195112e7b82e2df5ad1c252df7b",
+  "original5U33ABaseParentCommit": "54fd4a1744913d5d06845896cae2bcf36a3f3e39",
   "branch": "main",
   "executionMode": "STRICTLY_OFFLINE_READ_ONLY_AUDIT_REPAIR",
   "sealedPriorPhase": "A12B2C5U32_HOST_WORKER_BINDING_FOUNDATION_SEAL_APPROVED",
   "sealedPriorPhaseIntact": true,
   "overallReadinessStatus": "BLOCKED_PENDING_PROVISIONING_AND_ACTIVATION_LIFECYCLE",
   "finalVerdict": "A12B2C5U33AR_PROVISIONING_ACTIVATION_READINESS_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW",
+  "finalStatus": "A12B2C5U33AR_PROVISIONING_ACTIVATION_READINESS_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW",
   "nonNegotiableZeroActionInvariants": {
     "providerCalls": 0,
     "realD1Calls": 0,
@@ -531,7 +533,7 @@
       "unauthorizedModificationsDetected": false,
       "canonicalBaseCommit": "39dfe50c3ea83195112e7b82e2df5ad1c252df7b",
       "canonicalBaseTree": "f7651c977c78191942488cf6128c249a2d1bce65",
-      "priorParentCommit": "54fd4a1744913d5d06845896cae2bcf36a3f3e39"
+      "original5U33ABaseParentCommit": "54fd4a1744913d5d06845896cae2bcf36a3f3e39"
     }
   }
 }
