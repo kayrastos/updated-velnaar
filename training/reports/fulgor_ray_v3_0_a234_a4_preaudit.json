@@ -1,0 +1,91 @@
+{
+  "schema": "fulgor.a234_a4_preaudit.v1",
+  "status": "PASS_A234_A4_PREAUDIT",
+  "canonical_commit": "fb03348147676098c7a0d2eb9e1505d148693d58",
+  "source_bundle_sha256": "175f8fc576835c84db903c992cff5c868068cf97a93fca8eac08da1c2c7abd26",
+  "sealed_v6_results_sha256": "29e5935280052513a7bdb2c6203c76591f47c5e8ec9116adff5a6e6849670747",
+  "postrun_final_seal_sha256": "c2f2273b3ce438d73ef3c4f0ec4ae93fa2b2bfb19b145ff6974c0c0914d243a9",
+  "result_count": 30,
+  "v6_rerun_authorized": false,
+  "a4_executed": false,
+  "training_started": false,
+  "feedback_iteration_budget": 1,
+  "protected_semantic_output_reviewed_during_preaudit": false,
+  "real_verifier_invoked": false,
+  "gpu_used": false,
+  "network_used": false,
+  "existing_a2_components": [
+    "training/fulgor_ray_v3/stage_contract_prompts_v4.py:get_stage_system_prompt (diagnosis, plan, candidate)",
+    "training/fulgor_ray_v3/semantic_patch_intent_v2.py:parse_semantic_patch_intent",
+    "training/fulgor_ray_v3/candidate_host_binding_v1.py:bind_candidate_intent_to_host_patch",
+    "run_fulgor_v3_0_a234_dev30_inference_v6.py:process_candidates_v6 (K=3 candidate processing & primary selection)"
+  ],
+  "existing_a3_components": [
+    "training/fulgor_ray_v3/stage_contract_prompts_v4.py:get_stage_system_prompt (verifier stage, fulgor.verifier_score.v1)",
+    "run_fulgor_v3_0_a234_dev30_inference_v6.py:process_candidates_v6 (blind_id projection & parse_verifier score parsing)"
+  ],
+  "existing_a4_components": [
+    "training/fulgor_ray_v3/constants.py:MAX_FEEDBACK_REFINEMENTS=1 (declarative budget only)",
+    "results.jsonl:feedback_budget=1 (declarative schema field only)",
+    "NOTE: A4 execution logic, runner, and feedback prompt contracts are completely absent in V6 codebase"
+  ],
+  "required_a4_input_fields": [
+    "instance_id",
+    "diagnosis",
+    "raw_diagnosis",
+    "plan",
+    "raw_plan",
+    "raw_candidates",
+    "outcomes",
+    "no_primary_reasons",
+    "failure_code",
+    "failure_message"
+  ],
+  "provenance_only_fields": [
+    "dev_eval_only",
+    "gold_patch_read",
+    "training_started",
+    "candidate_budget",
+    "feedback_budget",
+    "generation_metadata",
+    "recovery_provenance"
+  ],
+  "protected_semantic_fields": [
+    "raw_diagnosis",
+    "diagnosis.observed_failure",
+    "diagnosis.likely_cause",
+    "diagnosis.minimal_edit_intent",
+    "raw_plan",
+    "plan.steps",
+    "plan.behavioral_postconditions",
+    "plan.test_intent",
+    "raw_candidates",
+    "outcomes.candidate",
+    "outcomes.patch.unified_diff",
+    "failure_message"
+  ],
+  "blinding_required": true,
+  "blinding_strategy": "deterministic host-side token blind_id(instance_id, candidate_id) mapping; verifier receives only blinded candidate diff and criteria without ranking, generator identity, prior scores, or primary selection tags",
+  "a4_requires_model_inference": true,
+  "recommended_compute_tier": "RTX_PRO_6000",
+  "a4_namespace": "training/eval/fulgor_ray_v3/dev30_v1/a234_runtime/a4_v1/",
+  "a4_marker_path": "training/eval/fulgor_ray_v3/dev30_v1/a234_runtime/a4_v1/.CANONICAL_V3_A234_DEV30_A4_ATTEMPTED",
+  "a4_output_path": "training/eval/fulgor_ray_v3/dev30_v1/a234_runtime/a4_v1/a234_hardened_v2_9_a4/",
+  "a4_execution_eligible": false,
+  "a4_execution_go_no_go": "NO_GO_A4_EXECUTION_ON_SEALED_V6",
+  "a4_implementation_status": "NOT_IMPLEMENTED",
+  "a3_verifier_invocation_count": 0,
+  "gate_accepted_candidate_count": 0,
+  "primary_selection_count": 0,
+  "a4_eligible_record_count": 0,
+  "pipeline_progression_classification": "A2_OR_PRE_A3_PIPELINE_PROGRESSION_FAILURE",
+  "recommended_next_phase": "LOCAL_ONLY_PRE_A3_FAILURE_ROOT_CAUSE_AUDIT",
+  "canonical_dev30_reuse_authorized": false,
+  "fresh_heldout_required_after_remediation": true,
+  "blockers": [
+    "NO_GATE_ACCEPTED_V6_CANDIDATE",
+    "NO_A3_VERIFIER_JUDGMENT",
+    "NO_A4_ELIGIBLE_V6_RECORD",
+    "A4_RUNTIME_NOT_IMPLEMENTED"
+  ]
+}
