@@ -153,7 +153,7 @@
           "type": "CANONICAL_RUNTIME_GATE",
           "value": false,
           "status": "BLOCKED",
-          "definition": "Requires WORKER_D1_BINDING_CONFIGURED, WORKER_D1_BINDING_DEPLOYED, and WORKER_D1_BINDING_RUNTIME_VERIFIED. Must not mean merely wrangler.jsonc was edited."
+          "definition": "Requires WORKER_D1_BINDING_CONFIGURED, WORKER_D1_BINDING_DEPLOYED, WORKER_D1_BINDING_RUNTIME_VERIFIED, and D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED. Must not mean merely wrangler.jsonc was edited or binding verified without independently reviewed concurrency certification."
         },
         "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": {
           "type": "CANONICAL_RUNTIME_GATE",
@@ -407,8 +407,9 @@
         { "id": "AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_WORKER_D1_BINDING_DEPLOYED"] },
         { "id": "AUDIT_CONCEPT_PROVIDER_FREE_D1_HARNESS_DEPLOYED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED"] },
         { "id": "AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_RECORDED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_PROVIDER_FREE_D1_HARNESS_DEPLOYED", "concurrency test protocol"] },
-        { "id": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_RECORDED"] },
-        { "id": "D1_REPLAY_BACKEND_PRODUCTION_BOUND", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED"] },
+        { "id": "AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_INDEPENDENTLY_REVIEWED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_RECORDED"] },
+        { "id": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_INDEPENDENTLY_REVIEWED"] },
+        { "id": "D1_REPLAY_BACKEND_PRODUCTION_BOUND", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED", "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED"] },
         { "id": "AUDIT_CONCEPT_HUMAN_KEY_CEREMONY_COMPLETED", "type": "AUDIT_CONCEPT", "value": false, "dependsOn": ["offline ceremony outside repository"] },
         { "id": "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["AUDIT_CONCEPT_HUMAN_KEY_CEREMONY_COMPLETED"] },
         { "id": "PRODUCTION_TRUST_ANCHOR_SLOT_READY", "type": "CANONICAL_RUNTIME_GATE", "value": false, "dependsOn": ["POLICY_ORDERING: independent of D1 concurrency, prepared via ceremony"] },

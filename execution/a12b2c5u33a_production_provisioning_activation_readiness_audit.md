@@ -64,9 +64,9 @@ The codebase defines three authoritative D1 runtime gates in `worker/ai/canary/d
 - **`D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED`** (`false as const`):
   * **Strict Definition**: Must **not** mean merely that `wrangler d1 create` completed. It requires that the resource exists, the database ID is verified, migration 0008 is applied, and post-migration schema verification passes.
 - **`D1_REPLAY_BACKEND_PRODUCTION_BOUND`** (`false as const`):
-  * **Strict Definition**: Must **not** mean merely that `wrangler.jsonc` was edited. It requires evidence from an uploaded/deployed Worker version and runtime verification that `env.DB` targets the recorded database.
+  * **Strict Definition**: Must **not** mean merely that `wrangler.jsonc` was edited. It requires BOTH verified deployed runtime `env.DB` binding (`AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED`) AND independently reviewed concurrency certification (`D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED`).
 - **`D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED`** (`false as const`):
-  * **Strict Definition**: Requires empirical multi-client verification under concurrent load using the dedicated provider-free certification protocol.
+  * **Strict Definition**: Requires empirical multi-client verification under concurrent load using the dedicated provider-free certification protocol followed by independent security and evidence review (`AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_INDEPENDENTLY_REVIEWED`).
 
 ### 2.3 Migration 0008 Semantics & Correct Idempotency Classification
 - **Migration File**: `migrations/0008_authorization_replay_ledger.sql`
@@ -184,6 +184,12 @@ Future test runs must capture the following schema:
   * `served_by_region`
   * `served_by_primary`
   * `total_attempts`
+
+### 5.5 Independent Concurrency Review & Gate Promotion Chain
+Once concurrency evidence is captured via `AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_RECORDED`, it must undergo separate independent security and evidence review (`AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_INDEPENDENTLY_REVIEWED`).
+- Only upon passing independent review does `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` become eligible for activation.
+- Only when BOTH `AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED` and `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` are verified does `D1_REPLAY_BACKEND_PRODUCTION_BOUND` become eligible for activation.
+- During concurrency testing and review, both `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` and `D1_REPLAY_BACKEND_PRODUCTION_BOUND` remain strictly `false`.
 
 ---
 
@@ -318,10 +324,12 @@ Every node in the dependency graph is categorized strictly by its architectural 
 ├── AUDIT_CONCEPT_WORKER_D1_BINDING_CONFIGURED (AUDIT_CONCEPT: false)
 ├── AUDIT_CONCEPT_WORKER_D1_BINDING_DEPLOYED (AUDIT_CONCEPT: false)
 ├── AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED (AUDIT_CONCEPT: false)
-├── AUDIT_CONCEPT_PROVIDER_FREE_D1_HARNESS_DEPLOYED (AUDIT_CONCEPT: false)
-├── AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_RECORDED (AUDIT_CONCEPT: false)
-├── D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED (CANONICAL_RUNTIME_GATE: false)
-└── D1_REPLAY_BACKEND_PRODUCTION_BOUND (CANONICAL_RUNTIME_GATE: false)
+│   ├── AUDIT_CONCEPT_PROVIDER_FREE_D1_HARNESS_DEPLOYED (AUDIT_CONCEPT: false)
+│   │   └── AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_RECORDED (AUDIT_CONCEPT: false)
+│   │       └── AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_INDEPENDENTLY_REVIEWED (AUDIT_CONCEPT: false)
+│   │           └── D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED (CANONICAL_RUNTIME_GATE: false)
+│   └── [contributes with D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED to]
+└── D1_REPLAY_BACKEND_PRODUCTION_BOUND (CANONICAL_RUNTIME_GATE: false) [requires AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED + D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED]
 
 [ Category: Human Authority Trust Anchor ]
 ├── AUDIT_CONCEPT_HUMAN_KEY_CEREMONY_COMPLETED (AUDIT_CONCEPT: false)
@@ -377,7 +385,7 @@ Every node in the dependency graph is categorized strictly by its architectural 
 - **Step 11**: Deploy/use separately protected provider-free D1-only certification harness.
 - **Step 12**: Run D1 concurrency certification (20 contested + 20 control rounds).
 - **Step 13**: Disable/remove the temporary D1-only harness.
-- **Step 14**: Independently review concurrency evidence.
+- **Step 14**: Independently review concurrency evidence (`AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_INDEPENDENTLY_REVIEWED`).
 - **Step 15**: Perform human authorization public trust-anchor ceremony and enrollment outside repository.
 - **Step 16**: Independently verify human trust-anchor evidence.
 - **Step 17**: Provision source signer + source public trust anchor.
@@ -388,6 +396,16 @@ Every node in the dependency graph is categorized strictly by its architectural 
 - **Step 22**: Execute exactly one bounded live provider canary under signed human package (lifetime $\le 15$ min).
 - **Step 23**: Independent post-canary security and evidence review.
 - **Step 24**: Only then consider production routing promotion under separate explicit human architectural review approval.
+
+### 11.3 Strict D1 Gate Passivity & Dual Prerequisite Enforcement (Steps 11–14)
+- **Gate Passivity During Concurrency Testing**: During Steps 11–14:
+  * `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED = false`
+  * `D1_REPLAY_BACKEND_PRODUCTION_BOUND = false`
+  Both gates remain strictly `false` until independent review of concurrency evidence is complete.
+- **Post-Step 14 Concurrency Gate Eligibility**: Only after Step 14 (successful independent review via `AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_INDEPENDENTLY_REVIEWED`) does `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` become eligible for a separately reviewed gate transition.
+- **Dual Prerequisite for Production-Bound Eligibility**: Only after `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` has been certified, AND with runtime binding verification (`AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED`) already proven, does `D1_REPLAY_BACKEND_PRODUCTION_BOUND` become eligible for its own separately reviewed transition. Production-bound eligibility must therefore occur no earlier than after Step 14.
+- **Zero Dependency Cycles**: The provider-free D1 harness depends solely on `AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED` and never on `D1_REPLAY_BACKEND_PRODUCTION_BOUND`, preventing circular dependencies.
+- **No Gate Flips**: Zero gates are flipped in this documentation phase; all readiness and live gates remain strictly `false`.
 
 ---
 
