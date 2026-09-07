@@ -1,0 +1,35 @@
+# Fulgor Ray V3.0 A234 V6 DEV30 Post-Run Final Cryptographic Seal Manifest
+# Generated: 2026-09-07 UTC
+# Status: PASS_A234_V6_DEV30_ONE_SHOT_COMPLETE
+
+[ASSERTIONS]
+schema = fulgor.a234_v6_dev30_postrun_final_seal.v1
+status = PASS_A234_V6_DEV30_ONE_SHOT_COMPLETE
+canonical_prelaunch_commit = 40e71168b83e5febe42b4b2906a2fd9065c3a6ae
+source_bundle_sha256 = 175f8fc576835c84db903c992cff5c868068cf97a93fca8eac08da1c2c7abd26
+results_sha256 = 29e5935280052513a7bdb2c6203c76591f47c5e8ec9116adff5a6e6849670747
+attempt_marker_sha256 = 7b5a47f78f76329b1f83dea0c022cce8a385649743e3a30f63b9acb2663cf43f
+launch_receipt_sha256 = b890c9b04f647556403dd7f56dfdda809c116c9cdcd5fd33ce0c1b854206764a
+exit_evidence_sha256 = 7653113809dcc1dea3b5a2cd2c2b9cd6b8bae8a6abc29ff7a7f2d933c0370ef7
+postrun_summary_sha256 = 93b589b580bb91eadc480675cb57cd3247ceb5c639c1d2b0647a3ecfb9cccb31
+wrapper_exit_code = 0
+result_line_count = 30
+valid_json_count = 30
+unique_raw_record_count = 30
+duplicate_raw_line_count = 0
+one_shot_consumed = true
+rerun_authorized = false
+A4_EXECUTED = false
+TRAINING_STARTED = false
+SEMANTIC_OUTPUT_REVIEWED_DURING_SEALING = false
+RAW_PROTECTED_DEV30_OUTPUT_COMMITTED = false
+
+[PRELAUNCH_SEALED_EVIDENCE]
+training/reports/fulgor_ray_v3_0_a234_launch_receipt_v6_final_seal.txt = 0e02601c2564080f5866d33685e7872ddd49cebeab33de406aeee330ef94bd5c
+docs/fulgor_ray_v3_a234_v6_receipt_operator_handoff.md = 6257b578d238f94f89ae0448e4d3b3857c0ec65974278286db5501ad3f42cdef
+training/reports/evidence/fulgor_v6_real_receipt_inspect_20260907.json = 4893d46a5c0c326e3544b4918aa5f0f8c766fd8ad9d1590980d4256238a45da7
+
+[POSTRUN_CANONICAL_DELIVERABLES]
+training/reports/fulgor_ray_v3_0_a234_v6_dev30_postrun.json = 23a0b4bd4c32914fd3e1d6de3e9777a4dc5efb830d2bf15dcf66371ee911e804
+training/reports/fulgor_ray_v3_0_a234_v6_dev30_postrun.md = cc7e1c9746d0fe9b9fb894fb4bd265e0f8712e18b2b93fdc4794bda7a6bf2094
+docs/fulgor_ray_v3_a234_v6_dev30_postrun_handoff.md = 7730cff79d21db2c3d035734cc61edc37c03d74c015249418a3dee90abbd2ce4
