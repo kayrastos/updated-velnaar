@@ -1,0 +1,157 @@
+{
+  "phase": "A.12B.2C-5U.3.3C",
+  "artifactType": "PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_EVIDENCE",
+  "timestamp": "2026-09-07T15:15:00Z",
+  "repository": "https://github.com/kayrastos/updated-velnaar",
+  "baseCommit": "6f045f29ae335d59dcad6813c7f94f41fbb067a1",
+  "baseTree": "5291280784b4307714eb80b9c0082bf35fb9ed07",
+  "branch": "main",
+  "status": "A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+  "priorPhaseSealed": {
+    "phase": "A.12B.2C-5U.3.3B",
+    "verdict": "A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED",
+    "status": "SEALED",
+    "foundationUntouched": true
+  },
+  "runtimeIntegrationSummary": {
+    "routerCarveOut": {
+      "path": "/api/ops/canary/deepseek-certification",
+      "matchingStrategy": "EXACT_PATH_EQUALITY_ONLY",
+      "dispatchLocation": "BEFORE_TENANT_SESSION_RESOLUTION",
+      "missingDbResilient": true,
+      "siblingPathIsolation": true,
+      "pathTraversalResistant": true
+    },
+    "handlerSignature": {
+      "parameters": [
+        "request: Request",
+        "env: WorkerEnv"
+      ],
+      "returnType": "Promise<Response>",
+      "argumentCountValidation": {
+        "enforced": true,
+        "exactCount": 2,
+        "firstOperation": true,
+        "rejectsZeroArgs": true,
+        "rejectsOneArg": true,
+        "rejectsThreeArgs": true,
+        "rejectsFourArgs": true,
+        "rejectionStatus": 404
+      }
+    },
+    "trustDomainDecoupling": {
+      "tenantUserRemovedFromSignature": true,
+      "authenticatedUserImportRemoved": true,
+      "tenantRolesHaveZeroStanding": true,
+      "operationalAuthoritySource": "CLOUDFLARE_ACCESS_PLUS_SUPERADMIN_REGISTRY"
+    },
+    "dormantPassivity": {
+      "routeBarriersCheckedFirst": true,
+      "dormantResponseStatus": 404,
+      "dormantResponsePayload": {
+        "error": "NOT_FOUND"
+      },
+      "dormantNetworkFetchCalls": 0,
+      "dormantJwksResolutionCalls": 0,
+      "dormantBodyStreamReads": 0,
+      "dormantCapabilityExecutions": 0,
+      "dormantConfigReads": 0
+    },
+    "futureAuthPathIntegration": {
+      "resolverUsed": "resolveCanonicalProductionOperationalPrincipal(request, env)",
+      "superAdminRequirement": "principal.isSuperAdmin === true",
+      "publicErrorMapping": {
+        "tokenOrSignatureFailures": {
+          "status": 401,
+          "error": "UNAUTHORIZED"
+        },
+        "authorizationOrRegistryFailures": {
+          "status": 403,
+          "error": "FORBIDDEN"
+        },
+        "configOrJwksOrInternalFailures": {
+          "status": 503,
+          "error": "AUTH_SERVICE_UNAVAILABLE"
+        }
+      },
+      "authPrecedesBodyRead": true
+    },
+    "trustRootProtection": {
+      "callerKeyResolverAccepted": false,
+      "requestControlledIssuerAccepted": false,
+      "requestControlledAudienceAccepted": false,
+      "requestControlledRegistryAccepted": false,
+      "configDerivedStrictlyFromEnv": true
+    }
+  },
+  "safetyGatesAndReadinessInvariants": {
+    "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+    "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+    "CANARY_LIVE_EXECUTION_ENABLED": false,
+    "CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+    "GUARDED_SOURCE_ATTESTATION_READY": false,
+    "GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+    "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+    "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+    "D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
+    "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
+    "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
+    "PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY_LENGTH": 0,
+    "allTwelveGatesVerified": true
+  },
+  "zeroActionVerification": {
+    "providerCalls": 0,
+    "realD1Calls": 0,
+    "realNetworkFetchCalls": 0,
+    "gateFlipOperations": 0,
+    "productionDeployments": 0,
+    "secretCreationsOrMutations": 0
+  },
+  "fileScope": {
+    "modified": [
+      "worker/index.ts",
+      "worker/ai/canary/deepSeekProductionWorkerOperationalRoute.ts",
+      "tests/ai/phaseA12B2C5U32ProductionWorkerHostBinding.test.ts"
+    ],
+    "added": [
+      "tests/security/phaseA12B2C5U33CProductionOperationalAuthRuntimeIntegration.test.ts",
+      "execution/a12b2c5u33c_production_operational_auth_runtime_integration_foundation.json",
+      "execution/a12b2c5u33c_production_operational_auth_runtime_integration_foundation.md"
+    ],
+    "strictlyUntouched": [
+      "worker/auth/cloudflareAccessOperationalAuth.ts",
+      "worker/auth/authContext.ts",
+      "worker/env.ts",
+      "worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts",
+      "worker/ai/canary/deepSeekProductionWorkerCapabilityBoundary.ts",
+      "worker/ai/canary/deepSeekGuardedLiveTransport.ts",
+      "worker/ai/canary/d1AuthorizationReplayBackend.ts",
+      "worker/ai/canary/canarySpecification.ts",
+      "package.json",
+      "package-lock.json",
+      "wrangler.jsonc",
+      "migrations/**",
+      "execution/a12b2c5u33b_*"
+    ]
+  },
+  "verificationResults": {
+    "totalTestFiles": 62,
+    "totalTests": 2494,
+    "totalPassed": 2494,
+    "totalFailed": 0,
+    "dedicatedIntegrationSuitePassed": 47,
+    "hostBindingSuitePassed": 62,
+    "operationalAuthSuitePassed": 66,
+    "apiRoutesSuitePassed": 39,
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "build": "PASS"
+  },
+  "claimsDiscipline": {
+    "sourceIntegrated": true,
+    "offlineTested": true,
+    "productionProvisioned": false,
+    "routeActivated": false,
+    "liveVerified": false
+  }
+}

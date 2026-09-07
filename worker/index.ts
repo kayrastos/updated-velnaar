@@ -151,6 +151,16 @@ export default {
         return addCorsAndSecurityHeaders(devDisabledResp, validatedOrigin);
       }
 
+      // Dedicated Production Canary Operational Route (Dormant Foundation)
+      // Carved out BEFORE tenant authentication; uses dedicated operational trust domain.
+      if (url.pathname === PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH) {
+        const operationalResponse = await handleProductionCanaryOperationalRoute(
+          request,
+          env
+        );
+        return addCorsAndSecurityHeaders(operationalResponse, validatedOrigin);
+      }
+
       // 3. Resolve Authenticated Identity (Fail-Closed)
       const authHeader = request.headers.get('Authorization');
       const user = AuthContextService.resolveSessionUser(authHeader, environment);
@@ -166,16 +176,6 @@ export default {
           message: 'Authentication required. Missing or invalid authorization token.',
         }, { status: 401 });
         return addCorsAndSecurityHeaders(unauthorizedResp, validatedOrigin);
-      }
-
-      // Dedicated Production Canary Operational Route (Dormant Foundation)
-      if (url.pathname === PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH) {
-        const operationalResponse = await handleProductionCanaryOperationalRoute(
-          request,
-          user,
-          env
-        );
-        return addCorsAndSecurityHeaders(operationalResponse, validatedOrigin);
       }
 
       // If in production and DB binding is missing, fail-closed with 503 DATABASE_NOT_CONFIGURED

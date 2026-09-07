@@ -58,6 +58,7 @@ import {
   D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED,
 } from '../../worker/ai/canary/d1AuthorizationReplayBackend';
 import { executeProductionWorkerCanaryCertification } from '../../worker/ai/canary/deepSeekProductionWorkerCapabilityBoundary';
+import { OperationalAuthErrorCode } from '../../worker/auth/cloudflareAccessOperationalAuth';
 
 function createDummySuperadmin(): AuthenticatedUser {
   return {
@@ -106,6 +107,7 @@ function createDummyPayloads() {
 interface FuturePathHarnessOptions {
   mockBoundaryResult?: Partial<GuardedTransportExecutionResult>;
   onBoundaryCalled?: (env: any, pkg: any, receipt: any) => void;
+  mockAuthResult?: any;
 }
 
 async function importFuturePathRouteForTest(options?: FuturePathHarnessOptions) {
@@ -116,6 +118,27 @@ async function importFuturePathRouteForTest(options?: FuturePathHarnessOptions) 
     PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED: true,
     PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY: true,
   }));
+
+  vi.doMock('../../worker/auth/cloudflareAccessOperationalAuth', async () => {
+    const actual = await vi.importActual<any>('../../worker/auth/cloudflareAccessOperationalAuth');
+    return {
+      ...actual,
+      resolveCanonicalProductionOperationalPrincipal: vi.fn(async (_req: any, _env: any) => {
+        if (options?.mockAuthResult !== undefined) {
+          return options.mockAuthResult;
+        }
+        return {
+          success: true,
+          principal: {
+            subject: 'ops-superadmin-001',
+            email: 'ops@velnar.io',
+            authSource: 'CLOUDFLARE_ACCESS',
+            isSuperAdmin: true,
+          },
+        };
+      }),
+    };
+  });
 
   const boundaryCalls: any[] = [];
   const defaultBoundaryResult: GuardedTransportExecutionResult = {
@@ -180,6 +203,7 @@ async function importFuturePathRouteForTest(options?: FuturePathHarnessOptions) 
     cleanup: () => {
       vi.doUnmock('../../worker/ai/canary/deepSeekProductionOperationalRoutePolicy');
       vi.doUnmock('../../worker/ai/canary/deepSeekProductionWorkerCapabilityBoundary');
+      vi.doUnmock('../../worker/auth/cloudflareAccessOperationalAuth');
       vi.resetModules();
     },
   };
@@ -226,7 +250,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleProductionCanaryOperationalRoute(request, user, env as any);
+      const response = await handleProductionCanaryOperationalRoute(request, env as any);
 
       expect(response.status).toBe(404);
       const json = (await response.json()) as any;
@@ -252,7 +276,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         DEEPSEEK_API_KEY: 'sk-key',
       };
 
-      const response = await handleProductionCanaryOperationalRoute(throwingRequest, user, env as any);
+      const response = await handleProductionCanaryOperationalRoute(throwingRequest, env as any);
 
       expect(response.status).toBe(404);
       expect(bodyGetterCalls).toBe(0);
@@ -281,7 +305,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleProductionCanaryOperationalRoute(request, user, throwingEnv as any);
+      const response = await handleProductionCanaryOperationalRoute(request, throwingEnv as any);
 
       expect(response.status).toBe(404);
       expect(dbReads).toBe(0);
@@ -297,7 +321,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleProductionCanaryOperationalRoute(request, user, env as any);
+      const response = await handleProductionCanaryOperationalRoute(request, env as any);
       const text = await response.text();
 
       expect(text).not.toContain('canary');
@@ -329,9 +353,9 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
       expect(json).toEqual({ error: 'NOT_FOUND' });
     });
 
-    it('3.3 rejects 2 arguments with 404 before reading any properties', async () => {
+    it('3.3 rejects 3 arguments (caller passing tenant user or extra arg) with 404', async () => {
       const fn = handleProductionCanaryOperationalRoute as any;
-      const response = await fn({} as any, {} as any);
+      const response = await fn({} as any, {} as any, {} as any);
       expect(response.status).toBe(404);
       const json = (await response.json()) as any;
       expect(json).toEqual({ error: 'NOT_FOUND' });
@@ -345,15 +369,14 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
       expect(json).toEqual({ error: 'NOT_FOUND' });
     });
 
-    it('3.5 throwing getters on request, user, env do NOT throw when argument count is invalid', async () => {
+    it('3.5 throwing getters on request do NOT throw when argument count is invalid', async () => {
       const fn = handleProductionCanaryOperationalRoute as any;
       const throwingReq = { get method() { throw new Error('REQ_GETTER'); } };
-      const throwingUser = { get isSuperAdmin() { throw new Error('USER_GETTER'); } };
 
       let didThrow = false;
       let response: any;
       try {
-        response = await fn(throwingReq, throwingUser);
+        response = await fn(throwingReq);
       } catch {
         didThrow = true;
       }
@@ -372,8 +395,8 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
 
       let capturedHandlerArgs: any = null;
       vi.doMock('../../worker/ai/canary/deepSeekProductionWorkerOperationalRoute', () => ({
-        handleProductionCanaryOperationalRoute: vi.fn(async (req: any, user: any, env: any) => {
-          capturedHandlerArgs = { req, user, env };
+        handleProductionCanaryOperationalRoute: vi.fn(async (req: any, env: any) => {
+          capturedHandlerArgs = { req, env };
           return new Response(JSON.stringify({ status: 'MOCK_CAPTURED' }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -490,10 +513,20 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
   // ==========================================================================
   // SUITE 6: Future-Path Superadmin Operational Authorization
   // ==========================================================================
-  describe('6. Future-Path Superadmin Operational Authorization (Simulated Route Open)', () => {
-    it('6.1 superadmin is authorized to reach operational capability boundary', async () => {
+  // ==========================================================================
+  // SUITE 6: Future-Path Operational Authorization (Simulated Route Open)
+  //
+  // ARCHITECTURAL MIGRATION NOTICE:
+  // OLD: operational route requires tenant AuthenticatedUser before dispatch
+  // NEW: exact operational route has an isolated operational-auth trust domain
+  //      and bypasses tenant AuthContextService only for that exact path.
+  //      Operational authority derives SOLELY from canonical Cloudflare Access
+  //      authentication and superadmin registry. Tenant roles (OWNER, ADMIN, etc.)
+  //      have ZERO standing in the operational route trust domain.
+  // ==========================================================================
+  describe('6. Future-Path Operational Authorization (Simulated Route Open)', () => {
+    it('6.1 canonical operational superadmin is authorized to reach operational capability boundary', async () => {
       const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
-      const user = createDummySuperadmin();
       const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
       const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
         method: 'POST',
@@ -501,16 +534,21 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
 
       expect(response.status).toBe(200);
       expect(getBoundaryCalls().length).toBe(1);
       cleanup();
     });
 
-    it('6.2 tenant OWNER is rejected with 403 FORBIDDEN (boundary calls = 0)', async () => {
-      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
-      const user = createDummyTenantUser('OWNER');
+    it('6.2 unauthorized subject / empty superadmin registry is rejected with 403 FORBIDDEN (boundary calls = 0)', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest({
+        mockAuthResult: {
+          success: false,
+          code: OperationalAuthErrorCode.SUPERADMIN_REGISTRY_EMPTY,
+          message: 'Registry is empty',
+        },
+      });
       const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
       const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
         method: 'POST',
@@ -518,7 +556,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
 
       expect(response.status).toBe(403);
       const json = (await response.json()) as any;
@@ -527,9 +565,14 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
       cleanup();
     });
 
-    it('6.3 tenant ADMIN is rejected with 403 FORBIDDEN (boundary calls = 0)', async () => {
-      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
-      const user = createDummyTenantUser('ADMIN');
+    it('6.3 subject not in superadmin registry is rejected with 403 FORBIDDEN (boundary calls = 0)', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest({
+        mockAuthResult: {
+          success: false,
+          code: OperationalAuthErrorCode.SUPERADMIN_NOT_AUTHORIZED,
+          message: 'Subject not in superadmin registry',
+        },
+      });
       const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
       const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
         method: 'POST',
@@ -537,36 +580,21 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
 
       expect(response.status).toBe(403);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
     });
 
-    it('6.4 tenant MANAGER, STAFF, and VIEWER are all rejected with 403 FORBIDDEN', async () => {
-      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
-      const roles: ('MANAGER' | 'STAFF' | 'VIEWER')[] = ['MANAGER', 'STAFF', 'VIEWER'];
-
-      for (const role of roles) {
-        const user = createDummyTenantUser(role);
-        const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
-        const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(createDummyPayloads()),
-        });
-
-        const response = await handleRoute(request, user, env as any);
-        expect(response.status).toBe(403);
-      }
-
-      expect(getBoundaryCalls().length).toBe(0);
-      cleanup();
-    });
-
-    it('6.5 null user is rejected with 403 FORBIDDEN', async () => {
-      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest();
+    it('6.4 identity binding mismatch is rejected with 403 FORBIDDEN (boundary calls = 0)', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest({
+        mockAuthResult: {
+          success: false,
+          code: OperationalAuthErrorCode.IDENTITY_BINDING_MISMATCH,
+          message: 'Identity binding mismatch',
+        },
+      });
       const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
       const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
         method: 'POST',
@@ -574,7 +602,33 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleRoute(request, null as any, env as any);
+      const response = await handleRoute(request, env as any);
+
+      expect(response.status).toBe(403);
+      expect(getBoundaryCalls().length).toBe(0);
+      cleanup();
+    });
+
+    it('6.5 principal with isSuperAdmin === false is rejected with 403 FORBIDDEN', async () => {
+      const { handleRoute, getBoundaryCalls, cleanup } = await importFuturePathRouteForTest({
+        mockAuthResult: {
+          success: true,
+          principal: {
+            subject: 'ops-user-002',
+            email: 'user@velnar.io',
+            authSource: 'CLOUDFLARE_ACCESS',
+            isSuperAdmin: false,
+          },
+        },
+      });
+      const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createDummyPayloads()),
+      });
+
+      const response = await handleRoute(request, env as any);
 
       expect(response.status).toBe(403);
       expect(getBoundaryCalls().length).toBe(0);
@@ -598,7 +652,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
           headers: { 'Content-Type': 'application/json' },
         });
 
-        const response = await handleRoute(request, user, env as any);
+        const response = await handleRoute(request, env as any);
         expect(response.status).toBe(405);
         const json = (await response.json()) as any;
         expect(json).toEqual({ error: 'METHOD_NOT_ALLOWED' });
@@ -618,7 +672,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(404);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -637,7 +691,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
           body: JSON.stringify(createDummyPayloads()),
         });
 
-        const response = await handleRoute(request, user, env as any);
+        const response = await handleRoute(request, env as any);
         expect(response.status).toBe(400);
         const json = (await response.json()) as any;
         expect(json).toEqual({ error: 'INVALID_REQUEST' });
@@ -657,7 +711,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(200);
       expect(getBoundaryCalls().length).toBe(1);
       cleanup();
@@ -676,7 +730,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(413);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -698,7 +752,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         }),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(413);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -714,7 +768,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: 'NOT_VALID_JSON{',
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(400);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -730,7 +784,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify([createDummyPayloads()]),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(400);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -746,7 +800,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: 'null',
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(400);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -764,7 +818,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         }),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(400);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -782,7 +836,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         }),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(400);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -824,7 +878,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
           body: JSON.stringify(body),
         });
 
-        const response = await handleRoute(request, user, env as any);
+        const response = await handleRoute(request, env as any);
         expect(response.status).toBe(400);
         const json = (await response.json()) as any;
         expect(json).toEqual({ error: 'INVALID_REQUEST' });
@@ -869,7 +923,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         }),
       });
 
-      const response = await handleRoute(request, user, hostEnv as any);
+      const response = await handleRoute(request, hostEnv as any);
       expect(response.status).toBe(200);
 
       expect(boundaryReceivedEnv).toBe(hostEnv);
@@ -918,6 +972,22 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         }),
       }));
 
+      vi.doMock('../../worker/auth/cloudflareAccessOperationalAuth', async () => {
+        const actual = await vi.importActual<any>('../../worker/auth/cloudflareAccessOperationalAuth');
+        return {
+          ...actual,
+          resolveCanonicalProductionOperationalPrincipal: vi.fn(async () => ({
+            success: true,
+            principal: {
+              subject: 'ops-superadmin-001',
+              email: 'ops@velnar.io',
+              authSource: 'CLOUDFLARE_ACCESS',
+              isSuperAdmin: true,
+            },
+          })),
+        };
+      });
+
       const actualAuth = await vi.importActual<any>('../../worker/auth/authContext');
       vi.doMock('../../worker/auth/authContext', () => ({
         ...actualAuth,
@@ -954,6 +1024,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
 
       vi.doUnmock('../../worker/ai/canary/deepSeekProductionOperationalRoutePolicy');
       vi.doUnmock('../../worker/ai/canary/deepSeekProductionWorkerCapabilityBoundary');
+      vi.doUnmock('../../worker/auth/cloudflareAccessOperationalAuth');
       vi.doUnmock('../../worker/auth/authContext');
       vi.resetModules();
     });
@@ -989,7 +1060,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(200);
 
       const json = (await response.json()) as any;
@@ -1036,7 +1107,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
       const user = createDummySuperadmin();
       const env = { ENVIRONMENT: 'production', DB: {} as any, DEEPSEEK_API_KEY: 'sk-key' };
 
-      const response = await handleRoute(throwingRequest, user, env as any);
+      const response = await handleRoute(throwingRequest, env as any);
       expect(response.status).toBe(500);
 
       const json = (await response.json()) as any;
@@ -1063,7 +1134,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(payloads),
       });
 
-      await handleRoute(request, user, hostEnv as any);
+      await handleRoute(request, hostEnv as any);
 
       const calls = getBoundaryCalls();
       expect(calls.length).toBe(1);
@@ -1151,7 +1222,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: jsonBody,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(200);
       expect(getBoundaryCalls().length).toBe(1);
       cleanup();
@@ -1175,7 +1246,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: jsonBody,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(413);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -1203,7 +1274,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: jsonBody,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(413);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -1232,7 +1303,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: jsonBody,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(413);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -1257,7 +1328,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: jsonBody,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(200);
       expect(getBoundaryCalls().length).toBe(1);
       cleanup();
@@ -1281,7 +1352,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: jsonBody,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(413);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -1310,7 +1381,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
 
       expect(request.headers.get('Content-Length')).toBeNull();
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(413);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -1333,7 +1404,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
           body: JSON.stringify(createDummyPayloads()),
         });
 
-        const response = await handleRoute(request, user, env as any);
+        const response = await handleRoute(request, env as any);
         expect(response.status).toBe(400);
       }
 
@@ -1357,7 +1428,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: oversized,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(413);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -1411,7 +1482,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         duplex: 'half',
       } as any);
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(413);
       expect(chunk3Read).toBe(false);
       expect(streamCancelled).toBe(true);
@@ -1440,7 +1511,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         duplex: 'half',
       } as any);
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(400);
       const json = (await response.json()) as any;
       expect(json).toEqual({ error: 'INVALID_REQUEST' });
@@ -1480,7 +1551,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(200);
 
       const json = (await response.json()) as any;
@@ -1512,7 +1583,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(200);
 
       const json = (await response.json()) as any;
@@ -1551,7 +1622,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
           body: JSON.stringify(createDummyPayloads()),
         });
 
-        const response = await handleRoute(request, user, env as any);
+        const response = await handleRoute(request, env as any);
         const json = (await response.json()) as any;
 
         expect(json.errors).toEqual([tc.expected]);
@@ -1580,7 +1651,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: duplicatePkgJson,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(400);
       const json = (await response.json()) as any;
       expect(json).toEqual({ error: 'INVALID_REQUEST' });
@@ -1601,7 +1672,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: duplicateReceiptJson,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(400);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -1623,7 +1694,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
           body: poisonJson,
         });
 
-        const response = await handleRoute(request, user, env as any);
+        const response = await handleRoute(request, env as any);
         expect(response.status).toBe(400);
       }
 
@@ -1645,7 +1716,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: lookalikeJson,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(400);
       expect(getBoundaryCalls().length).toBe(0);
       cleanup();
@@ -1667,7 +1738,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: validWithNestedString,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(200);
       expect(getBoundaryCalls().length).toBe(1);
       cleanup();
@@ -1694,7 +1765,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         body: validWithNestedKeys,
       });
 
-      const response = await handleRoute(request, user, env as any);
+      const response = await handleRoute(request, env as any);
       expect(response.status).toBe(200);
       expect(getBoundaryCalls().length).toBe(1);
       cleanup();
@@ -1715,6 +1786,22 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY: true,
       }));
 
+      vi.doMock('../../worker/auth/cloudflareAccessOperationalAuth', async () => {
+        const actual = await vi.importActual<any>('../../worker/auth/cloudflareAccessOperationalAuth');
+        return {
+          ...actual,
+          resolveCanonicalProductionOperationalPrincipal: vi.fn(async () => ({
+            success: true,
+            principal: {
+              subject: 'ops-superadmin-001',
+              email: 'ops@velnar.io',
+              authSource: 'CLOUDFLARE_ACCESS',
+              isSuperAdmin: true,
+            },
+          })),
+        };
+      });
+
       // NOTE: executeProductionWorkerCanaryCertification is NOT mocked! We test the real boundary!
       const routeMod = await import('../../worker/ai/canary/deepSeekProductionWorkerOperationalRoute');
 
@@ -1733,14 +1820,13 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
         },
       };
 
-      const user = createDummySuperadmin();
       const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createDummyPayloads()),
       });
 
-      const response = await routeMod.handleProductionCanaryOperationalRoute(request, user, hostEnv as any);
+      const response = await routeMod.handleProductionCanaryOperationalRoute(request, hostEnv as any);
 
       // Successfully reached real boundary and returned minimized operational response
       expect(response.status).toBe(200);
@@ -1760,6 +1846,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
       expect(json.transportAttempts).toBe(0);
 
       vi.doUnmock('../../worker/ai/canary/deepSeekProductionOperationalRoutePolicy');
+      vi.doUnmock('../../worker/auth/cloudflareAccessOperationalAuth');
       vi.resetModules();
     });
   });

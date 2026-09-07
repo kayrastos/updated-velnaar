@@ -7,11 +7,12 @@
  *    - PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED (false)
  *    - PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY (false)
  *    When disabled, returns 404 NOT_FOUND before ANY request body or capability access.
- * 2. EXACT RUNTIME SIGNATURE: arguments.length === 3 evaluated first.
+ * 2. EXACT RUNTIME SIGNATURE: arguments.length === 2 evaluated first.
  * 3. NO TENANT ROUTE COUPLING: Not under /api/ai, does not import aiRouter, AIRouter,
  *    or tenant business AI engines.
- * 4. STRICT SUPERADMIN REQUIREMENT: On future path, requires user.isSuperAdmin === true.
- *    Tenant roles (OWNER, ADMIN, MANAGER, etc.) are strictly insufficient (403 FORBIDDEN).
+ * 4. STRICT OPERATIONAL SUPERADMIN REQUIREMENT: On future path, requires canonical
+ *    Cloudflare Access authentication and principal.isSuperAdmin === true.
+ *    Tenant roles and AuthenticatedUser are completely decoupled.
  * 5. HOST ENV IDENTITY: Passes exact `env` reference received from worker/index.ts
  *    to executeProductionWorkerCanaryCertification without cloning, spreading, or mutation.
  * 6. TRUE 65,536-BYTE STREAMING LIMIT: Reads request.body incrementally via reader.read(),
@@ -28,7 +29,12 @@
  */
 
 import type { WorkerEnv } from '../../env';
-import type { AuthenticatedUser } from '../../auth/authContext';
+import {
+  resolveCanonicalProductionOperationalPrincipal,
+  OperationalAuthErrorCode,
+  type OperationalAuthFailure,
+  type ProductionOperationalPrincipal,
+} from '../../auth/cloudflareAccessOperationalAuth';
 import {
   PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH,
   PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED,
@@ -300,15 +306,14 @@ export function scanTopLevelJsonEnvelope(text: string): boolean {
 
 export async function handleProductionCanaryOperationalRoute(
   request: Request,
-  user: AuthenticatedUser,
   env: WorkerEnv
 ): Promise<Response> {
   // 1. EXACT RUNTIME ARGUMENT COUNT (MANDATORY FIRST OPERATION)
-  if (arguments.length !== 3) {
+  if (arguments.length !== 2) {
     return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
   }
 
-  // 2. DUAL ROUTE READINESS BARRIERS (MUST PRECEDE ANY BODY OR CAPABILITY ACCESS)
+  // 2. DUAL ROUTE READINESS BARRIERS (MUST PRECEDE ANY AUTH, BODY OR CAPABILITY ACCESS)
   if (
     !PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED ||
     !PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY
@@ -329,8 +334,34 @@ export async function handleProductionCanaryOperationalRoute(
       return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
     }
 
-    // 5. SUPERADMIN OPERATIONAL PRIVILEGE VERIFICATION
-    if (!user || user.isSuperAdmin !== true) {
+    // 5. CANONICAL CLOUDFLARE ACCESS OPERATIONAL AUTHENTICATION
+    const authResult = await resolveCanonicalProductionOperationalPrincipal(request, env);
+    if (!authResult.success) {
+      const failure = authResult as OperationalAuthFailure;
+      const code = failure.code;
+      if (
+        code === OperationalAuthErrorCode.SUPERADMIN_REGISTRY_EMPTY ||
+        code === OperationalAuthErrorCode.SUPERADMIN_NOT_AUTHORIZED ||
+        code === OperationalAuthErrorCode.IDENTITY_BINDING_MISMATCH
+      ) {
+        return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
+      }
+
+      if (
+        code === OperationalAuthErrorCode.CONFIG_NOT_READY ||
+        code === OperationalAuthErrorCode.JWKS_UNAVAILABLE ||
+        code === OperationalAuthErrorCode.AUTH_INTERNAL_FAILURE
+      ) {
+        return Response.json({ error: 'AUTH_SERVICE_UNAVAILABLE' }, { status: 503 });
+      }
+
+      // All authentication / token failures map to 401 UNAUTHORIZED
+      return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    }
+
+    // 5b. DEFENSE-IN-DEPTH OPERATIONAL SUPERADMIN REQUIREMENT
+    const principal: ProductionOperationalPrincipal = authResult.principal;
+    if (!principal || principal.isSuperAdmin !== true) {
       return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
     }
 
