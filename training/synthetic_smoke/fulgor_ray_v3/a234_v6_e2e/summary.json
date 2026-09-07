@@ -1,0 +1,131 @@
+{
+  "call_budget_max": 8,
+  "calls_made": 8,
+  "conditions": {
+    "a4_executed": false,
+    "at_least_one_gate_accepted": true,
+    "at_least_one_gate_evaluation": true,
+    "at_least_one_host_binding": true,
+    "at_least_one_serialization": true,
+    "at_least_one_verifier_invocation": true,
+    "at_least_one_verifier_parse": true,
+    "candidate_intents_all_three_parsed": true,
+    "candidate_intents_parsed_count": 3,
+    "dev30_accessed": false,
+    "diagnosis_strict_parse": true,
+    "diagnosis_target_membership": true,
+    "host_sha_is_host_generated": true,
+    "no_gold_answer_read": true,
+    "plan_strict_parse": true,
+    "selected_primary_not_none": true,
+    "training_started": false
+  },
+  "counts": {
+    "gate_accepted_count": 3,
+    "gate_evaluated_count": 3,
+    "host_bound_count": 3,
+    "selectable_count": 3,
+    "serialized_count": 3,
+    "verifier_invoked_count": 3,
+    "verifier_parse_count": 3
+  },
+  "stages": {
+    "candidate_0": {
+      "meta": {
+        "available_generation_tokens": 6388,
+        "context_truncated": false,
+        "context_window_tokens": 8192,
+        "ended_on_eos": true,
+        "generated_tokens": 334,
+        "hit_generation_reserve": false,
+        "included_context_units": 54,
+        "policy_version": "fulgor.context_budget.v2",
+        "prompt_token_ids_sha256": "f8516b83ebc4027ad3ecf5a075d998ec5b98837cc6e4dd514076b119ffa791a6",
+        "prompt_tokens": 1804,
+        "raw_output_sha256": "80e177a91040c23ba02a55f10e6e7d4724a8f7b38e972eed01ecdc7b2400cfd6",
+        "rendered_context_sha256": "747b97dd3ce0ef1d395eed0ee39828aee68bb75deb18e314ec94af32dea6a0eb",
+        "requested_context_units": 54,
+        "reserved_generation_tokens": 2048,
+        "stage": "candidate"
+      }
+    },
+    "candidate_1": {
+      "meta": {
+        "available_generation_tokens": 6385,
+        "context_truncated": false,
+        "context_window_tokens": 8192,
+        "ended_on_eos": true,
+        "generated_tokens": 332,
+        "hit_generation_reserve": false,
+        "included_context_units": 54,
+        "policy_version": "fulgor.context_budget.v2",
+        "prompt_token_ids_sha256": "5ac81a600cac6b1e85980ae9f70c15bdc76d8e42ce4ce29f35bad6c49c781bc5",
+        "prompt_tokens": 1807,
+        "raw_output_sha256": "e07be396d35f752a6df07a5c650c84d35cb5a019d52ffdc3233190bd6417b86f",
+        "rendered_context_sha256": "747b97dd3ce0ef1d395eed0ee39828aee68bb75deb18e314ec94af32dea6a0eb",
+        "requested_context_units": 54,
+        "reserved_generation_tokens": 2048,
+        "stage": "candidate"
+      }
+    },
+    "candidate_2": {
+      "meta": {
+        "available_generation_tokens": 6378,
+        "context_truncated": false,
+        "context_window_tokens": 8192,
+        "ended_on_eos": true,
+        "generated_tokens": 335,
+        "hit_generation_reserve": false,
+        "included_context_units": 54,
+        "policy_version": "fulgor.context_budget.v2",
+        "prompt_token_ids_sha256": "c88e767972c7d5113d6d6cc845e6f386bc66352cad08d7f759b174aee00afe8a",
+        "prompt_tokens": 1814,
+        "raw_output_sha256": "6cd225810831c1aed8739171d95a614a9d20305cc4d130a4a7483aa3be03f9ce",
+        "rendered_context_sha256": "747b97dd3ce0ef1d395eed0ee39828aee68bb75deb18e314ec94af32dea6a0eb",
+        "requested_context_units": 54,
+        "reserved_generation_tokens": 2048,
+        "stage": "candidate"
+      }
+    },
+    "diagnosis": {
+      "meta": {
+        "available_generation_tokens": 7272,
+        "context_truncated": false,
+        "context_window_tokens": 8192,
+        "ended_on_eos": true,
+        "generated_tokens": 184,
+        "hit_generation_reserve": false,
+        "included_context_units": 1,
+        "policy_version": "fulgor.context_budget.v2",
+        "prompt_token_ids_sha256": "9880d84f4347a830e14c16d4598ae0f070d1c4fe30583bd433f714db60d11665",
+        "prompt_tokens": 920,
+        "raw_output_sha256": "462403b655bab59059ac62a19c2014c936919991deb0ba1e9c53b974bae1f8b0",
+        "rendered_context_sha256": "dd987414f8df2ed109391ef80e7d7db1c1e3c44db4ec3e38c3c9d398271945cc",
+        "requested_context_units": 1,
+        "reserved_generation_tokens": 1024,
+        "stage": "diagnosis"
+      }
+    },
+    "plan": {
+      "meta": {
+        "available_generation_tokens": 6896,
+        "context_truncated": false,
+        "context_window_tokens": 8192,
+        "ended_on_eos": true,
+        "generated_tokens": 262,
+        "hit_generation_reserve": false,
+        "included_context_units": 54,
+        "policy_version": "fulgor.context_budget.v2",
+        "prompt_token_ids_sha256": "6335f0a493464bbd3536afe9cb354455ce451984eee497bda1bd4987cfe6c690",
+        "prompt_tokens": 1296,
+        "raw_output_sha256": "b6a25c8e97d6b14934e6fc3a6e62aa60ff63208054a942cbf34dfa92d8105cdd",
+        "rendered_context_sha256": "747b97dd3ce0ef1d395eed0ee39828aee68bb75deb18e314ec94af32dea6a0eb",
+        "requested_context_units": 54,
+        "reserved_generation_tokens": 1024,
+        "stage": "plan"
+      }
+    }
+  },
+  "status": "PASS_A234_V6_E2E_SYNTHETIC_SMOKE",
+  "synthetic_repo_hash": "23ee465cf3f946d73ec9c849f7e959b9466e30c50418d2d78b385aed0092e054"
+}

@@ -1,0 +1,96 @@
+{
+  "schema": "fulgor.a234_host_binding_report.v1",
+  "status": "PASS_A234_V6_ARCHITECTURE_SEALED",
+  "timestamp": "2026-09-06T13:28:00Z",
+  "model_facing_schema": {
+    "version": "fulgor.semantic_patch_intent.v2",
+    "forbidden_fields": [
+      "expected_preimage_sha256",
+      "anchor",
+      "repository_hash"
+    ],
+    "fields": [
+      "schema_version",
+      "candidate_id",
+      "diagnosis_hash",
+      "plan_hash",
+      "edits",
+      "rationale",
+      "expected_fail_to_pass_effect",
+      "regression_risks"
+    ]
+  },
+  "host_binding": {
+    "module": "training/fulgor_ray_v3/candidate_host_binding_v1.py",
+    "sha256": "b5a7fc331798892bbd14bdad443e9203e3a1596b5f6cc69209f300359eb2386c",
+    "operations": [
+      "closed_world_inventory_validation",
+      "canonical_preimage_derivation",
+      "host_expected_preimage_sha256_computation",
+      "deterministic_anchor_derivation",
+      "semantic_patch_v1_construction"
+    ]
+  },
+  "closed_world_target_validation": {
+    "module": "run_fulgor_v3_0_a234_dev30_inference_v6.py",
+    "error_class": "DiagnosisTargetMembershipError",
+    "status": "PASS"
+  },
+  "unit_tests": {
+    "total": 50,
+    "passed": 50,
+    "failed": 0,
+    "duration_seconds": 1.355
+  },
+  "runner_preflight": {
+    "status": "PASS_A234_V6_GPU_RUNNER_PREFLIGHT",
+    "candidate_reserved_tokens": 2048,
+    "closed_world_target_validation": true,
+    "model_loaded": false,
+    "inference_executed": false
+  },
+  "synthetic_smoke": {
+    "status": "PASS_A234_V6_E2E_SYNTHETIC_SMOKE",
+    "summary_sha256": "ed09f5313d0ddf7754ad913579773282ec01622f75e5fb9f1fe4270a8e0c1f01",
+    "calls_made": 8,
+    "call_budget_max": 8,
+    "counts": {
+      "host_bound_count": 3,
+      "serialized_count": 3,
+      "gate_evaluated_count": 3,
+      "gate_accepted_count": 3,
+      "verifier_invoked_count": 3,
+      "verifier_parse_count": 3,
+      "selectable_count": 3
+    },
+    "conditions": {
+      "diagnosis_strict_parse": true,
+      "diagnosis_target_membership": true,
+      "plan_strict_parse": true,
+      "candidate_intents_all_three_parsed": true,
+      "at_least_one_host_binding": true,
+      "host_sha_is_host_generated": true,
+      "at_least_one_serialization": true,
+      "at_least_one_gate_evaluation": true,
+      "at_least_one_gate_accepted": true,
+      "at_least_one_verifier_invocation": true,
+      "at_least_one_verifier_parse": true,
+      "selected_primary_not_none": true,
+      "dev30_accessed": false,
+      "a4_executed": false,
+      "training_started": false,
+      "no_gold_answer_read": true
+    }
+  },
+  "safety_confirmations": {
+    "A234_V5_RERUN": false,
+    "A234_V6_DEV30_EXECUTED": false,
+    "A234_V6_ATTEMPT_MARKER_WRITTEN": false,
+    "A4_EXECUTED": false,
+    "TRAINING_STARTED": false,
+    "DEV30_USED_BY_SYNTHETIC_SMOKE": false,
+    "MODEL_GENERATED_CRYPTOGRAPHIC_PROVENANCE": false,
+    "EXISTING_SERIALIZER_WEAKENED": false,
+    "EXISTING_SEALED_ARTIFACTS_MODIFIED": false
+  }
+}
