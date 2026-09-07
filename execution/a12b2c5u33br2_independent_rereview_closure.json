@@ -169,6 +169,8 @@
     "migrationsModifications": 0,
     "wranglerJsoncModifications": 0,
     "trackedModifications": [
+      "execution/a12b2c5u33br2_independent_rereview_closure.json",
+      "execution/a12b2c5u33br2_independent_rereview_closure.md",
       "tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts"
     ]
   }
