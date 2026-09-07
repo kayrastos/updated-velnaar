@@ -25,4 +25,8 @@ export interface WorkerEnv {
 
   // AI Routing Policy Mode Configuration (Optional; defaults to 'legacy')
   VELNAR_AI_ROUTING_POLICY_MODE?: 'legacy' | 'shadow' | string;
+
+  // Cloudflare Access Operational Authentication Configuration (Optional; inactive until runtime integration)
+  CLOUDFLARE_ACCESS_TEAM_DOMAIN?: string;
+  CLOUDFLARE_ACCESS_AUD?: string;
 }
