@@ -36,6 +36,7 @@ import {
   validateCloudflareAccessConfig,
   validateSuperAdminRegistry,
   authorizeOperationalPrincipalAgainstRegistry,
+  isValidEmail,
   PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY,
   OperationalAuthErrorCode,
   OPERATIONAL_AUTH_ERROR_MESSAGES,
@@ -567,6 +568,89 @@ describe('Phase A.12B.2C-5U.3.3B-R: Hardened Production Operational Authenticati
         if (!result.success) {
           expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.EMAIL_REQUIRED);
         }
+      }
+    });
+
+    it('21b. locks conservative email-validation terminology and forbids full RFC 5322 compliance claims', async () => {
+      // 1. Independently verify and lock the canonical JSON evidence contract
+      const jsonEvidencePath = path.resolve(
+        __dirname,
+        '../../execution/a12b2c5u33b_production_operational_authentication_foundation.json'
+      );
+      const rawJson = fs.readFileSync(jsonEvidencePath, 'utf8');
+      const jsonEvidence = JSON.parse(rawJson);
+
+      expect(jsonEvidence.cryptographicPolicy).toBeDefined();
+      expect(jsonEvidence.cryptographicPolicy.emailSyntaxRFC5322Enforced).toBe(false);
+      expect(jsonEvidence.cryptographicPolicy.emailSyntaxConservativeBoundedValidation).toBe(true);
+      expect(jsonEvidence.cryptographicPolicy.maxEmailLengthCharacters).toBe(320);
+      expect('maxEmailLengthBytes' in jsonEvidence.cryptographicPolicy).toBe(false);
+      expect((jsonEvidence.cryptographicPolicy as Record<string, unknown>).maxEmailLengthBytes).toBeUndefined();
+      expect(rawJson).not.toContain('maxEmailLengthBytes');
+
+      // 2. Inspect Markdown evidence: locks conservative/bounded terminology & forbids full RFC 5322 claims
+      const mdEvidencePath = path.resolve(
+        __dirname,
+        '../../execution/a12b2c5u33b_production_operational_authentication_foundation.md'
+      );
+      const mdEvidence = fs.readFileSync(mdEvidencePath, 'utf8');
+
+      expect(mdEvidence).toContain('conservative bounded operational email syntax description (<= 320 characters)');
+      expect(mdEvidence).toContain('Replaced false RFC 5322 claims');
+      expect(mdEvidence).not.toMatch(/RFC\s*5322\s+(?:compliant|compliance|enforced|parsing|parser)/i);
+
+      // 3. Inspect worker implementation source: comments and code forbid RFC 5322 compliance claims
+      const authModulePath = path.resolve(
+        __dirname,
+        '../../worker/auth/cloudflareAccessOperationalAuth.ts'
+      );
+      const authModuleSource = fs.readFileSync(authModulePath, 'utf8');
+
+      expect(authModuleSource).toContain('Conservative bounded operational email syntax validation (<= 320 chars)');
+      expect(authModuleSource).not.toContain('5322');
+      expect(authModuleSource).not.toMatch(/RFC\s*5322/i);
+
+      // 4. Bind assertions to actual implementation semantics in worker/auth/cloudflareAccessOperationalAuth.ts:
+      // A. JavaScript string-length bound of 320 characters (character count, not bytes)
+      const boundaryValidEmail = `${'a'.repeat(310)}@velnar.io`; // 310 + 10 = 320 characters
+      expect(boundaryValidEmail.length).toBe(320);
+      expect(isValidEmail(boundaryValidEmail)).toBe(true);
+
+      const boundaryInvalidEmail = `${'a'.repeat(311)}@velnar.io`; // 311 + 10 = 321 characters
+      expect(boundaryInvalidEmail.length).toBe(321);
+      expect(isValidEmail(boundaryInvalidEmail)).toBe(false);
+
+      // B. Rejection of RFC 5322 exotic forms (demonstrating non-claim of full RFC 5322 parsing)
+      const rfc5322FormsRejected = [
+        '"quoted.local"@velnar.io',
+        'user(comment)@velnar.io',
+        'user@[192.168.1.1]',
+        'user@localdomain',
+      ];
+      for (const nonConservativeEmail of rfc5322FormsRejected) {
+        expect(isValidEmail(nonConservativeEmail)).toBe(false);
+      }
+
+      // C. Bind to full verification pipeline (JWT assertion path)
+      const validToken = await createSyntheticAccessJwt({ email: boundaryValidEmail });
+      const validResult = await verifyCloudflareAccessIdentity(validToken, TEST_CONFIG, primaryKeyPair.publicKey);
+      expect(validResult.success).toBe(true);
+      if (validResult.success) {
+        expect(validResult.principal.email).toBe(boundaryValidEmail);
+      }
+
+      const invalidLengthToken = await createSyntheticAccessJwt({ email: boundaryInvalidEmail });
+      const invalidLengthResult = await verifyCloudflareAccessIdentity(invalidLengthToken, TEST_CONFIG, primaryKeyPair.publicKey);
+      expect(invalidLengthResult.success).toBe(false);
+      if (!invalidLengthResult.success) {
+        expect((invalidLengthResult as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.EMAIL_REQUIRED);
+      }
+
+      const rfcFormToken = await createSyntheticAccessJwt({ email: '"quoted.local"@velnar.io' });
+      const rfcFormResult = await verifyCloudflareAccessIdentity(rfcFormToken, TEST_CONFIG, primaryKeyPair.publicKey);
+      expect(rfcFormResult.success).toBe(false);
+      if (!rfcFormResult.success) {
+        expect((rfcFormResult as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.EMAIL_REQUIRED);
       }
     });
 
