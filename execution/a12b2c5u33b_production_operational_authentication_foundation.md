@@ -1,43 +1,37 @@
-# VELNAR — Phase A.12B.2C-5U.3.3B-R Evidence Artifact
-## Production Operational Authentication Foundation — Security Repair
+# VELNAR — Phase A.12B.2C-5U.3.3B Evidence Artifact
+## Production Operational Authentication Foundation — Canonical Seal Record
 
-- **Phase**: `A.12B.2C-5U.3.3B-R`
-- **Artifact Type**: `PRODUCTION_OPERATIONAL_AUTHENTICATION_FOUNDATION_REPAIR`
-- **Date**: `2026-09-07T10:40:26Z`
+- **Phase**: `A.12B.2C-5U.3.3B`
+- **Artifact Type**: `PRODUCTION_OPERATIONAL_AUTHENTICATION_FOUNDATION_SEAL`
+- **Date**: `2026-09-07T11:48:00Z`
 - **Repository**: [https://github.com/kayrastos/updated-velnaar](https://github.com/kayrastos/updated-velnaar)
-- **Base Commit**: `5bca1ff5b15e5f0716ab99ded68c64beb615dd11`
-- **Base Tree**: `8ae76238abd0d60df0ea1919aa652778d3cbf590`
+- **Approved Snapshot Commit**: `48178761a6c1c5f258e27785527417ed0bfe9a02`
+- **Approved Snapshot Tree**: `eed9cce4e5aeac6783db5fc666cb1ba7ed3c516c`
 - **Branch**: `main`
-- **Lineage Parent**: `5bca1ff5b15e5f0716ab99ded68c64beb615dd11`
 - **Sealed Prior Phase**: `A12B2C5U33A_PROVISIONING_ACTIVATION_READINESS_AUDIT_APPROVED` (Sealed & Untouched)
-- **Final Status**: `A12B2C5U33BR_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW`
+- **Independent Final Review Verdict**: `A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED`
+- **Final Status**: `A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED`
+- **Sealed**: `true`
 
 ---
 
-## 1. Executive Summary & Repair Objective
+## 1. Executive Summary & Canonical Seal Record
 
-Phase **A.12B.2C-5U.3.3B-R** addresses and resolves all findings identified in the independent Codex High review of Phase 5U.3.3B:
-1. **HIGH SECURITY (Canonical Trust Root Boundary)**: Eliminated caller-injected `keyResolver` parameter from `resolveCanonicalProductionOperationalPrincipal(tokenOrRequest, env)`. The canonical wrapper accepts strictly 2 arguments and constructs remote JWKS resolvers internally. Attacker attempts to inject custom resolvers or pass additional arguments are strictly ignored.
-2. **MEDIUM ARCHITECTURE (Granular Error Classification)**: Separated JWKS/network/internal failures from cryptographic signature/algorithm failures. Introduced `JWKS_UNAVAILABLE` for `ERR_JWKS_TIMEOUT` and network fetch failures; mapped `ERR_JWKS_INVALID` to `AUTH_INTERNAL_FAILURE`; mapped `ERR_JWT_INVALID` to `MALFORMED_TOKEN`; and prevented JOSE generic error misclassification as algorithm errors.
-3. **LOW SECURITY (Static Registry Redaction)**: Redacted duplicate-subject diagnostic reason to `"Duplicate accessSubject detected in registry"`, ensuring zero leakage of subject or email values.
-4. **LOW ARCHITECTURE (Minimal Principal Claims)**: Stripped full decoded JWT `claims` from `OperationalAuthSuccess`, exposing only the sanitized, validated `principal` (`subject`, `email`, `authSource`, `isSuperAdmin`).
-5. **EVIDENCE & TEST HARDENING**:
-   - Implemented genuine mocked-fetch offline test for canonical remote JWKS resolution.
-   - Implemented attacker trust-root substitution regression test verifying extra arguments are ignored.
-   - Implemented true local JWKS unknown-kid rejection test distinct from wrong-public-key tests.
-   - Implemented documented Cloudflare service-token shape rejection test (`sub: ''` and no email) with extra field checks documented as defensive heuristics.
-   - Corrected email syntax terminology to conservative bounded operational email syntax description (<= 320 characters).
-   - Replaced vacuous `expect(true).toBe(true)` assertions with instrumented fetch spy and source-inspected provider/D1 isolation.
-   - Implemented explicit `ES256` and `PS256` algorithm rejection tests.
-   - Implemented array audience positive and negative validation tests.
-   - Implemented temporal relationship hardening (`exp <= iat` and `nbf > exp`).
-   - Restored and verified the exact 12 canonical safety and readiness conditions from source.
+Phase **A.12B.2C-5U.3.3B** establishes the cryptographic **Application Authentication Foundation** for the future dedicated VELNAR production operational/canary route (`/api/ops/canary/deepseek-certification`).
+
+Independent Codex High review concluded with **A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED** on the canonical snapshot (`48178761a6c1c5f258e27785527417ed0bfe9a02`). All initial findings have been fully repaired and reconciled:
+1. **Canonical Trust Root**: Caller-injected key resolver removed; canonical wrapper accepts strictly 2 parameters and constructs remote JWKS resolver internally.
+2. **Error Classification**: Granular separation between JWKS service availability (`JWKS_UNAVAILABLE`), malformed token envelope (`MALFORMED_TOKEN`), and internal failures (`AUTH_INTERNAL_FAILURE`).
+3. **Registry Redaction**: Diagnostic reasons strictly static (`"Duplicate accessSubject detected in registry"`) with zero subject/email reflection.
+4. **Minimal Principal Claims**: Full JWT claims stripped; only verified principal exposed.
+5. **Exact JWS/JWT Error Mapping**: Canonical source and evidence reconciled to map both `ERR_JWS_INVALID` and `ERR_JWT_INVALID` to `MALFORMED_TOKEN`.
+6. **Zero Compromise Invariants**: Fully certified offline with 0 provider calls, 0 real D1 calls, 0 network calls, and 0 router integrations.
 
 ---
 
 ## 2. Non-Negotiable Zero-Action Invariant Ledger
 
-All operations in this repair phase were executed in an isolated, offline developer environment:
+All operations in this foundation phase were executed in an isolated, offline developer environment:
 
 | Sentinel / Invariant | Certified Value | Status |
 |---|---|---|
@@ -63,18 +57,18 @@ All 12 relevant closed safety/readiness conditions have been verified directly f
 
 | # | Canonical Condition | Source File | Expected Value | Actual Value | Verdict |
 |---|---|---|---|---|---|
-| 1 | `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED` | `worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts` | `false` | `false` | PASS_CLOSED |
-| 2 | `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY` | `worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts` | `false` | `false` | PASS_CLOSED |
-| 3 | `CANARY_LIVE_EXECUTION_ENABLED` | `worker/ai/canary/canarySpecification.ts` | `false` | `false` | PASS_CLOSED |
-| 4 | `CANARY_LIVE_EXECUTION_STATE` | `worker/ai/canary/canarySpecification.ts` | `"BLOCKED_PENDING_CERTIFICATION"` | `"BLOCKED_PENDING_CERTIFICATION"` | PASS_CLOSED |
-| 5 | `GUARDED_SOURCE_ATTESTATION_READY` | `worker/ai/canary/deepSeekGuardedLiveTransport.ts` | `false` | `false` | PASS_CLOSED |
-| 6 | `GUARDED_HUMAN_AUTH_ATTESTATION_READY` | `worker/ai/canary/deepSeekGuardedLiveTransport.ts` | `false` | `false` | PASS_CLOSED |
-| 7 | `PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED` | `worker/ai/canary/deepSeekProductionAuthorizationTrust.ts` | `false` | `false` | PASS_CLOSED |
-| 8 | `RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED` | `worker/ai/canary/deepSeekTrustedRuntimeSourceProvenance.ts` | `false` | `false` | PASS_CLOSED |
-| 9 | `D1_REPLAY_BACKEND_PRODUCTION_BOUND` | `worker/ai/canary/d1AuthorizationReplayBackend.ts` | `false` | `false` | PASS_CLOSED |
-| 10 | `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED` | `worker/ai/canary/d1AuthorizationReplayBackend.ts` | `false` | `false` | PASS_CLOSED |
-| 11 | `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` | `worker/ai/canary/d1AuthorizationReplayBackend.ts` | `false` | `false` | PASS_CLOSED |
-| 12 | `productionRoutingEnforcementAllowed` | `worker/ai/canary/canarySpecification.ts` | `false` | `false` | PASS_CLOSED |
+| 1 | `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED` | `worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts:14` | `false` | `false` | PASS_CLOSED |
+| 2 | `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY` | `worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts:17` | `false` | `false` | PASS_CLOSED |
+| 3 | `CANARY_LIVE_EXECUTION_ENABLED` | `worker/ai/canary/canarySpecification.ts:37` | `false` | `false` | PASS_CLOSED |
+| 4 | `CANARY_LIVE_EXECUTION_STATE` | `worker/ai/canary/canarySpecification.ts:39` | `"BLOCKED_PENDING_CERTIFICATION"` | `"BLOCKED_PENDING_CERTIFICATION"` | PASS_CLOSED |
+| 5 | `GUARDED_SOURCE_ATTESTATION_READY` | `worker/ai/canary/deepSeekGuardedLiveTransport.ts:127` | `false` | `false` | PASS_CLOSED |
+| 6 | `GUARDED_HUMAN_AUTH_ATTESTATION_READY` | `worker/ai/canary/deepSeekGuardedLiveTransport.ts:133` | `false` | `false` | PASS_CLOSED |
+| 7 | `PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED` | `worker/ai/canary/deepSeekProductionAuthorizationTrust.ts:41` | `false` | `false` | PASS_CLOSED |
+| 8 | `RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED` | `worker/ai/canary/deepSeekTrustedRuntimeSourceProvenance.ts:36` | `false` | `false` | PASS_CLOSED |
+| 9 | `D1_REPLAY_BACKEND_PRODUCTION_BOUND` | `worker/ai/canary/d1AuthorizationReplayBackend.ts:30` | `false` | `false` | PASS_CLOSED |
+| 10 | `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED` | `worker/ai/canary/d1AuthorizationReplayBackend.ts:32` | `false` | `false` | PASS_CLOSED |
+| 11 | `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` | `worker/ai/canary/d1AuthorizationReplayBackend.ts:31` | `false` | `false` | PASS_CLOSED |
+| 12 | `productionRoutingEnforcementAllowed` | `worker/ai/canary/canarySpecification.ts:857` | `false` | `false` | PASS_CLOSED |
 
 ### 3.1 Supplemental Foundation State (Not Runtime Gates)
 
@@ -99,7 +93,7 @@ The following offline assertions and metadata are tracked separately from the ca
 | **Repair 1: Canonical Wrapper Arity** | `resolveCanonicalProductionOperationalPrincipal(tokenOrRequest, env)` accepts strictly 2 parameters. Resolver injection removed from production wrapper. | PASS (`canonicalTrustRootCallerInjectable: false`, `canonicalWrapperAcceptsExternalKeyResolver: false`) |
 | **Repair 2: Mocked Fetch Positive Test** | Canonical wrapper certified offline using `vi.stubGlobal('fetch', fetchSpy)` with synthetic JWKS response. | PASS (`remoteJwksCanonicalConstructionOnly: true`, `canonicalTrustRootSubstitutionTestPassed: true`) |
 | **Repair 3: Local JWKS Unknown KID Test** | Distinct test with valid local JWKS containing different key ID, certifying rejection with `SIGNATURE_INVALID` without key confusion. | PASS (`actualUnknownKidLocalJwksTestImplemented: true`) |
-| **Repair 4: Granular Error Mapping** | `ERR_JWKS_TIMEOUT` & fetch errors -> `JWKS_UNAVAILABLE`; `ERR_JWKS_INVALID` -> `AUTH_INTERNAL_FAILURE`; `ERR_JWT_INVALID` -> `MALFORMED_TOKEN`. | PASS (`jwksAvailabilityFailuresSanitized: true`) |
+| **Repair 4: Granular Error Mapping** | `ERR_JWKS_TIMEOUT` & fetch errors -> `JWKS_UNAVAILABLE`; `ERR_JWKS_INVALID` -> `AUTH_INTERNAL_FAILURE`; `ERR_JWT_INVALID` & `ERR_JWS_INVALID` -> `MALFORMED_TOKEN`. | PASS (`jwksAvailabilityFailuresSanitized: true`) |
 | **Repair 5: JOSE Generic Classification** | `ERR_JOSE_GENERIC` fails closed as `AUTH_INTERNAL_FAILURE` and is never misclassified as `ALGORITHM_NOT_ALLOWED`. | PASS |
 | **Repair 6: Minimal Success Principal** | Full `claims` stripped from `OperationalAuthSuccess`; only validated `principal` exposed. | PASS (`fullClaimsExposedByAuthResult: false`) |
 | **Repair 7: Static Redaction of Duplicate Reason** | Static reason `"Duplicate accessSubject detected in registry"` returned on duplicate entries with zero subject value reflection. | PASS (`registryValidationReasonsRedacted: true`) |
@@ -137,8 +131,55 @@ execution/a12b2c5u33a_*: 0 diff
 
 ---
 
-## 6. Phase Certification & Readiness Verdict
+## 6. Independent Codex High Final Review & Canonical Seal Record
 
-Phase A.12B.2C-5U.3.3B-R is verified, self-contained, and complete. All independent Codex High findings are resolved without expanding scope or compromising existing invariants.
+Independent Codex High review completed.
+- **Canonical Approved Commit**: `48178761a6c1c5f258e27785527417ed0bfe9a02`
+- **Canonical Approved Tree**: `eed9cce4e5aeac6783db5fc666cb1ba7ed3c516c`
+- **Previous HIGH Trust-Root Defect**: Repaired (`resolveCanonicalProductionOperationalPrincipal` accepts strictly 2 parameters; no injected resolver permitted).
+- **JWKS & Error Semantics**: Independently reviewed and certified. Source and evidence mapping reconciled (`ERR_JWS_INVALID` = `MALFORMED_TOKEN`, `ERR_JWT_INVALID` = `MALFORMED_TOKEN`).
+- **Safety / Readiness Ledger**: 12 canonical conditions inspected from source and certified closed.
+- **Remaining Security Findings**: **0**
+- **Remaining Architecture Findings**: **0**
+- **Remaining Material Evidence Findings**: **0**
+- **Final Independent Verdict**: **`A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED`**
 
-**FINAL STATUS**: `A12B2C5U33BR_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW`
+### 6.1 Seal Semantics & Boundaries
+
+The canonical seal recorded here means **ONLY**:
+> The Production Operational Authentication Foundation is implemented, offline tested, independently reviewed, internally consistent, and canonically approved as the authentication foundation for future bounded runtime integration.
+
+The seal **DOES NOT** mean:
+- Cloudflare Access provisioned in live infrastructure (`false`)
+- Real Access application created (`false`)
+- Production hostname protected by Access (`false`)
+- Production operational identity enrolled (`false`)
+- Operational superadmin enrolled (`false`)
+- Worker router integrated with Access auth (`false`)
+- Operational ingress auth ready (`false`)
+- Production auth live verified (`false`)
+- Live JWKS rotation verified (`false`)
+- D1 replay backend production bound (`false`)
+- D1 database provisioned (`false`)
+- D1 concurrency certified (`false`)
+- Human trust anchor provisioned (`false`)
+- Source provenance trust anchor provisioned (`false`)
+- Canary live execution enabled (`false`)
+- Production routing enabled (`false`)
+- Production success path certified (`false`)
+
+### 6.2 Canonical Repair Lineage
+
+| Milestone | Commit SHA | Description |
+|---|---|---|
+| **Original Implementation** | `8236c435e3238f6eaea059f925be6f27b2eea817` | Initial 5U.3.3B operational auth foundation |
+| **Substantive Security Repair** | `5bca1ff5b15e5f0716ab99ded68c64beb615dd11` | Canonical trust-root removal, error taxonomy, registry redaction |
+| **Evidence Normalization** | `1ad60743b7bf1a94de623fecece9cde83717a833` | Exact 12 canonical gates restoration, timestamp and email unit normalization |
+| **Final JWS Evidence Correction** | `48178761a6c1c5f258e27785527417ed0bfe9a02` | Reconciled `ERR_JWS_INVALID` mapping to `MALFORMED_TOKEN` |
+| **Approved Canonical Seal** | `48178761a6c1c5f258e27785527417ed0bfe9a02` | Canonical approval and seal recorded in evidence |
+
+---
+
+## 7. Phase Status
+
+**FINAL STATUS**: `A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED`
