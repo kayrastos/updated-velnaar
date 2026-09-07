@@ -1,21 +1,34 @@
 /**
  * @file tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts
- * @description Phase A.12B.2C-5U.3.3B Production Operational Authentication Foundation Security Tests
+ * @description Phase A.12B.2C-5U.3.3B-R Production Operational Authentication Foundation Security Tests
  *
  * Mandate: Offline cryptographic certification of Cloudflare Access JWT verification,
  * fail-closed operational identity validation, and operational-superadmin registry foundation.
  *
- * STRICT PROHIBITIONS:
- * - ZERO network calls.
- * - ZERO provider calls.
- * - ZERO D1 calls.
- * - ZERO real Cloudflare Access JWKS calls.
+ * HARDENED REPAIR MANDATES (5U.3.3B-R):
+ * - Zero caller-injected trust root in canonical production wrapper.
+ * - Genuine mocked-fetch offline test for canonical remote JWKS resolution.
+ * - True local JWKS unknown-kid test distinct from wrong-public-key test.
+ * - Granular JWKS/internal error classification (JWKS_UNAVAILABLE, AUTH_INTERNAL_FAILURE).
+ * - Full JWT claims stripped from exported result.
+ * - Static redaction of registry duplicate-subject diagnostic reason.
+ * - Documented Cloudflare service-token shape rejection.
+ * - ES256 and PS256 explicit algorithm rejection.
+ * - Array audience positive and negative tests.
+ * - Temporal relationship hardening (exp <= iat, nbf > exp).
+ * - Instrumented fetch spy and source-inspected provider/D1 isolation (no vacuous assertions).
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
-import { generateKeyPair, SignJWT, exportJWK, createLocalJWKSet, type GenerateKeyPairResult } from 'jose';
+import {
+  generateKeyPair,
+  SignJWT,
+  exportJWK,
+  createLocalJWKSet,
+  type GenerateKeyPairResult,
+} from 'jose';
 import {
   verifyCloudflareAccessIdentity,
   verifyCloudflareAccessRequest,
@@ -33,6 +46,7 @@ import {
   CF_ACCESS_JWT_ASSERTION_HEADER_CANONICAL,
   type OperationalSuperAdminEntry,
   type ValidatedCloudflareAccessConfig,
+  type OperationalAuthFailure,
 } from '../../worker/auth/cloudflareAccessOperationalAuth';
 import { AuthContextService } from '../../worker/auth/authContext';
 import {
@@ -56,7 +70,7 @@ import {
 } from '../../worker/ai/canary/d1AuthorizationReplayBackend';
 import { DEEPSEEK_FIRST_PROVIDER_STRATEGY } from '../../worker/ai/canary/deepSeekFirstProviderStrategy';
 
-describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundation', () => {
+describe('Phase A.12B.2C-5U.3.3B-R: Hardened Production Operational Authentication Foundation', () => {
   const TEST_TEAM_DOMAIN = 'https://velnar-test.cloudflareaccess.com';
   const TEST_AUD = 'test-aud-64char-hex-operational-canary-lane-1234567890abcdef12345678';
   const TEST_CONFIG: ValidatedCloudflareAccessConfig = {
@@ -68,11 +82,18 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
   let primaryKeyPair: GenerateKeyPairResult;
   let secondaryKeyPair: GenerateKeyPairResult;
+  let attackerKeyPair: GenerateKeyPairResult;
 
   beforeAll(async () => {
     // Generate isolated in-memory RSA keypairs for offline testing (strictly zero external network)
     primaryKeyPair = await generateKeyPair('RS256');
     secondaryKeyPair = await generateKeyPair('RS256');
+    attackerKeyPair = await generateKeyPair('RS256');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   /**
@@ -88,6 +109,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
     iat?: number | null;
     nbf?: number | null;
     alg?: string;
+    kid?: string;
     key?: any;
     omitSub?: boolean;
     omitEmail?: boolean;
@@ -114,7 +136,11 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
     }
 
     const signer = new SignJWT(payload);
-    signer.setProtectedHeader({ alg });
+    const protectedHeader: Record<string, unknown> = { alg };
+    if (overrides.kid) {
+      protectedHeader.kid = overrides.kid;
+    }
+    signer.setProtectedHeader(protectedHeader as any);
 
     if (overrides.iss !== null) {
       signer.setIssuer(overrides.iss !== undefined ? overrides.iss : TEST_TEAM_DOMAIN);
@@ -149,6 +175,9 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
         expect(result.principal.email).toBe('ops.admin@velnar.io');
         expect(result.principal.authSource).toBe('CLOUDFLARE_ACCESS');
         expect(result.principal.isSuperAdmin).toBe(false);
+        // Repair 6: Assert full JWT claims are NOT exposed in result
+        expect('claims' in result).toBe(false);
+        expect((result as any).claims).toBeUndefined();
       }
     });
 
@@ -156,14 +185,14 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const resNull = await verifyCloudflareAccessIdentity(null, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(resNull.success).toBe(false);
       if (!resNull.success) {
-        expect((resNull as any).code).toBe(OperationalAuthErrorCode.MISSING_TOKEN);
-        expect((resNull as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.MISSING_TOKEN);
+        expect((resNull as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.MISSING_TOKEN);
+        expect((resNull as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.MISSING_TOKEN);
       }
 
       const resUndef = await verifyCloudflareAccessIdentity(undefined, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(resUndef.success).toBe(false);
       if (!resUndef.success) {
-        expect((resUndef as any).code).toBe(OperationalAuthErrorCode.MISSING_TOKEN);
+        expect((resUndef as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.MISSING_TOKEN);
       }
     });
 
@@ -171,18 +200,17 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const resEmpty = await verifyCloudflareAccessIdentity('', TEST_CONFIG, primaryKeyPair.publicKey);
       expect(resEmpty.success).toBe(false);
       if (!resEmpty.success) {
-        expect((resEmpty as any).code).toBe(OperationalAuthErrorCode.MISSING_TOKEN);
+        expect((resEmpty as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.MISSING_TOKEN);
       }
 
       const resWhitespace = await verifyCloudflareAccessIdentity('   ', TEST_CONFIG, primaryKeyPair.publicKey);
       expect(resWhitespace.success).toBe(false);
       if (!resWhitespace.success) {
-        expect((resWhitespace as any).code).toBe(OperationalAuthErrorCode.MISSING_TOKEN);
+        expect((resWhitespace as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.MISSING_TOKEN);
       }
     });
 
     it('4. oversized token rejected (> 16 KiB ceiling)', async () => {
-      // Build an oversized JWT payload exceeding MAX_ACCESS_JWT_LENGTH_BYTES (16,384 bytes)
       const hugePadding = 'A'.repeat(MAX_ACCESS_JWT_LENGTH_BYTES);
       const token = await createSyntheticAccessJwt({
         extraClaims: { padding: hugePadding },
@@ -192,8 +220,8 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.TOKEN_TOO_LARGE);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.TOKEN_TOO_LARGE);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.TOKEN_TOO_LARGE);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.TOKEN_TOO_LARGE);
       }
     });
 
@@ -211,7 +239,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
         const result = await verifyCloudflareAccessIdentity(malformed, TEST_CONFIG, primaryKeyPair.publicKey);
         expect(result.success, `Malformed case should fail: ${malformed}`).toBe(false);
         if (!result.success) {
-          expect((result as any).code).toBe(OperationalAuthErrorCode.MALFORMED_TOKEN);
+          expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.MALFORMED_TOKEN);
         }
       }
     });
@@ -225,8 +253,8 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const result = await verifyCloudflareAccessIdentity(tamperedToken, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.SIGNATURE_INVALID);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.SIGNATURE_INVALID);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.SIGNATURE_INVALID);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.SIGNATURE_INVALID);
       }
     });
 
@@ -239,18 +267,38 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const result = await verifyCloudflareAccessIdentity(tamperedToken, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.SIGNATURE_INVALID);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.SIGNATURE_INVALID);
       }
     });
 
-    it('8. unknown signing key / kid rejected', async () => {
-      // Signed with primary key, verified against secondary key
+    it('8a. WRONG_PUBLIC_KEY_REJECTED (direct public key mismatch)', async () => {
+      // Signed with primary key, verified directly against secondary key
       const token = await createSyntheticAccessJwt({ key: primaryKeyPair.privateKey });
       const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, secondaryKeyPair.publicKey);
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.SIGNATURE_INVALID);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.SIGNATURE_INVALID);
+      }
+    });
+
+    it('8b. UNKNOWN_KID_LOCAL_JWKS_REJECTED (Repair 3: true local JWKS kid selection test)', async () => {
+      // Local JWKS contains key A with kid='known-key-01'
+      const jwkA = await exportJWK(primaryKeyPair.publicKey);
+      jwkA.alg = 'RS256';
+      jwkA.kid = 'known-key-01';
+      const localJwks = createLocalJWKSet({ keys: [jwkA] });
+
+      // Token signed with secondary key with kid='unknown-key-99'
+      const token = await createSyntheticAccessJwt({
+        key: secondaryKeyPair.privateKey,
+        kid: 'unknown-key-99',
+      });
+
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, localJwks);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.SIGNATURE_INVALID);
       }
     });
 
@@ -271,8 +319,50 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const result = await verifyCloudflareAccessIdentity(hmacToken, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.ALGORITHM_NOT_ALLOWED);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.ALGORITHM_NOT_ALLOWED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.ALGORITHM_NOT_ALLOWED);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.ALGORITHM_NOT_ALLOWED);
+      }
+    });
+
+    it('9b. ES256 algorithm rejected (Repair 12)', async () => {
+      const esKp = await generateKeyPair('ES256');
+      const esJwt = await new SignJWT({
+        sub: 'sub-ops-admin-01',
+        email: 'ops.admin@velnar.io',
+        type: 'app',
+      })
+        .setProtectedHeader({ alg: 'ES256' })
+        .setIssuer(TEST_TEAM_DOMAIN)
+        .setAudience(TEST_AUD)
+        .setIssuedAt()
+        .setExpirationTime('1h')
+        .sign(esKp.privateKey);
+
+      const result = await verifyCloudflareAccessIdentity(esJwt, TEST_CONFIG, esKp.publicKey);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.ALGORITHM_NOT_ALLOWED);
+      }
+    });
+
+    it('9c. PS256 algorithm rejected (Repair 12)', async () => {
+      const psKp = await generateKeyPair('PS256');
+      const psJwt = await new SignJWT({
+        sub: 'sub-ops-admin-01',
+        email: 'ops.admin@velnar.io',
+        type: 'app',
+      })
+        .setProtectedHeader({ alg: 'PS256' })
+        .setIssuer(TEST_TEAM_DOMAIN)
+        .setAudience(TEST_AUD)
+        .setIssuedAt()
+        .setExpirationTime('1h')
+        .sign(psKp.privateKey);
+
+      const result = await verifyCloudflareAccessIdentity(psJwt, TEST_CONFIG, psKp.publicKey);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.ALGORITHM_NOT_ALLOWED);
       }
     });
 
@@ -292,7 +382,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const result = await verifyCloudflareAccessIdentity(unsignedToken, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.ALGORITHM_NOT_ALLOWED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.ALGORITHM_NOT_ALLOWED);
       }
     });
 
@@ -302,19 +392,44 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.ISSUER_MISMATCH);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.ISSUER_MISMATCH);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.ISSUER_MISMATCH);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.ISSUER_MISMATCH);
       }
     });
 
-    it('12. wrong audience rejected', async () => {
+    it('12. wrong audience rejected (string audience)', async () => {
       const token = await createSyntheticAccessJwt({ aud: 'wrong-audience-uuid-value' });
       const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, primaryKeyPair.publicKey);
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.AUDIENCE_MISMATCH);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.AUDIENCE_MISMATCH);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.AUDIENCE_MISMATCH);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.AUDIENCE_MISMATCH);
+      }
+    });
+
+    it('12b. array audience positive test (Repair 13)', async () => {
+      // Cloudflare Access may return aud as array of client IDs
+      const token = await createSyntheticAccessJwt({
+        aud: ['unrelated-aud-client-id', TEST_AUD],
+      });
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, primaryKeyPair.publicKey);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.principal.subject).toBe('sub-ops-admin-01');
+      }
+    });
+
+    it('12c. array audience negative test (Repair 13)', async () => {
+      const token = await createSyntheticAccessJwt({
+        aud: ['unrelated-aud-1', 'unrelated-aud-2'],
+      });
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, primaryKeyPair.publicKey);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.AUDIENCE_MISMATCH);
       }
     });
 
@@ -328,8 +443,8 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.TOKEN_EXPIRED);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.TOKEN_EXPIRED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.TOKEN_EXPIRED);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.TOKEN_EXPIRED);
       }
     });
 
@@ -342,8 +457,8 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.TOKEN_NOT_YET_VALID);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.TOKEN_NOT_YET_VALID);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.TOKEN_NOT_YET_VALID);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.TOKEN_NOT_YET_VALID);
       }
     });
 
@@ -356,8 +471,37 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.IAT_INVALID);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.IAT_INVALID);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.IAT_INVALID);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.IAT_INVALID);
+      }
+    });
+
+    it('15b. temporal relationship hardening: exp <= iat rejected (Repair 15)', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      const token = await createSyntheticAccessJwt({
+        iat: now,
+        exp: now, // exp === iat (invalid lifecycle)
+      });
+
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, primaryKeyPair.publicKey);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.IAT_INVALID);
+      }
+    });
+
+    it('15c. temporal relationship hardening: nbf > exp rejected (Repair 15)', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      const token = await createSyntheticAccessJwt({
+        iat: now,
+        exp: now + 600,
+        nbf: now + 1200, // nbf after exp
+      });
+
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, primaryKeyPair.publicKey);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.TOKEN_NOT_YET_VALID);
       }
     });
 
@@ -367,7 +511,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.TOKEN_EXPIRED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.TOKEN_EXPIRED);
       }
     });
 
@@ -377,7 +521,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.IAT_INVALID);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.IAT_INVALID);
       }
     });
 
@@ -387,8 +531,8 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.HUMAN_SUBJECT_REQUIRED);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.HUMAN_SUBJECT_REQUIRED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.HUMAN_SUBJECT_REQUIRED);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.HUMAN_SUBJECT_REQUIRED);
       }
     });
 
@@ -398,7 +542,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.HUMAN_SUBJECT_REQUIRED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.HUMAN_SUBJECT_REQUIRED);
       }
     });
 
@@ -408,12 +552,12 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.EMAIL_REQUIRED);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.EMAIL_REQUIRED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.EMAIL_REQUIRED);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.EMAIL_REQUIRED);
       }
     });
 
-    it('21. invalid email rejected', async () => {
+    it('21. invalid email rejected (conservative operational syntax validation)', async () => {
       const invalidEmails = ['not-an-email', 'missing@domain', '@missinguser.com', 'has spaces@domain.com'];
       for (const email of invalidEmails) {
         const token = await createSyntheticAccessJwt({ email });
@@ -421,7 +565,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
         expect(result.success, `Invalid email should be rejected: ${email}`).toBe(false);
         if (!result.success) {
-          expect((result as any).code).toBe(OperationalAuthErrorCode.EMAIL_REQUIRED);
+          expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.EMAIL_REQUIRED);
         }
       }
     });
@@ -434,20 +578,37 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
         expect(result.success, `Invalid type should be rejected: ${badType}`).toBe(false);
         if (!result.success) {
-          expect((result as any).code).toBe(OperationalAuthErrorCode.TOKEN_TYPE_INVALID);
+          expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.TOKEN_TYPE_INVALID);
         }
       }
     });
 
-    it('23. service-token shape rejected', async () => {
-      // Cloudflare Access service token shapes
+    it('23a. documented Cloudflare service-token shape rejected (Repair 9: sub="" & no email)', async () => {
+      // Documented Cloudflare service-token application JWT shape: type=app, sub="", common_name=client_id, no email
+      const documentedServiceToken = await createSyntheticAccessJwt({
+        sub: '',
+        omitEmail: true,
+        extraClaims: { common_name: 'service-token-app-id-12345' },
+      });
+      const result = await verifyCloudflareAccessIdentity(documentedServiceToken, TEST_CONFIG, primaryKeyPair.publicKey);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect([
+          OperationalAuthErrorCode.HUMAN_SUBJECT_REQUIRED,
+          OperationalAuthErrorCode.EMAIL_REQUIRED,
+          OperationalAuthErrorCode.TOKEN_TYPE_INVALID,
+        ]).toContain((result as OperationalAuthFailure).code);
+      }
+    });
+
+    it('23b. defensive service-token heuristics rejected (Repair 9)', async () => {
       const serviceToken1 = await createSyntheticAccessJwt({
         extraClaims: { identity_type: 'service_token' },
       });
       const res1 = await verifyCloudflareAccessIdentity(serviceToken1, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(res1.success).toBe(false);
       if (!res1.success) {
-        expect((res1 as any).code).toBe(OperationalAuthErrorCode.TOKEN_TYPE_INVALID);
+        expect((res1 as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.TOKEN_TYPE_INVALID);
       }
 
       const serviceToken2 = await createSyntheticAccessJwt({
@@ -456,18 +617,11 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const res2 = await verifyCloudflareAccessIdentity(serviceToken2, TEST_CONFIG, primaryKeyPair.publicKey);
       expect(res2.success).toBe(false);
       if (!res2.success) {
-        expect((res2 as any).code).toBe(OperationalAuthErrorCode.TOKEN_TYPE_INVALID);
+        expect((res2 as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.TOKEN_TYPE_INVALID);
       }
-
-      const serviceToken3 = await createSyntheticAccessJwt({
-        omitEmail: true,
-        extraClaims: { common_name: 'service-token-app-id' },
-      });
-      const res3 = await verifyCloudflareAccessIdentity(serviceToken3, TEST_CONFIG, primaryKeyPair.publicKey);
-      expect(res3.success).toBe(false);
     });
 
-    it('23b. request header extraction helper works for Request instance', async () => {
+    it('23c. request header extraction helper works for Request instance', async () => {
       const token = await createSyntheticAccessJwt();
       const request = new Request('https://worker.velnar.io/api/ops/canary/deepseek-certification', {
         headers: {
@@ -484,13 +638,93 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
   });
 
   // ==========================================================================
+  // SECTION A-REPAIR: THROWING RESOLVER & ERROR CLASSIFICATION (Repairs 4 & 5)
+  // ==========================================================================
+  describe('Group A-Repair: Throwing Resolver & Error Classification (Repairs 4 & 5)', () => {
+    it('throws generic Error -> AUTH_INTERNAL_FAILURE', async () => {
+      const token = await createSyntheticAccessJwt();
+      const throwingResolver = async () => {
+        throw new Error('Unexpected internal explosion');
+      };
+
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, throwingResolver as any);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.AUTH_INTERNAL_FAILURE);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.AUTH_INTERNAL_FAILURE);
+      }
+    });
+
+    it('throws ERR_JWKS_TIMEOUT -> JWKS_UNAVAILABLE', async () => {
+      const token = await createSyntheticAccessJwt();
+      const timeoutResolver = async () => {
+        const err = new Error('JWKS timeout');
+        (err as any).code = 'ERR_JWKS_TIMEOUT';
+        throw err;
+      };
+
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, timeoutResolver as any);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.JWKS_UNAVAILABLE);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.JWKS_UNAVAILABLE);
+      }
+    });
+
+    it('throws ERR_JWKS_INVALID -> AUTH_INTERNAL_FAILURE', async () => {
+      const token = await createSyntheticAccessJwt();
+      const invalidJwksResolver = async () => {
+        const err = new Error('JWKS invalid');
+        (err as any).code = 'ERR_JWKS_INVALID';
+        throw err;
+      };
+
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, invalidJwksResolver as any);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.AUTH_INTERNAL_FAILURE);
+      }
+    });
+
+    it('network fetch failure -> JWKS_UNAVAILABLE', async () => {
+      const token = await createSyntheticAccessJwt();
+      const networkErrorResolver = async () => {
+        throw new TypeError('fetch failed: connect ECONNREFUSED');
+      };
+
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, networkErrorResolver as any);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.JWKS_UNAVAILABLE);
+      }
+    });
+
+    it('ERR_JOSE_GENERIC misclassification prevented (fails closed as AUTH_INTERNAL_FAILURE)', async () => {
+      const token = await createSyntheticAccessJwt();
+      const genericJoseResolver = async () => {
+        const err = new Error('Generic JOSE failure');
+        (err as any).code = 'ERR_JOSE_GENERIC';
+        throw err;
+      };
+
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, genericJoseResolver as any);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        // Must NOT become ALGORITHM_NOT_ALLOWED
+        expect((result as OperationalAuthFailure).code).not.toBe(OperationalAuthErrorCode.ALGORITHM_NOT_ALLOWED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.AUTH_INTERNAL_FAILURE);
+      }
+    });
+  });
+
+  // ==========================================================================
   // SECTION B: ENVIRONMENT CONFIGURATION VALIDATION
   // ==========================================================================
   describe('Group B: Cloudflare Access Environment Configuration Validation', () => {
     it('24. missing team domain fails closed', () => {
       const result = validateCloudflareAccessConfig({ CLOUDFLARE_ACCESS_AUD: TEST_AUD });
-      expect((result as any).ok).toBe(false);
-      if (!(result as any).ok) {
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
         expect((result as any).code).toBe(OperationalAuthErrorCode.CONFIG_NOT_READY);
       }
     });
@@ -500,8 +734,8 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
         CLOUDFLARE_ACCESS_TEAM_DOMAIN: 'http://velnar-test.cloudflareaccess.com',
         CLOUDFLARE_ACCESS_AUD: TEST_AUD,
       });
-      expect((result as any).ok).toBe(false);
-      if (!(result as any).ok) {
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
         expect((result as any).code).toBe(OperationalAuthErrorCode.CONFIG_NOT_READY);
       }
     });
@@ -511,8 +745,8 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
         CLOUDFLARE_ACCESS_TEAM_DOMAIN: 'https://evilcloudflareaccess.com',
         CLOUDFLARE_ACCESS_AUD: TEST_AUD,
       });
-      expect((result as any).ok).toBe(false);
-      if (!(result as any).ok) {
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
         expect((result as any).code).toBe(OperationalAuthErrorCode.CONFIG_NOT_READY);
       }
     });
@@ -521,7 +755,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const confusingDomains = [
         'https://velnar-test.cloudflareaccess.com.attacker.com',
         'https://velnar.cloudflareaccess.com.evil.io',
-        'https://sub.sub.velnar-test.cloudflareaccess.com', // multi-level subdomain confusion
+        'https://sub.sub.velnar-test.cloudflareaccess.com',
         'https://.cloudflareaccess.com',
       ];
 
@@ -530,7 +764,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
           CLOUDFLARE_ACCESS_TEAM_DOMAIN: domain,
           CLOUDFLARE_ACCESS_AUD: TEST_AUD,
         });
-        expect((result as any).ok, `Domain should be rejected: ${domain}`).toBe(false);
+        expect(result.ok, `Domain should be rejected: ${domain}`).toBe(false);
       }
     });
 
@@ -548,7 +782,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
           CLOUDFLARE_ACCESS_TEAM_DOMAIN: domain,
           CLOUDFLARE_ACCESS_AUD: TEST_AUD,
         });
-        expect((result as any).ok, `Should reject URI with query/fragment/path/port: ${domain}`).toBe(false);
+        expect(result.ok, `Should reject URI with query/fragment/path/port: ${domain}`).toBe(false);
       }
     });
 
@@ -556,8 +790,8 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       const result = validateCloudflareAccessConfig({
         CLOUDFLARE_ACCESS_TEAM_DOMAIN: TEST_TEAM_DOMAIN,
       });
-      expect((result as any).ok).toBe(false);
-      if (!(result as any).ok) {
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
         expect((result as any).code).toBe(OperationalAuthErrorCode.CONFIG_NOT_READY);
       }
     });
@@ -567,13 +801,13 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
         CLOUDFLARE_ACCESS_TEAM_DOMAIN: TEST_TEAM_DOMAIN,
         CLOUDFLARE_ACCESS_AUD: '',
       });
-      expect((resEmpty as any).ok).toBe(false);
+      expect(resEmpty.ok).toBe(false);
 
       const resWhitespace = validateCloudflareAccessConfig({
         CLOUDFLARE_ACCESS_TEAM_DOMAIN: TEST_TEAM_DOMAIN,
         CLOUDFLARE_ACCESS_AUD: '   ',
       });
-      expect((resWhitespace as any).ok).toBe(false);
+      expect(resWhitespace.ok).toBe(false);
     });
 
     it('30b. valid configuration normalizes canonical origin and certs URL', () => {
@@ -581,12 +815,12 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
         CLOUDFLARE_ACCESS_TEAM_DOMAIN: 'https://velnar-test.cloudflareaccess.com/',
         CLOUDFLARE_ACCESS_AUD: TEST_AUD,
       });
-      expect((result as any).ok).toBe(true);
-      if ((result as any).ok) {
-        expect((result as any).config.teamDomain).toBe(TEST_TEAM_DOMAIN);
-        expect((result as any).config.expectedIssuer).toBe(TEST_TEAM_DOMAIN);
-        expect((result as any).config.expectedAudience).toBe(TEST_AUD);
-        expect((result as any).config.jwksUrl).toBe('https://velnar-test.cloudflareaccess.com/cdn-cgi/access/certs');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.config.teamDomain).toBe(TEST_TEAM_DOMAIN);
+        expect(result.config.expectedIssuer).toBe(TEST_TEAM_DOMAIN);
+        expect(result.config.expectedAudience).toBe(TEST_AUD);
+        expect(result.config.jwksUrl).toBe('https://velnar-test.cloudflareaccess.com/cdn-cgi/access/certs');
       }
     });
   });
@@ -607,8 +841,8 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.SUPERADMIN_REGISTRY_EMPTY);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.SUPERADMIN_REGISTRY_EMPTY);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.SUPERADMIN_REGISTRY_EMPTY);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.SUPERADMIN_REGISTRY_EMPTY);
       }
     });
 
@@ -625,7 +859,7 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.SUPERADMIN_NOT_AUTHORIZED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.SUPERADMIN_NOT_AUTHORIZED);
       }
     });
 
@@ -637,13 +871,12 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
           status: 'active',
         },
       ];
-      // Attacker has matching email claim but different subject
       const principal = { subject: 'attacker-subject-uuid-2', email: 'founder@velnar.io' };
       const result = authorizeOperationalPrincipalAgainstRegistry(principal, syntheticRegistry);
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.SUPERADMIN_NOT_AUTHORIZED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.SUPERADMIN_NOT_AUTHORIZED);
       }
     });
 
@@ -655,14 +888,13 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
           status: 'active',
         },
       ];
-      // Subject matches, but email does not match enrolled expected email
       const principal = { subject: 'authorized-subject-uuid-1', email: 'hijacked@other.com' };
       const result = authorizeOperationalPrincipalAgainstRegistry(principal, syntheticRegistry);
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.IDENTITY_BINDING_MISMATCH);
-        expect((result as any).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.IDENTITY_BINDING_MISMATCH);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.IDENTITY_BINDING_MISMATCH);
+        expect((result as OperationalAuthFailure).message).toBe(OPERATIONAL_AUTH_ERROR_MESSAGES.IDENTITY_BINDING_MISMATCH);
       }
     });
 
@@ -698,66 +930,135 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.SUPERADMIN_NOT_AUTHORIZED);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.SUPERADMIN_NOT_AUTHORIZED);
       }
     });
 
-    it('38. duplicate subject registry fails validation', () => {
+    it('38. duplicate subject registry fails validation & reason is strictly redacted (Repair 7)', () => {
+      const duplicateSubjectValue = 'sensitive-subject-identifier-007';
       const duplicateRegistry: readonly OperationalSuperAdminEntry[] = [
         {
-          accessSubject: 'duplicate-subject-1',
+          accessSubject: duplicateSubjectValue,
           expectedEmail: 'first@velnar.io',
           status: 'active',
         },
         {
-          accessSubject: 'duplicate-subject-1',
+          accessSubject: duplicateSubjectValue,
           expectedEmail: 'second@velnar.io',
           status: 'active',
         },
       ];
 
       const validation = validateSuperAdminRegistry(duplicateRegistry);
-      expect((validation as any).valid).toBe(false);
-      if (!(validation as any).valid) {
-        expect((validation as any).reason).toContain('Duplicate accessSubject');
+      expect(validation.valid).toBe(false);
+      if (!validation.valid) {
+        // Assert static reason
+        expect((validation as any).reason).toBe('Duplicate accessSubject detected in registry');
+        // Assert duplicate subject string is strictly redacted
+        expect((validation as any).reason).not.toContain(duplicateSubjectValue);
       }
 
-      const principal = { subject: 'duplicate-subject-1', email: 'first@velnar.io' };
+      const principal = { subject: duplicateSubjectValue, email: 'first@velnar.io' };
       const authResult = authorizeOperationalPrincipalAgainstRegistry(principal, duplicateRegistry);
       expect(authResult.success).toBe(false);
     });
 
-    it('39. caller cannot pass isSuperAdmin=true to canonical production wrapper', async () => {
-      const token = await createSyntheticAccessJwt();
+    it('39a. canonical production wrapper API arity confirms ZERO resolver parameters (Repair 1)', () => {
+      // Signature must be strictly (tokenOrRequest, env)
+      expect(resolveCanonicalProductionOperationalPrincipal.length).toBe(2);
+    });
+
+    it('39b. canonical production wrapper: offline positive path with mocked JWKS (Repair 2)', async () => {
+      const canonicalJwk = await exportJWK(primaryKeyPair.publicKey);
+      canonicalJwk.alg = 'RS256';
+      canonicalJwk.kid = 'canonical-key-01';
+
+      // Mock global fetch strictly for synthetic JWKS endpoint
+      const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+        const urlStr = input.toString();
+        if (urlStr === 'https://velnar-test.cloudflareaccess.com/cdn-cgi/access/certs') {
+          return new Response(JSON.stringify({ keys: [canonicalJwk] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        return new Response('Not found', { status: 404 });
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const token = await createSyntheticAccessJwt({ kid: 'canonical-key-01' });
       const env = {
         ENVIRONMENT: 'production',
         CLOUDFLARE_ACCESS_TEAM_DOMAIN: TEST_TEAM_DOMAIN,
         CLOUDFLARE_ACCESS_AUD: TEST_AUD,
       };
 
-      // Canonical production wrapper queries PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY internally
-      // and cannot receive custom registry or superadmin override from caller
-      const result = await resolveCanonicalProductionOperationalPrincipal(
-        token,
-        env,
-        primaryKeyPair.publicKey
-      );
+      const result = await resolveCanonicalProductionOperationalPrincipal(token, env);
 
-      // Must fail closed because canonical registry is empty
+      // Cryptographic verification succeeded; authorization fails because canonical registry is empty
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect((result as any).code).toBe(OperationalAuthErrorCode.SUPERADMIN_REGISTRY_EMPTY);
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.SUPERADMIN_REGISTRY_EMPTY);
+      }
+
+      // Assert fetch was called only for the expected endpoint
+      expect(fetchSpy).toHaveBeenCalled();
+      expect(fetchSpy.mock.calls.length).toBe(1);
+      expect(fetchSpy.mock.calls[0][0].toString()).toBe(
+        'https://velnar-test.cloudflareaccess.com/cdn-cgi/access/certs'
+      );
+    });
+
+    it('39c. attacker trust-root substitution regression: third argument strictly ignored (Repairs 1 & 2)', async () => {
+      const canonicalJwk = await exportJWK(primaryKeyPair.publicKey);
+      canonicalJwk.alg = 'RS256';
+      canonicalJwk.kid = 'canonical-key-01';
+
+      // Canonical mocked JWKS contains ONLY canonical public key
+      const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+        const urlStr = input.toString();
+        if (urlStr === 'https://velnar-test.cloudflareaccess.com/cdn-cgi/access/certs') {
+          return new Response(JSON.stringify({ keys: [canonicalJwk] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        return new Response('Not found', { status: 404 });
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      // Forged token signed with attacker private key
+      const attackerToken = await createSyntheticAccessJwt({
+        key: attackerKeyPair.privateKey,
+        kid: 'attacker-key-66',
+      });
+
+      const env = {
+        ENVIRONMENT: 'production',
+        CLOUDFLARE_ACCESS_TEAM_DOMAIN: TEST_TEAM_DOMAIN,
+        CLOUDFLARE_ACCESS_AUD: TEST_AUD,
+      };
+
+      // Attacker attempts to inject custom resolver via untyped JavaScript call
+      const attackerResolver = attackerKeyPair.publicKey;
+      const result = await (resolveCanonicalProductionOperationalPrincipal as any)(
+        attackerToken,
+        env,
+        attackerResolver
+      );
+
+      // Must fail closed because attacker resolver is ignored and token fails against canonical JWKS
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect((result as OperationalAuthFailure).code).toBe(OperationalAuthErrorCode.SIGNATURE_INVALID);
       }
     });
 
     it('40. tenant OWNER role cannot influence operational superadmin result', async () => {
-      // Prove complete separation of trust domains: tenant role in session cannot grant operational authority
       const tenantUser = AuthContextService.resolveSessionUser('Bearer dev_owner_token', 'development');
       expect(tenantUser).not.toBeNull();
       expect(tenantUser?.memberships[0].role).toBe('OWNER');
 
-      // Passing tenant identity to operational authorization has zero effect:
-      // Operational principal does not accept tenant roles
       const syntheticRegistry: readonly OperationalSuperAdminEntry[] = [];
       const operationalAttempt = authorizeOperationalPrincipalAgainstRegistry(
         { subject: tenantUser!.userId, email: tenantUser!.email },
@@ -781,25 +1082,42 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
   });
 
   // ==========================================================================
-  // SECTION D: ISOLATION & NON-REGRESSION
+  // SECTION D: ISOLATION & NON-REGRESSION (Repair 11: Instrumented Verification)
   // ==========================================================================
-  describe('Group D: Isolation, Non-Regression & Zero-Action Verification', () => {
-    it('42. zero provider calls', () => {
-      // Verified strictly offline
-      expect(true).toBe(true);
+  describe('Group D: Isolation, Non-Regression & Instrumented Verification', () => {
+    it('42. instrumented network isolation: pure low-level verifiers execute zero fetch calls', async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const token = await createSyntheticAccessJwt();
+      const result = await verifyCloudflareAccessIdentity(token, TEST_CONFIG, primaryKeyPair.publicKey);
+
+      expect(result.success).toBe(true);
+      // Instrumented check: low-level offline verification MUST perform 0 network fetches
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it('43. zero D1 calls', () => {
-      // Verified strictly offline
-      expect(true).toBe(true);
+    it('43. source-inspected provider isolation: operational auth module has zero AI provider references', () => {
+      const authModulePath = path.resolve(__dirname, '../../worker/auth/cloudflareAccessOperationalAuth.ts');
+      const content = fs.readFileSync(authModulePath, 'utf8');
+
+      expect(content).not.toContain('DEEPSEEK_API_KEY');
+      expect(content).not.toContain('GEMINI_API_KEY');
+      expect(content).not.toContain('KIMI_API_KEY');
+      expect(content).not.toContain('api.deepseek.com');
+      expect(content).not.toContain('generativelanguage.googleapis.com');
     });
 
-    it('44. zero production network calls', () => {
-      // Verified strictly offline with local in-memory RSA keypairs
-      expect(true).toBe(true);
+    it('44. source-inspected D1 isolation: operational auth module has zero D1 database references', () => {
+      const authModulePath = path.resolve(__dirname, '../../worker/auth/cloudflareAccessOperationalAuth.ts');
+      const content = fs.readFileSync(authModulePath, 'utf8');
+
+      expect(content).not.toContain('D1Database');
+      expect(content).not.toContain('.prepare(');
+      expect(content).not.toContain('d1AuthorizationReplayBackend');
     });
 
-    it('45. worker/index.ts has zero integration with operational access auth in 5U.3.3B', () => {
+    it('45. worker/index.ts has zero integration with operational access auth in 5U.3.3B-R', () => {
       const workerIndexPath = path.resolve(__dirname, '../../worker/index.ts');
       const workerIndexContent = fs.readFileSync(workerIndexPath, 'utf8');
 
@@ -831,18 +1149,30 @@ describe('Phase A.12B.2C-5U.3.3B: Production Operational Authentication Foundati
       expect(PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY).toHaveLength(0);
     });
 
-    it('49. all 11 canary readiness and live gates remain strictly false', () => {
+    it('49. all inspected relevant production/readiness/live conditions remain closed (Repair 10: 12 conditions)', () => {
+      // 1. Operational Route Enabled
       expect(PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED).toBe(false);
+      // 2. Operational Ingress Auth Ready
       expect(PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY).toBe(false);
+      // 3. Canary Live Execution Enabled
       expect(CANARY_LIVE_EXECUTION_ENABLED).toBe(false);
+      // 4. Canary Live Execution State Blocked
       expect(CANARY_LIVE_EXECUTION_STATE as string).not.toBe('LIVE_EXECUTION_ALLOWED');
+      // 5. Guarded Source Attestation Ready
       expect(GUARDED_SOURCE_ATTESTATION_READY).toBe(false);
+      // 6. Guarded Human Auth Attestation Ready
       expect(GUARDED_HUMAN_AUTH_ATTESTATION_READY).toBe(false);
+      // 7. Production Authority Trust Anchor Provisioned
       expect(PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED).toBe(false);
+      // 8. Runtime Source Provenance Trust Anchor Provisioned
       expect(RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED).toBe(false);
+      // 9. D1 Replay Backend Production Bound
       expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(false);
+      // 10. D1 Replay Backend Real Database Provisioned
       expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(false);
+      // 11. D1 Replay Backend Real Concurrency Certified
       expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
+      // 12. Production Routing Enforcement Allowed
       expect(DEEPSEEK_FIRST_PROVIDER_STRATEGY.securityInvariants.productionRoutingEnforcementAllowed).toBe(false);
     });
   });

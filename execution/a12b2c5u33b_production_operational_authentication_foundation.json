@@ -1,21 +1,24 @@
 {
-  "phase": "A.12B.2C-5U.3.3B",
-  "artifactType": "PRODUCTION_OPERATIONAL_AUTHENTICATION_FOUNDATION",
-  "timestamp": "2026-09-07T12:38:00Z",
+  "phase": "A.12B.2C-5U.3.3B-R",
+  "artifactType": "PRODUCTION_OPERATIONAL_AUTHENTICATION_FOUNDATION_REPAIR",
+  "timestamp": "2026-09-07T13:40:00Z",
   "repository": "https://github.com/kayrastos/updated-velnaar",
-  "baseCommit": "5404480cdd9232b4cce93ada38f184c35b532b98",
-  "baseTree": "53f73af308e6d9d401862cd28d38f43a7b5f05c2",
-  "parentCommit": "5404480cdd9232b4cce93ada38f184c35b532b98",
+  "baseCommit": "8236c435e3238f6eaea059f925be6f27b2eea817",
+  "baseTree": "ba86bda4d1b75de55fd409abda9ecc551a6b64fb",
+  "parentCommit": "8236c435e3238f6eaea059f925be6f27b2eea817",
   "branch": "main",
   "phase5U33ASealed": true,
   "cloudflareAccessJwtFoundationImplemented": true,
   "cryptographicJwtVerificationImplemented": true,
   "rs256Only": true,
+  "es256AndPs256RejectionImplemented": true,
   "issuerVerificationImplemented": true,
   "audienceVerificationImplemented": true,
+  "arrayAudiencePositiveTestImplemented": true,
   "expiryVerificationImplemented": true,
   "notBeforeVerificationImplemented": true,
   "issuedAtVerificationImplemented": true,
+  "temporalRelationshipHardeningImplemented": true,
   "operationalPrincipalSeparatedFromTenantIdentity": true,
   "canonicalSuperAdminRegistryImplemented": true,
   "canonicalSuperAdminRegistryEntryCount": 0,
@@ -36,18 +39,43 @@
   "productionSuperAdminAuthProvenLive": false,
   "productionSuccessPathCertified": false,
   "independentReviewRequiredBeforeIntegration": true,
-  "finalStatus": "A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+  "canonicalTrustRootCallerInjectable": false,
+  "canonicalWrapperAcceptsExternalKeyResolver": false,
+  "remoteJwksCanonicalConstructionOnly": true,
+  "canonicalTrustRootSubstitutionTestPassed": true,
+  "fullClaimsExposedByAuthResult": false,
+  "registryValidationReasonsRedacted": true,
+  "jwksAvailabilityFailuresSanitized": true,
+  "conservativeEmailSyntaxValidationImplemented": true,
+  "actualUnknownKidLocalJwksTestImplemented": true,
+  "vacuousZeroCallAssertionsRemoved": true,
+  "finalStatus": "A12B2C5U33BR_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW",
   "cryptographicPolicy": {
     "algorithm": "RS256",
     "algorithmAllowlistStrict": true,
+    "explicitlyRejectedAlgorithms": [
+      "HS256",
+      "ES256",
+      "PS256",
+      "none"
+    ],
     "headerAlgorithmPrecheck": true,
     "maxTokenSizeBytes": 16384,
     "maxClockToleranceSeconds": 5,
     "expectedTokenType": "app",
-    "serviceTokenRejectionEnforced": true,
+    "serviceTokenPolicy": "Rejects documented Cloudflare service-token shape (sub='' and no email) with defensive heuristics",
     "humanSubjectRequired": true,
     "authenticatedEmailRequired": true,
-    "emailSyntaxRFC5322Enforced": true
+    "emailSyntaxRFC5322Enforced": false,
+    "emailSyntaxConservativeBoundedValidation": true,
+    "maxEmailLengthBytes": 320,
+    "temporalRelationshipChecks": [
+      "exp <= iat rejection (IAT_INVALID)",
+      "nbf > exp rejection (TOKEN_NOT_YET_VALID)",
+      "expired token rejection (TOKEN_EXPIRED)",
+      "future nbf rejection (TOKEN_NOT_YET_VALID)",
+      "materially future iat rejection (IAT_INVALID)"
+    ]
   },
   "configurationPolicy": {
     "teamDomainProtocol": "https:",
@@ -59,7 +87,8 @@
     "forbidPathComponents": true,
     "forbidNonStandardPorts": true,
     "audienceBoundedLengthMax": 256,
-    "audienceWhitespaceRejection": true
+    "audienceWhitespaceRejection": true,
+    "arrayAudienceSupport": true
   },
   "trustSeparation": {
     "operationalPrincipalType": "ProductionOperationalPrincipal",
@@ -67,7 +96,8 @@
     "tenantMembershipImplications": 0,
     "ownerRoleInfluenceOnSuperadmin": false,
     "adminRoleInfluenceOnSuperadmin": false,
-    "customRoleClaimsIgnored": true
+    "customRoleClaimsIgnored": true,
+    "fullClaimsExposedInSuccess": false
   },
   "superadminRegistry": {
     "registryConstant": "PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY",
@@ -80,6 +110,7 @@
       "suspended"
     ],
     "duplicateSubjectValidationFailsClosed": true,
+    "duplicateSubjectReasonRedacted": "Duplicate accessSubject detected in registry",
     "productionWrapperUsesInternalRegistryOnly": true
   },
   "errorClassification": {
@@ -101,19 +132,104 @@
       "SUPERADMIN_REGISTRY_EMPTY",
       "SUPERADMIN_NOT_AUTHORIZED",
       "IDENTITY_BINDING_MISMATCH",
+      "JWKS_UNAVAILABLE",
       "AUTH_INTERNAL_FAILURE"
     ],
+    "joseErrorMapping": {
+      "ERR_JWKS_TIMEOUT": "JWKS_UNAVAILABLE",
+      "ERR_JWKS_INVALID": "AUTH_INTERNAL_FAILURE",
+      "ERR_JWKS_NO_MATCHING_KEY": "SIGNATURE_INVALID",
+      "ERR_JWT_INVALID": "MALFORMED_TOKEN",
+      "ERR_JWS_INVALID": "SIGNATURE_INVALID",
+      "ERR_JOSE_ALG_NOT_ALLOWED": "ALGORITHM_NOT_ALLOWED",
+      "ERR_JOSE_GENERIC": "AUTH_INTERNAL_FAILURE",
+      "NetworkFetchError": "JWKS_UNAVAILABLE"
+    },
     "rawCryptoExceptionsLeaked": 0,
     "rawTokensLeaked": 0,
     "rawKeysLeaked": 0,
     "stackTracesLeaked": 0
   },
+  "relevantConditionsInspectLedger": [
+    {
+      "condition": "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "CANARY_LIVE_EXECUTION_ENABLED",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "CANARY_LIVE_EXECUTION_STATE",
+      "expectedValue": "DISABLED",
+      "actualValue": "DISABLED",
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "D1_REPLAY_BACKEND_PRODUCTION_BOUND",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "DEEPSEEK_PROVISIONING_CERTIFICATE.provisioningStatus",
+      "expectedValue": "UNPROVISIONED",
+      "actualValue": "UNPROVISIONED",
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "DEEPSEEK_PROVISIONING_CERTIFICATE.networkEgressVerified",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "DEEPSEEK_PROVISIONING_CERTIFICATE.environmentVariablesPopulated",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "DEEPSEEK_PROVISIONING_CERTIFICATE.productionActivationApproved",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY.length",
+      "expectedValue": 0,
+      "actualValue": 0,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "Object.isFrozen(PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY)",
+      "expectedValue": true,
+      "actualValue": true,
+      "status": "PASS_CLOSED"
+    }
+  ],
   "verificationResults": {
     "dedicatedSecurityTestFile": "tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts",
-    "dedicatedTestsPassed": 51,
+    "dedicatedTestsPassed": 66,
     "dedicatedTestsFailed": 0,
     "fullSuiteFilesPassed": 61,
-    "fullSuiteTotalTestsPassed": 2432,
+    "fullSuiteTotalTestsPassed": 2447,
     "fullSuiteTotalTestsFailed": 0,
     "typecheck": "PASS",
     "lint": "PASS",

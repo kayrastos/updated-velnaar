@@ -3,21 +3,23 @@
  * @description Cloudflare Access Application-JWT Verification Foundation & Operational Superadmin Registry
  *
  * ============================================================================
- * ARCHITECTURAL MANDATES (Phase A.12B.2C-5U.3.3B):
+ * ARCHITECTURAL MANDATES (Phase A.12B.2C-5U.3.3B-R):
  * 1. Cryptographic application-JWT verification for Cf-Access-Jwt-Assertion tokens.
- * 2. Algorithm allowlist: RS256 ONLY. Reject 'none', HS256, ES256, and unsigned tokens.
+ * 2. Algorithm allowlist: RS256 ONLY. Reject 'none', HS256, ES256, PS256, and unsigned tokens.
  * 3. Exact issuer (canonical team domain origin) and audience (AUD) enforcement.
  * 4. Expiration, not-before, and issued-at (no materially future iat) temporal verification.
  * 5. Bounded clock tolerance: <= 5 seconds.
  * 6. Hard token size ceiling: 16 KiB (16,384 bytes).
  * 7. Human operational identity required: non-empty subject, valid email, token type 'app'.
- * 8. Service token separation: reject machine/service-token identity shapes.
+ * 8. Service token separation: reject machine/service-token identity shapes (documented & defensive).
  * 9. Separation of trust domains: Operational identity has ZERO tenant role or membership implications.
  * 10. Explicit operational-superadmin registry foundation.
  * 11. Canonical production registry MUST remain strictly EMPTY (0 entries) until explicit provisioning.
  * 12. Fail-closed error discipline: public-safe error classifications with ZERO crypto/token leakage.
- * 13. Logging safety: NEVER log tokens, keys, signatures, or registry contents.
- * 14. Fully isolated: offline key injection for tests, factory boundary for production JWKS.
+ * 13. Canonical production wrapper has NO caller-selected key or keyResolver parameter.
+ *     Remote JWKS resolver is constructed INTERNALLY ONLY from server-controlled configuration.
+ * 14. Logging safety: NEVER log tokens, keys, signatures, or registry contents.
+ * 15. Fully isolated: offline key injection for low-level tests, factory boundary for production JWKS.
  * ============================================================================
  */
 
@@ -65,7 +67,7 @@ export const EXPECTED_TOKEN_TYPE = 'app' as const;
 export const CLOUDFLARE_ACCESS_CERTS_PATH = '/cdn-cgi/access/certs' as const;
 
 /**
- * RFC 5322 compliant email regex for identity cross-validation.
+ * Conservative bounded operational email syntax validation (<= 320 chars).
  */
 const EMAIL_REGEX =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`\{\|\}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
@@ -92,6 +94,7 @@ export const OperationalAuthErrorCode = {
   SUPERADMIN_REGISTRY_EMPTY: 'SUPERADMIN_REGISTRY_EMPTY',
   SUPERADMIN_NOT_AUTHORIZED: 'SUPERADMIN_NOT_AUTHORIZED',
   IDENTITY_BINDING_MISMATCH: 'IDENTITY_BINDING_MISMATCH',
+  JWKS_UNAVAILABLE: 'JWKS_UNAVAILABLE',
   AUTH_INTERNAL_FAILURE: 'AUTH_INTERNAL_FAILURE',
 } as const;
 
@@ -123,6 +126,7 @@ export const OPERATIONAL_AUTH_ERROR_MESSAGES: Readonly<Record<OperationalAuthErr
     SUPERADMIN_REGISTRY_EMPTY: 'Operational superadmin authorization registry is empty.',
     SUPERADMIN_NOT_AUTHORIZED: 'Identity is not authorized as an operational superadmin.',
     IDENTITY_BINDING_MISMATCH: 'Subject identity does not match authorized registry binding.',
+    JWKS_UNAVAILABLE: 'Operational public key service is temporarily unavailable.',
     AUTH_INTERNAL_FAILURE:
       'An internal error occurred during operational authentication evaluation.',
   });
@@ -172,7 +176,6 @@ export interface OperationalAuthFailure {
 export interface OperationalAuthSuccess {
   readonly success: true;
   readonly principal: ProductionOperationalPrincipal;
-  readonly claims?: Readonly<JWTPayload>;
 }
 
 export type OperationalAuthResult = OperationalAuthSuccess | OperationalAuthFailure;
@@ -184,7 +187,7 @@ export type OperationalAuthResult = OperationalAuthSuccess | OperationalAuthFail
 /**
  * Canonical Operational Superadmin Registry.
  *
- * MANDATE: Must remain strictly EMPTY (0 entries) in 5U.3.3B.
+ * MANDATE: Must remain strictly EMPTY (0 entries) in 5U.3.3B / 5U.3.3B-R.
  * No real or synthetic identities may be enrolled in canonical production registry
  * until separate future provisioning and audit.
  */
@@ -196,7 +199,7 @@ export const PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY: readonly OperationalSup
 // ============================================================================
 
 /**
- * Validate email address syntax according to RFC 5322.
+ * Conservative bounded operational email syntax validation (<= 320 chars).
  */
 export function isValidEmail(email: string): boolean {
   if (typeof email !== 'string' || email.length === 0 || email.length > 320) {
@@ -359,7 +362,7 @@ export function validateCloudflareAccessConfig(
 
 /**
  * Factory for production remote JWKS resolver.
- * Kept strictly isolated: NEVER invoked during unit/security tests or offline mode.
+ * Separates endpoint construction from verification logic.
  */
 export function createCloudflareAccessRemoteJWKSet(
   config: ValidatedCloudflareAccessConfig
@@ -388,6 +391,7 @@ export function extractAccessJwtFromRequest(request: Request): string | null {
 /**
  * Validate the integrity of an operational superadmin registry.
  * Detects malformed entries, invalid emails, and duplicate subjects.
+ * Reason strings are strictly static and redacted to avoid leaking subject values.
  */
 export function validateSuperAdminRegistry(
   registry: readonly OperationalSuperAdminEntry[]
@@ -413,7 +417,8 @@ export function validateSuperAdminRegistry(
 
     const normalizedSubject = entry.accessSubject.trim();
     if (seenSubjects.has(normalizedSubject)) {
-      return { valid: false, reason: 'Duplicate accessSubject in registry: ' + normalizedSubject };
+      // Diagnostic reason is strictly static: NEVER leak actual subject values
+      return { valid: false, reason: 'Duplicate accessSubject detected in registry' };
     }
     seenSubjects.add(normalizedSubject);
   }
@@ -492,15 +497,16 @@ export function authorizeOperationalPrincipalAgainstRegistry(
 }
 
 // ============================================================================
-// TOKEN VERIFICATION LOGIC
+// TOKEN VERIFICATION LOGIC (LOW-LEVEL PRIMITIVE)
 // ============================================================================
 
 /**
- * Verify Cloudflare Access JWT Identity.
+ * Verify Cloudflare Access JWT Identity (Low-level cryptographic primitive).
  *
  * Verifies cryptographic signature, algorithm (RS256 only), issuer, audience,
  * temporal validity (exp, nbf, iat), token type ('app'), human subject, and email.
  *
+ * Accepts an injected keyResolver for offline cryptographic testing.
  * Does NOT grant superadmin privileges: isSuperAdmin defaults to false.
  */
 export async function verifyCloudflareAccessIdentity(
@@ -631,7 +637,8 @@ export async function verifyCloudflareAccessIdentity(
 
     if (
       errCode === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED' ||
-      errCode === 'ERR_JWKS_NO_MATCHING_KEY'
+      errCode === 'ERR_JWKS_NO_MATCHING_KEY' ||
+      errCode === 'ERR_JWKS_MULTIPLE_MATCHING_KEYS'
     ) {
       return {
         success: false,
@@ -640,7 +647,10 @@ export async function verifyCloudflareAccessIdentity(
       };
     }
 
-    if (errCode === 'ERR_JWS_INVALID' || errCode === 'ERR_JWT_MALFORMED') {
+    if (
+      errCode === 'ERR_JWS_INVALID' ||
+      errCode === 'ERR_JWT_INVALID'
+    ) {
       return {
         success: false,
         code: OperationalAuthErrorCode.MALFORMED_TOKEN,
@@ -648,7 +658,7 @@ export async function verifyCloudflareAccessIdentity(
       };
     }
 
-    if (errCode === 'ERR_JOSE_GENERIC' || errCode === 'ERR_JOSE_ALG_NOT_ALLOWED') {
+    if (errCode === 'ERR_JOSE_ALG_NOT_ALLOWED') {
       return {
         success: false,
         code: OperationalAuthErrorCode.ALGORITHM_NOT_ALLOWED,
@@ -656,11 +666,40 @@ export async function verifyCloudflareAccessIdentity(
       };
     }
 
-    // Default fail-closed response with zero sensitive data leakage
+    if (errCode === 'ERR_JWKS_TIMEOUT') {
+      return {
+        success: false,
+        code: OperationalAuthErrorCode.JWKS_UNAVAILABLE,
+        message: OPERATIONAL_AUTH_ERROR_MESSAGES.JWKS_UNAVAILABLE,
+      };
+    }
+
+    if (errCode === 'ERR_JWKS_INVALID') {
+      return {
+        success: false,
+        code: OperationalAuthErrorCode.AUTH_INTERNAL_FAILURE,
+        message: OPERATIONAL_AUTH_ERROR_MESSAGES.AUTH_INTERNAL_FAILURE,
+      };
+    }
+
+    // Network / fetch errors from JWKS resolution
+    if (
+      err instanceof TypeError ||
+      (typeof err?.message === 'string' &&
+        (err.message.toLowerCase().includes('fetch') || err.message.toLowerCase().includes('network')))
+    ) {
+      return {
+        success: false,
+        code: OperationalAuthErrorCode.JWKS_UNAVAILABLE,
+        message: OPERATIONAL_AUTH_ERROR_MESSAGES.JWKS_UNAVAILABLE,
+      };
+    }
+
+    // Default fail-closed response for unexpected/generic internal errors
     return {
       success: false,
-      code: OperationalAuthErrorCode.SIGNATURE_INVALID,
-      message: OPERATIONAL_AUTH_ERROR_MESSAGES.SIGNATURE_INVALID,
+      code: OperationalAuthErrorCode.AUTH_INTERNAL_FAILURE,
+      message: OPERATIONAL_AUTH_ERROR_MESSAGES.AUTH_INTERNAL_FAILURE,
     };
   }
 
@@ -686,7 +725,24 @@ export async function verifyCloudflareAccessIdentity(
     };
   }
 
-  // 6c. Token type validation (must be 'app')
+  // 6c. Temporal relationship validation
+  if (payload.exp <= payload.iat) {
+    return {
+      success: false,
+      code: OperationalAuthErrorCode.IAT_INVALID,
+      message: OPERATIONAL_AUTH_ERROR_MESSAGES.IAT_INVALID,
+    };
+  }
+
+  if (typeof payload.nbf === 'number' && payload.nbf > payload.exp) {
+    return {
+      success: false,
+      code: OperationalAuthErrorCode.TOKEN_NOT_YET_VALID,
+      message: OPERATIONAL_AUTH_ERROR_MESSAGES.TOKEN_NOT_YET_VALID,
+    };
+  }
+
+  // 6d. Token type validation (must be 'app')
   if (payload.type !== EXPECTED_TOKEN_TYPE) {
     return {
       success: false,
@@ -695,7 +751,10 @@ export async function verifyCloudflareAccessIdentity(
     };
   }
 
-  // 6d. Service token shape separation & rejection
+  // 6e. Service token shape separation:
+  // Documented Cloudflare service-token shape (type=app, empty sub, common_name, no email)
+  // is rejected by human sub & email requirements below.
+  // Additional claim checks below are defensive heuristics.
   const rawPayload = payload as Record<string, unknown>;
   if (
     rawPayload.identity_type === 'service_token' ||
@@ -710,7 +769,7 @@ export async function verifyCloudflareAccessIdentity(
     };
   }
 
-  // 6e. Human subject (sub) validation
+  // 6f. Human subject (sub) validation
   if (typeof payload.sub !== 'string' || payload.sub.trim().length === 0) {
     return {
       success: false,
@@ -719,7 +778,7 @@ export async function verifyCloudflareAccessIdentity(
     };
   }
 
-  // 6f. Authenticated email validation
+  // 6g. Authenticated email validation
   const rawEmail = rawPayload.email;
   if (typeof rawEmail !== 'string' || rawEmail.trim().length === 0) {
     return {
@@ -739,6 +798,7 @@ export async function verifyCloudflareAccessIdentity(
   }
 
   // Cryptographic identity successfully verified
+  // Note: full JWT claims are kept local and NEVER returned through public auth result
   return {
     success: true,
     principal: {
@@ -747,12 +807,11 @@ export async function verifyCloudflareAccessIdentity(
       authSource: 'CLOUDFLARE_ACCESS',
       isSuperAdmin: false,
     },
-    claims: payload,
   };
 }
 
 /**
- * Verify Cloudflare Access Request helper.
+ * Verify Cloudflare Access Request helper (Low-level cryptographic primitive).
  */
 export async function verifyCloudflareAccessRequest(
   request: Request,
@@ -770,19 +829,19 @@ export async function verifyCloudflareAccessRequest(
 /**
  * Canonical Production Operational Principal Resolver.
  *
- * STRICT INTEGRITY MANDATES:
- * - Does NOT accept custom registries from caller input.
+ * STRICT INTEGRITY & TRUST-ROOT MANDATES:
+ * - Accepts exactly TWO parameters: (tokenOrRequest, env).
+ * - Accepts ZERO caller-selected key, keyResolver, or JWKS parameters.
+ * - Constructs remote JWKS resolver INTERNALLY ONLY from server-controlled configuration.
+ * - Any extra runtime arguments (e.g. arguments[2]) are completely ignored.
  * - Does NOT accept roles, isSuperAdmin, or tenant memberships from caller input.
- * - Validates configuration from environment.
- * - Extracts and verifies Cloudflare Access token.
  * - Evaluates identity strictly against the internal PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY.
  * - Because the canonical registry is currently empty, this resolver fails closed
  *   with SUPERADMIN_REGISTRY_EMPTY in this phase.
  */
 export async function resolveCanonicalProductionOperationalPrincipal(
   tokenOrRequest: string | Request | null | undefined,
-  env: WorkerEnv | Partial<WorkerEnv>,
-  keyResolver?: KeyInput | JWTVerifyGetKey
+  env: WorkerEnv | Partial<WorkerEnv>
 ): Promise<OperationalAuthResult> {
   // 1. Strict configuration validation
   const configResult = validateCloudflareAccessConfig(env);
@@ -811,11 +870,12 @@ export async function resolveCanonicalProductionOperationalPrincipal(
     };
   }
 
-  // 3. Resolve cryptographic key resolver (injected for tests or factory for production)
-  const activeResolver = keyResolver ?? createCloudflareAccessRemoteJWKSet(config);
+  // 3. Construct canonical remote JWKS resolver internally ONLY
+  // Caller-selected trust roots are strictly rejected; no third argument is read.
+  const canonicalResolver = createCloudflareAccessRemoteJWKSet(config);
 
-  // 4. Verify cryptographic identity
-  const identityResult = await verifyCloudflareAccessIdentity(token, config, activeResolver);
+  // 4. Verify cryptographic identity using internal canonical resolver
+  const identityResult = await verifyCloudflareAccessIdentity(token, config, canonicalResolver);
   if (!identityResult.success) {
     return identityResult;
   }

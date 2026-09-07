@@ -1,35 +1,43 @@
-# VELNAR — Phase A.12B.2C-5U.3.3B Evidence Artifact
-## Production Operational Authentication Foundation (Offline Certification)
+# VELNAR — Phase A.12B.2C-5U.3.3B-R Evidence Artifact
+## Production Operational Authentication Foundation — Security Repair
 
-- **Phase**: `A.12B.2C-5U.3.3B`
-- **Artifact Type**: `PRODUCTION_OPERATIONAL_AUTHENTICATION_FOUNDATION`
-- **Date**: `2026-09-07T12:38:00Z`
+- **Phase**: `A.12B.2C-5U.3.3B-R`
+- **Artifact Type**: `PRODUCTION_OPERATIONAL_AUTHENTICATION_FOUNDATION_REPAIR`
+- **Date**: `2026-09-07T13:40:00Z`
 - **Repository**: [https://github.com/kayrastos/updated-velnaar](https://github.com/kayrastos/updated-velnaar)
-- **Base Commit**: `5404480cdd9232b4cce93ada38f184c35b532b98`
-- **Base Tree**: `53f73af308e6d9d401862cd28d38f43a7b5f05c2`
+- **Base Commit**: `8236c435e3238f6eaea059f925be6f27b2eea817`
+- **Base Tree**: `ba86bda4d1b75de55fd409abda9ecc551a6b64fb`
 - **Branch**: `main`
-- **Lineage Parent**: `5404480cdd9232b4cce93ada38f184c35b532b98`
+- **Lineage Parent**: `8236c435e3238f6eaea059f925be6f27b2eea817`
 - **Sealed Prior Phase**: `A12B2C5U33A_PROVISIONING_ACTIVATION_READINESS_AUDIT_APPROVED` (Sealed & Untouched)
-- **Final Status**: `A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_COMPLETE_PENDING_INDEPENDENT_REVIEW`
+- **Final Status**: `A12B2C5U33BR_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW`
 
 ---
 
-## 1. Executive Summary & Objective
+## 1. Executive Summary & Repair Objective
 
-Phase **A.12B.2C-5U.3.3B** implements and offline-certifies the cryptographic **Application Authentication Foundation** for the future dedicated VELNAR production operational/canary route (`/api/ops/canary/deepseek-certification`).
-
-In strict adherence to the non-negotiable architectural mandates:
-1. **Zero Production Request Integration**: The new authentication module is implemented in isolation under `worker/auth/cloudflareAccessOperationalAuth.ts` and certified with synthetic offline cryptographic keypairs. It is **NOT** connected to `worker/index.ts` or activated in any router.
-2. **Zero Tenant Auth Mutation**: Existing tenant/session authentication in `worker/auth/authContext.ts` (`AuthContextService.resolveSessionUser`) remains 100% untouched.
-3. **Strict Separation of Trust Domains**: Operational identity (`ProductionOperationalPrincipal`) has **zero** overlap with tenant roles (`OWNER`, `ADMIN`, etc.) or memberships. Tenant authority cannot confer operational authority.
-4. **Frozen Empty Canonical Registry**: The canonical production operational-superadmin registry (`PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY`) is initialized and remains strictly empty (`0` entries).
-5. **Fail-Closed Cryptographic Verification**: Strict RS256 algorithm enforcement, 16 KiB token ceiling, bounded clock tolerance (<= 5s), exact issuer and audience checking, and public-safe sanitized error reporting with zero data leakage.
+Phase **A.12B.2C-5U.3.3B-R** addresses and resolves all findings identified in the independent Codex High review of Phase 5U.3.3B:
+1. **HIGH SECURITY (Canonical Trust Root Boundary)**: Eliminated caller-injected `keyResolver` parameter from `resolveCanonicalProductionOperationalPrincipal(tokenOrRequest, env)`. The canonical wrapper accepts strictly 2 arguments and constructs remote JWKS resolvers internally. Attacker attempts to inject custom resolvers or pass additional arguments are strictly ignored.
+2. **MEDIUM ARCHITECTURE (Granular Error Classification)**: Separated JWKS/network/internal failures from cryptographic signature/algorithm failures. Introduced `JWKS_UNAVAILABLE` for `ERR_JWKS_TIMEOUT` and network fetch failures; mapped `ERR_JWKS_INVALID` to `AUTH_INTERNAL_FAILURE`; mapped `ERR_JWT_INVALID` to `MALFORMED_TOKEN`; and prevented JOSE generic error misclassification as algorithm errors.
+3. **LOW SECURITY (Static Registry Redaction)**: Redacted duplicate-subject diagnostic reason to `"Duplicate accessSubject detected in registry"`, ensuring zero leakage of subject or email values.
+4. **LOW ARCHITECTURE (Minimal Principal Claims)**: Stripped full decoded JWT `claims` from `OperationalAuthSuccess`, exposing only the sanitized, validated `principal` (`subject`, `email`, `authSource`, `isSuperAdmin`).
+5. **EVIDENCE & TEST HARDENING**:
+   - Implemented genuine mocked-fetch offline test for canonical remote JWKS resolution.
+   - Implemented attacker trust-root substitution regression test verifying extra arguments are ignored.
+   - Implemented true local JWKS unknown-kid rejection test distinct from wrong-public-key tests.
+   - Implemented documented Cloudflare service-token shape rejection test (`sub: ''` and no email) with extra field checks documented as defensive heuristics.
+   - Corrected email syntax terminology to conservative bounded validation (<= 320 characters, alphanumeric, conservative symbols; not claimed as full RFC 5322).
+   - Replaced vacuous `expect(true).toBe(true)` assertions with instrumented fetch spy and source-inspected provider/D1 isolation.
+   - Implemented explicit `ES256` and `PS256` algorithm rejection tests.
+   - Implemented array audience positive and negative validation tests.
+   - Implemented temporal relationship hardening (`exp <= iat` and `nbf > exp`).
+   - Enumerate all 12 inspected closed conditions individually.
 
 ---
 
 ## 2. Non-Negotiable Zero-Action Invariant Ledger
 
-All operations in this phase were executed in an isolated, offline developer environment:
+All operations in this repair phase were executed in an isolated, offline developer environment:
 
 | Sentinel / Invariant | Certified Value | Status |
 |---|---|---|
@@ -49,149 +57,74 @@ All operations in this phase were executed in an isolated, offline developer env
 
 ---
 
-## 3. Architecture & Implementation Inventory
+## 3. Inspected Relevant Production & Readiness Conditions Ledger
 
-### 3.1 Module Implementation: `worker/auth/cloudflareAccessOperationalAuth.ts`
-A dedicated, standalone operational authentication module establishing:
-- **Constants**:
-  - `CF_ACCESS_JWT_ASSERTION_HEADER = 'cf-access-jwt-assertion'`
-  - `CF_ACCESS_JWT_ASSERTION_HEADER_CANONICAL = 'Cf-Access-Jwt-Assertion'`
-  - `MAX_ACCESS_JWT_LENGTH_BYTES = 16384` (16 KiB hard ceiling)
-  - `CLOCK_TOLERANCE_SECONDS = 5` (max 5s skew)
-  - `ALLOWED_JWT_ALGORITHM = 'RS256'`
-  - `EXPECTED_TOKEN_TYPE = 'app'`
-  - `CLOUDFLARE_ACCESS_CERTS_PATH = '/cdn-cgi/access/certs'`
-- **Error Taxonomy & Public-Safe Sanitization**:
-  Finite enum `OperationalAuthErrorCode` covering 18 discrete failure classifications. Each code maps to a static public-safe error string. Raw cryptographic exceptions, tokens, keys, signatures, and registry contents are strictly redacted and never leaked.
-- **Principal & Identity Isolation**:
-  `ProductionOperationalPrincipal` contains only:
-  - `subject: string`
-  - `email: string`
-  - `authSource: 'CLOUDFLARE_ACCESS'`
-  - `isSuperAdmin: boolean`
-  Does not contain or recognize tenant IDs, organization memberships, or tenant `UserRole` values.
-- **Canonical Registry**:
-  `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY: readonly OperationalSuperAdminEntry[] = Object.freeze([]);`
-  Sealed at `0` entries.
-- **Pure Testing Helper vs. Production Wrapper**:
-  - Pure helper `authorizeOperationalPrincipalAgainstRegistry(principal, registry)` allows testing synthetic registries.
-  - Production wrapper `resolveCanonicalProductionOperationalPrincipal(tokenOrRequest, env, keyResolver?)` strictly queries the internal `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY` and rejects any caller-supplied registry or role overrides.
-- **Remote JWKS Boundary**:
-  `createCloudflareAccessRemoteJWKSet` factory separates production JWKS endpoint construction from verification logic. Verifiers accept an injected key/resolver, ensuring offline testing with local in-memory RSA keys without touching Cloudflare network endpoints.
+As mandated by Repair Requirement 10, all 12 relevant closed conditions are inspected individually:
 
-### 3.2 Environment Configuration Typing: `worker/env.ts`
-Added optional future configuration types:
-```ts
-  // Cloudflare Access Operational Authentication Configuration (Optional; inactive until runtime integration)
-  CLOUDFLARE_ACCESS_TEAM_DOMAIN?: string;
-  CLOUDFLARE_ACCESS_AUD?: string;
+| # | Invariant / Gate / State | Expected Value | Actual Value | Verdict |
+|---|---|---|---|---|
+| 1 | `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED` | `false` | `false` | PASS_CLOSED |
+| 2 | `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY` | `false` | `false` | PASS_CLOSED |
+| 3 | `CANARY_LIVE_EXECUTION_ENABLED` | `false` | `false` | PASS_CLOSED |
+| 4 | `CANARY_LIVE_EXECUTION_STATE` | `"DISABLED"` | `"DISABLED"` | PASS_CLOSED |
+| 5 | `D1_REPLAY_BACKEND_PRODUCTION_BOUND` | `false` | `false` | PASS_CLOSED |
+| 6 | `AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED` | `false` | `false` | PASS_CLOSED |
+| 7 | `DEEPSEEK_PROVISIONING_CERTIFICATE.provisioningStatus` | `"UNPROVISIONED"` | `"UNPROVISIONED"` | PASS_CLOSED |
+| 8 | `DEEPSEEK_PROVISIONING_CERTIFICATE.networkEgressVerified` | `false` | `false` | PASS_CLOSED |
+| 9 | `DEEPSEEK_PROVISIONING_CERTIFICATE.environmentVariablesPopulated` | `false` | `false` | PASS_CLOSED |
+| 10 | `DEEPSEEK_PROVISIONING_CERTIFICATE.productionActivationApproved` | `false` | `false` | PASS_CLOSED |
+| 11 | `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY.length` | `0` | `0` | PASS_CLOSED |
+| 12 | `Object.isFrozen(PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY)` | `true` | `true` | PASS_CLOSED |
+
+---
+
+## 4. Specific Repair Verification Summary
+
+| Repair Finding | Resolution Mechanism | Certified Status |
+|---|---|---|
+| **Repair 1: Canonical Wrapper Arity** | `resolveCanonicalProductionOperationalPrincipal(tokenOrRequest, env)` accepts strictly 2 parameters. Resolver injection removed from production wrapper. | PASS (`canonicalTrustRootCallerInjectable: false`, `canonicalWrapperAcceptsExternalKeyResolver: false`) |
+| **Repair 2: Mocked Fetch Positive Test** | Canonical wrapper certified offline using `vi.stubGlobal('fetch', fetchSpy)` with synthetic JWKS response. | PASS (`remoteJwksCanonicalConstructionOnly: true`, `canonicalTrustRootSubstitutionTestPassed: true`) |
+| **Repair 3: Local JWKS Unknown KID Test** | Distinct test with valid local JWKS containing different key ID, certifying rejection with `SIGNATURE_INVALID` without key confusion. | PASS (`actualUnknownKidLocalJwksTestImplemented: true`) |
+| **Repair 4: Granular Error Mapping** | `ERR_JWKS_TIMEOUT` & fetch errors -> `JWKS_UNAVAILABLE`; `ERR_JWKS_INVALID` -> `AUTH_INTERNAL_FAILURE`; `ERR_JWT_INVALID` -> `MALFORMED_TOKEN`. | PASS (`jwksAvailabilityFailuresSanitized: true`) |
+| **Repair 5: JOSE Generic Classification** | `ERR_JOSE_GENERIC` fails closed as `AUTH_INTERNAL_FAILURE` and is never misclassified as `ALGORITHM_NOT_ALLOWED`. | PASS |
+| **Repair 6: Minimal Success Principal** | Full `claims` stripped from `OperationalAuthSuccess`; only validated `principal` exposed. | PASS (`fullClaimsExposedByAuthResult: false`) |
+| **Repair 7: Static Redaction of Duplicate Reason** | Static reason `"Duplicate accessSubject detected in registry"` returned on duplicate entries with zero subject value reflection. | PASS (`registryValidationReasonsRedacted: true`) |
+| **Repair 8: Conservative Email Syntax Terminology** | Replaced false RFC 5322 claims with conservative bounded operational email syntax description (<= 320 chars). | PASS (`conservativeEmailSyntaxValidationImplemented: true`) |
+| **Repair 9: Cloudflare Service-Token Shape Test** | Certified rejection of documented Cloudflare service token shape (`sub: ""`, no email). Defensive heuristics documented. | PASS |
+| **Repair 10: 12 Closed Conditions Ledger** | Enumerated and certified all 12 relevant closed conditions individually. | PASS |
+| **Repair 11: Non-Vacuous Isolation Tests** | Instrumented fetch spy and source-inspected provider/D1 isolation in place of tautological assertions. | PASS (`vacuousZeroCallAssertionsRemoved: true`) |
+| **Repair 12: ES256 & PS256 Rejection Tests** | Explicitly tested rejection of `ES256` and `PS256` algorithms with `ALGORITHM_NOT_ALLOWED`. | PASS (`es256AndPs256RejectionImplemented: true`) |
+| **Repair 13: Array Audience Positive & Negative** | Certified acceptance of array audience containing expected AUD and rejection of array audience omitting it. | PASS (`arrayAudiencePositiveTestImplemented: true`) |
+| **Repair 14: Token Header Pre-Check Hardening** | Fast-fail header inspection for malformed headers and prohibited algorithms before cryptographic verification. | PASS |
+| **Repair 15: Temporal Inversion Hardening** | Enforced `exp <= iat` rejection (`IAT_INVALID`) and `nbf > exp` rejection (`TOKEN_NOT_YET_VALID`). | PASS (`temporalRelationshipHardeningImplemented: true`) |
+
+---
+
+## 5. Verification Gate Results
+
+```
+=== TEST VERIFICATION ===
+vitest tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts: 66 passed (66 total)
+vitest full suite: 61 test files passed, 2,447 tests passed, 0 failed
+
+=== COMPILATION & LINT ===
+tsc --noEmit (typecheck): PASS (0 errors)
+tsc --noEmit (lint): PASS (0 errors)
+vite build: PASS (dist generated in 5.26s)
+
+=== SCOPE INTEGRITY ===
+worker/index.ts: 0 diff
+worker/auth/authContext.ts: 0 diff
+worker/ai/canary/**: 0 diff
+migrations/**: 0 diff
+wrangler.jsonc: 0 diff
+execution/a12b2c5u33a_*: 0 diff
 ```
 
 ---
 
-## 4. Security Verification & Test Suite
+## 6. Phase Certification & Readiness Verdict
 
-Dedicated test suite implemented in:
-`tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts`
+Phase A.12B.2C-5U.3.3B-R is verified, self-contained, and complete. All independent Codex High findings are resolved without expanding scope or compromising existing invariants.
 
-### Test Breakdown (51 / 51 Passed):
-- **Group A: Cryptographic Token & Claims Validation (24 tests)**
-  1. Valid RS256 token passes cryptographic verification.
-  2. Missing token rejected (`MISSING_TOKEN`).
-  3. Empty and whitespace token rejected (`MISSING_TOKEN`).
-  4. Oversized token (> 16 KiB) rejected (`TOKEN_TOO_LARGE`).
-  5. Malformed 3-segment structure rejected (`MALFORMED_TOKEN`).
-  6. Tampered payload after signing rejected (`SIGNATURE_INVALID`).
-  7. Tampered signature rejected (`SIGNATURE_INVALID`).
-  8. Unknown signing key / kid rejected (`SIGNATURE_INVALID`).
-  9. Symmetric HMAC `HS256` algorithm rejected (`ALGORITHM_NOT_ALLOWED`).
-  10. Unsigned `alg: none` token rejected (`ALGORITHM_NOT_ALLOWED`).
-  11. Mismatched issuer rejected (`ISSUER_MISMATCH`).
-  12. Mismatched audience rejected (`AUDIENCE_MISMATCH`).
-  13. Expired token rejected (`TOKEN_EXPIRED`).
-  14. Future `nbf` rejected (`TOKEN_NOT_YET_VALID`).
-  15. Materially future `iat` rejected (`IAT_INVALID`).
-  16. Missing `exp` claim rejected (`TOKEN_EXPIRED`).
-  17. Missing `iat` claim rejected (`IAT_INVALID`).
-  18. Missing `sub` claim rejected (`HUMAN_SUBJECT_REQUIRED`).
-  19. Empty `sub` claim rejected (`HUMAN_SUBJECT_REQUIRED`).
-  20. Missing `email` claim rejected (`EMAIL_REQUIRED`).
-  21. Invalid RFC 5322 email syntax rejected (`EMAIL_REQUIRED`).
-  22. Token type != `app` rejected (`TOKEN_TYPE_INVALID`).
-  23. Service token shape rejected (`TOKEN_TYPE_INVALID`).
-  24. Request header extraction helper verified.
-- **Group B: Environment Configuration Validation (8 tests)**
-  25. Missing team domain fails closed (`CONFIG_NOT_READY`).
-  26. Plain HTTP team domain rejected (`CONFIG_NOT_READY`).
-  27. Deceptive hostname rejected, e.g. `evilcloudflareaccess.com` (`CONFIG_NOT_READY`).
-  28. Subdomain confusion and multi-level subdomain rejected (`CONFIG_NOT_READY`).
-  29. Query parameters, fragments, paths, and ports rejected (`CONFIG_NOT_READY`).
-  30. Missing AUD rejected (`CONFIG_NOT_READY`).
-  31. Empty or whitespace AUD rejected (`CONFIG_NOT_READY`).
-  32. Configuration normalizes canonical HTTPS origin and `/cdn-cgi/access/certs` JWKS endpoint.
-- **Group C: Operational Superadmin Authorization Registry (11 tests)**
-  33. Canonical registry initially empty and frozen.
-  34. Verified human identity + empty registry fails closed (`SUPERADMIN_REGISTRY_EMPTY`).
-  35. Subject not present in registry rejected (`SUPERADMIN_NOT_AUTHORIZED`).
-  36. Matching email but mismatched subject rejected (`SUPERADMIN_NOT_AUTHORIZED`).
-  37. Matching subject but mismatched email rejected (`IDENTITY_BINDING_MISMATCH`).
-  38. Exact active registry match yields `isSuperAdmin: true`.
-  39. Inactive/suspended registry entry rejected (`SUPERADMIN_NOT_AUTHORIZED`).
-  40. Duplicate subject registry fails integrity validation.
-  41. Caller cannot pass `isSuperAdmin: true` to canonical production wrapper.
-  42. Tenant `OWNER` role cannot grant operational superadmin authority.
-  43. Tenant `ADMIN` role cannot grant operational superadmin authority.
-- **Group D: Isolation, Non-Regression & Zero-Action Verification (8 tests)**
-  44. Zero provider calls verified.
-  45. Zero D1 calls verified.
-  46. Zero production network calls verified.
-  47. `worker/index.ts` has zero integration with operational access auth.
-  48. Existing `AuthContextService` dev/test behavior remains completely unchanged.
-  49. Existing production `AuthContextService` still rejects unverified external bearer tokens.
-  50. Production operational registry contains exactly zero real identities.
-  51. All 11 canary readiness and live gates remain strictly false.
-
----
-
-## 5. Full Quality Gate Results
-
-```bash
-# Dedicated Security Tests
-npx vitest run tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts
-# Result: 51 passed / 51 tests (100%)
-
-# Full Test Suite
-npm test
-# Result: 61 passed test files / 2,432 passed tests (100%)
-
-# TypeScript Typecheck
-npm run typecheck
-# Result: tsc --noEmit (0 errors)
-
-# Code Quality Lint
-npm run lint
-# Result: tsc --noEmit (0 errors)
-
-# Production Build
-npm run build
-# Result: vite build (0 errors)
-```
-
----
-
-## 6. Claim Discipline & Next Phase Prerequisites
-
-### Allowed Status:
-- `IMPLEMENTED`
-- `OFFLINE TESTED`
-
-### Strictly Prohibited Claims (Until Separately Verified in Subsequent Phases):
-- `PROVISIONED` (Cloudflare Access application is NOT provisioned)
-- `INTEGRATED` (Worker request router does NOT reference operational auth)
-- `DEPLOYED` (Worker is NOT deployed to Cloudflare production)
-- `LIVE VERIFIED` (No live network/JWKS verification has occurred)
-- `PRODUCTION AUTH READY` (Ingress gate remains `false`)
-- `PRODUCTION SUPERADMIN PROVEN` (Canonical registry remains empty)
-
-### Final Phase Verdict:
-`A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_COMPLETE_PENDING_INDEPENDENT_REVIEW`
+**FINAL STATUS**: `A12B2C5U33BR_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW`
