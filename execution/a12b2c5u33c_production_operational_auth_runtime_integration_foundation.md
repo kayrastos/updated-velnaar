@@ -1,8 +1,9 @@
-# VELNAR — Phase A.12B.2C-5U.3.3C-R Evidence Record
-## Production Operational Auth Runtime Integration Foundation — Repair & Hardening
+# VELNAR — Phase A.12B.2C-5U.3.3C Evidence Record
+## Production Operational Auth Runtime Integration Foundation — Canonical Independent Approval & Seal
 
 ### 1. Executive Summary
-- **Phase**: VELNAR — A.12B.2C-5U.3.3C-R
+- **Phase**: VELNAR — A.12B.2C-5U.3.3C
+- **Artifact Type**: `PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_SEAL`
 - **Repository**: `https://github.com/kayrastos/updated-velnaar`
 - **Branch**: `main`
 - **Base Lineage**:
@@ -10,14 +11,16 @@
   - Authoritative Base Tree: `5291280784b4307714eb80b9c0082bf35fb9ed07`
   - Original 5U.3.3C Implementation Commit: `033907e262b38e0eed6c94c67310bae17dacbefa`
   - Original 5U.3.3C Commit Timestamp: `2026-09-07T12:15:12Z`
-  - Repair Base Commit: `033907e262b38e0eed6c94c67310bae17dacbefa`
-  - Repair Base Tree: `35646cda17d70df77899a9fd0f49153337b3e902`
-- **Current Status**: `A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_COMPLETE_PENDING_INDEPENDENT_REVIEW`
-- **Independent Review Required**: `true` (Phase is NOT approved or sealed; awaiting independent Codex review)
+  - Repaired & Independently Approved Commit: `52902614aaa30995cc365a346c53bfa17a5727bc`
+  - Repaired & Independently Approved Tree: `22c5e5242c35ac7b9c4c1e96254c0833e2feace3`
+- **Canonical Seal State**: **SEALED** (`sealed: true`)
+- **Final Verdict**: `A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_APPROVED`
+- **Final Status**: `A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_APPROVED`
+- **Independent Review Required**: `false` (Independent review successfully passed and recorded)
 
 ---
 
-### 2. Concrete Repair Objectives Accomplished
+### 2. Concrete Repair Objectives Accomplished (5U.3.3C-R)
 
 #### 2.1 Blocker 1: Dormant Operational Preflight Barrier (`worker/index.ts`)
 - **Ordering Repaired**: In `worker/index.ts`, the exact operational path carveout (`url.pathname === PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH`) is placed **AHEAD OF** the generic `request.method === 'OPTIONS'` preflight handler.
@@ -81,8 +84,8 @@ The dedicated test suite (`tests/security/phaseA12B2C5U33CProductionOperationalA
   - Source/diff-inspected: Cloudflare provisioning calls = 0, deployments = 0, secret mutations = 0, key operations = 0, gate flips = 0
 
 #### 2.4 Blocker 4: Evidence Schema & Timestamp Normalization
-- Normalized `artifactType` to `PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION`.
-- Normalized `finalStatus` and `status` to `A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_COMPLETE_PENDING_INDEPENDENT_REVIEW`.
+- Normalized `artifactType` to `PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_SEAL`.
+- Normalized `finalStatus` and `status` to `A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_APPROVED`.
 - Programmatically generated UTC ISO timestamp via `new Date().toISOString()`.
 - Preserved exact Git commit timestamp for original implementation: `2026-09-07T12:15:12Z`.
 
@@ -136,6 +139,55 @@ The dedicated test suite (`tests/security/phaseA12B2C5U33CProductionOperationalA
 
 ---
 
-### 6. Claims Discipline
-- **CLAIMED**: `SOURCE_INTEGRATED`, `OFFLINE_TESTED`
+### 6. Claims Discipline & Non-Claims
+- **CLAIMED**: `SOURCE_INTEGRATED`, `OFFLINE_TESTED`, `SEALED`
 - **STRICTLY NOT CLAIMED**: `PRODUCTION_PROVISIONED`, `ROUTE_ACTIVATED`, `LIVE_VERIFIED`
+
+Specifically, the seal does **NOT** claim that:
+- Cloudflare Access is provisioned
+- Access application exists
+- Access policy exists
+- Production hostname is Access-protected
+- Service token exists
+- Production identity is enrolled
+- Operational superadmin is enrolled
+- Production Access configuration is live
+- Real JWKS fetch has been certified
+- JWKS rotation has been certified
+- Operational ingress auth is ready
+- Operational route is enabled
+- Canary live execution is enabled
+- D1 production binding exists
+- D1 production database is provisioned
+- D1 concurrency is certified
+- Human trust anchor is provisioned
+- Source provenance trust anchor is provisioned
+- Production routing enforcement is enabled
+- Production success path is certified
+
+---
+
+### 7. Independent Review Approval & Canonical Seal
+- **Independent Reviewer**: Codex High
+- **Final Independent Verdict**: `A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_APPROVED`
+- **Approved Commit**: `52902614aaa30995cc365a346c53bfa17a5727bc`
+- **Approved Tree**: `22c5e5242c35ac7b9c4c1e96254c0833e2feace3`
+- **Parent Commit**: `033907e262b38e0eed6c94c67310bae17dacbefa`
+- **Canonical Seal State**: **SEALED** (`sealed = true`)
+- **Remaining Security Findings**: **0**
+- **Remaining Architecture Findings**: **0**
+- **Remaining Material Evidence Findings**: **0**
+
+#### Specific Independent Review Confirmations:
+1. **Exact Operational Route Carve-Out**: Only exact path equality (`/api/ops/canary/deepseek-certification`) triggers operational routing. Sibling and sub-paths remain routed through the standard tenant pipeline.
+2. **Generic OPTIONS Dormant Barrier**: In `worker/index.ts`, the exact operational carve-out is evaluated before the generic `request.method === 'OPTIONS'` preflight handler, ensuring dormant `OPTIONS` requests receive HTTP 404 `NOT_FOUND` rather than generic CORS 204.
+3. **Ordinary CORS Non-Regression**: Ordinary tenant routes retain standard CORS preflight behavior (204 for valid origins, 403 for untrusted origins) without modification.
+4. **Tenant Auth Domain Isolation**: Tenant auth context (`AuthContextService.resolveSessionUser`) and tenant roles (`OWNER`, `ADMIN`, `isSuperAdmin`) have zero standing in operational auth. Tenant tokens cannot substitute for Cloudflare Access assertions.
+5. **Sealed Access Resolver Integration**: The operational handler exclusively invokes `resolveCanonicalProductionOperationalPrincipal(request, env)` from the sealed 5U.3.3B foundation with caller-injected `keyResolver` disallowed.
+6. **Barrier-Before-Auth Passivity**: Route disablement barriers are evaluated before any auth checks, JWKS resolution, body reads, or capability invocations.
+7. **Operational Principal Authority Separation**: Operational authorization is decoupled from tenant `AuthenticatedUser`, requiring superadmin status via `principal.isSuperAdmin === true`.
+8. **Capability Non-Execution on Auth Failure**: Failures in operational authentication (missing assertion, invalid token, forbidden identity, missing config) immediately terminate with mapped HTTP status codes without invoking `executeProductionWorkerCanaryCertification`.
+9. **Exact Canonical 12-Condition Ledger**: All 12 canonical safety and readiness gates remain strictly closed/false with `CANARY_LIVE_EXECUTION_STATE = 'BLOCKED_PENDING_CERTIFICATION'` and `productionRoutingEnforcementAllowed = false`.
+10. **Supplemental Superadmin Registry**: `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY` remains classified under `AUTH_FOUNDATION_STATE` as an empty, frozen array.
+11. **Source Integration Offline Tested Only**: All 60 dedicated security tests and 2,507 total test assertions run strictly offline against synthetic cryptographic keys and mock environments.
+12. **Zero Production Action Record**: Provider calls = 0, D1 calls = 0, network fetch calls = 0, provisioning API calls = 0, production deployments = 0, secret operations = 0, key operations = 0, gate flips = 0.
