@@ -131,6 +131,7 @@ The public operational route (`/api/ops/canary/deepseek-certification`) **MUST N
 
 ### 5.2 Provider-Free D1 Certification Harness (Future Plan Only — DO NOT IMPLEMENT NOW)
 A temporary, isolated, provider-free test harness must be utilized for concurrency certification:
+- **Prerequisite & DAG Alignment**: Requires real D1 creation, migration verification, Worker D1 binding configuration, non-live Worker deployment, and verified runtime `env.DB` binding (`AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED`). The harness does NOT require `D1_REPLAY_BACKEND_PRODUCTION_BOUND`, which must remain strictly `false` during concurrency testing until subsequent formal activation.
 - **Binding Scope**: Accesses `env.DB` only.
 - **Provider Isolation**: Zero imports of DeepSeek or provider transports; zero access to `env.DEEPSEEK_API_KEY`.
 - **Zero Customer Data**: Employs strictly synthetic replay keys.
@@ -219,8 +220,8 @@ Private key bytes, seed phrases, or private key PEMs **MUST NEVER ENTER**:
 Prior documentation coupled `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` directly to `PRODUCTION_TRUST_ANCHOR_SLOT_READY`.
 
 ### Classification: Policy Ordering vs Source Dependency
-- **Source Code Verification**: In `deepSeekProductionAuthorizationTrust.ts`, `PRODUCTION_TRUST_ANCHOR_SLOT_READY` evaluates trust registry slot availability and is completely independent of D1 runtime code.
-- **Correction**: The sequencing of D1 concurrency certification before trust anchor activation is classified strictly as a **`POLICY ORDERING`**, **not** a `SOURCE-ENFORCED DEPENDENCY`. Both controls are independently preparable and verifiable.
+- **Source Code Verification**: `PRODUCTION_TRUST_ANCHOR_SLOT_READY` is declared in `worker/ai/canary/deepSeekProductionTrustAnchorProvisioningSlot.ts`. It is currently a static compile-time readiness marker set to `false as const`. It does NOT dynamically evaluate registry availability. There is no source-enforced dependency from D1 concurrency certification to this slot-ready constant.
+- **Correction**: Any D1-before-trust sequencing remains strictly a **`POLICY ORDERING`**, **not** a source-enforced dependency. Both controls are independently preparable and verifiable.
 
 ---
 
@@ -317,10 +318,10 @@ Every node in the dependency graph is categorized strictly by its architectural 
 ├── AUDIT_CONCEPT_WORKER_D1_BINDING_CONFIGURED (AUDIT_CONCEPT: false)
 ├── AUDIT_CONCEPT_WORKER_D1_BINDING_DEPLOYED (AUDIT_CONCEPT: false)
 ├── AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED (AUDIT_CONCEPT: false)
-├── D1_REPLAY_BACKEND_PRODUCTION_BOUND (CANONICAL_RUNTIME_GATE: false)
 ├── AUDIT_CONCEPT_PROVIDER_FREE_D1_HARNESS_DEPLOYED (AUDIT_CONCEPT: false)
 ├── AUDIT_CONCEPT_D1_CONCURRENCY_EVIDENCE_RECORDED (AUDIT_CONCEPT: false)
-└── D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED (CANONICAL_RUNTIME_GATE: false)
+├── D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED (CANONICAL_RUNTIME_GATE: false)
+└── D1_REPLAY_BACKEND_PRODUCTION_BOUND (CANONICAL_RUNTIME_GATE: false)
 
 [ Category: Human Authority Trust Anchor ]
 ├── AUDIT_CONCEPT_HUMAN_KEY_CEREMONY_COMPLETED (AUDIT_CONCEPT: false)
@@ -336,17 +337,17 @@ Every node in the dependency graph is categorized strictly by its architectural 
 ├── TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY (CANONICAL_RUNTIME_GATE: false)
 └── GUARDED_SOURCE_ATTESTATION_READY (CANONICAL_RUNTIME_GATE: false)
 
-[ Category: Ingress Authentication & Operational Route ]
+[ Category: Ingress Authentication & Pre-Activation Security Review ]
 ├── AUDIT_CONCEPT_PRODUCTION_AUTH_IMPLEMENTED (AUDIT_CONCEPT: false)
 ├── AUDIT_CONCEPT_PRODUCTION_AUTH_VERIFIED (AUDIT_CONCEPT: false)
 ├── AUDIT_CONCEPT_ACCESS_INGRESS_CONFIGURED (AUDIT_CONCEPT: false)
 ├── AUDIT_CONCEPT_ACCESS_INGRESS_VERIFIED (AUDIT_CONCEPT: false)
-├── PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY (CANONICAL_RUNTIME_GATE: false)
-└── PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED (CANONICAL_RUNTIME_GATE: false)
-
-[ Category: Live Canary Execution & Routing Promotion ]
 ├── AUDIT_CONCEPT_PROVIDER_SECRET_PROVISIONED (AUDIT_CONCEPT: false)
-├── AUDIT_CONCEPT_PRE_ACTIVATION_SECURITY_REVIEW (AUDIT_CONCEPT: false)
+└── AUDIT_CONCEPT_PRE_ACTIVATION_SECURITY_REVIEW (AUDIT_CONCEPT: false)
+
+[ Category: Operational Route, Live Canary Execution & Routing Promotion ]
+├── PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY (CANONICAL_RUNTIME_GATE: false)
+├── PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED (CANONICAL_RUNTIME_GATE: false)
 ├── CANARY_LIVE_EXECUTION_ENABLED (CANONICAL_RUNTIME_GATE: false)
 ├── CANARY_LIVE_EXECUTION_STATE (CANONICAL_RUNTIME_GATE: 'BLOCKED_PENDING_CERTIFICATION')
 ├── AUDIT_CONCEPT_BOUNDED_LIVE_CANARY_EXECUTED (AUDIT_CONCEPT: false)
