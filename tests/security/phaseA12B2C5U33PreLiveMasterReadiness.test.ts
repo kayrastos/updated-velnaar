@@ -817,6 +817,65 @@ describe('Phase A.12B.2C-5U.3.3 Pre-Live Master Readiness Test Suite', () => {
       expect(reviewJson.sovereignBoundary.sovereignBoundarySpecificationReady).toBe(true);
       expect(reviewJson.sovereignBoundary.hardGate2Blocker).toBe(true);
     });
+
+    it('9.2 enforces GREY Sovereign Boundary invariants and allowed context taxonomy', () => {
+      const readinessJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.json'), 'utf-8'));
+      const reviewJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_review_package_v1.json'), 'utf-8'));
+      const matrixJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_provider_live_readiness_matrix_v1.json'), 'utf-8'));
+      const canaryPlanJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_controlled_live_canary_plan_v1.json'), 'utf-8'));
+      const readinessMd = fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.md'), 'utf-8');
+      const reviewMd = fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_review_package_v1.md'), 'utf-8');
+      const matrixMd = fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_provider_live_readiness_matrix_v1.md'), 'utf-8');
+      const canaryMd = fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_controlled_live_canary_plan_v1.md'), 'utf-8');
+
+      // Canonical GREY rule string
+      const canonicalGreyRule = 'MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE';
+      expect(readinessJson.sovereignBoundary.rules.GREY).toBe(canonicalGreyRule);
+      expect(reviewJson.sovereignBoundary.rules.GREY).toBe(canonicalGreyRule);
+      expect(matrixJson.sovereignBoundary.rules.GREY).toBe(canonicalGreyRule);
+      expect(canaryPlanJson.velnarSovereignBoundary.dataClassificationModel.GREY.boundaryRule).toBe(canonicalGreyRule);
+
+      // Invariants: customer context is restricted, requires minimization & sanitization, bounded to task capsule, no BLACK material
+      for (const inv of [
+        readinessJson.sovereignBoundary.greyBoundaryInvariants,
+        reviewJson.sovereignBoundary.greyBoundaryInvariants,
+        matrixJson.sovereignBoundary.greyBoundaryInvariants,
+        canaryPlanJson.velnarSovereignBoundary.dataClassificationModel.GREY.boundaryInvariants,
+      ]) {
+        expect(inv.customerContextRestricted).toBe(true);
+        expect(inv.requiresMinimization).toBe(true);
+        expect(inv.requiresSanitization).toBe(true);
+        expect(inv.requiresBoundedTaskCapsule).toBe(true);
+        expect(inv.prohibitsBlackMaterial).toBe(true);
+        expect(inv.syntheticFixturesPreferredWhereSufficient).toBe(true);
+        expect(inv.limitedExclusivelyToSyntheticFixtures).toBe(false);
+      }
+
+      // Allowed context categories include small code excerpts, AST fragments, stack traces, etc.
+      const expectedGreyCategories = [
+        'small code excerpts',
+        'stack traces',
+        'anonymized vulnerability context',
+        'necessary tests',
+        'minimized sanitized metadata',
+      ];
+      for (const cat of expectedGreyCategories) {
+        expect(readinessJson.sovereignBoundary.greyTaxonomyAllowedContext).toContain(cat);
+        expect(reviewJson.sovereignBoundary.greyTaxonomyAllowedContext).toContain(cat);
+        expect(matrixJson.sovereignBoundary.greyTaxonomyAllowedContext).toContain(cat);
+        expect(canaryPlanJson.velnarSovereignBoundary.dataClassificationModel.GREY.allowedContent).toContain(cat);
+      }
+      expect(readinessJson.sovereignBoundary.greyTaxonomyAllowedContext.some((c: string) => c.includes('AST'))).toBe(true);
+      expect(reviewJson.sovereignBoundary.greyTaxonomyAllowedContext.some((c: string) => c.includes('AST'))).toBe(true);
+      expect(matrixJson.sovereignBoundary.greyTaxonomyAllowedContext.some((c: string) => c.includes('AST'))).toBe(true);
+      expect(canaryPlanJson.velnarSovereignBoundary.dataClassificationModel.GREY.allowedContent.some((c: string) => c.includes('AST'))).toBe(true);
+
+      // Ensure Markdown documentation reinforces that GREY is not limited exclusively to synthetic fixtures
+      for (const md of [readinessMd, reviewMd, matrixMd, canaryMd]) {
+        expect(md).toContain(canonicalGreyRule);
+        expect(md).toMatch(/not limited exclusively to synthetic fixtures/i);
+      }
+    });
   });
 
   // ==========================================================================
@@ -955,10 +1014,42 @@ describe('Phase A.12B.2C-5U.3.3 Pre-Live Master Readiness Test Suite', () => {
       expect(planBJson.provisioningPlan.step3_accessSelfHostedApplication.audCaptureRequirement.actualAudValue).toBe('UNRESOLVED_NOT_CREATED');
 
       // Distinguishes vendor documented constraint vs internal validator bound
-      expect(audGate.velnarInternalValidatorMaxAudBytes).toBe(64);
+      expect(audGate.velnarInternalValidatorMaxAudCharacters).toBe(256);
+      expect(audGate.velnarInternalValidatorBound).toBe('<= 256 JavaScript string characters');
       expect(audGate.internalValidatorEpistemicStatus).toBe('CANONICAL_REPOSITORY_FACT');
       expect(audGate.vendorLengthConstraint).toBe('64 characters');
       expect(audGate.vendorLengthConstraintEpistemicStatus).toBe('VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION');
+      expect(planBJson.provisioningPlan.step3_accessSelfHostedApplication.audCaptureRequirement.velnarInternalValidatorMaxAudCharacters).toBe(256);
+    });
+
+    it('11.3.1 verifies canonical Cloudflare AUD validator bound (<= 256 chars) in source and runtime', () => {
+      // 1. Source binding check in worker/auth/cloudflareAccessOperationalAuth.ts
+      const authSource = fs.readFileSync(path.resolve(process.cwd(), 'worker/auth/cloudflareAccessOperationalAuth.ts'), 'utf-8');
+      expect(authSource).toContain('if (rawAud.length > 256)');
+      expect(authSource).toContain('CLOUDFLARE_ACCESS_AUD exceeds maximum allowed length (256 characters)');
+
+      // 2. Runtime validation with exact 256 characters (passes length check)
+      const valid256Aud = 'a'.repeat(256);
+      const result256 = validateCloudflareAccessConfig({
+        CLOUDFLARE_ACCESS_TEAM_DOMAIN: 'https://test.cloudflareaccess.com',
+        CLOUDFLARE_ACCESS_AUD: valid256Aud,
+      });
+      expect(result256.ok).toBe(true);
+      if (result256.ok) {
+        expect(result256.config.expectedAudience).toBe(valid256Aud);
+      }
+
+      // 3. Runtime validation with 257 characters (fails length check with CONFIG_NOT_READY)
+      const invalid257Aud = 'a'.repeat(257);
+      const result257 = validateCloudflareAccessConfig({
+        CLOUDFLARE_ACCESS_TEAM_DOMAIN: 'https://test.cloudflareaccess.com',
+        CLOUDFLARE_ACCESS_AUD: invalid257Aud,
+      });
+      expect(result257.ok).toBe(false);
+      if (result257.ok === false) {
+        expect(result257.code).toBe(OperationalAuthErrorCode.CONFIG_NOT_READY);
+        expect(result257.error).toBe('CLOUDFLARE_ACCESS_AUD exceeds maximum allowed length (256 characters)');
+      }
     });
 
     it('11.4 rejects resolved DNS target and requires UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION', () => {

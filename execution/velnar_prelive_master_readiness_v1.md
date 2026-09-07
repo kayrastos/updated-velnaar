@@ -89,7 +89,7 @@ Exact zero-dollar infrastructure cost claims have been removed:
 | 2 | **Operational Hostname** | `UNRESOLVED` (`ops.velnar.studio`: `PROPOSED_NOT_CANONICAL`) | `execution/a12b2c5u33d_...json` | Proposed only; not a canonical production hostname | Confirm DNS in Seg B if approved | **YES** | **YES** | NO |
 | 3 | **Operational DNS Target** | `UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION` | `execution/a12b2c5u33d_...json` | DNS target unresolved until zone inspection | Set verified CNAME target in Seg B if approved | **YES** | **YES** | NO |
 | 4 | **Team Domain** | `UNRESOLVED` (`https://velnar.cloudflareaccess.com`: `PROPOSED_NOT_CANONICAL`) | `worker/auth/cloudflareAccessOperationalAuth.ts` | Proposed only; not authoritative until read from account | Read from real Zero Trust account in Seg B if approved | **YES** | **YES** | NO |
-| 5 | **Access App AUD** | `UNRESOLVED_NOT_CREATED` (`OBSERVED_ONLY_AFTER_PROVISIONING`) | `execution/a12b2c5u33d_...json` | App not yet created; vendor 64-char constraint is vendor-documented | Capture AUD in Seg B post-creation | **YES** | **YES** | NO |
+| 5 | **Access App AUD** | `UNRESOLVED_NOT_CREATED` (`OBSERVED_ONLY_AFTER_PROVISIONING`) | `execution/a12b2c5u33d_...json` | App not yet created; vendor $\le 64$-char constraint is `VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION`; internal validator bound is $\le 256$ JavaScript string characters (`CANONICAL_REPOSITORY_FACT`) | Capture AUD in Seg B post-creation | **YES** | **YES** | NO |
 | 6 | **IdP Integration** | `UNRESOLVED_PROPOSED` (`FUTURE_HUMAN_DECISION_REQUIRED`) | `execution/a12b2c5u33d_...json` | IdP selection and auto-redirect remain future decisions | Enforce IdP + MFA in Seg B | **YES** | **YES** | NO |
 | 7 | **Human Operator Identity** | `UNENROLLED` | `worker/auth/cloudflareAccessOperationalAuth.ts` | No login session | Capture sub + email in Seg B | NO | **YES** | NO |
 | 8 | **Superadmin Registry** | `EMPTY_AND_FROZEN (0)` | `worker/auth/cloudflareAccessOperationalAuth.ts` | Registry empty by design | Enroll operator in Seg B only if explicitly approved | NO | **YES** | NO |
@@ -137,7 +137,7 @@ All of the following 10 core categories are strictly BLACK data with zero except
 
 #### Boundary Rules:
 - **BLACK**: `NEVER_SENT_TO_EXTERNAL_MODEL` (No exceptions through sanitization).
-- **GREY**: `MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE` (Pseudonymous operational telemetry, integer microUSD cost metrics).
+- **GREY**: `MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE`. Examples may include only the minimum necessary sanitized context: small code excerpts, AST/data-flow fragments, stack traces, anonymized vulnerability context, necessary tests, minimized sanitized metadata, pseudonymous operational telemetry. GREY must never contain BLACK material. Synthetic fixtures are allowed and preferred where sufficient, but GREY is not limited exclusively to synthetic fixtures.
 - **WHITE**: `PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION` (Approved public synthetic evaluation fixtures from `VELNAR_SHADOW_EVAL_V1`).
 
 #### Sovereign Boundary Runtime Implementation Truth:

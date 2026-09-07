@@ -68,7 +68,8 @@
         "actualAudEpistemicStatus": "OBSERVED_ONLY_AFTER_PROVISIONING",
         "vendorLengthConstraint": "64 characters",
         "vendorLengthConstraintEpistemicStatus": "VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION",
-        "velnarInternalValidatorMaxAudBytes": 64,
+        "velnarInternalValidatorMaxAudCharacters": 256,
+        "velnarInternalValidatorBound": "<= 256 JavaScript string characters",
         "internalValidatorEpistemicStatus": "CANONICAL_REPOSITORY_FACT",
         "format": "Opaque hex or alphanumeric string issued by Cloudflare Zero Trust post-creation"
       },

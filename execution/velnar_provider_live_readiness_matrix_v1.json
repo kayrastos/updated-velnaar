@@ -173,7 +173,24 @@
       "critical routing/policy internals",
       "Customer PII and raw identity data",
       "VELNAR master KMS keys"
-    ]
+    ],
+    "greyTaxonomyAllowedContext": [
+      "small code excerpts",
+      "AST and data-flow fragments",
+      "stack traces",
+      "anonymized vulnerability context",
+      "necessary tests",
+      "minimized sanitized metadata"
+    ],
+    "greyBoundaryInvariants": {
+      "customerContextRestricted": true,
+      "requiresMinimization": true,
+      "requiresSanitization": true,
+      "requiresBoundedTaskCapsule": true,
+      "prohibitsBlackMaterial": true,
+      "syntheticFixturesPreferredWhereSufficient": true,
+      "limitedExclusivelyToSyntheticFixtures": false
+    }
   },
   "matrixInvariants": {
     "totalLiveCallsPermittedSegmentA": 0,

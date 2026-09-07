@@ -121,8 +121,10 @@
       "epistemicStatus": "OBSERVED_ONLY_AFTER_PROVISIONING",
       "vendorLengthConstraint": "64 characters",
       "vendorLengthConstraintEpistemicStatus": "VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION",
-      "velnarInternalValidatorMaxAudBytes": 64,
+      "velnarInternalValidatorMaxAudCharacters": 256,
+      "velnarInternalValidatorBound": "<= 256 JavaScript string characters",
       "internalValidatorEpistemicStatus": "CANONICAL_REPOSITORY_FACT",
+      "internalValidatorDescription": "<= 256 JavaScript string characters enforced by worker/auth/cloudflareAccessOperationalAuth.ts",
       "canonicalSource": "execution/a12b2c5u33d_cloudflare_access_dormant_provisioning_readiness.json",
       "blocker": "Application AUD generated upon Access application creation; not yet created. Must not be fabricated or predicted.",
       "nextAction": "Capture AUD from Cloudflare Zero Trust and populate CLOUDFLARE_ACCESS_AUD in Segment B",
@@ -408,6 +410,27 @@
       "BLACK": "NEVER_SENT_TO_EXTERNAL_MODEL (No exceptions through sanitization)",
       "GREY": "MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE",
       "WHITE": "PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION"
+    },
+    "greyTaxonomyAllowedContext": [
+      "small code excerpts",
+      "AST/data-flow fragments",
+      "stack traces",
+      "anonymized vulnerability context",
+      "necessary tests",
+      "minimized sanitized metadata"
+    ],
+    "greyBoundaryInvariants": {
+      "customerContextRestricted": true,
+      "requiresMinimization": true,
+      "requiresSanitization": true,
+      "requiresBoundedTaskCapsule": true,
+      "unrestrictedTransmissionProhibited": true,
+      "neverContainsBlackMaterial": true,
+      "prohibitsBlackMaterial": true,
+      "syntheticFixturesPreferred": true,
+      "syntheticFixturesPreferredWhereSufficient": true,
+      "notLimitedExclusivelyToSyntheticFixtures": true,
+      "limitedExclusivelyToSyntheticFixtures": false
     },
     "externalModels": [
       "DeepSeek",

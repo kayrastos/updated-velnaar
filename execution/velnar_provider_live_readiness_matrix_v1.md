@@ -95,7 +95,7 @@ All 10 canonical categories are strictly classified as BLACK data with zero exce
 
 #### Boundary Rules:
 - **BLACK**: `NEVER_SENT_TO_EXTERNAL_MODEL` (No exceptions through sanitization).
-- **GREY**: `MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE` (Pseudonymous telemetry, integer microUSD cost metrics).
+- **GREY**: `MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE` (Customer context is NOT unrestricted; must be strictly minimized, sanitized, bounded to the specific task capsule, and must NEVER contain BLACK material. Context may include only minimum necessary sanitized context such as small code excerpts, AST/data-flow fragments, stack traces, anonymized vulnerability context, necessary tests, and minimized sanitized metadata. Synthetic fixtures preferred where sufficient, but GREY is not limited exclusively to synthetic fixtures).
 - **WHITE**: `PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION` (Approved public synthetic evaluation fixtures from `VELNAR_SHADOW_EVAL_V1`).
 
 #### Sovereign Boundary Implementation Truth:

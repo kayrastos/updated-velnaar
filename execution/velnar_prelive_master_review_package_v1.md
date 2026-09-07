@@ -62,7 +62,7 @@ To prevent unjustified claims of canonical authority, all facts and parameters a
   - `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY` has 0 entries and is frozen
   - `PRODUCTION_HUMAN_AUTHORITY_REGISTRY` has 0 entries and is frozen
   - `PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES` has 0 entries and is frozen
-  - Internal validator max AUD length bound = 64 bytes
+  - Internal validator max AUD length bound = 256 JavaScript string characters
 - **`SPECIFICATION_ONLY`**:
   - 10-category mandatory BLACK Sovereign Boundary taxonomy
   - Step-by-step dormant Cloudflare Access application and policy setup
@@ -119,7 +119,7 @@ The Sovereign Data Boundary ensures that confidential, proprietary, and identity
    - (10) critical routing/policy internals
    - Customer PII and raw identity data
    - VELNAR master KMS keys
-2. **GREY Rule**: `MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE`
+2. **GREY Rule**: `MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE` (Customer context is NOT unrestricted; must be strictly minimized, sanitized, bounded to the specific task capsule, and must NEVER contain BLACK material. Context may include only minimum necessary sanitized context such as small code excerpts, AST/data-flow fragments, stack traces, anonymized vulnerability context, necessary tests, and minimized sanitized metadata. GREY is not limited exclusively to synthetic fixtures, though synthetic fixtures are preferred where sufficient).
 3. **WHITE Rule**: `PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION`
 4. **Current Status**:
    - `sovereignBoundarySpecificationReady = true`
@@ -159,7 +159,7 @@ If explicit human approval is granted via the required token, Segment B will exe
    - Create or verify CNAME for proposed hostname `ops.velnar.studio` (`PROPOSED_NOT_CANONICAL`; DNS target `UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION`).
    - Create self-hosted Access Application: `ops.velnar.studio/api/ops/canary/deepseek-certification` (`PROPOSED_NOT_CANONICAL`; 15m session, no wildcard).
    - Create Access Policy: Allow only vetted engineer emails; require hardware MFA (FIDO2) (`PROPOSED_NOT_CANONICAL`; `FUTURE_HUMAN_DECISION_REQUIRED`).
-   - Capture Cloudflare application AUD tag (`actualAudValue = UNRESOLVED_NOT_CREATED`; vendor 64-char constraint is `VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION`; internal validator bound is `CANONICAL_REPOSITORY_FACT`).
+   - Capture Cloudflare application AUD tag (`actualAudValue = UNRESOLVED_NOT_CREATED`; vendor 64-char constraint is `VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION`; internal validator bound is `<= 256 JavaScript string characters`, `CANONICAL_REPOSITORY_FACT`).
 2. **Worker Non-Secret Runtime Configuration**:
    - Set `CLOUDFLARE_ACCESS_TEAM_DOMAIN = "https://velnar.cloudflareaccess.com"` (`PROPOSED_NOT_CANONICAL` until confirmed from Cloudflare account).
    - Set `CLOUDFLARE_ACCESS_AUD = "<CAPTURED_AUD>"` (post-creation).

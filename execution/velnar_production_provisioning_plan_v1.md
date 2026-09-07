@@ -55,7 +55,7 @@
 - **AUD Capture**:
   - *Actual AUD Value*: `UNRESOLVED_NOT_CREATED` (`OBSERVED_ONLY_AFTER_PROVISIONING`). Must not be fabricated or predicted.
   - *Vendor Constraint*: 64 characters (`VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION`).
-  - *Internal Validator Bound*: 64 bytes max (`CANONICAL_REPOSITORY_FACT`).
+  - *Internal Validator Bound*: <= 256 JavaScript string characters (`CANONICAL_REPOSITORY_FACT`).
 - **Rollback**: Delete application in Cloudflare Zero Trust.
 
 #### Step 4: Cloudflare Access Policy (Zero Wildcards)

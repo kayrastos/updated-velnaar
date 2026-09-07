@@ -52,9 +52,16 @@ External models covered: **DeepSeek**, **Gemini / Google AI Studio**, **OpenAI**
    *(as well as Customer PII and raw identity data, and VELNAR master KMS keys)*
 
 2. **GREY DATA (`MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE`)**:
-   - Pseudonymous operational telemetry.
-   - Integer microUSD cost metrics and execution latency.
-   - Anonymized task and run IDs.
+   - Customer and repository context is **NOT** unrestricted. It may leave only after strict minimization and sanitization as a bounded task capsule, and must **NEVER** contain BLACK material.
+   - Context may include only minimum necessary sanitized context such as:
+     - small code excerpts
+     - AST / data-flow fragments
+     - stack traces
+     - anonymized vulnerability context
+     - necessary tests
+     - minimized sanitized metadata
+     - pseudonymous operational telemetry (latency, microUSD cost metrics, anonymized task/run IDs)
+   - Synthetic fixtures are preferred where sufficient (such as canary runs), but GREY is not limited exclusively to synthetic fixtures.
 
 3. **WHITE DATA (`PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION`)**:
    - Approved public synthetic evaluation fixtures (`VELNAR_SHADOW_EVAL_V1`).

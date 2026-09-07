@@ -47,7 +47,7 @@
       "PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY has 0 entries and is frozen",
       "PRODUCTION_HUMAN_AUTHORITY_REGISTRY has 0 entries and is frozen",
       "PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES has 0 entries and is frozen",
-      "Internal validator max AUD length bound = 64 bytes"
+      "Internal validator max AUD length bound = 256 JavaScript string characters (CANONICAL_REPOSITORY_FACT)"
     ],
     "SPECIFICATION_ONLY": [
       "10-category mandatory BLACK Sovereign Boundary taxonomy",
@@ -98,7 +98,7 @@
       "Create or verify CNAME for proposed hostname ops.velnar.studio (PROPOSED_NOT_CANONICAL; DNS target UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION)",
       "Create self-hosted Access Application for /api/ops/canary/deepseek-certification (PROPOSED_NOT_CANONICAL)",
       "Create Access Policy requiring hardware MFA and explicit allowlist of vetted emails (PROPOSED_NOT_CANONICAL; FUTURE_HUMAN_DECISION_REQUIRED)",
-      "Capture Cloudflare Access Application AUD upon creation (UNRESOLVED_NOT_CREATED; vendor 64-char constraint is VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION; internal validator bound is CANONICAL_REPOSITORY_FACT)"
+      "Capture Cloudflare Access Application AUD upon creation (actualAudValue = UNRESOLVED_NOT_CREATED; vendor 64-char constraint is VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION; internal validator bound is <= 256 JavaScript string characters, CANONICAL_REPOSITORY_FACT)"
     ],
     "workerRuntimeConfig": [
       "Set CLOUDFLARE_ACCESS_TEAM_DOMAIN = verified team domain (PROPOSED_NOT_CANONICAL until read from Cloudflare account)",
@@ -147,6 +147,27 @@
       "BLACK": "NEVER_SENT_TO_EXTERNAL_MODEL (No exceptions through sanitization)",
       "GREY": "MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE",
       "WHITE": "PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION"
+    },
+    "greyTaxonomyAllowedContext": [
+      "small code excerpts",
+      "AST/data-flow fragments",
+      "stack traces",
+      "anonymized vulnerability context",
+      "necessary tests",
+      "minimized sanitized metadata"
+    ],
+    "greyBoundaryInvariants": {
+      "customerContextRestricted": true,
+      "requiresMinimization": true,
+      "requiresSanitization": true,
+      "requiresBoundedTaskCapsule": true,
+      "unrestrictedTransmissionProhibited": true,
+      "neverContainsBlackMaterial": true,
+      "prohibitsBlackMaterial": true,
+      "syntheticFixturesPreferred": true,
+      "syntheticFixturesPreferredWhereSufficient": true,
+      "notLimitedExclusivelyToSyntheticFixtures": true,
+      "limitedExclusivelyToSyntheticFixtures": false
     },
     "blackTaxonomyMandatoryCategories": [
       "full Security Memory",

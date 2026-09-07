@@ -217,14 +217,32 @@
       },
       "GREY": {
         "boundaryRule": "MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE",
-        "allowedContent": "Pseudonymous operational metadata, timing metrics, integer cost telemetry, anonymized task IDs"
+        "definition": "Customer and repository context may leave only after strict minimization and sanitization as a bounded task capsule; never unrestricted; must never contain BLACK material; synthetic fixtures preferred where sufficient but GREY is not limited exclusively to synthetic fixtures",
+        "allowedContent": [
+          "small code excerpts",
+          "AST and data-flow fragments",
+          "stack traces",
+          "anonymized vulnerability context",
+          "necessary tests",
+          "minimized sanitized metadata",
+          "pseudonymous operational telemetry"
+        ],
+        "boundaryInvariants": {
+          "customerContextRestricted": true,
+          "requiresMinimization": true,
+          "requiresSanitization": true,
+          "requiresBoundedTaskCapsule": true,
+          "prohibitsBlackMaterial": true,
+          "syntheticFixturesPreferredWhereSufficient": true,
+          "limitedExclusivelyToSyntheticFixtures": false
+        }
       },
       "WHITE": {
         "boundaryRule": "PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION",
         "allowedContent": "Approved public synthetic evaluation fixtures (VELNAR_SHADOW_EVAL_V1) and standard task type identifiers"
       }
     },
-    "taskCapsuleConstraint": "Only canonical synthetic fixtures from CANARY_SYNTHETIC_FIXTURES may be transmitted",
+    "taskCapsuleConstraint": "For canary certification runs, canonical synthetic fixtures from CANARY_SYNTHETIC_FIXTURES are transmitted (synthetic fixtures preferred for canary; general GREY allows minimized sanitized context)",
     "credentialIsolation": "Provider API keys are resolved ambiently from Worker env post-reservation; NEVER exported, logged, or included in payloads"
   },
   "verificationAndPromotionGates": {
