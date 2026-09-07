@@ -1,0 +1,91 @@
+{
+  "base_head": "8e1aa54c60d5bf4ad7534d2fd7d721dd702b1cfb",
+  "branch": "fulgor/a234-v6-handoff-20260906",
+  "local_verified": {
+    "candidate_artifact_hashes": {
+      "docs/fulgor_ray_v3_a234_v6_operator_handoff.md": "2d388c7c90b37a99f4c58d44c3d738e5e0b3bb04842e16aef35ed12a1c59307b",
+      "run_fulgor_v3_0_a234_dev30_inference_v6.py": "5dacaef8f7d9f1c0658cfe4abe5c024fb9d38db84a4c8392fd2a984421d9395b",
+      "training/fulgor_ray_v3/candidate_host_binding_v1.py": "b5a7fc331798892bbd14bdad443e9203e3a1596b5f6cc69209f300359eb2386c",
+      "training/fulgor_ray_v3/semantic_patch_intent_v2.py": "31a6f04f87a37e240ac1bb85692f61b8c26e44221ff39035697e5c70d01a1709",
+      "training/fulgor_ray_v3/stage_contract_prompts_v4.py": "a66bf49189e7c2857fe495ec36119bea119ac1caf2f965883336eb86916adf9b",
+      "training/reports/fulgor_ray_v3_0_a234_candidate_v6_final_seal.txt": "bb68569cdbafacd737d4efe48e2fadc8de1c740fbde74b2498551661ac136fb3",
+      "training/reports/fulgor_ray_v3_0_a234_v6_host_binding.json": "3fc9bdf8b21799c82d7f0e153929f2f6063451756c433ba1052630d76615d419",
+      "training/reports/fulgor_ray_v3_0_a234_v6_host_binding.md": "8ad044ea9432a6f15cf7339b78f27cc220d840f022c1690759aaea2bc0dbde5d",
+      "training/synthetic_smoke/fulgor_ray_v3/a234_v6_e2e/summary.json": "ed09f5313d0ddf7754ad913579773282ec01622f75e5fb9f1fe4270a8e0c1f01",
+      "validate_a234_v6_end_to_end_synthetic_smoke.py": "8f8a6075e2ab7b265c7d2365f290dcc3bdf5b8bffd4527b48047c8f8d6eb151d"
+    },
+    "captured_evidence_file": {
+      "captured_receipt_sha256_nonstable_metadata": "8510d04402dec4d56ea5b69c6c45ddf55a2fd31e58383ebdc9065a0f1a26aeac",
+      "path": "training/reports/evidence/fulgor_v6_real_receipt_inspect_20260907.json",
+      "sha256": "4893d46a5c0c326e3544b4918aa5f0f8c766fd8ad9d1590980d4256238a45da7",
+      "source_path": "C:\\\\Users\\\\kayra\\\\Downloads\\\\fulgor-v6-real-receipt-inspect-20260907.json"
+    },
+    "post_recovery_receipt_hashes": {
+      "run_fulgor_v3_0_a234_launch_receipt_v6.py": "45b9452a00a767c53306400379e3ad55aef96c247125e00591cef56ee8a5dca7",
+      "training/fulgor_ray_v3/a234_launch_receipt_v6.py": "23ebd02fbe9991f8a20f10c46d284e206aecdbdc5a9ab818823e30e2ddc31675",
+      "training/fulgor_ray_v3/tests/test_a234_launch_receipt_v6.py": "0feb4e4f65b71ae23fe0cdf6ec5c7c167110f3e742efb36809b6b022ed0f838b"
+    }
+  },
+  "not_executed": {
+    "a234_v6_dev30_inference": false,
+    "a4_execution": false,
+    "gpu_used_during_sealing": false,
+    "model_weights_loaded_during_sealing": false,
+    "synthetic_smoke_rerun": false,
+    "training": false
+  },
+  "real_vm_inspect_verified_via_captured_evidence": {
+    "all_checks_true": true,
+    "check_count": 27,
+    "checks": {
+      "adapter_config_hash": true,
+      "adapter_weights_hash": true,
+      "bf16_supported": true,
+      "candidate_host_binding_v1_hash": true,
+      "candidate_v6_seal_verified": true,
+      "canonical_a1_input_hash": true,
+      "context_budget_v2_hash": true,
+      "cuda_available": true,
+      "disk_free_sufficient": true,
+      "e2e_synthetic_smoke_summary_verified": true,
+      "gpu_memory_sufficient": true,
+      "output_parent_safe": true,
+      "pinned_model_snapshot_complete": true,
+      "runner_v6_hash": true,
+      "semantic_patch_intent_v2_hash": true,
+      "stage_contract_prompts_v4_hash": true,
+      "tokenizer_accounting_passed": true,
+      "v2_marker_preserved": true,
+      "v2_results_preserved": true,
+      "v3_marker_preserved": true,
+      "v3_results_preserved": true,
+      "v5_marker_preserved": true,
+      "v5_results_preserved": true,
+      "v6_marker_absent": true,
+      "v6_output_absent": true,
+      "v6_results_absent": true,
+      "workspace_root_safe": true
+    },
+    "historical_evidence_note": "Preservation of remote-only historical evidence (V2, V3, V5 markers and results) was verified by the captured real production receipt gate on the RTX PRO 6000 host, not locally.",
+    "inference_executed": false,
+    "marker_written": false,
+    "schema": "fulgor.a234_gpu_launch_preflight.v6",
+    "status": "READY",
+    "training_started": false
+  },
+  "safety_confirmations": {
+    "A234_V5_RERUN": false,
+    "A234_V6_ATTEMPT_MARKER_WRITTEN": false,
+    "A234_V6_DEV30_EXECUTED": false,
+    "A4_EXECUTED": false,
+    "DEV30_USED_BY_SYNTHETIC_SMOKE": false,
+    "EXISTING_SEALED_ARTIFACTS_MODIFIED": false,
+    "EXISTING_SERIALIZER_WEAKENED": false,
+    "GPU_USED": false,
+    "MODEL_WEIGHTS_LOADED": false,
+    "SSH_USED": false,
+    "TRAINING_STARTED": false
+  },
+  "schema": "fulgor.a234_launch_receipt_report.v6",
+  "status": "PASS_A234_V6_FINAL_RECEIPT_AUDIT"
+}
