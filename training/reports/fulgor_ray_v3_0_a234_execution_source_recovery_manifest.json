@@ -1,0 +1,85 @@
+﻿{
+    "schema":  "fulgor.a234_execution_source_recovery_manifest.v2",
+    "status":  "PASS_A234_EXECUTION_SOURCE_RECOVERY",
+    "base_canonical_commit":  "90c6927ab2611489cb9a4e112073bb4528b1f1f6",
+    "forensic_bundle":  {
+                            "filename":  "fulgor-ray-v3-runtime-source-recovery-20260907.tar.gz",
+                            "sha256":  "d78111da4bd1a1a2b65b212029b5028df5c2a15be50f2d3f17309a8383f52429"
+                        },
+    "forensic_source_manifest":  {
+                                     "filename":  "fulgor-ray-v3-source-manifest-20260907.sha256",
+                                     "sha256":  "5c5007d287782a033aaece20dbeccb4669ba05d00e4469036a9fcd0423880a53"
+                                 },
+    "source_recovery":  {
+                            "snapshot":  "fulgor-v3-g4-source-recovery-20260907",
+                            "method":  "snapshot_to_pd_balanced_cpu_vm_read_only_ext4_norecovery",
+                            "original_gpu_vm_started":  false,
+                            "recovery_cpu_used":  true,
+                            "source_filesystem_read_only":  true
+                        },
+    "direct_missing_dependency_count":  8,
+    "transitive_additional_dependency_count":  4,
+    "recovered_dependency_count":  12,
+    "full_first_party_runtime_closure_count":  16,
+    "recovered_runtime_dependencies":  [
+                                           {
+                                               "path":  "training/fulgor_ray_v3/a1_inference.py",
+                                               "sha256":  "58394bb72a92be36c7ff9a6c640312be011d4ef1c5a0b8190b0c8d773a99288b"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/a234_inference.py",
+                                               "sha256":  "37f558660f7d5de4858894143694a9415930bd315515f942cb6574999e510842"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/constants.py",
+                                               "sha256":  "f45ef41bce89156a80aa89f2ddb10e6b9dc88ce25b4a3e95d0ee6fed37ad9f88"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/context_budget_v2.py",
+                                               "sha256":  "da9ae0af2ed057287660abf820d31b4bed869b89d97a38db53ba9d9680f3374c"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/patch_serializer.py",
+                                               "sha256":  "41f65938098391579e04075ba548a6eaed1c9674e21d0908923b7fd9683f46c6"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/schemas/__init__.py",
+                                               "sha256":  "f7b5a3a60324cb60db6d00184685c72a98ebcbd346464fbc7c0f50d8adac65b8"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/static_gate.py",
+                                               "sha256":  "402e7c59c2c8b5045bcbf8dbdb75162b1657144b54b376c55cbee096f5d94c12"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/structured_output_recovery.py",
+                                               "sha256":  "db1cdfedb111fc588c233253cc26c87364a47b3f43b18a8d4e6cb3214eae8740"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/candidate_generator.py",
+                                               "sha256":  "4498b222c989446c4c3d4bab2b3e26a402150f11817a1c1c7231b9f6c1d1be98"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/execution_adapter.py",
+                                               "sha256":  "eadc8ebcf765ca3a4758cee3d0f57f8838dd284e78b552880b2fc0ac389c71eb"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/feedback_controller.py",
+                                               "sha256":  "ff9a4525f6e43a21582768e7f0757c2dd0b2fece960222f5070eef8593005c31"
+                                           },
+                                           {
+                                               "path":  "training/fulgor_ray_v3/selector.py",
+                                               "sha256":  "b517c3177e9c16057cfdd62a7f40a91808c4d69036e68abef63ecbea0fd75bd5"
+                                           }
+                                       ],
+    "context_budget_v2_authoritative_hash_verified":  true,
+    "full_transitive_runtime_imports_verified":  true,
+    "v6_rerun_authorized":  false,
+    "v6_rerun_executed":  false,
+    "a4_executed":  false,
+    "canonical_dev30_reuse_authorized":  false,
+    "model_inference_used":  false,
+    "training_started":  false,
+    "protected_dev30_semantic_output_reviewed":  false,
+    "pre_a3_failure_root_cause_audit_started":  false,
+    "pre_a3_failure_root_cause_audit_authorized":  false
+}
