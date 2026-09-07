@@ -1,0 +1,187 @@
+{
+  "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
+  "segment": "C — CONTROLLED LIVE PROVIDER CANARY PLAN",
+  "documentType": "CONTROLLED_LIVE_CANARY_SPECIFICATION",
+  "version": "v1.0",
+  "status": "APPROVED_FOR_REVIEW_NOT_EXECUTED",
+  "executionPrerequisite": "EXPLICIT_HUMAN_APPROVAL_HARD_GATE_2",
+  "firstCallAuthorizationState": "SEGMENT_C_FIRST_LIVE_PROVIDER_CALL_APPROVAL_REQUIRED",
+  "providerCallsCurrentlyPermitted": 0,
+  "participatingProviders": {
+    "deepseek": {
+      "lane": "INTERACTIVE",
+      "role": "PRIMARY_INTERACTIVE_PROVIDER",
+      "requestedModelIdentifier": "deepseek-v4-flash",
+      "expectedReturnedModelIdentifier": "deepseek-v4-flash",
+      "documentedVersionTarget": "DeepSeek-V4-Flash-0731",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
+      "certifiedPricingTier": "offpeak",
+      "pricing": {
+        "cacheHitInputUsdPerM": 0.007,
+        "cacheMissInputUsdPerM": 0.22,
+        "outputUsdPerM": 0.66
+      },
+      "reasoningEffort": "low",
+      "reasoningBudgetTokens": 2048,
+      "maxOutputTokens": 2048,
+      "timeoutMs": 15000,
+      "status": "CERTIFIED_CANDIDATE"
+    },
+    "gemini": {
+      "lane": "BACKGROUND_ECONOMY",
+      "role": "BACKGROUND_ECONOMY_STANDBY",
+      "apiPath": "Google AI Studio / Generative Language API",
+      "requestedModelIdentifier": "gemini-3.5-flash-lite",
+      "expectedReturnedModelIdentifier": "gemini-3.5-flash-lite",
+      "documentedVersionTarget": "gemini-3.5-flash-lite",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/interactions",
+      "certifiedServiceTier": "flex",
+      "thinkingLevel": "low",
+      "pricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "timeoutMs": 15000,
+      "status": "CERTIFIED_CANDIDATE_DORMANT"
+    },
+    "openai": {
+      "lane": "BENCHMARK_COMPARISON_ONLY",
+      "role": "OPTIONAL_COMPARISON_LANE",
+      "requestedModelIdentifier": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "expectedReturnedModelIdentifier": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "endpoint": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "pricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "status": "UNCERTIFIED_BENCHMARK_ONLY",
+      "networkCallsPermitted": false
+    }
+  },
+  "certifiedTaskList": [
+    {
+      "taskIndex": 1,
+      "taskType": "LEAD_INTENT_CLASSIFICATION",
+      "fixtureId": "eval_v1_lead_01",
+      "dataClassification": "PUBLIC_BUSINESS",
+      "schemaExpected": "LeadIntentResult"
+    },
+    {
+      "taskIndex": 2,
+      "taskType": "LEAK_EXPLANATION",
+      "fixtureId": "eval_v1_leak_01",
+      "dataClassification": "PUBLIC_BUSINESS",
+      "schemaExpected": "RevenueLeakExplanation"
+    },
+    {
+      "taskIndex": 3,
+      "taskType": "GROWTH_ACTION_DRAFT",
+      "fixtureId": "eval_v1_growth_01",
+      "dataClassification": "PUBLIC_BUSINESS",
+      "schemaExpected": "GrowthActionDraft"
+    },
+    {
+      "taskIndex": 4,
+      "taskType": "BUSINESS_TWIN_SUMMARY",
+      "fixtureId": "eval_v1_twin_01",
+      "dataClassification": "PUBLIC_BUSINESS",
+      "schemaExpected": "BusinessTwinSummary"
+    },
+    {
+      "taskIndex": 5,
+      "taskType": "FUNNEL_DIAGNOSTIC_EXPLANATION",
+      "fixtureId": "eval_v1_funnel_01",
+      "dataClassification": "PUBLIC_BUSINESS",
+      "schemaExpected": "FunnelDiagnostic"
+    },
+    {
+      "taskIndex": 6,
+      "taskType": "SEO_CONTENT_SUGGESTION",
+      "fixtureId": "eval_v1_seo_01",
+      "dataClassification": "PUBLIC_BUSINESS",
+      "schemaExpected": "SeoSuggestion"
+    },
+    {
+      "taskIndex": 7,
+      "taskType": "ANOMALY_TRIAGE",
+      "fixtureId": "eval_v1_anomaly_01",
+      "dataClassification": "PUBLIC_BUSINESS",
+      "schemaExpected": "AnomalyTriage"
+    }
+  ],
+  "executionSafetyEnvelopes": {
+    "concurrency": {
+      "maxConcurrentInvocations": 1,
+      "executionMode": "STRICTLY_SEQUENTIAL"
+    },
+    "requestCeilings": {
+      "hardGlobalRequestCeiling": 14,
+      "hardPerProviderCeiling": 7
+    },
+    "retryPolicy": {
+      "maxSameProviderRetries": 1,
+      "allowedConditions": ["HTTP_503_SERVICE_UNAVAILABLE"],
+      "disallowedConditions": ["HTTP_4xx", "SCHEMA_FAILURE", "TIMEOUT", "BUDGET_BREACH"]
+    },
+    "fallbackPolicy": {
+      "maxCrossProviderFallbacks": 1,
+      "allowedTransition": "deepseek -> gemini upon retry exhaustion only",
+      "currentlyEnabled": false
+    },
+    "budgetCeilings": {
+      "maxEstimatedCostMicroUsd": 25000,
+      "hardCeilingMicroUsd": 50000,
+      "maxSingleInvocationMicroUsd": 5000
+    },
+    "timeoutPolicy": {
+      "lifecycleTimeoutMs": 15000,
+      "enforcement": "AbortController with strict socket timeout"
+    },
+    "killSwitchPolicy": {
+      "totalCategories": 17,
+      "behavior": "IMMEDIATE_FAIL_CLOSED_ABORT",
+      "triggers": [
+        "PROVENANCE_MISMATCH",
+        "MODEL_SUBSTITUTION_DETECTED",
+        "UNEXPECTED_MODEL_VERSION",
+        "MALFORMED_USAGE_TELEMETRY",
+        "CACHE_ARITHMETIC_INCONSISTENCY",
+        "REASONING_TOKEN_INCONSISTENCY",
+        "REASONING_LEAKAGE_DETECTED",
+        "PRIVACY_CLASSIFICATION_VIOLATION",
+        "TASK_SCOPE_VIOLATION",
+        "UNEXPECTED_RETRY_OR_FALLBACK",
+        "RECURSIVE_FALLBACK_ATTEMPTED",
+        "NETWORK_DESTINATION_MISMATCH",
+        "COST_CEILING_BREACH",
+        "INVOCATION_LIMIT_BREACH",
+        "HUMAN_APPROVAL_INVALID",
+        "UNAUTHORIZED_ENVIRONMENT",
+        "UNEXPECTED_EXCEPTION"
+      ]
+    },
+    "autonomousLoopPolicy": {
+      "openEndedExecutionProhibited": true,
+      "maxLoopIterations": 1
+    }
+  },
+  "velnarSovereignBoundary": {
+    "dataClassificationModel": {
+      "BLACK": {
+        "definition": "Customer PII, raw credentials, production secrets, master KMS keys, Security Memory internal state, proprietary verification internals",
+        "boundaryRule": "CATEGORICALLY_PROHIBITED_FROM_EXTERNAL_TRANSMISSION",
+        "enforcement": "Static inspection + runtime classification gate"
+      },
+      "GREY": {
+        "definition": "Pseudonymous operational metadata, timing metrics, integer cost telemetry, anonymized task IDs",
+        "boundaryRule": "Permitted strictly with sanitization"
+      },
+      "WHITE": {
+        "definition": "Approved public synthetic evaluation fixtures (VELNAR_SHADOW_EVAL_V1)",
+        "boundaryRule": "Permitted in Task Capsules"
+      }
+    },
+    "taskCapsuleConstraint": "Only canonical synthetic fixtures from CANARY_SYNTHETIC_FIXTURES may be transmitted",
+    "credentialIsolation": "Provider API keys are resolved ambiently from Worker env post-reservation; NEVER exported, logged, or included in payloads"
+  },
+  "verificationAndPromotionGates": {
+    "deterministicOutputValidation": "Every response parsed and validated against JSON schema via OutputValidator",
+    "fulgorVerification": "Aggregate semantic score must be >= 0.85 (SEMANTIC_SCORE_MIN_THRESHOLD)",
+    "humanPromotionGate": "Human sign-off mandatory; zero automatic promotion to production routing",
+    "modelAuthorityZeroInvariant": "Outputs are treated as UNTRUSTED CLAIMS; cannot mutate D1, Worker config, IAM, or route gates"
+  }
+}

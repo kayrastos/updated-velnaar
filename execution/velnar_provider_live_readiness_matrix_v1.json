@@ -1,0 +1,126 @@
+{
+  "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
+  "documentType": "PROVIDER_LIVE_READINESS_MATRIX",
+  "version": "v1.0",
+  "timestamp": "2026-09-07T14:35:00.000Z",
+  "authoritativeLiveExecutionGate": {
+    "flag": "CANARY_LIVE_EXECUTION_ENABLED",
+    "value": false,
+    "state": "BLOCKED_PENDING_CERTIFICATION"
+  },
+  "providers": [
+    {
+      "providerId": "deepseek",
+      "providerName": "DeepSeek AI",
+      "lane": "INTERACTIVE",
+      "role": "PRIMARY_INTERACTIVE_PROVIDER",
+      "modelIdentifier": "deepseek-v4-flash",
+      "expectedReturnedModel": "deepseek-v4-flash",
+      "documentedVersionTarget": "DeepSeek-V4-Flash-0731",
+      "endpoints": [
+        "https://api.deepseek.com/v1/chat/completions",
+        "https://api.deepseek.com/chat/completions"
+      ],
+      "networkHost": "api.deepseek.com",
+      "serviceTier": "offpeak",
+      "pricing": {
+        "cacheHitInputUsdPerM": 0.007,
+        "cacheMissInputUsdPerM": 0.22,
+        "outputUsdPerM": 0.66,
+        "currency": "USD"
+      },
+      "tokenLimits": {
+        "reasoningBudgetTokens": 2048,
+        "maxOutputTokens": 2048,
+        "outputBound": 2048
+      },
+      "timeoutMs": 15000,
+      "credentialBinding": {
+        "secretName": "DEEPSEEK_API_KEY",
+        "resolutionScope": "Ambient Worker env post-D1-reservation",
+        "isolation": "Zero logging, zero export, exact bytes preserved"
+      },
+      "concurrencyLimit": 1,
+      "readinessState": {
+        "codeIntegrated": true,
+        "offlineTested": true,
+        "credentialProvisioned": false,
+        "liveGateEnabled": false,
+        "verdict": "READY_FOR_CONTROLLED_CANARY_BLOCKED_BY_HARD_GATE_2"
+      }
+    },
+    {
+      "providerId": "gemini",
+      "providerName": "Google AI Studio / Generative Language API",
+      "lane": "BACKGROUND_ECONOMY",
+      "role": "BACKGROUND_ECONOMY_STANDBY",
+      "modelIdentifier": "gemini-3.5-flash-lite",
+      "expectedReturnedModel": "gemini-3.5-flash-lite",
+      "documentedVersionTarget": "gemini-3.5-flash-lite",
+      "endpoints": [
+        "https://generativelanguage.googleapis.com/v1beta/interactions",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
+      ],
+      "networkHost": "generativelanguage.googleapis.com",
+      "serviceTier": "flex",
+      "pricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "tokenLimits": {
+        "thinkingLevel": "low",
+        "maxOutputTokens": 2048
+      },
+      "timeoutMs": 15000,
+      "credentialBinding": {
+        "secretName": "GEMINI_API_KEY",
+        "resolutionScope": "Ambient Worker env",
+        "isolation": "Zero logging, zero export, exact bytes preserved"
+      },
+      "concurrencyLimit": 1,
+      "readinessState": {
+        "codeIntegrated": true,
+        "offlineTested": true,
+        "credentialProvisioned": false,
+        "liveGateEnabled": false,
+        "verdict": "STANDBY_DORMANT_BLOCKED_BY_HARD_GATE_2"
+      }
+    },
+    {
+      "providerId": "openai",
+      "providerName": "OpenAI",
+      "lane": "BENCHMARK_COMPARISON_ONLY",
+      "role": "OPTIONAL_COMPARISON_LANE",
+      "modelIdentifier": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "expectedReturnedModel": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "documentedVersionTarget": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "endpoints": [
+        "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION"
+      ],
+      "networkHost": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "serviceTier": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "pricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "tokenLimits": {
+        "maxOutputTokens": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION"
+      },
+      "timeoutMs": 15000,
+      "credentialBinding": {
+        "secretName": "OPENAI_API_KEY",
+        "resolutionScope": "Unbound",
+        "isolation": "Unbound"
+      },
+      "concurrencyLimit": 1,
+      "readinessState": {
+        "codeIntegrated": false,
+        "offlineTested": false,
+        "credentialProvisioned": false,
+        "liveGateEnabled": false,
+        "verdict": "UNCERTIFIED_BENCHMARK_CANDIDATE_NETWORK_DISALLOWED"
+      }
+    }
+  ],
+  "matrixInvariants": {
+    "totalLiveCallsPermittedSegmentA": 0,
+    "totalLiveCallsPermittedSegmentB": 0,
+    "liveCallsPermittedSegmentC": "Bounded strictly to certified candidates upon Hard Gate 2 human approval",
+    "sovereignBoundaryEnforced": true,
+    "blackDataTransmissionProhibited": true
+  }
+}

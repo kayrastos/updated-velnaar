@@ -1,0 +1,202 @@
+{
+  "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
+  "segment": "B — PRODUCTION PROVISIONING PLAN",
+  "documentType": "DETERMINISTIC_PRODUCTION_PROVISIONING_SPECIFICATION",
+  "version": "v1.0",
+  "status": "APPROVED_FOR_REVIEW_NOT_EXECUTED",
+  "executionPrerequisite": "EXPLICIT_HUMAN_APPROVAL_HARD_GATE_1",
+  "targetRepository": "kayrastos/updated-velnaar",
+  "targetCommitBinding": "05a136b76342f3514ec6c69a3064763adbd54bf4",
+  "zeroActionGuaranteeSegmentA": "Strictly 0 Cloudflare, D1, Worker, or Identity writes performed during preparation",
+  "provisioningPlan": {
+    "step1_operationalHostname": {
+      "action": "CONFIRM_OR_PROVISION_OPERATIONAL_HOSTNAME",
+      "targetDomain": "ops.velnar.studio",
+      "dnsRecordType": "CNAME",
+      "proxyStatus": "proxied",
+      "cloudflareZone": "velnar.studio",
+      "securityInvariant": "Host must resolve through Cloudflare edge proxy to ensure Access enforcement",
+      "rollback": "Delete CNAME record ops.velnar.studio or revert DNS target"
+    },
+    "step2_accessTeamDomain": {
+      "action": "VERIFY_ACCESS_TEAM_DOMAIN",
+      "authoritativeTeamDomain": "https://velnar.cloudflareaccess.com",
+      "validationConstraints": {
+        "protocol": "https:",
+        "suffix": ".cloudflareaccess.com",
+        "subdomainPattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+      },
+      "rollback": "Unset team domain variable in Worker environment"
+    },
+    "step3_accessSelfHostedApplication": {
+      "action": "CREATE_CLOUDFLARE_ACCESS_APPLICATION",
+      "applicationName": "VELNAR Dedicated Operational Canary Surface",
+      "applicationType": "self_hosted",
+      "domain": "ops.velnar.studio/api/ops/canary/deepseek-certification",
+      "exactPathOnly": true,
+      "wildcardPrefixProhibited": true,
+      "sessionDuration": "15m",
+      "autoRedirectToIdentity": false,
+      "audCaptureRequirement": {
+        "variableName": "CLOUDFLARE_ACCESS_AUD",
+        "maxLengthCharacters": 64,
+        "format": "Opaque hex or alphanumeric string issued by Cloudflare Zero Trust"
+      },
+      "rollback": "Delete Access application via Cloudflare Zero Trust API"
+    },
+    "step4_accessPolicy": {
+      "action": "CREATE_ACCESS_POLICY",
+      "policyName": "Operational Canary Vetted Superadmins Only",
+      "decision": "allow",
+      "rules": {
+        "include": [
+          {
+            "type": "email",
+            "description": "Explicit enumerated allowlist of vetted operational engineers only"
+          }
+        ],
+        "require": [
+          {
+            "type": "mfa",
+            "description": "Hardware security key (FIDO2 / WebAuthn) required"
+          }
+        ]
+      },
+      "prohibitions": {
+        "wildcardAuthorization": "CATEGORICALLY_PROHIBITED",
+        "domainWideRules": "CATEGORICALLY_PROHIBITED",
+        "serviceTokenAdmissionAsHuman": "CATEGORICALLY_PROHIBITED",
+        "tenantRoleInheritance": "CATEGORICALLY_PROHIBITED"
+      },
+      "rollback": "Delete Access policy via Cloudflare Zero Trust API"
+    },
+    "step5_workerRuntimeConfiguration": {
+      "action": "SET_WORKER_NON_SECRET_RUNTIME_VARIABLES",
+      "variables": {
+        "CLOUDFLARE_ACCESS_TEAM_DOMAIN": "https://velnar.cloudflareaccess.com",
+        "CLOUDFLARE_ACCESS_AUD": "<CAPTURED_APPLICATION_AUD_64_CHAR>"
+      },
+      "classification": "Non-Secret Runtime Configuration",
+      "deploymentMethod": "wrangler.jsonc vars update or wrangler secret put for non-secret vars",
+      "rollback": "Unset CLOUDFLARE_ACCESS_TEAM_DOMAIN and CLOUDFLARE_ACCESS_AUD"
+    },
+    "step6_operatorAccessLoginAndCapture": {
+      "action": "AUDITED_OPERATOR_ACCESS_LOGIN",
+      "flow": [
+        "Operator completes Cloudflare Access login via browser",
+        "Worker logs non-secret assertion headers in safe test harness",
+        "Exact opaque accessSubject string captured from sub claim",
+        "Exact authenticated email string captured from email claim (<= 320 chars)",
+        "Confirm accessSubject is not assumed permanent or UUID"
+      ],
+      "rollback": "Invalidate Access session / revoke Access token"
+    },
+    "step7_superadminRegistryEnrollment": {
+      "action": "ENROLL_OPERATIONAL_SUPERADMIN_REGISTRY",
+      "targetFile": "worker/auth/cloudflareAccessOperationalAuth.ts",
+      "registryStructure": [
+        {
+          "accessSubject": "<CAPTURED_OPAQUE_CF_ACCESS_SUB>",
+          "expectedEmail": "<CAPTURED_OPERATOR_EMAIL>",
+          "status": "active",
+          "registryVersion": "a12b2c5-provisioned-v1"
+        }
+      ],
+      "dualAuthorization": "Dual-signed commit requirement",
+      "frozenStatus": "Remains Object.isFrozen at runtime",
+      "rollback": "Set status to suspended or empty registry array"
+    },
+    "step8_trustAnchorPackage": {
+      "action": "PROVISION_CRYPTOGRAPHIC_TRUST_ANCHORS",
+      "anchors": {
+        "humanAuthorizationTrustAnchor": {
+          "flag": "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED",
+          "targetConstant": true,
+          "targetFile": "worker/ai/canary/deepSeekProductionAuthorizationTrust.ts",
+          "algorithm": "Ed25519",
+          "authorityId": "auth-velnar-production-human-01",
+          "keyVersion": "v1",
+          "publicKeyPemLocation": "PRODUCTION_HUMAN_AUTHORITY_REGISTRY",
+          "fingerprintValidationSha256": true
+        },
+        "runtimeSourceProvenanceTrustAnchor": {
+          "flag": "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED",
+          "targetConstant": true,
+          "targetFile": "worker/ai/canary/deepSeekTrustedRuntimeSourceProvenance.ts",
+          "algorithm": "Ed25519",
+          "issuerId": "velnar-source-provenance-builder-01",
+          "keyVersion": "v1",
+          "boundRepository": "kayrastos/updated-velnaar",
+          "boundCommit": "05a136b76342f3514ec6c69a3064763adbd54bf4"
+        },
+        "guardedHumanAuthAttestation": {
+          "flag": "GUARDED_HUMAN_AUTH_ATTESTATION_READY",
+          "targetConstant": true,
+          "targetFile": "worker/ai/canary/deepSeekGuardedLiveTransport.ts"
+        },
+        "guardedSourceAttestation": {
+          "flag": "GUARDED_SOURCE_ATTESTATION_READY",
+          "targetConstant": true,
+          "targetFile": "worker/ai/canary/deepSeekGuardedLiveTransport.ts"
+        }
+      },
+      "specifications": {
+        "identityBinding": "Exact Ed25519 public key pem and authorityId matching authorized human operator",
+        "commitTreeBinding": "Source commit SHA and source tree SHA strictly validated against canonical Git state",
+        "expiry": "ISO 8601 UTC timestamp enforced; max authorization window <= 15 minutes (900 seconds)",
+        "rotation": "Static versioned replacement only; zero dynamic/remote rotation in production",
+        "revocation": "Explicit revocation list or status: suspended in registry; immediate fail-closed",
+        "antiReplay": "Single-use run_nonce and payload digest registered atomically in D1 authorization_replay_ledger",
+        "evidence": "Cryptographic signature receipt stored with invocation metadata; zero secret leakage",
+        "failClosedSemantics": "Any missing, invalid, expired, or non-matching attestation fails closed with 401/403"
+      },
+      "rollback": "Set all 4 trust flags to false and clear registries"
+    },
+    "step9_d1ProductionBindingAndVerification": {
+      "action": "PROVISION_AND_BIND_D1_DATABASE",
+      "databaseName": "velnar-production-db",
+      "wranglerConfiguration": {
+        "binding": "DB",
+        "database_name": "velnar-production-db",
+        "database_id": "<REAL_CLOUDFLARE_D1_UUID_36_CHAR>",
+        "migrations_dir": "migrations"
+      },
+      "verificationSteps": [
+        "Run wrangler d1 execute DB --command 'SELECT 1;'",
+        "Apply migrations 0001_initial_schema.sql through 0008_authorization_replay_ledger.sql",
+        "Verify table authorization_replay_ledger exists with 64-char hex primary key constraint",
+        "Execute atomic reservation test: insert row, verify conflict on duplicate replay_key, clean up test row"
+      ],
+      "concurrencyCertification": {
+        "flag": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED",
+        "targetConstant": true,
+        "targetFile": "worker/ai/canary/d1AuthorizationReplayBackend.ts"
+      },
+      "rollback": "Revert database_id in wrangler.jsonc to placeholder; drop canary test tables if needed"
+    },
+    "step10_preflightRouteGates": {
+      "action": "FLIP_OPERATIONAL_ROUTE_GATES",
+      "gates": {
+        "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": true,
+        "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": true
+      },
+      "targetFile": "worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts",
+      "mandatoryGuardrail": "CANARY_LIVE_EXECUTION_ENABLED REMAINS FALSE. Zero provider calls permitted in Segment B.",
+      "rollback": "Reset both gates to false in worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts"
+    }
+  },
+  "preMutationEvidenceSnapshotProcedure": {
+    "commandSequence": [
+      "git rev-parse HEAD > execution/snapshots/pre_mutation_head.txt",
+      "git write-tree > execution/snapshots/pre_mutation_tree.txt",
+      "npm run lint > execution/snapshots/pre_mutation_lint.log",
+      "npx vitest run tests/security/phaseA12B2C5U33PreLiveMasterReadiness.test.ts > execution/snapshots/pre_mutation_tests.log"
+    ]
+  },
+  "expectedCostImpact": {
+    "cloudflareAccess": "Free tier (up to 50 Zero Trust users) / $0.00",
+    "cloudflareD1": "Included in Worker paid tier / $0.00 additional for migration schema",
+    "providerCallsSegmentB": "$0.00 (Zero calls permitted in Segment B)"
+  },
+  "firstExternalIrreversibleAction": "Creation of the self-hosted Cloudflare Access Application via Cloudflare Zero Trust API / Dashboard"
+}
