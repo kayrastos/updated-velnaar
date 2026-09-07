@@ -1,9 +1,9 @@
 # VELNAR — Phase A.12B.2C-5U.3.3D Evidence Record
-## Cloudflare Access Dormant Provisioning Readiness & Human Approval Package (Repaired)
+## Cloudflare Access Dormant Provisioning Readiness — Canonical Independent Approval & Seal
 
 ### 1. Executive Summary
-- **Phase**: VELNAR — A.12B.2C-5U.3.3D-R
-- **Artifact Type**: `CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS`
+- **Phase**: VELNAR — A.12B.2C-5U.3.3D
+- **Artifact Type**: `CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS_SEAL`
 - **Repository**: `https://github.com/kayrastos/updated-velnaar`
 - **Branch**: `main`
 - **Original 5U.3.3D Readiness Base Commit**: `4b64de26fce19ccd18b9b03d6f7fe04f0bcba3fb`
@@ -12,19 +12,22 @@
 - **Original 5U.3.3D Readiness Implementation Tree**: `8de412fef04e77e345aba9c4f69366a7e1b0b173`
 - **Post-Readiness Intermediate Canonical Integration Commit**: `ad0b8e521d90cb98eec3fdec9e5bbf00e5ad8258`
 - **Post-Readiness Intermediate Canonical Integration Tree**: `38208437d108829b91e19e48a36d70408c8f8974`
-- **Current Canonical Repair Base Commit**: `de4538b4889ce5c6784dcebbe7191f909bb90cdf`
-- **Current Canonical Repair Base Tree**: `b61c0f97e69c0f4b600759fce9475b962b4970ef`
+- **Canonical Approved Snapshot Commit**: `05a136b76342f3514ec6c69a3064763adbd54bf4`
+- **Canonical Approved Snapshot Tree**: `d9fa32bab8dbd8201cc4351a3b13223a97b8a4ca`
+- **Parent Commit**: `de4538b4889ce5c6784dcebbe7191f909bb90cdf`
 - **Approved 5U.3.3C Implementation Snapshot**: `52902614aaa30995cc365a346c53bfa17a5727bc`
 - **Approved 5U.3.3C Implementation Tree**: `22c5e5242c35ac7b9c4c1e96254c0833e2feace3`
 - **Sealed Predecessors & Historical Closures**:
   - Phase A.12B.2C-5U.3.3B: **SEALED** (`A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED`)
   - Phase A.12B.2C-5U.3.3C: **SEALED** (`A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_APPROVED`)
   - Phase A.12B.2C-5U.3.3B-R2 Historical Closure: **SEALED** (`A12B2C5U33BR2_HISTORICAL_CERTIFICATION_CLOSURE_SEALED`, scope: `HISTORICAL_CERTIFICATION_CLOSURE_ONLY`)
-- **Phase Purpose**: Prepare the exact, production-ready Cloudflare Access dormant provisioning specification and human approval package required to protect the dedicated VELNAR operational route.
+- **Canonical Seal State**: **SEALED** (`sealed: true`)
+- **Final Verdict**: `A12B2C5U33D_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS_APPROVED`
+- **Final Status**: `A12B2C5U33D_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS_APPROVED`
+- **Phase Purpose**: Record independent approval and canonical seal metadata for the exact, production-ready Cloudflare Access dormant provisioning specification and human approval package required to protect the dedicated VELNAR operational route.
 - **Infrastructure Mutation Status**: **STRICTLY READ-ONLY** (Zero mutations performed).
 - **Human Provisioning Approval Status**: `HUMAN_PROVISIONING_APPROVAL_GRANTED = false`
-- **Current Phase Status**: `A12B2C5U33D_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS_COMPLETE_PENDING_INDEPENDENT_REVIEW`
-- **Independent Review Required**: `true`
+- **Independent Review Required**: `false` (Independent review successfully passed and recorded)
 
 ---
 
@@ -141,7 +144,7 @@ Future Access application specification for the dedicated operational surface:
    ```
 3. **Access Subject Semantics**:
    - The `accessSubject` is an opaque Cloudflare Access user subject identifier captured from a verified Access session and used as an exact registry binding.
-   - It **MUST NOT** be assumed globally or permanently immutable, nor is it guaranteed to be a UUID.
+   - It **MUST NOT** be assumed globally permanent, nor is it guaranteed to be a UUID.
    - If the Access subject changes (e.g. user removed and re-added to Zero Trust organization), the old registry binding fails closed, and a separately reviewed re-enrollment/update is required.
 4. **Dual Verification Prerequisites**:
    - Confirmation of current verified opaque Access `accessSubject` and `expectedEmail` from audited test session.
@@ -266,7 +269,7 @@ Resource existence in Cloudflare Zero Trust $\ne$ Ingress Readiness. Ingress rea
 | Inputs:                                                                           |
 |   - CLOUDFLARE_ACCESS_TEAM_DOMAIN: Authoritative HTTPS team domain                |
 |   - CLOUDFLARE_ACCESS_AUD: Application AUD generated in Step 1                    |
-| Expected Result: Worker runtime receives configuration without code changes       |
+| Expected Result: Worker runtime configuration contains non-secret variables       |
 | Verification: Read Worker environment via Wrangler/Dashboard (non-secret check)   |
 | Rollback: Unset environment variables in Worker environment                       |
 +-----------------------------------------------------------------------------------+
@@ -372,3 +375,36 @@ It is explicitly declared and confirmed that this phase does **NOT** claim:
 - Production routing enforcement allowed: **FALSE**
 - Production success path certified: **FALSE**
 - 5U.3.3B-R2 historical closure seal grants production activation: **FALSE**
+
+---
+
+### 20. Independent Review Approval & Canonical Seal
+- **Independent Reviewer**: Codex High
+- **Final Verdict**: `A12B2C5U33D_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS_APPROVED`
+- **Approved Snapshot Commit**: `05a136b76342f3514ec6c69a3064763adbd54bf4`
+- **Approved Snapshot Tree**: `d9fa32bab8dbd8201cc4351a3b13223a97b8a4ca`
+- **Canonical Seal State**: **SEALED** (`sealed: true`)
+- **Remaining Security Findings**: `0`
+- **Remaining Architecture Findings**: `0`
+- **Remaining Provider-Contract Findings**: `0`
+- **Remaining Material Evidence Findings**: `0`
+
+#### Independent Review Confirmations:
+1. **Cloudflare Provider-Contract Factual Accuracy**: Application AUD bound ($\le 64$ characters) and internal validator ceiling ($\le 256$ characters) are cleanly distinguished and documented accurately.
+2. **Conservative Email-Validation Terminology**: RFC 5322 full-compliance claim removed; accurately specified as conservative bounded operational email syntax validation ($\le 320$ JavaScript string characters).
+3. **Correct Public Auth Error Mapping**: `IDENTITY_BINDING_MISMATCH` is mapped strictly to HTTP 403 `FORBIDDEN` alongside registry absence/unauthorized errors.
+4. **Correct Access Subject Semantics**: Access `sub` is specified as an opaque user subject identifier captured from a verified session; immutability and UUID claims are removed; subject changes require re-enrollment.
+5. **Correct Service-Token JWT Shape & Separation**: Service-token shape has `type: "app"`, `sub: ""`, `common_name` present, and `email` absent; fails closed on human operational route with HTTP 401 (`HUMAN_SUBJECT_REQUIRED` / `EMAIL_REQUIRED`).
+6. **Self-Hosted Access Application Suitability**: Architecture correctly models self-hosted application boundary for operational endpoint.
+7. **Exact Path-Only Proposal**: Restricted strictly to `/api/ops/canary/deepseek-certification` without broad prefix wildcards.
+8. **Hostname Resolution State**: Operational hostname remains `PRODUCTION_OPERATIONAL_HOSTNAME_UNRESOLVED`; candidate `ops.velnar.studio` is classified strictly as `PROPOSED_NOT_CANONICAL`.
+9. **Team Domain State**: Authoritative team domain remains `UNRESOLVED`; recommendation `https://velnar.cloudflareaccess.com` is classified as `PROPOSED_NOT_CANONICAL`.
+10. **AUD Provider/Internal Limits Distinguished**: 64-character Cloudflare provider max vs. 256-character internal validator limit.
+11. **Auto Redirect Inactive While IdP Unresolved**: `auto_redirect_to_identity: false` enforced in current plan.
+12. **MFA & 15m Session Classified as Proposals**: Both classified as `PROPOSED_SECURITY_POLICY_NOT_CANONICAL`.
+13. **Future Human Policy is Least Privilege**: Deny by default, explicit enumerated allow list, no wildcards, no tenant authority bleed.
+14. **Worker Access Variables are Non-Secret Runtime Config**: Clearly separated from secret keys/credentials.
+15. **Production Superadmin Registry Remains Empty & Frozen**: Registry entry count is 0; `Object.isFrozen === true`.
+16. **Human Provisioning Approval Remains False**: `humanProvisioningApprovalGranted = false` and `cloudflareMutationAllowed = false` strictly preserved.
+17. **Zero External Infrastructure Mutations**: All mutation counters confirmed 0.
+18. **All Runtime & Readiness Gates Closed**: All 12 canonical safety ledger conditions remain strictly `false`.
