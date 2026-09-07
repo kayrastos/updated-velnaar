@@ -1,26 +1,81 @@
 {
   "phase": "A.12B.2C-5U.3.3C",
-  "artifactType": "PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_EVIDENCE",
-  "timestamp": "2026-09-07T15:15:00Z",
+  "artifactType": "PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION",
   "repository": "https://github.com/kayrastos/updated-velnaar",
+  "branch": "main",
   "baseCommit": "6f045f29ae335d59dcad6813c7f94f41fbb067a1",
   "baseTree": "5291280784b4307714eb80b9c0082bf35fb9ed07",
-  "branch": "main",
+  "repairBaseCommit": "033907e262b38e0eed6c94c67310bae17dacbefa",
+  "repairBaseTree": "35646cda17d70df77899a9fd0f49153337b3e902",
+  "originalImplementationCommit": "033907e262b38e0eed6c94c67310bae17dacbefa",
+  "originalImplementationCommitTimestampUtc": "2026-09-07T12:15:12Z",
+  "timestamp": "2026-09-07T12:35:46.489Z",
+  "phase5U33BSealed": true,
   "status": "A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
-  "priorPhaseSealed": {
-    "phase": "A.12B.2C-5U.3.3B",
-    "verdict": "A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED",
-    "status": "SEALED",
-    "foundationUntouched": true
+  "finalStatus": "A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+  "exactOperationalRouteCarveoutImplemented": true,
+  "operationalRouteDispatchBeforeTenantAuth": true,
+  "operationalRouteDispatchBeforeGenericOptions": true,
+  "tenantAuthContextUnchanged": true,
+  "operationalHandlerUsesAuthenticatedUser": false,
+  "operationalHandlerUsesProductionOperationalPrincipal": true,
+  "canonicalOperationalAuthResolverIntegrated": true,
+  "disabledRouteBarrierBeforeOperationalAuth": true,
+  "disabledRouteBarrierBeforeBodyRead": true,
+  "disabledRouteBarrierBeforeCapabilityAccess": true,
+  "disabledOperationalOptionsReturns404": true,
+  "disabledRouteJwksFetches": 0,
+  "disabledRouteBodyReads": 0,
+  "disabledRouteCapabilityExecutions": 0,
+  "canonicalSuperAdminRegistryEntryCount": 0,
+  "canonicalSuperAdminRegistryFrozen": true,
+  "realProductionIdentityEnrolled": false,
+  "cloudflareAccessProvisioned": false,
+  "productionAuthProviderConfigured": false,
+  "operationalIngressAuthReady": false,
+  "operationalRouteEnabled": false,
+  "providerCalls": 0,
+  "realD1Calls": 0,
+  "realProductionAuthNetworkCalls": 0,
+  "externalProvisioningCalls": 0,
+  "productionDeployments": 0,
+  "productionSecretOperations": 0,
+  "productionKeyOperations": 0,
+  "gateFlipOperations": 0,
+  "productionOperationalAuthLiveVerified": false,
+  "productionSuperAdminAuthProvenLive": false,
+  "productionSuccessPathCertified": false,
+  "independentReviewRequired": true,
+  "canonicalSafetyReadinessLedger": {
+    "1_PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+    "2_PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+    "3_CANARY_LIVE_EXECUTION_ENABLED": false,
+    "4_CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+    "5_GUARDED_SOURCE_ATTESTATION_READY": false,
+    "6_GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+    "7_PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+    "8_RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+    "9_D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
+    "10_D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
+    "11_D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
+    "12_productionRoutingEnforcementAllowed": false
+  },
+  "authFoundationState": {
+    "classification": "AUTH_FOUNDATION_STATE",
+    "canonicalSuperAdminRegistryLength": 0,
+    "canonicalSuperAdminRegistryFrozen": true,
+    "separateFromSafetyLedger": true
   },
   "runtimeIntegrationSummary": {
     "routerCarveOut": {
       "path": "/api/ops/canary/deepseek-certification",
       "matchingStrategy": "EXACT_PATH_EQUALITY_ONLY",
-      "dispatchLocation": "BEFORE_TENANT_SESSION_RESOLUTION",
+      "dispatchLocation": "BEFORE_GENERIC_OPTIONS_AND_TENANT_AUTH",
       "missingDbResilient": true,
       "siblingPathIsolation": true,
-      "pathTraversalResistant": true
+      "pathTraversalResistant": true,
+      "optionsReturns404WhileDormant": true,
+      "ordinaryOptionsUnchanged": true
     },
     "handlerSignature": {
       "parameters": [
@@ -43,6 +98,10 @@
       "tenantUserRemovedFromSignature": true,
       "authenticatedUserImportRemoved": true,
       "tenantRolesHaveZeroStanding": true,
+      "tenantOwnerStanding": "ZERO_OPERATIONAL_AUTHORITY",
+      "tenantAdminStanding": "ZERO_OPERATIONAL_AUTHORITY",
+      "tenantSuperAdminStanding": "ZERO_OPERATIONAL_AUTHORITY",
+      "tenantTokenCannotSubstituteAccessAssertion": true,
       "operationalAuthoritySource": "CLOUDFLARE_ACCESS_PLUS_SUPERADMIN_REGISTRY"
     },
     "dormantPassivity": {
@@ -51,6 +110,8 @@
       "dormantResponsePayload": {
         "error": "NOT_FOUND"
       },
+      "dormantOptionsResponseStatus": 404,
+      "dormantOptionsNot204": true,
       "dormantNetworkFetchCalls": 0,
       "dormantJwksResolutionCalls": 0,
       "dormantBodyStreamReads": 0,
@@ -74,7 +135,8 @@
           "error": "AUTH_SERVICE_UNAVAILABLE"
         }
       },
-      "authPrecedesBodyRead": true
+      "authPrecedesBodyRead": true,
+      "capabilityBoundaryNeverCalledOnAuthFailure": true
     },
     "trustRootProtection": {
       "callerKeyResolverAccepted": false,
@@ -84,39 +146,16 @@
       "configDerivedStrictlyFromEnv": true
     }
   },
-  "safetyGatesAndReadinessInvariants": {
-    "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
-    "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
-    "CANARY_LIVE_EXECUTION_ENABLED": false,
-    "CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
-    "GUARDED_SOURCE_ATTESTATION_READY": false,
-    "GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
-    "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
-    "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
-    "D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
-    "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
-    "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
-    "PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY_LENGTH": 0,
-    "allTwelveGatesVerified": true
-  },
-  "zeroActionVerification": {
-    "providerCalls": 0,
-    "realD1Calls": 0,
-    "realNetworkFetchCalls": 0,
-    "gateFlipOperations": 0,
-    "productionDeployments": 0,
-    "secretCreationsOrMutations": 0
-  },
   "fileScope": {
     "modified": [
       "worker/index.ts",
-      "worker/ai/canary/deepSeekProductionWorkerOperationalRoute.ts",
-      "tests/ai/phaseA12B2C5U32ProductionWorkerHostBinding.test.ts"
-    ],
-    "added": [
       "tests/security/phaseA12B2C5U33CProductionOperationalAuthRuntimeIntegration.test.ts",
       "execution/a12b2c5u33c_production_operational_auth_runtime_integration_foundation.json",
       "execution/a12b2c5u33c_production_operational_auth_runtime_integration_foundation.md"
+    ],
+    "priorPhase5U33CModifiedAndPreserved": [
+      "worker/ai/canary/deepSeekProductionWorkerOperationalRoute.ts",
+      "tests/ai/phaseA12B2C5U32ProductionWorkerHostBinding.test.ts"
     ],
     "strictlyUntouched": [
       "worker/auth/cloudflareAccessOperationalAuth.ts",
@@ -131,18 +170,41 @@
       "package-lock.json",
       "wrangler.jsonc",
       "migrations/**",
-      "execution/a12b2c5u33b_*"
+      "execution/a12b2c5u33b_production_operational_authentication_foundation.json",
+      "execution/a12b2c5u33b_production_operational_authentication_foundation.md"
     ]
   },
   "verificationResults": {
-    "totalTestFiles": 62,
-    "totalTests": 2494,
-    "totalPassed": 2494,
-    "totalFailed": 0,
-    "dedicatedIntegrationSuitePassed": 47,
-    "hostBindingSuitePassed": 62,
-    "operationalAuthSuitePassed": 66,
-    "apiRoutesSuitePassed": 39,
+    "dedicatedIntegrationSuite": {
+      "file": "tests/security/phaseA12B2C5U33CProductionOperationalAuthRuntimeIntegration.test.ts",
+      "totalTests": 60,
+      "passed": 60,
+      "failed": 0
+    },
+    "hostBindingSuite": {
+      "file": "tests/ai/phaseA12B2C5U32ProductionWorkerHostBinding.test.ts",
+      "totalTests": 62,
+      "passed": 62,
+      "failed": 0
+    },
+    "operationalAuthFoundationSuite": {
+      "file": "tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts",
+      "totalTests": 66,
+      "passed": 66,
+      "failed": 0
+    },
+    "apiRoutesSuite": {
+      "file": "tests/worker/apiRoutes.test.ts",
+      "totalTests": 39,
+      "passed": 39,
+      "failed": 0
+    },
+    "fullTestSuite": {
+      "totalFiles": 62,
+      "totalTests": 2507,
+      "passed": 2507,
+      "failed": 0
+    },
     "typecheck": "PASS",
     "lint": "PASS",
     "build": "PASS"

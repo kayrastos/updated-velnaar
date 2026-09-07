@@ -1,16 +1,17 @@
 /**
  * @file tests/security/phaseA12B2C5U33CProductionOperationalAuthRuntimeIntegration.test.ts
- * @description Phase A.12B.2C-5U.3.3C Production Operational Auth Runtime Integration Foundation Security Tests
+ * @description Phase A.12B.2C-5U.3.3C-R Production Operational Auth Runtime Integration Foundation Security Tests
  *
  * MANDATES TESTED:
- * - Group A: Router Carve-Out & Path Routing (exact match, before tenant auth, missing DB resilience, sibling paths, path traversal).
- * - Group B: Dormant Route Passivity & Zero-Work Guarantee (404 by default, zero fetch/JWKS, zero body reads, zero config reads).
- * - Group C: Tenant Auth Isolation & Zero Operational Standing (tenant routes require tenant user, tenant roles have zero operational standing).
+ * - Group A: Router Carve-Out & Path Routing (exact match, before generic OPTIONS preflight, before tenant auth, missing DB resilience, sibling paths, path traversal).
+ * - Group B: Dormant Route Passivity & Zero-Work Guarantee (404 by default for all HTTP methods including OPTIONS, zero fetch/JWKS, zero body reads, zero config reads, token shape passivity).
+ * - Group C: Tenant Auth Isolation & Zero Operational Standing (tenant OWNER/ADMIN/superadmin have zero operational standing, tenant token cannot substitute for Access assertion).
  * - Group D: Handler Signature & Parameter Integrity (arguments.length === 2, rejects 0, 1, 3, 4 args, no AuthenticatedUser import).
- * - Group E: Test-Only Future Auth Path Evaluation (401 for missing/invalid/expired token, 403 for unauthorized/empty registry, 503 for config/JWKS failure).
+ * - Group E: Test-Only Future Auth Path Evaluation (401 for missing/invalid/expired token, 403 for unauthorized/empty registry, 503 for config/JWKS failure, capability boundary calls = 0 on auth failure).
  * - Group F: Canonical Trust Boundary Protection (no caller keyResolver injection, no request-controlled trust roots).
- * - Group G: Gate Regression & Safety Invariants (all 12 canonical safety/readiness conditions strictly false / sealed).
- * - Group H: Network / D1 / Provider Isolation (fetch calls = 0, D1 calls = 0, provider calls = 0).
+ * - Group G: Canonical 12-Condition Safety/Readiness Ledger (all 12 canonical conditions strictly false / sealed).
+ * - Supplemental: Auth Foundation State (registry length = 0, frozen = true, categorized as AUTH_FOUNDATION_STATE).
+ * - Group H: Network / D1 / Provider Isolation & Zero-Action Verification (runtime instrumented + source inspected).
  */
 
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
@@ -61,8 +62,9 @@ import {
   D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED,
   D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED,
 } from '../../worker/ai/canary/d1AuthorizationReplayBackend';
+import { DEEPSEEK_FIRST_PROVIDER_STRATEGY } from '../../worker/ai/canary/deepSeekFirstProviderStrategy';
 
-describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integration Foundation', () => {
+describe('Phase A.12B.2C-5U.3.3C-R: Production Operational Auth Runtime Integration Foundation', () => {
   const TEST_TEAM_DOMAIN = 'https://velnar-test.cloudflareaccess.com';
   const TEST_AUD = 'test-aud-64char-hex-operational-canary-lane-1234567890abcdef12345678';
   const TEST_KID = 'test-key-id-001';
@@ -383,6 +385,100 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
       vi.doUnmock('../../worker/auth/authContext');
       vi.resetModules();
     });
+
+    it('A.8 operational carve-out executes BEFORE generic OPTIONS preflight and returns 404 (NOT 204)', async () => {
+      vi.resetModules();
+
+      const fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+
+      let resolveSessionUserCalled = false;
+      const actualAuth = await vi.importActual<any>('../../worker/auth/authContext');
+      vi.doMock('../../worker/auth/authContext', () => ({
+        ...actualAuth,
+        AuthContextService: {
+          ...actualAuth.AuthContextService,
+          resolveSessionUser: vi.fn(() => {
+            resolveSessionUserCalled = true;
+            return null;
+          }),
+        },
+      }));
+
+      const workerMod = await import('../../worker/index');
+      const worker = workerMod.default;
+
+      const hostEnv: any = {
+        ENVIRONMENT: 'production',
+        DB: { name: 'host_bound_db' },
+        CLOUDFLARE_ACCESS_TEAM_DOMAIN: TEST_TEAM_DOMAIN,
+        CLOUDFLARE_ACCESS_AUD: TEST_AUD,
+      };
+
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'OPTIONS',
+        headers: {
+          'Origin': 'https://velnar.studio',
+          'Access-Control-Request-Method': 'POST',
+        },
+      });
+
+      const response = await worker.fetch(request, hostEnv);
+
+      // Critical proof: does NOT return 204 from generic CORS preflight! Returns 404 from dormant handler!
+      expect(response.status).toBe(404);
+      expect(response.status).not.toBe(204);
+      const json = (await response.json()) as any;
+      expect(json).toEqual({ error: 'NOT_FOUND' });
+
+      // Zero tenant auth resolution
+      expect(resolveSessionUserCalled).toBe(false);
+      // Zero JWKS/network fetch calls
+      expect(fetchSpy).toHaveBeenCalledTimes(0);
+
+      vi.doUnmock('../../worker/auth/authContext');
+      vi.resetModules();
+    });
+
+    it('A.9 ordinary non-operational route OPTIONS retains normal CORS preflight behavior', async () => {
+      vi.resetModules();
+
+      const workerMod = await import('../../worker/index');
+      const worker = workerMod.default;
+
+      const hostEnv: any = {
+        ENVIRONMENT: 'production',
+        DB: { name: 'host_bound_db' },
+      };
+
+      // Valid origin on ordinary route
+      const requestValidOrigin = new Request('https://velnar.studio/api/projects', {
+        method: 'OPTIONS',
+        headers: {
+          'Origin': 'https://velnar.studio',
+          'Access-Control-Request-Method': 'GET',
+        },
+      });
+
+      const responseValid = await worker.fetch(requestValidOrigin, hostEnv);
+      expect(responseValid.status).toBe(204);
+      expect(responseValid.headers.get('Access-Control-Allow-Origin')).toBe('https://velnar.studio');
+      expect(responseValid.headers.get('Access-Control-Allow-Methods')).toContain('POST');
+
+      // Unknown origin receives 403 on generic preflight
+      const requestUnknownOrigin = new Request('https://velnar.studio/api/projects', {
+        method: 'OPTIONS',
+        headers: {
+          'Origin': 'https://attacker.com',
+          'Access-Control-Request-Method': 'GET',
+        },
+      });
+
+      const responseUnknown = await worker.fetch(requestUnknownOrigin, hostEnv);
+      expect(responseUnknown.status).toBe(403);
+
+      vi.resetModules();
+    });
   });
 
   // ==========================================================================
@@ -460,7 +556,7 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
           teamDomainReads++;
           throw new Error('UNEXPECTED_TEAM_DOMAIN_READ');
         },
-        get CLOUDFLARE_ACCESS_AUDIENCE() {
+        get CLOUDFLARE_ACCESS_AUD() {
           audReads++;
           throw new Error('UNEXPECTED_AUD_READ');
         },
@@ -475,6 +571,66 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
       expect(response.status).toBe(404);
       expect(teamDomainReads).toBe(0);
       expect(audReads).toBe(0);
+    });
+
+    it('B.5 dormant HTTP method invariant: ALL methods return 404 NOT_FOUND while gates are false', async () => {
+      const methods = ['OPTIONS', 'GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'];
+      const env: any = { ENVIRONMENT: 'production' };
+
+      for (const method of methods) {
+        const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        const response = await handleProductionCanaryOperationalRoute(request, env);
+        expect(response.status).toBe(404);
+        const json = (await response.json()) as any;
+        expect(json).toEqual({ error: 'NOT_FOUND' });
+      }
+    });
+
+    it('B.6 dormant token shapes at Worker host level all return 404 with ZERO fetch/JWKS calls', async () => {
+      vi.resetModules();
+
+      const fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const workerMod = await import('../../worker/index');
+      const worker = workerMod.default;
+
+      const hostEnv: any = {
+        ENVIRONMENT: 'production',
+        DB: { name: 'host_bound_db' },
+        CLOUDFLARE_ACCESS_TEAM_DOMAIN: TEST_TEAM_DOMAIN,
+        CLOUDFLARE_ACCESS_AUD: TEST_AUD,
+      };
+
+      const validSyntheticToken = await createSyntheticAccessJwt();
+
+      const testCases = [
+        { name: 'no Access assertion', headers: { 'Content-Type': 'application/json' } },
+        { name: 'malformed Access assertion', headers: { 'Content-Type': 'application/json', [CF_ACCESS_JWT_ASSERTION_HEADER_CANONICAL]: 'bad.token.shape' } },
+        { name: 'valid synthetic Access assertion', headers: { 'Content-Type': 'application/json', [CF_ACCESS_JWT_ASSERTION_HEADER_CANONICAL]: validSyntheticToken } },
+      ];
+
+      for (const tc of testCases) {
+        const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+          method: 'POST',
+          headers: tc.headers,
+          body: JSON.stringify(createValidDummyPayload()),
+        });
+
+        const response = await worker.fetch(request, hostEnv);
+        expect(response.status, `Failed on ${tc.name}`).toBe(404);
+        const json = (await response.json()) as any;
+        expect(json).toEqual({ error: 'NOT_FOUND' });
+      }
+
+      // Proves strictly zero fetch / JWKS calls across all dormant token shapes
+      expect(fetchSpy).toHaveBeenCalledTimes(0);
+
+      vi.resetModules();
     });
   });
 
@@ -534,6 +690,193 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
       expect(source).not.toContain("from '../../auth/authContext'");
       expect(source).not.toContain("from '../auth/authContext'");
       expect(source).not.toMatch(/import\s*\{[^}]*AuthenticatedUser[^}]*\}\s*from/);
+    });
+
+    it('C.5 tenant OWNER has zero operational authority: AuthContextService is never called', async () => {
+      vi.resetModules();
+
+      let resolveSessionUserCalled = false;
+      const actualAuth = await vi.importActual<any>('../../worker/auth/authContext');
+      vi.doMock('../../worker/auth/authContext', () => ({
+        ...actualAuth,
+        AuthContextService: {
+          ...actualAuth.AuthContextService,
+          resolveSessionUser: vi.fn(() => {
+            resolveSessionUserCalled = true;
+            return {
+              userId: 'usr_tenant_owner',
+              email: 'owner@tenant.io',
+              fullName: 'Tenant Owner',
+              memberships: [{ organizationId: 'org_1', role: 'OWNER', status: 'active' }],
+              isSuperAdmin: false,
+            };
+          }),
+        },
+      }));
+
+      const workerMod = await import('../../worker/index');
+      const worker = workerMod.default;
+
+      const hostEnv: any = { ENVIRONMENT: 'production', DB: {} as any };
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer owner_tenant_token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createValidDummyPayload()),
+      });
+
+      const response = await worker.fetch(request, hostEnv);
+      expect(response.status).toBe(404);
+      expect(resolveSessionUserCalled).toBe(false);
+
+      vi.doUnmock('../../worker/auth/authContext');
+      vi.resetModules();
+    });
+
+    it('C.6 tenant ADMIN has zero operational authority: AuthContextService is never called', async () => {
+      vi.resetModules();
+
+      let resolveSessionUserCalled = false;
+      const actualAuth = await vi.importActual<any>('../../worker/auth/authContext');
+      vi.doMock('../../worker/auth/authContext', () => ({
+        ...actualAuth,
+        AuthContextService: {
+          ...actualAuth.AuthContextService,
+          resolveSessionUser: vi.fn(() => {
+            resolveSessionUserCalled = true;
+            return {
+              userId: 'usr_tenant_admin',
+              email: 'admin@tenant.io',
+              fullName: 'Tenant Admin',
+              memberships: [{ organizationId: 'org_1', role: 'ADMIN', status: 'active' }],
+              isSuperAdmin: false,
+            };
+          }),
+        },
+      }));
+
+      const workerMod = await import('../../worker/index');
+      const worker = workerMod.default;
+
+      const hostEnv: any = { ENVIRONMENT: 'production', DB: {} as any };
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer admin_tenant_token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createValidDummyPayload()),
+      });
+
+      const response = await worker.fetch(request, hostEnv);
+      expect(response.status).toBe(404);
+      expect(resolveSessionUserCalled).toBe(false);
+
+      vi.doUnmock('../../worker/auth/authContext');
+      vi.resetModules();
+    });
+
+    it('C.7 tenant isSuperAdmin === true has zero operational authority: AuthContextService is never called', async () => {
+      vi.resetModules();
+
+      let resolveSessionUserCalled = false;
+      const actualAuth = await vi.importActual<any>('../../worker/auth/authContext');
+      vi.doMock('../../worker/auth/authContext', () => ({
+        ...actualAuth,
+        AuthContextService: {
+          ...actualAuth.AuthContextService,
+          resolveSessionUser: vi.fn(() => {
+            resolveSessionUserCalled = true;
+            return {
+              userId: 'usr_tenant_superadmin',
+              email: 'superadmin@tenant.io',
+              fullName: 'Tenant Superadmin',
+              memberships: [],
+              isSuperAdmin: true,
+            };
+          }),
+        },
+      }));
+
+      const workerMod = await import('../../worker/index');
+      const worker = workerMod.default;
+
+      const hostEnv: any = { ENVIRONMENT: 'production', DB: {} as any };
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer tenant_superadmin_token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createValidDummyPayload()),
+      });
+
+      const response = await worker.fetch(request, hostEnv);
+      expect(response.status).toBe(404);
+      expect(resolveSessionUserCalled).toBe(false);
+
+      vi.doUnmock('../../worker/auth/authContext');
+      vi.resetModules();
+    });
+
+    it('C.8 future-path test: tenant Authorization header cannot substitute for operational Access token (returns 401)', async () => {
+      vi.resetModules();
+
+      vi.doMock('../../worker/ai/canary/deepSeekProductionOperationalRoutePolicy', () => ({
+        PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH: '/api/ops/canary/deepseek-certification',
+        PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED: true,
+        PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY: true,
+      }));
+
+      const routeMod = await import('../../worker/ai/canary/deepSeekProductionWorkerOperationalRoute');
+
+      const env: any = {
+        ENVIRONMENT: 'production',
+        CLOUDFLARE_ACCESS_TEAM_DOMAIN: TEST_TEAM_DOMAIN,
+        CLOUDFLARE_ACCESS_AUD: TEST_AUD,
+      };
+
+      // Request has tenant Authorization header, but NO Cf-Access-Jwt-Assertion header!
+      const request = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer tenant_superadmin_credentials_xyz',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createValidDummyPayload()),
+      });
+
+      const response = await routeMod.handleProductionCanaryOperationalRoute(request, env);
+      expect(response.status).toBe(401);
+      const json = (await response.json()) as any;
+      expect(json).toEqual({ error: 'UNAUTHORIZED' });
+
+      vi.doUnmock('../../worker/ai/canary/deepSeekProductionOperationalRoutePolicy');
+      vi.resetModules();
+    });
+
+    it('C.9 ordinary tenant auth non-regression: canonical authContext resolves valid test sessions', () => {
+      // 1. Dev fixture token in development environment
+      const devUser = AuthContextService.resolveSessionUser('Bearer dev_owner_token', 'development');
+      expect(devUser).not.toBeNull();
+      expect(devUser?.userId).toBe('usr_dev_owner');
+      expect(devUser?.memberships[0]?.role).toBe('OWNER');
+
+      // 2. Synthetic test token in test environment
+      const testUser = AuthContextService.resolveSessionUser('Bearer test_user:usr_test_admin:org_apex:ADMIN', 'test');
+      expect(testUser).not.toBeNull();
+      expect(testUser?.userId).toBe('usr_test_admin');
+      expect(testUser?.memberships[0]?.role).toBe('ADMIN');
+
+      // 3. Dev fixture token in production environment fails closed (null)
+      const prodDevUser = AuthContextService.resolveSessionUser('Bearer dev_owner_token', 'production');
+      expect(prodDevUser).toBeNull();
+
+      // 4. Missing token fails closed (null)
+      const unauthUser = AuthContextService.resolveSessionUser(null, 'production');
+      expect(unauthUser).toBeNull();
     });
   });
 
@@ -881,6 +1224,64 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
 
       cleanup();
     });
+
+    it('E.9 capability boundary must NOT execute on any auth failure (call count strictly 0)', async () => {
+      vi.resetModules();
+
+      let capabilityExecutionCalls = 0;
+      vi.doMock('../../worker/ai/canary/deepSeekProductionWorkerCapabilityBoundary', () => ({
+        executeProductionWorkerCanaryCertification: vi.fn(async () => {
+          capabilityExecutionCalls++;
+          return { success: true };
+        }),
+      }));
+
+      vi.doMock('../../worker/ai/canary/deepSeekProductionOperationalRoutePolicy', () => ({
+        PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH: '/api/ops/canary/deepseek-certification',
+        PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED: true,
+        PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY: true,
+      }));
+
+      const routeMod = await import('../../worker/ai/canary/deepSeekProductionWorkerOperationalRoute');
+
+      // Test 1: Missing assertion token -> 401
+      const env: any = {
+        ENVIRONMENT: 'production',
+        CLOUDFLARE_ACCESS_TEAM_DOMAIN: TEST_TEAM_DOMAIN,
+        CLOUDFLARE_ACCESS_AUD: TEST_AUD,
+      };
+      const reqMissingToken = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createValidDummyPayload()),
+      });
+      const resp1 = await routeMod.handleProductionCanaryOperationalRoute(reqMissingToken, env);
+      expect(resp1.status).toBe(401);
+      expect(capabilityExecutionCalls).toBe(0);
+
+      // Test 2: Malformed token -> 401
+      const reqMalformed = new Request('https://velnar.studio/api/ops/canary/deepseek-certification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          [CF_ACCESS_JWT_ASSERTION_HEADER_CANONICAL]: 'bad.token',
+        },
+        body: JSON.stringify(createValidDummyPayload()),
+      });
+      const resp2 = await routeMod.handleProductionCanaryOperationalRoute(reqMalformed, env);
+      expect(resp2.status).toBe(401);
+      expect(capabilityExecutionCalls).toBe(0);
+
+      // Test 3: Missing config -> 503
+      const envNoDomain: any = { ENVIRONMENT: 'production', CLOUDFLARE_ACCESS_AUD: TEST_AUD };
+      const resp3 = await routeMod.handleProductionCanaryOperationalRoute(reqMissingToken, envNoDomain);
+      expect(resp3.status).toBe(503);
+      expect(capabilityExecutionCalls).toBe(0);
+
+      vi.doUnmock('../../worker/ai/canary/deepSeekProductionWorkerCapabilityBoundary');
+      vi.doUnmock('../../worker/ai/canary/deepSeekProductionOperationalRoutePolicy');
+      vi.resetModules();
+    });
   });
 
   // ==========================================================================
@@ -920,12 +1321,23 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
         expect(code).not.toContain('KEY');
       }
     });
+
+    it('F.4 request headers/params cannot override canonical issuer, audience, or registry', async () => {
+      const filePath = path.resolve('worker/ai/canary/deepSeekProductionWorkerOperationalRoute.ts');
+      const source = fs.readFileSync(filePath, 'utf8');
+
+      // Route handler has no custom issuer, aud, or registry extraction logic
+      expect(source).not.toContain('x-custom-issuer');
+      expect(source).not.toContain('x-custom-audience');
+      expect(source).not.toContain('x-custom-registry');
+      expect(source).not.toContain('keyResolver');
+    });
   });
 
   // ==========================================================================
-  // GROUP G: Gate Regression & Safety Invariant
+  // GROUP G: Canonical 12-Condition Safety/Readiness Ledger
   // ==========================================================================
-  describe('Group G: Gate Regression & Safety Invariants', () => {
+  describe('Group G: Canonical 12-Condition Safety/Readiness Ledger', () => {
     it('G.1 PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED is strictly false', () => {
       expect(PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED).toBe(false);
     });
@@ -938,7 +1350,7 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
       expect(CANARY_LIVE_EXECUTION_ENABLED).toBe(false);
     });
 
-    it('G.4 CANARY_LIVE_EXECUTION_STATE is strictly DORMANT_GATED', () => {
+    it('G.4 CANARY_LIVE_EXECUTION_STATE is strictly BLOCKED_PENDING_CERTIFICATION', () => {
       expect(CANARY_LIVE_EXECUTION_STATE).toBe('BLOCKED_PENDING_CERTIFICATION');
     });
 
@@ -970,17 +1382,21 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
       expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
     });
 
-    it('G.12 PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY is strictly empty (length 0)', () => {
+    it('G.12 productionRoutingEnforcementAllowed is strictly false (Canonical Gate #12)', () => {
+      expect(DEEPSEEK_FIRST_PROVIDER_STRATEGY.securityInvariants.productionRoutingEnforcementAllowed).toBe(false);
+    });
+
+    it('Supplemental: AUTH_FOUNDATION_STATE: canonical superadmin registry is empty (0) and frozen', () => {
       expect(PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY).toHaveLength(0);
       expect(Object.isFrozen(PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY)).toBe(true);
     });
   });
 
   // ==========================================================================
-  // GROUP H: Network / D1 / Provider Isolation
+  // GROUP H: Network / D1 / Provider Isolation & Zero-Action Verification
   // ==========================================================================
-  describe('Group H: Network / D1 / Provider Isolation', () => {
-    it('H.1 dormant route causes exactly ZERO network fetch calls', async () => {
+  describe('Group H: Network / D1 / Provider Isolation & Zero-Action Verification', () => {
+    it('H.1 runtime-instrumented: dormant route causes exactly ZERO network fetch calls', async () => {
       const fetchSpy = vi.fn();
       vi.stubGlobal('fetch', fetchSpy);
 
@@ -1000,7 +1416,7 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
       expect(fetchSpy).toHaveBeenCalledTimes(0);
     });
 
-    it('H.2 dormant route causes exactly ZERO D1 database operations', async () => {
+    it('H.2 runtime-instrumented: dormant route causes exactly ZERO D1 database operations', async () => {
       let d1PrepareCalls = 0;
       let d1BatchCalls = 0;
 
@@ -1032,7 +1448,7 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
       expect(d1BatchCalls).toBe(0);
     });
 
-    it('H.3 dormant route causes exactly ZERO DeepSeek provider calls', async () => {
+    it('H.3 runtime-instrumented: dormant route causes exactly ZERO DeepSeek provider calls', async () => {
       let secretAccessCount = 0;
       const env: any = {
         ENVIRONMENT: 'production',
@@ -1051,6 +1467,25 @@ describe('Phase A.12B.2C-5U.3.3C: Production Operational Auth Runtime Integratio
       const response = await handleProductionCanaryOperationalRoute(request, env);
       expect(response.status).toBe(404);
       expect(secretAccessCount).toBe(0);
+    });
+
+    it('H.4 source/diff-inspected: zero provisioning, deployments, secret mutations, or key operations', () => {
+      const routeSource = fs.readFileSync(
+        path.resolve('worker/ai/canary/deepSeekProductionWorkerOperationalRoute.ts'),
+        'utf8'
+      );
+      // Zero Cloudflare provisioning API clients
+      expect(routeSource).not.toContain('api.cloudflare.com');
+      // Zero secret mutation calls
+      expect(routeSource).not.toContain('putSecret');
+      expect(routeSource).not.toContain('deleteSecret');
+      // Zero KMS key generation
+      expect(routeSource).not.toContain('generateKey');
+      // Zero deployment triggers
+      expect(routeSource).not.toContain('deployWorker');
+      // Zero gate flips
+      expect(PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED).toBe(false);
+      expect(PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY).toBe(false);
     });
   });
 });

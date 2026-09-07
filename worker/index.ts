@@ -96,6 +96,17 @@ export default {
     const environment = env?.ENVIRONMENT || 'production';
     const validatedOrigin = getValidatedCorsOrigin(origin, environment, env?.ALLOWED_ORIGINS);
 
+    // Dedicated Production Canary Operational Route (Dormant Foundation)
+    // Carved out BEFORE generic OPTIONS preflight and tenant authentication;
+    // uses dedicated operational trust domain.
+    if (url.pathname === PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH) {
+      const operationalResponse = await handleProductionCanaryOperationalRoute(
+        request,
+        env
+      );
+      return addCorsAndSecurityHeaders(operationalResponse, validatedOrigin);
+    }
+
     // 1. Handle CORS Preflight
     if (request.method === 'OPTIONS') {
       if (origin && !validatedOrigin) {
@@ -149,16 +160,6 @@ export default {
           message: 'Dev demo endpoint is disabled in production.',
         }, { status: 404 });
         return addCorsAndSecurityHeaders(devDisabledResp, validatedOrigin);
-      }
-
-      // Dedicated Production Canary Operational Route (Dormant Foundation)
-      // Carved out BEFORE tenant authentication; uses dedicated operational trust domain.
-      if (url.pathname === PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH) {
-        const operationalResponse = await handleProductionCanaryOperationalRoute(
-          request,
-          env
-        );
-        return addCorsAndSecurityHeaders(operationalResponse, validatedOrigin);
       }
 
       // 3. Resolve Authenticated Identity (Fail-Closed)
