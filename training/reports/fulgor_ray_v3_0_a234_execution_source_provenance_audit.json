@@ -1,0 +1,136 @@
+{
+  "schema": "fulgor.a234_execution_source_provenance_audit.v1",
+  "status": "PASS_A234_EXECUTION_SOURCE_PROVENANCE_AUDIT",
+  "canonical_commit": "40eb6e02f18d5d241cd9cb23f9380418f7899638",
+  "v6_results_sha256": "29e5935280052513a7bdb2c6203c76591f47c5e8ec9116adff5a6e6849670747",
+  "postrun_final_seal_sha256": "c2f2273b3ce438d73ef3c4f0ec4ae93fa2b2bfb19b145ff6974c0c0914d243a9",
+  "first_party_dependency_count": 12,
+  "tracked_dependency_count": 4,
+  "missing_from_canonical_git_count": 8,
+  "exact_local_recovery_count": 0,
+  "unresolved_dependency_count": 8,
+  "dependency_inventory": {
+    "candidate_host_binding_v1": {
+      "path": "training/fulgor_ray_v3/candidate_host_binding_v1.py",
+      "classification": "A. PRESENT_AND_TRACKED_AT_CANONICAL_HEAD",
+      "sha256": "b5a7fc331798892bbd14bdad443e9203e3a1596b5f6cc69209f300359eb2386c",
+      "role": "Candidate host-binding, span checks, unique anchor derivation"
+    },
+    "semantic_patch_intent_v2": {
+      "path": "training/fulgor_ray_v3/semantic_patch_intent_v2.py",
+      "classification": "A. PRESENT_AND_TRACKED_AT_CANONICAL_HEAD",
+      "sha256": "31a6f04f87a37e240ac1bb85692f61b8c26e44221ff39035697e5c70d01a1709",
+      "role": "Model-facing patch intent schema, coordinate parsing"
+    },
+    "stage_contract_prompts_v4": {
+      "path": "training/fulgor_ray_v3/stage_contract_prompts_v4.py",
+      "classification": "A. PRESENT_AND_TRACKED_AT_CANONICAL_HEAD",
+      "sha256": "a66bf49189e7c2857fe495ec36119bea119ac1caf2f965883336eb86916adf9b",
+      "role": "Stage contract system prompts (diagnosis, plan, candidate, verifier)"
+    },
+    "a234_launch_receipt_v6": {
+      "path": "training/fulgor_ray_v3/a234_launch_receipt_v6.py",
+      "classification": "A. PRESENT_AND_TRACKED_AT_CANONICAL_HEAD",
+      "sha256": "23ebd02fbe9991f8a20f10c46d284e206aecdbdc5a9ab818823e30e2ddc31675",
+      "role": "Preflight inspection, launch receipt generation, audit trail"
+    },
+    "context_budget_v2": {
+      "path": "training/fulgor_ray_v3/context_budget_v2.py",
+      "classification": "E. EXPECTED_BY_SEAL_OR_RECEIPT_BUT_SOURCE_NOT_FOUND",
+      "expected_sha256": "da9ae0af2ed057287660abf820d31b4bed869b89d97a38db53ba9d9680f3374c",
+      "role": "Context budgeting, token fitting, chat prompt tokenization"
+    },
+    "a1_inference": {
+      "path": "training/fulgor_ray_v3/a1_inference.py",
+      "classification": "E. EXPECTED_BY_SEAL_OR_RECEIPT_BUT_SOURCE_NOT_FOUND",
+      "expected_sha256": null,
+      "role": "LocalRepositoryProvider, repository file localization"
+    },
+    "a234_inference": {
+      "path": "training/fulgor_ray_v3/a234_inference.py",
+      "classification": "E. EXPECTED_BY_SEAL_OR_RECEIPT_BUT_SOURCE_NOT_FOUND",
+      "expected_sha256": null,
+      "role": "A234ContractError, SLOTS, blind_id, candidate selection, parse_verifier"
+    },
+    "constants": {
+      "path": "training/fulgor_ray_v3/constants.py",
+      "classification": "E. EXPECTED_BY_SEAL_OR_RECEIPT_BUT_SOURCE_NOT_FOUND",
+      "expected_sha256": null,
+      "role": "CANDIDATE_BUDGET, MAX_FEEDBACK_REFINEMENTS"
+    },
+    "patch_serializer": {
+      "path": "training/fulgor_ray_v3/patch_serializer.py",
+      "classification": "E. EXPECTED_BY_SEAL_OR_RECEIPT_BUT_SOURCE_NOT_FOUND",
+      "expected_sha256": null,
+      "role": "Strict patch serialization, SerializationError, unified diff generation"
+    },
+    "schemas": {
+      "path": "training/fulgor_ray_v3/schemas.py",
+      "classification": "E. EXPECTED_BY_SEAL_OR_RECEIPT_BUT_SOURCE_NOT_FOUND",
+      "expected_sha256": null,
+      "role": "ContractError, DiagnosisV1, RepairPlanV1, SemanticPatchV1, GateResult, NoPrimary"
+    },
+    "static_gate": {
+      "path": "training/fulgor_ray_v3/static_gate.py",
+      "classification": "E. EXPECTED_BY_SEAL_OR_RECEIPT_BUT_SOURCE_NOT_FOUND",
+      "expected_sha256": null,
+      "role": "Static patch safety gate evaluation"
+    },
+    "structured_output_recovery": {
+      "path": "training/fulgor_ray_v3/structured_output_recovery.py",
+      "classification": "E. EXPECTED_BY_SEAL_OR_RECEIPT_BUT_SOURCE_NOT_FOUND",
+      "expected_sha256": null,
+      "role": "StructuredOutputRecoveryError, normalize_single_json_object"
+    }
+  },
+  "authoritative_hash_bindings": {
+    "context_budget_v2.py": {
+      "expected_sha256": "da9ae0af2ed057287660abf820d31b4bed869b89d97a38db53ba9d9680f3374c",
+      "bound_in": [
+        "run_fulgor_v3_0_a234_dev30_inference_v6.py:130",
+        "training/reports/evidence/fulgor_v6_real_receipt_inspect_20260907.json:33",
+        "training/reports/fulgor_ray_v3_0_a234_candidate_v5_final_seal.txt:14"
+      ]
+    },
+    "stage_contract_prompts_v4.py": {
+      "expected_sha256": "a66bf49189e7c2857fe495ec36119bea119ac1caf2f965883336eb86916adf9b",
+      "bound_in": [
+        "training/reports/fulgor_ray_v3_0_a234_candidate_v6_final_seal.txt:10",
+        "training/reports/fulgor_ray_v3_0_a234_launch_receipt_v6_final_seal.txt:26"
+      ]
+    },
+    "semantic_patch_intent_v2.py": {
+      "expected_sha256": "31a6f04f87a37e240ac1bb85692f61b8c26e44221ff39035697e5c70d01a1709",
+      "bound_in": [
+        "training/reports/fulgor_ray_v3_0_a234_candidate_v6_final_seal.txt:13",
+        "training/reports/fulgor_ray_v3_0_a234_launch_receipt_v6_final_seal.txt:27"
+      ]
+    },
+    "candidate_host_binding_v1.py": {
+      "expected_sha256": "b5a7fc331798892bbd14bdad443e9203e3a1596b5f6cc69209f300359eb2386c",
+      "bound_in": [
+        "training/reports/fulgor_ray_v3_0_a234_candidate_v6_final_seal.txt:16",
+        "training/reports/fulgor_ray_v3_0_a234_launch_receipt_v6_final_seal.txt:28"
+      ]
+    }
+  },
+  "context_budget_v2_recovered_exact": false,
+  "source_reproducibility_classification": "SOURCE_PROVENANCE_INCOMPLETE",
+  "root_cause_audit_eligible": false,
+  "root_cause_audit_blockers": [
+    "MISSING_SOURCE_A234_INFERENCE",
+    "MISSING_SOURCE_STRUCTURED_OUTPUT_RECOVERY",
+    "MISSING_SOURCE_CONTEXT_BUDGET_V2",
+    "MISSING_SOURCE_PATCH_SERIALIZER",
+    "MISSING_SOURCE_STATIC_GATE",
+    "MISSING_SOURCE_SCHEMAS",
+    "MISSING_SOURCE_A1_INFERENCE",
+    "MISSING_SOURCE_CONSTANTS"
+  ],
+  "canonical_dev30_reuse_authorized": false,
+  "v6_rerun_authorized": false,
+  "gpu_used": false,
+  "ssh_used": false,
+  "network_used": false,
+  "protected_dev30_semantic_output_reviewed": false
+}
