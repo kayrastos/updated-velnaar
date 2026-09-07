@@ -1,20 +1,24 @@
 {
   "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
   "documentType": "PROVIDER_LIVE_READINESS_MATRIX",
-  "version": "v1.1",
-  "timestamp": "2026-09-07T15:15:00.000Z",
+  "version": "v1.2",
+  "timestamp": "2026-09-07T15:45:00.000Z",
   "canonicalCommitBinding": "5f19cbc2f3a8be9ba68f5404c437392a70db4245",
   "authoritativeLiveExecutionGate": {
     "flag": "CANARY_LIVE_EXECUTION_ENABLED",
     "value": false,
     "state": "BLOCKED_PENDING_CERTIFICATION"
   },
+  "executionTimeProviderConfirmationRequired": true,
+  "epistemicPolicy": "Strategy values are REPO_PINNED_STRATEGY_VALUE. Candidate != current provider certification. Zero live calls occur before Hard Gate 2.",
   "providers": [
     {
       "providerId": "deepseek",
       "providerName": "DeepSeek AI",
       "lane": "INTERACTIVE",
       "role": "PRIMARY_INTERACTIVE_PROVIDER",
+      "strategyCandidateModel": "deepseek-v4-flash",
+      "strategyCandidateModelEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
       "modelIdentifier": "deepseek-v4-flash",
       "expectedReturnedModel": "deepseek-v4-flash",
       "documentedVersionTarget": "DeepSeek-V4-Flash-0731",
@@ -22,13 +26,16 @@
         "https://api.deepseek.com/v1/chat/completions",
         "https://api.deepseek.com/chat/completions"
       ],
+      "endpointsEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
       "networkHost": "api.deepseek.com",
       "serviceTier": "offpeak",
+      "serviceTierEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
       "pricing": {
         "cacheHitInputUsdPerM": 0.007,
         "cacheMissInputUsdPerM": 0.22,
         "outputUsdPerM": 0.66,
-        "currency": "USD"
+        "currency": "USD",
+        "epistemicStatus": "REPO_PINNED_STRATEGY_VALUE"
       },
       "tokenLimits": {
         "reasoningBudgetTokens": 2048,
@@ -49,6 +56,13 @@
         "liveGateEnabled": false,
         "callsPermittedInSegmentB": 0,
         "verdict": "READY_FOR_CONTROLLED_CANARY_BLOCKED_BY_HARD_GATE_2"
+      },
+      "executionTimeConfirmations": {
+        "actualModelAvailableAtExecutionTime": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "actualApiEndpointCompatibility": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "actualTierOrWindow": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "actualPricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "credentialReadiness": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION"
       }
     },
     {
@@ -56,6 +70,8 @@
       "providerName": "Google AI Studio / Generative Language API",
       "lane": "BACKGROUND_ECONOMY",
       "role": "BACKGROUND_ECONOMY_STANDBY",
+      "strategyCandidateModel": "gemini-3.5-flash-lite",
+      "strategyCandidateModelEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
       "modelIdentifier": "gemini-3.5-flash-lite",
       "expectedReturnedModel": "gemini-3.5-flash-lite",
       "documentedVersionTarget": "gemini-3.5-flash-lite",
@@ -63,8 +79,10 @@
         "https://generativelanguage.googleapis.com/v1beta/interactions",
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
       ],
+      "endpointsEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
       "networkHost": "generativelanguage.googleapis.com",
       "serviceTier": "flex",
+      "serviceTierEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
       "pricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
       "tokenLimits": {
         "thinkingLevel": "low",
@@ -84,6 +102,12 @@
         "liveGateEnabled": false,
         "callsPermittedInSegmentB": 0,
         "verdict": "STANDBY_DORMANT_BLOCKED_BY_HARD_GATE_2"
+      },
+      "executionTimeConfirmations": {
+        "actualModelAvailableAtExecutionTime": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "supportedGoogleAiStudioOrApiPath": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "actualPricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "credentialReadiness": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION"
       }
     },
     {
@@ -120,12 +144,45 @@
       }
     }
   ],
+  "sovereignBoundary": {
+    "sovereignBoundarySpecificationReady": true,
+    "sovereignBoundaryRuntimeEnforcementCertified": false,
+    "sovereignBoundaryRuntimeEnforcementStatus": "SPECIFIED_NOT_RUNTIME_CERTIFIED",
+    "hardGate2Blocker": true,
+    "externalModels": [
+      "DeepSeek",
+      "Gemini / Google AI Studio",
+      "OpenAI",
+      "future frontier/external models"
+    ],
+    "rules": {
+      "BLACK": "NEVER_SENT_TO_EXTERNAL_MODEL (No exceptions through sanitization)",
+      "GREY": "MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE",
+      "WHITE": "PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION"
+    },
+    "blackTaxonomyMandatoryCategories": [
+      "full Security Memory",
+      "proprietary verification algorithms",
+      "detection heuristics",
+      "private benchmark answers",
+      "customer credentials",
+      "production secrets",
+      "master keys",
+      "critical IAM policy internals",
+      "critical Safety Kernel internals",
+      "critical routing/policy internals",
+      "Customer PII and raw identity data",
+      "VELNAR master KMS keys"
+    ]
+  },
   "matrixInvariants": {
     "totalLiveCallsPermittedSegmentA": 0,
     "totalLiveCallsPermittedSegmentB": 0,
     "liveCallsPermittedSegmentC": "Bounded strictly to certified candidates upon Hard Gate 2 human approval",
     "firstProviderCallBoundary": "Segment C after Hard Gate 2",
-    "sovereignBoundaryEnforced": true,
+    "sovereignBoundarySpecificationReady": true,
+    "sovereignBoundaryRuntimeEnforcementCertified": false,
+    "sovereignBoundaryRuntimeEnforcementStatus": "SPECIFIED_NOT_RUNTIME_CERTIFIED",
     "blackDataTransmissionProhibited": true
   }
 }

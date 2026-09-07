@@ -34,51 +34,81 @@
 > - deploy Worker code
 > - approve themselves or alter IAM policies
 
-#### VELNAR Sovereign Boundary (Data Classification):
-1. **BLACK DATA (Categorically Prohibited from External Transmission)**:
-   - Customer PII and raw identity data.
-   - Customer authentication tokens and credentials.
-   - Production secrets, encryption keys, and Cloudflare API tokens.
-   - VELNAR master KMS keys.
-   - Security Memory internal state.
-   - Critical proprietary verification engine internals.
-2. **GREY DATA (Permitted Strictly with Sanitization)**:
+#### VELNAR Sovereign Boundary Architecture & Mandatory Data Classification:
+External models covered: **DeepSeek**, **Gemini / Google AI Studio**, **OpenAI**, and **future frontier/external models**.
+
+1. **BLACK DATA (`NEVER_SENT_TO_EXTERNAL_MODEL`)**:
+   Under no circumstances may BLACK data be transmitted to any external model. There are zero exceptions through sanitization. The mandatory taxonomy explicitly includes all 10 canonical categories:
+   - **full Security Memory**
+   - **proprietary verification algorithms**
+   - **detection heuristics**
+   - **private benchmark answers**
+   - **customer credentials**
+   - **production secrets**
+   - **master keys**
+   - **critical IAM policy internals**
+   - **critical Safety Kernel internals**
+   - **critical routing/policy internals**
+   *(as well as Customer PII and raw identity data, and VELNAR master KMS keys)*
+
+2. **GREY DATA (`MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE`)**:
    - Pseudonymous operational telemetry.
    - Integer microUSD cost metrics and execution latency.
    - Anonymized task and run IDs.
-3. **WHITE DATA (Permitted in Task Capsules)**:
+
+3. **WHITE DATA (`PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION`)**:
    - Approved public synthetic evaluation fixtures (`VELNAR_SHADOW_EVAL_V1`).
    - Standard task type identifiers.
 
+#### Sovereign Boundary Implementation Truth:
+- `sovereignBoundarySpecificationReady = true`
+- `sovereignBoundaryRuntimeEnforcementCertified = false`
+- `sovereignBoundaryRuntimeEnforcementStatus = "SPECIFIED_NOT_RUNTIME_CERTIFIED"`
+- **HARD GATE 2 BLOCKER**: Sovereign Boundary runtime enforcement certification is an explicit mandatory blocker before any live provider invocations in Segment C.
+
 ---
 
-### 3. Participating Provider Specifications
+### 3. Participating Provider Specifications & Epistemic Boundaries
+
+All provider parameters documented below represent **`REPO_PINNED_STRATEGY_VALUE`** constants retained for reproducibility. They are **NOT** promoted to `CURRENT_PROVIDER_FACT`, `CURRENT_PROVIDER_PRICING`, `CURRENT_PROVIDER_MODEL_CERTIFIED`, `CURRENT_PROVIDER_TIER_CERTIFIED`, or `LIVE_EXECUTION_APPROVED`.
+
+- **`executionTimeProviderConfirmationRequired = true`**
+- All execution-time provider parameters remain **`UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION`** until confirmed prior to Segment C execution.
 
 #### Lane 1: DeepSeek (Primary Interactive Provider)
 - **Role**: Primary Interactive Certified Lane.
-- **Requested Model**: `deepseek-v4-flash`.
-- **Expected Returned Model**: `deepseek-v4-flash`.
-- **Documented Version Target**: `DeepSeek-V4-Flash-0731`.
-- **Endpoint**: `https://api.deepseek.com/v1/chat/completions`.
-- **Certified Pricing Tier**: `offpeak`.
+- **Strategy Candidate Model**: `deepseek-v4-flash` (`REPO_PINNED_STRATEGY_VALUE`).
+- **Expected Returned Model**: `deepseek-v4-flash` (`REPO_PINNED_STRATEGY_VALUE`).
+- **Documented Version Target**: `DeepSeek-V4-Flash-0731` (`REPO_PINNED_STRATEGY_VALUE`).
+- **Endpoint**: `https://api.deepseek.com/v1/chat/completions` (`REPO_PINNED_STRATEGY_VALUE`).
+- **Strategy Pricing Tier**: `offpeak` (`REPO_PINNED_STRATEGY_VALUE`).
   - Cache Hit Input: $\$0.007$ / 1M tokens ($7 \mu\text{USD}$).
   - Cache Miss Input: $\$0.22$ / 1M tokens ($220 \mu\text{USD}$).
   - Output: $\$0.66$ / 1M tokens ($660 \mu\text{USD}$).
-- **Reasoning Effort**: `low`.
-- **Reasoning Budget Tokens**: $2,048$.
+- **Reasoning Effort**: `low` ($2,048$ budget tokens).
 - **Max Output Tokens**: $2,048$.
 - **Lifecycle Timeout**: $15,000$ ms ($15$ seconds).
+- **Execution-Time Confirmations Required**:
+  - Actual model available at execution time: `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION`
+  - Actual API endpoint compatibility: `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION`
+  - Actual tier/window: `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION`
+  - Actual pricing: `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION`
+  - Credential readiness: `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION`
 
 #### Lane 2: Gemini (Google AI Studio / Generative Language API)
 - **Role**: Background Economy Standby Lane.
-- **Requested Model**: `gemini-3.5-flash-lite`.
-- **Expected Returned Model**: `gemini-3.5-flash-lite`.
-- **Documented Version Target**: `gemini-3.5-flash-lite`.
-- **Endpoint**: `https://generativelanguage.googleapis.com/v1beta/interactions`.
-- **Certified Service Tier**: `flex`.
+- **Strategy Candidate Model**: `gemini-3.5-flash-lite` (`REPO_PINNED_STRATEGY_VALUE`).
+- **Expected Returned Model**: `gemini-3.5-flash-lite` (`REPO_PINNED_STRATEGY_VALUE`).
+- **Documented Version Target**: `gemini-3.5-flash-lite` (`REPO_PINNED_STRATEGY_VALUE`).
+- **Endpoint**: `https://generativelanguage.googleapis.com/v1beta/interactions` (`REPO_PINNED_STRATEGY_VALUE`).
+- **Strategy Service Tier**: `flex` (`REPO_PINNED_STRATEGY_VALUE`).
 - **Thinking Level**: `low`.
-- **Pricing**: `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION` (to be confirmed at Hard Gate 2 review).
 - **Lifecycle Timeout**: $15,000$ ms.
+- **Execution-Time Confirmations Required**:
+  - Actual model available at execution time: `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION`
+  - Supported Google AI Studio/API invocation path: `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION`
+  - Actual pricing: `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION`
+  - Credential readiness: `UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION`
 
 #### Lane 3: OpenAI (Optional Comparison Lane Only)
 - **Role**: Optional Comparison Lane (Uncertified Benchmark Only).

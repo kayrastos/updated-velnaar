@@ -9,38 +9,62 @@
   "firstCallAuthorizationDirective": "SEGMENT_C_FIRST_LIVE_PROVIDER_CALL_APPROVAL_REQUIRED",
   "firstCallBoundary": "Segment C is the FIRST point where real AI provider calls (Google AI Studio / Gemini, DeepSeek) may occur. Segment B calls remain strictly 0.",
   "participatingProviders": {
+    "executionTimeProviderConfirmationRequired": true,
+    "note": "Strategy parameters are REPO_PINNED_STRATEGY_VALUE (retained for reproducibility). Candidate != current provider certification. Zero calls occur before Hard Gate 2.",
     "deepseek": {
       "lane": "INTERACTIVE",
       "role": "PRIMARY_INTERACTIVE_PROVIDER",
+      "strategyCandidateModel": "deepseek-v4-flash",
+      "strategyCandidateModelEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
       "requestedModelIdentifier": "deepseek-v4-flash",
       "expectedReturnedModelIdentifier": "deepseek-v4-flash",
       "documentedVersionTarget": "DeepSeek-V4-Flash-0731",
       "endpoint": "https://api.deepseek.com/v1/chat/completions",
-      "certifiedPricingTier": "offpeak",
+      "endpointEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
+      "strategyPricingTier": "offpeak",
+      "strategyPricingTierEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
       "pricing": {
         "cacheHitInputUsdPerM": 0.007,
         "cacheMissInputUsdPerM": 0.22,
-        "outputUsdPerM": 0.66
+        "outputUsdPerM": 0.66,
+        "epistemicStatus": "REPO_PINNED_STRATEGY_VALUE"
       },
       "reasoningEffort": "low",
       "reasoningBudgetTokens": 2048,
       "maxOutputTokens": 2048,
       "timeoutMs": 15000,
-      "status": "CERTIFIED_CANDIDATE"
+      "status": "REPO_PINNED_STRATEGY_VALUE_DORMANT",
+      "executionTimeConfirmations": {
+        "actualModelAvailableAtExecutionTime": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "actualApiEndpointCompatibility": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "actualTierOrWindow": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "actualPricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "credentialReadiness": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION"
+      }
     },
     "gemini": {
       "lane": "BACKGROUND_ECONOMY",
       "role": "BACKGROUND_ECONOMY_STANDBY",
       "apiPath": "Google AI Studio / Generative Language API",
+      "strategyCandidateModel": "gemini-3.5-flash-lite",
+      "strategyCandidateModelEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
       "requestedModelIdentifier": "gemini-3.5-flash-lite",
       "expectedReturnedModelIdentifier": "gemini-3.5-flash-lite",
       "documentedVersionTarget": "gemini-3.5-flash-lite",
       "endpoint": "https://generativelanguage.googleapis.com/v1beta/interactions",
-      "certifiedServiceTier": "flex",
+      "endpointEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
+      "strategyServiceTier": "flex",
+      "strategyServiceTierEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
       "thinkingLevel": "low",
       "pricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
       "timeoutMs": 15000,
-      "status": "CERTIFIED_CANDIDATE_DORMANT"
+      "status": "REPO_PINNED_STRATEGY_VALUE_DORMANT",
+      "executionTimeConfirmations": {
+        "actualModelAvailableAtExecutionTime": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "supportedGoogleAiStudioOrApiPath": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "actualPricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+        "credentialReadiness": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION"
+      }
     },
     "openai": {
       "lane": "BENCHMARK_COMPARISON_ONLY",
@@ -161,19 +185,43 @@
     }
   },
   "velnarSovereignBoundary": {
+    "sovereignBoundarySpecificationReady": true,
+    "sovereignBoundaryRuntimeEnforcementCertified": false,
+    "sovereignBoundaryRuntimeEnforcementStatus": "SPECIFIED_NOT_RUNTIME_CERTIFIED",
+    "hardGate2Blocker": true,
+    "hardGate2Mandate": "Sovereign Boundary runtime enforcement certification is an explicit mandatory blocker before any live provider invocations in Segment C.",
+    "externalModels": [
+      "DeepSeek",
+      "Gemini / Google AI Studio",
+      "OpenAI",
+      "future frontier/external models"
+    ],
     "dataClassificationModel": {
       "BLACK": {
-        "definition": "Customer PII, raw credentials, production secrets, master KMS keys, Security Memory internal state, proprietary verification internals",
-        "boundaryRule": "CATEGORICALLY_PROHIBITED_FROM_EXTERNAL_TRANSMISSION",
-        "enforcement": "Static inspection + runtime classification gate"
+        "boundaryRule": "NEVER_SENT_TO_EXTERNAL_MODEL",
+        "ruleEnforcement": "NEVER_SENT_TO_EXTERNAL_MODEL (No exceptions through sanitization)",
+        "mandatoryTaxonomy": [
+          "full Security Memory",
+          "proprietary verification algorithms",
+          "detection heuristics",
+          "private benchmark answers",
+          "customer credentials",
+          "production secrets",
+          "master keys",
+          "critical IAM policy internals",
+          "critical Safety Kernel internals",
+          "critical routing/policy internals",
+          "Customer PII and raw identity data",
+          "VELNAR master KMS keys"
+        ]
       },
       "GREY": {
-        "definition": "Pseudonymous operational metadata, timing metrics, integer cost telemetry, anonymized task IDs",
-        "boundaryRule": "Permitted strictly with sanitization"
+        "boundaryRule": "MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE",
+        "allowedContent": "Pseudonymous operational metadata, timing metrics, integer cost telemetry, anonymized task IDs"
       },
       "WHITE": {
-        "definition": "Approved public synthetic evaluation fixtures (VELNAR_SHADOW_EVAL_V1)",
-        "boundaryRule": "Permitted in Task Capsules"
+        "boundaryRule": "PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION",
+        "allowedContent": "Approved public synthetic evaluation fixtures (VELNAR_SHADOW_EVAL_V1) and standard task type identifiers"
       }
     },
     "taskCapsuleConstraint": "Only canonical synthetic fixtures from CANARY_SYNTHETIC_FIXTURES may be transmitted",

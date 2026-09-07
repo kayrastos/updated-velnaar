@@ -122,7 +122,11 @@ import {
   ACTIVE_PREFERRED_MODEL,
   CROSS_PROVIDER_FALLBACK_ENABLED,
   GEMINI_CURRENT_STATUS,
+  DEEPSEEK_FIRST_PROVIDER_STRATEGY,
 } from '../../worker/ai/canary/deepSeekFirstProviderStrategy';
+import {
+  DEEPSEEK_SUCCESSOR_CERTIFICATION_SPECIFICATION,
+} from '../../worker/ai/canary/deepSeekSingleProviderCertificationSpecification';
 import {
   SEMANTIC_SCORE_MIN_THRESHOLD,
   CERTIFIED_A12B2C_TASK_TYPES,
@@ -609,19 +613,27 @@ describe('Phase A.12B.2C-5U.3.3 Pre-Live Master Readiness Test Suite', () => {
   // GROUP 8: CANARY CEILINGS, TIMEOUTS, BUDGETS & KILL SWITCH
   // ==========================================================================
   describe('Group 8: Canary Ceilings, Timeouts, Budgets & Kill Switch', () => {
-    it('8.1 invocation limits are strictly bounded', () => {
+    it('8.1 invocation limits match exact canary specification constants', () => {
       expect(CANARY_INVOCATION_LIMITS.maxTotalInvocations).toBeLessThanOrEqual(14);
+      expect(CANARY_INVOCATION_LIMITS.maxTotalInvocations).toBe(14);
       expect(CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider).toBeLessThanOrEqual(7);
+      expect(CANARY_INVOCATION_LIMITS.maxInvocationsPerProvider).toBe(7);
       expect(CANARY_INVOCATION_LIMITS.maxSameProviderRetries).toBeLessThanOrEqual(1);
+      expect(CANARY_INVOCATION_LIMITS.maxSameProviderRetries).toBe(1);
       expect(CANARY_INVOCATION_LIMITS.maxCrossProviderFallbacks).toBeLessThanOrEqual(1);
+      expect(CANARY_INVOCATION_LIMITS.maxCrossProviderFallbacks).toBe(1);
       expect(CANARY_INVOCATION_LIMITS.maxConcurrentInvocations).toBe(1);
+      expect(Number.isFinite(CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation)).toBe(true);
+      expect(CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation).toBeGreaterThan(0);
       expect(CANARY_INVOCATION_LIMITS.timeoutMsPerInvocation).toBe(15000);
     });
 
-    it('8.2 cost limits are strictly bounded in integer microUSD', () => {
-      expect(CANARY_COST_LIMITS.maxEstimatedCostMicroUsd).toBeLessThanOrEqual(25000); // $0.025
-      expect(CANARY_COST_LIMITS.hardCeilingMicroUsd).toBeLessThanOrEqual(50000);     // $0.050
-      expect(CANARY_COST_LIMITS.maxSingleInvocationMicroUsd).toBeLessThanOrEqual(5000); // $0.005
+    it('8.2 cost limits match exact integer microUSD constants from specification', () => {
+      expect(Number.isFinite(CANARY_COST_LIMITS.hardCeilingMicroUsd)).toBe(true);
+      expect(CANARY_COST_LIMITS.hardCeilingMicroUsd).toBeGreaterThan(0);
+      expect(CANARY_COST_LIMITS.maxEstimatedCostMicroUsd).toBe(25000); // $0.025 USD
+      expect(CANARY_COST_LIMITS.hardCeilingMicroUsd).toBe(50000);     // $0.050 USD
+      expect(CANARY_COST_LIMITS.maxSingleInvocationMicroUsd).toBe(5000); // $0.005 USD
     });
 
     it('8.3 exactly 7 certified task types are defined', () => {
@@ -644,8 +656,17 @@ describe('Phase A.12B.2C-5U.3.3 Pre-Live Master Readiness Test Suite', () => {
       expect(SEMANTIC_SCORE_MIN_THRESHOLD).toBe(0.85);
     });
 
-    it('8.5 kill switch reasons cover all 17 canonical event categories', () => {
-      const canonicalReasons: CanaryKillSwitchReason[] = [
+    it('8.5 kill switch reasons directly bind to canarySpecification.ts and cover all 17 categories', () => {
+      const specPath = path.resolve(process.cwd(), 'worker/ai/canary/canarySpecification.ts');
+      const specSource = fs.readFileSync(specPath, 'utf-8');
+      const killSwitchMatch = specSource.match(/export type CanaryKillSwitchReason =\s*([\s\S]*?);/);
+      expect(killSwitchMatch).toBeTruthy();
+      const extractedReasons = killSwitchMatch![1]
+        .split('|')
+        .map((s) => s.trim().replace(/^'|'$/g, ''))
+        .filter(Boolean);
+
+      const required17Reasons: CanaryKillSwitchReason[] = [
         'PROVENANCE_MISMATCH',
         'MODEL_SUBSTITUTION_DETECTED',
         'UNEXPECTED_MODEL_VERSION',
@@ -664,7 +685,25 @@ describe('Phase A.12B.2C-5U.3.3 Pre-Live Master Readiness Test Suite', () => {
         'UNAUTHORIZED_ENVIRONMENT',
         'UNEXPECTED_EXCEPTION',
       ];
-      expect(canonicalReasons.length).toBe(17);
+
+      expect(extractedReasons.length).toBe(17);
+      for (const reason of required17Reasons) {
+        expect(extractedReasons).toContain(reason);
+      }
+
+      // Verify fail-closed error contract
+      expect(specSource).toContain('export interface CanaryKillSwitchEvent {');
+      expect(specSource).toContain('terminatedFailClosed: true;');
+    });
+
+    it('8.6 productionRoutingEnforcementAllowed is strictly false in runtime strategy and spec', () => {
+      expect(DEEPSEEK_FIRST_PROVIDER_STRATEGY.securityInvariants.productionRoutingEnforcementAllowed).toBe(false);
+      expect(DEEPSEEK_SUCCESSOR_CERTIFICATION_SPECIFICATION.securityInvariants.productionRoutingEnforcementAllowed).toBe(false);
+
+      const smSourcePath = path.resolve(process.cwd(), 'worker/ai/canary/deepSeekSuccessorCertificationStateMachine.ts');
+      const smSource = fs.readFileSync(smSourcePath, 'utf-8');
+      expect(smSource).toContain('if (evidence.productionRoutingEnforcementAllowed !== false)');
+      expect(smSource).toContain('errors.push');
     });
   });
 
@@ -701,23 +740,82 @@ describe('Phase A.12B.2C-5U.3.3 Pre-Live Master Readiness Test Suite', () => {
       expect(isCanaryNetworkEndpointAllowed('https://user:pass@api.deepseek.com/v1/chat/completions')).toBe(false);
     });
 
-    it('9.3 confirms customer code and AI model outputs have ZERO authority to mutate trusted state', () => {
-      // Invariant: The capability boundary exports strictly typed execution results.
-      // None of the model outputs or candidate structures have functions to write to D1,
-      // mutate route policies, or deploy code.
+    it('9.3 confirms capability boundary exports NO D1 write or deploy capabilities', () => {
       const boundarySourcePath = path.resolve(process.cwd(), 'worker/ai/canary/deepSeekProductionWorkerCapabilityBoundary.ts');
       const boundarySource = fs.readFileSync(boundarySourcePath, 'utf-8');
 
       expect(boundarySource).not.toContain('.prepare(');
       expect(boundarySource).not.toContain('.exec(');
+      expect(boundarySource).not.toContain('.batch(');
       expect(boundarySource).not.toContain('wrangler');
       expect(boundarySource).not.toContain('deploy');
+
+      // The capability boundary must export exactly executeProductionWorkerCanaryCertification
+      const functionExports = boundarySource.match(/export\s+(?:async\s+)?function\s+([A-Za-z0-9_]+)/g);
+      expect(functionExports).toEqual(['export async function executeProductionWorkerCanaryCertification']);
     });
 
     it('9.4 confirms streaming body limit is strictly bounded at 65536 bytes', () => {
       expect(MAX_REQUEST_BODY_BYTES).toBe(65536);
       expect(MAX_ACCESS_JWT_LENGTH_BYTES).toBe(16384);
       expect(CLOCK_TOLERANCE_SECONDS).toBe(5);
+    });
+
+    it('9.5 verifies Sovereign Boundary 10-category BLACK taxonomy across JSON and MD artifacts', () => {
+      const readinessJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.json'), 'utf-8'));
+      const readinessMd = fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.md'), 'utf-8');
+      const reviewJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_review_package_v1.json'), 'utf-8'));
+      const reviewMd = fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_review_package_v1.md'), 'utf-8');
+      const matrixJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_provider_live_readiness_matrix_v1.json'), 'utf-8'));
+      const canaryPlanJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_controlled_live_canary_plan_v1.json'), 'utf-8'));
+
+      const mandatoryBlackCategories = [
+        'full Security Memory',
+        'proprietary verification algorithms',
+        'detection heuristics',
+        'private benchmark answers',
+        'customer credentials',
+        'production secrets',
+        'master keys',
+        'critical IAM policy internals',
+        'critical Safety Kernel internals',
+        'critical routing/policy internals',
+      ];
+
+      for (const cat of mandatoryBlackCategories) {
+        expect(readinessJson.sovereignBoundary.blackTaxonomyMandatoryCategories).toContain(cat);
+        expect(reviewJson.sovereignBoundary.blackTaxonomyMandatoryCategories).toContain(cat);
+        expect(matrixJson.sovereignBoundary.blackTaxonomyMandatoryCategories).toContain(cat);
+        expect(canaryPlanJson.velnarSovereignBoundary.dataClassificationModel.BLACK.mandatoryTaxonomy).toContain(cat);
+        expect(readinessMd).toContain(cat);
+        expect(reviewMd).toContain(cat);
+      }
+
+      // Rules
+      expect(readinessJson.sovereignBoundary.rules.BLACK).toContain('NEVER_SENT_TO_EXTERNAL_MODEL');
+      expect(readinessJson.sovereignBoundary.rules.GREY).toBe('MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE');
+      expect(readinessJson.sovereignBoundary.rules.WHITE).toBe('PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION');
+      expect(reviewJson.sovereignBoundary.rules.BLACK).toContain('NEVER_SENT_TO_EXTERNAL_MODEL');
+      expect(reviewJson.sovereignBoundary.rules.GREY).toBe('MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE');
+      expect(reviewJson.sovereignBoundary.rules.WHITE).toBe('PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION');
+
+      // External models
+      const expectedModels = ['DeepSeek', 'Gemini / Google AI Studio', 'OpenAI', 'future frontier/external models'];
+      for (const model of expectedModels) {
+        expect(readinessJson.sovereignBoundary.externalModels).toContain(model);
+        expect(reviewJson.sovereignBoundary.externalModels).toContain(model);
+      }
+
+      // Status truthfully records SPECIFIED_NOT_RUNTIME_CERTIFIED and is Hard Gate 2 blocker
+      expect(readinessJson.sovereignBoundary.sovereignBoundaryRuntimeEnforcementStatus).toBe('SPECIFIED_NOT_RUNTIME_CERTIFIED');
+      expect(readinessJson.sovereignBoundary.sovereignBoundaryRuntimeEnforcementCertified).toBe(false);
+      expect(readinessJson.sovereignBoundary.sovereignBoundarySpecificationReady).toBe(true);
+      expect(readinessJson.sovereignBoundary.hardGate2Blocker).toBe(true);
+
+      expect(reviewJson.sovereignBoundary.sovereignBoundaryRuntimeEnforcementStatus).toBe('SPECIFIED_NOT_RUNTIME_CERTIFIED');
+      expect(reviewJson.sovereignBoundary.sovereignBoundaryRuntimeEnforcementCertified).toBe(false);
+      expect(reviewJson.sovereignBoundary.sovereignBoundarySpecificationReady).toBe(true);
+      expect(reviewJson.sovereignBoundary.hardGate2Blocker).toBe(true);
     });
   });
 
@@ -820,6 +918,110 @@ describe('Phase A.12B.2C-5U.3.3 Pre-Live Master Readiness Test Suite', () => {
       expect(reviewPkg.approvalTokenContract.currentStatus).toBe('SEGMENT_B_PRODUCTION_PROVISIONING_APPROVAL_REQUIRED');
       expect(reviewPkg.approvalTokenContract.requiredApprovalToken).toBe('SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED');
       expect(reviewPkg.approvalTokenContract.segmentBExecutionAllowed).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // GROUP 11: CLOUDFLARE EPISTEMIC STATUS & FACT-CLASSIFICATION INTEGRITY
+  // ==========================================================================
+  describe('Group 11: Cloudflare Epistemic Status & Fact-Classification Integrity', () => {
+    it('11.1 rejects ops.velnar.studio as canonical hostname and requires PROPOSED_NOT_CANONICAL', () => {
+      const readinessJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.json'), 'utf-8'));
+      const planBJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_production_provisioning_plan_v1.json'), 'utf-8'));
+      const reviewJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_review_package_v1.json'), 'utf-8'));
+
+      const hostnameGate = readinessJson.masterGateMatrix.find((g: any) => g.gateId === 'operational_hostname');
+      expect(hostnameGate.epistemicStatus).toBe('PROPOSED_NOT_CANONICAL');
+      expect(planBJson.provisioningPlan.step1_operationalHostname.epistemicStatus).toBe('PROPOSED_NOT_CANONICAL');
+      expect(reviewJson.epistemicTaxonomy.PROPOSED_NOT_CANONICAL).toContain(
+        'Operational hostname candidate ops.velnar.studio'
+      );
+    });
+
+    it('11.2 rejects team domain as authoritative fact and requires PROPOSED_NOT_CANONICAL or UNRESOLVED', () => {
+      const readinessJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.json'), 'utf-8'));
+      const teamGate = readinessJson.masterGateMatrix.find((g: any) => g.gateId === 'team_domain');
+      expect(teamGate.epistemicStatus).toBe('PROPOSED_NOT_CANONICAL');
+      expect(teamGate.currentState).toBe('UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION');
+    });
+
+    it('11.3 rejects fabricated AUD and requires actualAudValue === UNRESOLVED_NOT_CREATED', () => {
+      const readinessJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.json'), 'utf-8'));
+      const planBJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_production_provisioning_plan_v1.json'), 'utf-8'));
+
+      const audGate = readinessJson.masterGateMatrix.find((g: any) => g.gateId === 'access_application_aud');
+      expect(audGate.actualAudValue).toBe('UNRESOLVED_NOT_CREATED');
+      expect(audGate.epistemicStatus).toBe('OBSERVED_ONLY_AFTER_PROVISIONING');
+      expect(planBJson.provisioningPlan.step3_accessSelfHostedApplication.audCaptureRequirement.actualAudValue).toBe('UNRESOLVED_NOT_CREATED');
+
+      // Distinguishes vendor documented constraint vs internal validator bound
+      expect(audGate.velnarInternalValidatorMaxAudBytes).toBe(64);
+      expect(audGate.internalValidatorEpistemicStatus).toBe('CANONICAL_REPOSITORY_FACT');
+      expect(audGate.vendorLengthConstraint).toBe('64 characters');
+      expect(audGate.vendorLengthConstraintEpistemicStatus).toBe('VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION');
+    });
+
+    it('11.4 rejects resolved DNS target and requires UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION', () => {
+      const readinessJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.json'), 'utf-8'));
+      const planBJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_production_provisioning_plan_v1.json'), 'utf-8'));
+
+      const targetGate = readinessJson.masterGateMatrix.find((g: any) => g.gateId === 'operational_dns_target');
+      expect(targetGate.dnsTargetValue).toBe('UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION');
+      expect(targetGate.epistemicStatus).toBe('UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION');
+      expect(planBJson.provisioningPlan.step1_operationalHostname.dnsTarget).toBe('UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION');
+    });
+  });
+
+  // ==========================================================================
+  // GROUP 12: PROVIDER EPISTEMIC STATUS & LIVE INVOCATION BOUNDARY
+  // ==========================================================================
+  describe('Group 12: Provider Epistemic Status & Live Invocation Boundary', () => {
+    it('12.1 marks strategy values as REPO_PINNED_STRATEGY_VALUE and forbids promotion to current certification', () => {
+      const readinessJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.json'), 'utf-8'));
+      const matrixJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_provider_live_readiness_matrix_v1.json'), 'utf-8'));
+      const canaryPlanJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_controlled_live_canary_plan_v1.json'), 'utf-8'));
+
+      expect(readinessJson.providerFactClassifications.deepseek.strategyCandidateModelEpistemicStatus).toBe('REPO_PINNED_STRATEGY_VALUE');
+      expect(readinessJson.providerFactClassifications.gemini.strategyCandidateModelEpistemicStatus).toBe('REPO_PINNED_STRATEGY_VALUE');
+      expect(matrixJson.providers[0].strategyCandidateModelEpistemicStatus).toBe('REPO_PINNED_STRATEGY_VALUE');
+      expect(canaryPlanJson.participatingProviders.deepseek.strategyCandidateModelEpistemicStatus).toBe('REPO_PINNED_STRATEGY_VALUE');
+    });
+
+    it('12.2 requires executionTimeProviderConfirmationRequired === true across provider artifacts', () => {
+      const readinessJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.json'), 'utf-8'));
+      const matrixJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_provider_live_readiness_matrix_v1.json'), 'utf-8'));
+      const canaryPlanJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_controlled_live_canary_plan_v1.json'), 'utf-8'));
+
+      expect(readinessJson.providerFactClassifications.executionTimeProviderConfirmationRequired).toBe(true);
+      expect(matrixJson.executionTimeProviderConfirmationRequired).toBe(true);
+      expect(canaryPlanJson.participatingProviders.executionTimeProviderConfirmationRequired).toBe(true);
+    });
+
+    it('12.3 marks execution-time provider parameters as UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION', () => {
+      const readinessJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.json'), 'utf-8'));
+      const canaryPlanJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_controlled_live_canary_plan_v1.json'), 'utf-8'));
+
+      expect(readinessJson.providerFactClassifications.deepseek.actualModelAvailableAtExecutionTime).toBe('UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION');
+      expect(readinessJson.providerFactClassifications.deepseek.actualApiEndpointCompatibility).toBe('UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION');
+      expect(readinessJson.providerFactClassifications.deepseek.actualPricing).toBe('UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION');
+      expect(readinessJson.providerFactClassifications.gemini.actualPricing).toBe('UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION');
+      expect(canaryPlanJson.participatingProviders.deepseek.executionTimeConfirmations.actualPricing).toBe('UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION');
+      expect(canaryPlanJson.participatingProviders.deepseek.executionTimeConfirmations.actualApiEndpointCompatibility).toBe('UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION');
+      expect(canaryPlanJson.participatingProviders.gemini.pricing).toBe('UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION');
+    });
+
+    it('12.4 confirms all 29 gates in readiness evidence are closed/fail-closed', () => {
+      const readinessJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'execution/velnar_prelive_master_readiness_v1.json'), 'utf-8'));
+      expect(readinessJson.verificationSummary.totalGates).toBe(29);
+      expect(readinessJson.verificationSummary.gatesClosed).toBe(29);
+      expect(readinessJson.verificationSummary.liveCallsPermitted).toBe(0);
+      expect(readinessJson.verificationSummary.productionMutationsPermitted).toBe(0);
+      expect(readinessJson.verificationSummary.segmentBExecutionAllowed).toBe(false);
+      expect(readinessJson.verificationSummary.verdict).toBe('SEGMENT_A_RECONCILED_PRE_LIVE_MASTER_READINESS_CERTIFIED');
+      expect(readinessJson.masterGateMatrix.length).toBe(29);
+      for (const gate of readinessJson.masterGateMatrix) {
+        expect(gate.currentState).not.toMatch(/^(?:OPEN|ACTIVE|ENABLED|PERMITTED|PROVISIONED$)/);
+      }
     });
   });
 });

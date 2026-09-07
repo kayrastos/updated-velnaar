@@ -75,11 +75,27 @@
     },
     {
       "gateId": "operational_hostname",
-      "gateName": "Operational Hostname / DNS",
-      "currentState": "UNRESOLVED (Proposed: ops.velnar.studio)",
+      "gateName": "Operational Hostname",
+      "currentState": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
+      "candidateDomain": "ops.velnar.studio",
+      "epistemicStatus": "PROPOSED_NOT_CANONICAL",
       "canonicalSource": "execution/a12b2c5u33d_cloudflare_access_dormant_provisioning_readiness.json",
-      "blocker": "Canonical DNS hostname not assigned to Access application",
+      "blocker": "ops.velnar.studio is strictly PROPOSED_NOT_CANONICAL; not a canonical production hostname until confirmed during Segment B",
       "nextAction": "Confirm or select authoritative operational hostname during Segment B provisioning if approved",
+      "externalMutationRequired": true,
+      "humanApprovalRequired": true,
+      "realProviderCallRequired": false
+    },
+    {
+      "gateId": "operational_dns_target",
+      "gateName": "Operational DNS Target Resolution",
+      "currentState": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
+      "targetDomain": "ops.velnar.studio (PROPOSED_NOT_CANONICAL)",
+      "dnsTargetValue": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
+      "epistemicStatus": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
+      "canonicalSource": "execution/a12b2c5u33d_cloudflare_access_dormant_provisioning_readiness.json",
+      "blocker": "No DNS target value is asserted as canonical until real Segment B account/zone inspection resolves it",
+      "nextAction": "Inspect real Cloudflare zone and set verified CNAME target in Segment B if approved",
       "externalMutationRequired": true,
       "humanApprovalRequired": true,
       "realProviderCallRequired": false
@@ -87,10 +103,12 @@
     {
       "gateId": "team_domain",
       "gateName": "Cloudflare Access Team Domain",
-      "currentState": "UNRESOLVED (Proposed: https://velnar.cloudflareaccess.com)",
-      "canonicalSource": "worker/auth/cloudflareAccessOperationalAuth.ts",
-      "blocker": "Authoritative team domain not configured in Worker runtime variables",
-      "nextAction": "Set CLOUDFLARE_ACCESS_TEAM_DOMAIN in Worker runtime configuration during Segment B if approved",
+      "currentState": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
+      "candidateTeamDomain": "https://velnar.cloudflareaccess.com",
+      "epistemicStatus": "PROPOSED_NOT_CANONICAL",
+      "canonicalSource": "execution/a12b2c5u33d_cloudflare_access_dormant_provisioning_readiness.json",
+      "blocker": "https://velnar.cloudflareaccess.com is proposed only; MUST NOT be treated as authoritative until read from real Cloudflare account",
+      "nextAction": "Read authoritative team domain from Cloudflare Zero Trust account during Segment B if approved",
       "externalMutationRequired": true,
       "humanApprovalRequired": true,
       "realProviderCallRequired": false
@@ -99,8 +117,14 @@
       "gateId": "access_application_aud",
       "gateName": "Access Application AUD",
       "currentState": "UNRESOLVED_NOT_CREATED",
+      "actualAudValue": "UNRESOLVED_NOT_CREATED",
+      "epistemicStatus": "OBSERVED_ONLY_AFTER_PROVISIONING",
+      "vendorLengthConstraint": "64 characters",
+      "vendorLengthConstraintEpistemicStatus": "VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION",
+      "velnarInternalValidatorMaxAudBytes": 64,
+      "internalValidatorEpistemicStatus": "CANONICAL_REPOSITORY_FACT",
       "canonicalSource": "execution/a12b2c5u33d_cloudflare_access_dormant_provisioning_readiness.json",
-      "blocker": "Application AUD generated upon Access application creation; not yet created",
+      "blocker": "Application AUD generated upon Access application creation; not yet created. Must not be fabricated or predicted.",
       "nextAction": "Capture AUD from Cloudflare Zero Trust and populate CLOUDFLARE_ACCESS_AUD in Segment B",
       "externalMutationRequired": true,
       "humanApprovalRequired": true,
@@ -109,9 +133,12 @@
     {
       "gateId": "idp",
       "gateName": "Identity Provider (IdP) Integration",
-      "currentState": "UNRESOLVED (Default Cloudflare OTP / Corporate IdP)",
+      "currentState": "UNRESOLVED_PROPOSED",
+      "candidateIdp": "Default Cloudflare OTP / Corporate IdP",
+      "epistemicStatus": "PROPOSED_NOT_CANONICAL",
+      "decisionState": "FUTURE_HUMAN_DECISION_REQUIRED",
       "canonicalSource": "execution/a12b2c5u33d_cloudflare_access_dormant_provisioning_readiness.json",
-      "blocker": "IdP selection not canonically confirmed; auto_redirect_to_identity remains false",
+      "blocker": "IdP selection and auto_redirect_to_identity remain proposed future human decisions",
       "nextAction": "Confirm IdP and MFA policy enforcement in Cloudflare Access policy in Segment B",
       "externalMutationRequired": true,
       "humanApprovalRequired": true,
@@ -371,6 +398,65 @@
       "realProviderCallRequired": false
     }
   ],
+  "sovereignBoundary": {
+    "sovereignBoundarySpecificationReady": true,
+    "sovereignBoundaryRuntimeEnforcementCertified": false,
+    "sovereignBoundaryRuntimeEnforcementStatus": "SPECIFIED_NOT_RUNTIME_CERTIFIED",
+    "hardGate2Blocker": true,
+    "hardGate2Mandate": "Sovereign Boundary runtime enforcement certification is an explicit HARD GATE 2 blocker before Segment C live provider invocations.",
+    "rules": {
+      "BLACK": "NEVER_SENT_TO_EXTERNAL_MODEL (No exceptions through sanitization)",
+      "GREY": "MAY_LEAVE_ONLY_AFTER_MINIMIZATION_AND_SANITIZATION_AS_BOUNDED_TASK_CAPSULE",
+      "WHITE": "PUBLIC_OR_EXTERNALLY_SAFE_INFORMATION"
+    },
+    "externalModels": [
+      "DeepSeek",
+      "Gemini / Google AI Studio",
+      "OpenAI",
+      "future frontier/external models"
+    ],
+    "blackTaxonomyMandatoryCategories": [
+      "full Security Memory",
+      "proprietary verification algorithms",
+      "detection heuristics",
+      "private benchmark answers",
+      "customer credentials",
+      "production secrets",
+      "master keys",
+      "critical IAM policy internals",
+      "critical Safety Kernel internals",
+      "critical routing/policy internals",
+      "Customer PII and raw identity data",
+      "VELNAR master KMS keys"
+    ]
+  },
+  "providerFactClassifications": {
+    "executionTimeProviderConfirmationRequired": true,
+    "note": "Repository strategy constants (REPO_PINNED_STRATEGY_VALUE) are retained for reproducibility, but candidate != current provider certification. Zero calls occur before Hard Gate 2.",
+    "deepseek": {
+      "strategyCandidateModel": "deepseek-v4-flash",
+      "strategyCandidateModelEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
+      "strategyEndpoint": "https://api.deepseek.com/v1/chat/completions",
+      "strategyEndpointEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
+      "strategyPricingTier": "offpeak",
+      "strategyPricingTierEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
+      "actualModelAvailableAtExecutionTime": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "actualApiEndpointCompatibility": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "actualTierOrWindow": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "actualPricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "credentialReadiness": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION"
+    },
+    "gemini": {
+      "strategyCandidateModel": "gemini-3.5-flash-lite",
+      "strategyCandidateModelEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
+      "strategyStatus": "DORMANT_UNSELECTED_PROVIDER",
+      "strategyStatusEpistemicStatus": "REPO_PINNED_STRATEGY_VALUE",
+      "actualModelAvailableAtExecutionTime": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "supportedGoogleAiStudioOrApiPath": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "actualPricing": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION",
+      "credentialReadiness": "UNRESOLVED_REQUIRES_PRELIVE_CONFIRMATION"
+    }
+  },
   "costClaimVerification": {
     "providerCallsInSegmentB": 0,
     "aiProviderSpendInSegmentB": "$0.00 (Zero calls by design)",
@@ -378,8 +464,8 @@
     "note": "Pricing and free-tier availability for Cloudflare Access and D1 are time-sensitive and must be confirmed immediately prior to mutation."
   },
   "verificationSummary": {
-    "totalGates": 28,
-    "gatesClosed": 28,
+    "totalGates": 29,
+    "gatesClosed": 29,
     "liveCallsPermitted": 0,
     "productionMutationsPermitted": 0,
     "segmentBExecutionAllowed": false,

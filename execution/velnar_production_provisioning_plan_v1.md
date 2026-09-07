@@ -28,36 +28,43 @@
 
 ### 2. Step-by-Step Production Provisioning Sequence (Segment B)
 
-#### Step 1: Canonical Operational Hostname & DNS
+#### Step 1: Operational Hostname & DNS Resolution
 - **Resource**: Cloudflare DNS Record
-- **Action**: Create or verify `ops.velnar.studio` CNAME pointing to `velnar-platform-worker.workers.dev` (or apex domain proxy).
+- **Target Domain**: `ops.velnar.studio` (`PROPOSED_NOT_CANONICAL`).
+  - *Epistemic Status*: `ops.velnar.studio` is strictly `PROPOSED_NOT_CANONICAL`. It MUST NOT be treated as a canonical production hostname until explicitly confirmed during Segment B.
+- **DNS Target**: `UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION`. No DNS target value is asserted as canonical until real Segment B account/zone inspection resolves it.
 - **Zone**: `velnar.studio`
 - **Proxy Status**: `proxied` (traffic flows through Cloudflare edge to enforce Zero Trust Access).
-- **Rollback**: Delete CNAME record `ops.velnar.studio`.
+- **Rollback**: Delete CNAME record `ops.velnar.studio` or revert DNS target.
 
 #### Step 2: Cloudflare Access Team Domain
 - **Resource**: Cloudflare Zero Trust Organization Settings
-- **Action**: Confirm authoritative team domain: `https://velnar.cloudflareaccess.com`.
-- **Validation**: Enforce `https:` protocol, alphanumeric subdomain, `.cloudflareaccess.com` suffix.
+- **Proposed Team Domain**: `https://velnar.cloudflareaccess.com` (`PROPOSED_NOT_CANONICAL`).
+  - *Epistemic Status*: `https://velnar.cloudflareaccess.com` is proposed only; it MUST NOT be treated as authoritative until read from the real Cloudflare account during Segment B.
+- **Validation Constraints**: Enforce `https:` protocol, alphanumeric subdomain, `.cloudflareaccess.com` suffix.
 - **Rollback**: Unset `CLOUDFLARE_ACCESS_TEAM_DOMAIN` in Worker configuration.
 
 #### Step 3: Cloudflare Access Self-Hosted Application
 - **Resource**: Cloudflare Zero Trust Application
 - **Action**: Create self-hosted application protecting the operational surface:
   - **Name**: `VELNAR Dedicated Operational Canary Surface`
-  - **Domain**: `ops.velnar.studio/api/ops/canary/deepseek-certification`
+  - **Domain**: `ops.velnar.studio/api/ops/canary/deepseek-certification` (`PROPOSED_NOT_CANONICAL`)
   - **Path Constraint**: Strict path match only; no wildcard prefix (`/api/ops/*` prohibited).
-  - **Session Duration**: `15m` (proposed least-privilege window).
-  - **Auto Redirect**: `false` (until IdP canonically resolved).
-- **AUD Capture**: Capture Cloudflare application AUD tag ($\le 64$ characters).
+  - **Session Duration**: `15m` (`PROPOSED_NOT_CANONICAL` / `FUTURE_HUMAN_DECISION_REQUIRED`).
+  - **Auto Redirect**: `false` (`PROPOSED_NOT_CANONICAL` / `FUTURE_HUMAN_DECISION_REQUIRED`).
+- **AUD Capture**:
+  - *Actual AUD Value*: `UNRESOLVED_NOT_CREATED` (`OBSERVED_ONLY_AFTER_PROVISIONING`). Must not be fabricated or predicted.
+  - *Vendor Constraint*: 64 characters (`VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION`).
+  - *Internal Validator Bound*: 64 bytes max (`CANONICAL_REPOSITORY_FACT`).
 - **Rollback**: Delete application in Cloudflare Zero Trust.
 
 #### Step 4: Cloudflare Access Policy (Zero Wildcards)
 - **Resource**: Cloudflare Access Policy
+- **Policy Decision State**: `FUTURE_HUMAN_DECISION_REQUIRED`
 - **Action**: Create allow policy attached strictly to the operational application:
   - **Decision**: `allow`
-  - **Include**: Explicit list of vetted human operator emails.
-  - **Require**: Hardware MFA (FIDO2 / WebAuthn token enrollment).
+  - **Include**: Explicit list of vetted human operator emails (`PROPOSED_NOT_CANONICAL`).
+  - **Require**: Hardware MFA (`PROPOSED_NOT_CANONICAL` / `FUTURE_HUMAN_DECISION_REQUIRED`).
 - **Prohibitions**:
   - `*@company.com` wildcard domain rules are **CATEGORICALLY FORBIDDEN**.
   - Service tokens are **CATEGORICALLY FORBIDDEN** from gaining human operational authority.
@@ -66,9 +73,9 @@
 
 #### Step 5: Worker Runtime Environment Variables
 - **Resource**: Cloudflare Worker Configuration
-- **Action**: Set non-secret runtime variables in production Worker environment:
-  - `CLOUDFLARE_ACCESS_TEAM_DOMAIN = "https://velnar.cloudflareaccess.com"`
-  - `CLOUDFLARE_ACCESS_AUD = "<CAPTURED_AUD_64_CHAR>"`
+- **Action**: Set non-secret runtime variables in production Worker environment upon verified creation:
+  - `CLOUDFLARE_ACCESS_TEAM_DOMAIN = "https://velnar.cloudflareaccess.com (PROPOSED_NOT_CANONICAL)"`
+  - `CLOUDFLARE_ACCESS_AUD = "<CAPTURED_APPLICATION_AUD_POST_CREATION>"`
 - **Classification**: Non-Secret Runtime Configuration.
 - **Rollback**: Remove / unset environment variables via Wrangler.
 

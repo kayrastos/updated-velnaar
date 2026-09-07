@@ -22,15 +22,22 @@
     "step1_operationalHostname": {
       "action": "CONFIRM_OR_PROVISION_OPERATIONAL_HOSTNAME",
       "targetDomain": "ops.velnar.studio",
+      "epistemicStatus": "PROPOSED_NOT_CANONICAL",
+      "dnsTarget": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
+      "dnsTargetEpistemicStatus": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
       "dnsRecordType": "CNAME",
       "proxyStatus": "proxied",
       "cloudflareZone": "velnar.studio",
+      "note": "ops.velnar.studio is strictly PROPOSED_NOT_CANONICAL; not a canonical production hostname until explicitly confirmed during Segment B. No DNS target value is asserted as canonical until real Segment B account/zone inspection resolves it.",
       "securityInvariant": "Host must resolve through Cloudflare edge proxy to ensure Access enforcement",
       "rollback": "Delete CNAME record ops.velnar.studio or revert DNS target"
     },
     "step2_accessTeamDomain": {
       "action": "VERIFY_ACCESS_TEAM_DOMAIN",
-      "authoritativeTeamDomain": "https://velnar.cloudflareaccess.com",
+      "proposedTeamDomain": "https://velnar.cloudflareaccess.com",
+      "epistemicStatus": "PROPOSED_NOT_CANONICAL",
+      "runtimeConfirmation": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
+      "note": "https://velnar.cloudflareaccess.com is proposed only; MUST NOT be treated as authoritative until read from real Cloudflare account during Segment B.",
       "validationConstraints": {
         "protocol": "https:",
         "suffix": ".cloudflareaccess.com",
@@ -42,15 +49,28 @@
       "action": "CREATE_CLOUDFLARE_ACCESS_APPLICATION",
       "applicationName": "VELNAR Dedicated Operational Canary Surface",
       "applicationType": "self_hosted",
-      "domain": "ops.velnar.studio/api/ops/canary/deepseek-certification",
+      "domain": "ops.velnar.studio/api/ops/canary/deepseek-certification (PROPOSED_NOT_CANONICAL)",
       "exactPathOnly": true,
       "wildcardPrefixProhibited": true,
-      "sessionDuration": "15m",
-      "autoRedirectToIdentity": false,
+      "sessionDuration": {
+        "value": "15m",
+        "epistemicStatus": "PROPOSED_NOT_CANONICAL",
+        "decisionState": "FUTURE_HUMAN_DECISION_REQUIRED"
+      },
+      "autoRedirectToIdentity": {
+        "value": false,
+        "epistemicStatus": "PROPOSED_NOT_CANONICAL",
+        "decisionState": "FUTURE_HUMAN_DECISION_REQUIRED"
+      },
       "audCaptureRequirement": {
         "variableName": "CLOUDFLARE_ACCESS_AUD",
-        "maxLengthCharacters": 64,
-        "format": "Opaque hex or alphanumeric string issued by Cloudflare Zero Trust"
+        "actualAudValue": "UNRESOLVED_NOT_CREATED",
+        "actualAudEpistemicStatus": "OBSERVED_ONLY_AFTER_PROVISIONING",
+        "vendorLengthConstraint": "64 characters",
+        "vendorLengthConstraintEpistemicStatus": "VENDOR_DOCUMENTED_REQUIRES_EXECUTION_TIME_REVALIDATION",
+        "velnarInternalValidatorMaxAudBytes": 64,
+        "internalValidatorEpistemicStatus": "CANONICAL_REPOSITORY_FACT",
+        "format": "Opaque hex or alphanumeric string issued by Cloudflare Zero Trust post-creation"
       },
       "rollback": "Delete Access application via Cloudflare Zero Trust API"
     },
@@ -58,17 +78,21 @@
       "action": "CREATE_ACCESS_POLICY",
       "policyName": "Operational Canary Vetted Superadmins Only",
       "decision": "allow",
+      "policyDecisionState": "FUTURE_HUMAN_DECISION_REQUIRED",
       "rules": {
         "include": [
           {
             "type": "email",
-            "description": "Explicit enumerated allowlist of vetted operational engineers only"
+            "description": "Explicit enumerated allowlist of vetted operational engineers only",
+            "epistemicStatus": "PROPOSED_NOT_CANONICAL"
           }
         ],
         "require": [
           {
             "type": "mfa",
-            "description": "Hardware security key (FIDO2 / WebAuthn) required"
+            "description": "Hardware security key (FIDO2 / WebAuthn) required",
+            "epistemicStatus": "PROPOSED_NOT_CANONICAL",
+            "decisionState": "FUTURE_HUMAN_DECISION_REQUIRED"
           }
         ]
       },
@@ -83,8 +107,8 @@
     "step5_workerRuntimeConfiguration": {
       "action": "SET_WORKER_NON_SECRET_RUNTIME_VARIABLES",
       "variables": {
-        "CLOUDFLARE_ACCESS_TEAM_DOMAIN": "https://velnar.cloudflareaccess.com",
-        "CLOUDFLARE_ACCESS_AUD": "<CAPTURED_APPLICATION_AUD_64_CHAR>"
+        "CLOUDFLARE_ACCESS_TEAM_DOMAIN": "https://velnar.cloudflareaccess.com (PROPOSED_NOT_CANONICAL)",
+        "CLOUDFLARE_ACCESS_AUD": "<CAPTURED_APPLICATION_AUD_POST_CREATION>"
       },
       "classification": "Non-Secret Runtime Configuration",
       "deploymentMethod": "wrangler.jsonc vars update or wrangler secret put for non-secret vars",
