@@ -7,7 +7,7 @@ This report documents the structural completion and evidence verification of the
 - **Status**: `PASS_A234_V6_DEV30_ONE_SHOT_COMPLETE`
 - **Canonical Pre-Launch Checkpoint**: Commit `40e71168b83e5febe42b4b2906a2fd9065c3a6ae` on branch `fulgor/a234-v6-handoff-20260906`
 - **Execution Mode**: Strict human-gated one-shot invocation via `python3 run_fulgor_v3_0_a234_launch_receipt_v6.py --run`
-- **Host**: RTX PRO 6000 GPU host (`fulgor-v3-g4-96`, `35.239.38.77`)
+- **Host**: RTX PRO 6000 GPU host (`fulgor-v3-g4-96`, `34.46.116.170`)
 - **Scope**: FORENSIC / STRUCTURAL VERIFICATION ONLY
 
 ---
