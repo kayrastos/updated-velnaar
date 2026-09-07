@@ -1,0 +1,356 @@
+# VELNAR — Phase A.12B.2C-5U.3.3D Evidence Record
+## Cloudflare Access Dormant Provisioning Readiness & Human Approval Package
+
+### 1. Executive Summary
+- **Phase**: VELNAR — A.12B.2C-5U.3.3D
+- **Artifact Type**: `CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS`
+- **Repository**: `https://github.com/kayrastos/updated-velnaar`
+- **Branch**: `main`
+- **Canonical Base Commit**: `4b64de26fce19ccd18b9b03d6f7fe04f0bcba3fb`
+- **Canonical Base Tree**: `f5f9febf9251964f3104a11ed44f99f3adc38b6b`
+- **Approved 5U.3.3C Implementation Snapshot**: `52902614aaa30995cc365a346c53bfa17a5727bc`
+- **Approved 5U.3.3C Implementation Tree**: `22c5e5242c35ac7b9c4c1e96254c0833e2feace3`
+- **Sealed Predecessors**:
+  - Phase A.12B.2C-5U.3.3B: **SEALED** (`A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED`)
+  - Phase A.12B.2C-5U.3.3C: **SEALED** (`A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_APPROVED`)
+- **Phase Purpose**: Prepare the exact, production-ready Cloudflare Access dormant provisioning specification and human approval package required to protect the dedicated VELNAR operational route.
+- **Infrastructure Mutation Status**: **STRICTLY READ-ONLY** (Zero mutations performed).
+- **Human Provisioning Approval Status**: `HUMAN_PROVISIONING_APPROVAL_GRANTED = false`
+- **Current Status**: `A12B2C5U33D_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS_COMPLETE_PENDING_INDEPENDENT_REVIEW`
+- **Independent Review Required**: `true`
+
+---
+
+### 2. Non-Negotiable Zero-Action Audit Record
+This phase is strictly documentation, design, and specification. Zero external resources were created or mutated.
+
+| Metric | Required | Actual | Verification |
+|---|---|---|---|
+| Cloudflare Access Application Creates | 0 | 0 | PASS |
+| Cloudflare Access Policy Creates | 0 | 0 | PASS |
+| Cloudflare Access Policy Updates | 0 | 0 | PASS |
+| Cloudflare Service Token Creates | 0 | 0 | PASS |
+| DNS Mutations | 0 | 0 | PASS |
+| Worker Deployments | 0 | 0 | PASS |
+| Worker Route Mutations | 0 | 0 | PASS |
+| Production Secret Operations | 0 | 0 | PASS |
+| Production Key Operations | 0 | 0 | PASS |
+| Real JWKS Network Calls | 0 | 0 | PASS |
+| Real D1 Database Calls | 0 | 0 | PASS |
+| AI Provider Calls | 0 | 0 | PASS |
+| Gate Flip Operations | 0 | 0 | PASS |
+
+---
+
+### 3. Canonical Sealed Authentication Architecture Review
+Source code inspection of sealed foundations confirms the following immutable contracts:
+
+1. **Assertion Header**: `Cf-Access-Jwt-Assertion` (defined as `CF_ACCESS_JWT_ASSERTION_HEADER` / `CF_ACCESS_JWT_ASSERTION_HEADER_CANONICAL` in `worker/auth/cloudflareAccessOperationalAuth.ts`).
+2. **Cryptographic Algorithm**: `RS256` strictly enforced (`ALLOWED_JWT_ALGORITHM = 'RS256'`). Algorithms `none`, `HS256`, `ES256`, `PS256` are immediately rejected with `ALGORITHM_NOT_ALLOWED`.
+3. **Issuer Origin**: Validated HTTPS origin of the canonical Cloudflare Access team domain (`https://<team-name>.cloudflareaccess.com`).
+4. **Audience (AUD)**: Exact match against server-configured `CLOUDFLARE_ACCESS_AUD`.
+5. **JWKS Certs Endpoint**: `https://<team-name>.cloudflareaccess.com/cdn-cgi/access/certs`. Remote key resolution is constructed internally by the Worker; caller-injected `keyResolver` is strictly disallowed in production.
+6. **Token Constraints**:
+   - Token size ceiling: 16 KiB (`MAX_ACCESS_JWT_LENGTH_BYTES = 16384`).
+   - Clock skew tolerance: $\le$ 5 seconds (`CLOCK_TOLERANCE_SECONDS = 5`).
+   - Token type: `app` (`EXPECTED_TOKEN_TYPE = 'app'`).
+   - Subject: Non-empty string.
+   - Email: Bounded RFC 5322 syntax ($\le$ 320 characters).
+7. **Authorization Registry**: Identity must match an active entry in `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY`. In 5U.3.3B/C/D, this registry is **frozen with 0 entries**.
+8. **Trust Domain Decoupling**: Operational principal (`ProductionOperationalPrincipal`) has **zero tenant roles** (`OWNER`, `ADMIN`, etc.) and zero organization memberships.
+9. **Public Error Classification**:
+   - **401 UNAUTHORIZED**: Token missing, malformed, signature invalid, algorithm prohibited, issuer/aud mismatch, expired, invalid iat/nbf, invalid token type, missing human subject/email.
+   - **403 FORBIDDEN**: Superadmin registry empty or identity not authorized.
+   - **503 AUTH_SERVICE_UNAVAILABLE**: Configuration not ready, JWKS unavailable, internal auth failure.
+
+---
+
+### 4. Required Environment Variables Specification
+Operational authentication requires two environment variables in `WorkerEnv` (`worker/env.ts`):
+
+| Variable Name | Type | Format / Constraints | Secret vs Config | Consumed In | Configured in Repo | Configured in Prod |
+|---|---|---|---|---|---|---|
+| `CLOUDFLARE_ACCESS_TEAM_DOMAIN` | `string` | HTTPS origin ending in `.cloudflareaccess.com` with alphanumeric/hyphen subdomain, no path/query/fragment/port | Non-Secret Configuration | `worker/auth/cloudflareAccessOperationalAuth.ts` (`validateCloudflareAccessConfig`) | NO (present in `WorkerEnv`, absent in `wrangler.jsonc`) | **UNKNOWN** (no live provisioning evidence) |
+| `CLOUDFLARE_ACCESS_AUD` | `string` | Non-empty string $\le$ 256 chars, no leading/trailing whitespace, exact match against JWT `aud` | Non-Secret Configuration Identifier (Integrity-Sensitive) | `worker/auth/cloudflareAccessOperationalAuth.ts` (`validateCloudflareAccessConfig`) | NO (present in `WorkerEnv`, absent in `wrangler.jsonc`) | **UNKNOWN** (application not yet created) |
+
+---
+
+### 5. Operational Hostname & Path Resolution
+- **Canonical Operational Worker Path**: `/api/ops/canary/deepseek-certification` (exact match only).
+- **Production Operational Hostname Status**: **`PRODUCTION_OPERATIONAL_HOSTNAME_UNRESOLVED`**.
+  - Comprehensive inspection of repository source, configuration (`wrangler.jsonc`), tests, and prior sealed evidence reveals no dedicated operational hostname has been established as canonical fact.
+- **Recommendation**: `ops.velnar.studio` is recorded strictly as **`PROPOSED_NOT_CANONICAL`**. It must not be treated as an authoritative fact until confirmed by human production ownership.
+
+---
+
+### 6. Cloudflare Access Application Design
+Future Access application specification for the dedicated operational surface:
+
+1. **Application Type**: `self_hosted` (Self-Hosted Cloudflare Access Application).
+2. **Dedicated Boundary**:
+   - Hostname: Dedicated operational hostname (candidate: `ops.velnar.studio`, `PROPOSED_NOT_CANONICAL`).
+   - Path Scope: `/api/ops/canary/deepseek-certification` (or dedicated operational prefix `/api/ops/*` backed by Worker exact-path router carve-out).
+3. **Session Duration**: `15 minutes` (least-privilege ephemeral sessions for operational/canary certification procedures).
+4. **Identity Provider (IdP)**: Corporate IdP with mandatory hardware-backed MFA (FIDO2 / WebAuthn security keys). Social logins, username/password without MFA, and one-time email PINs are strictly prohibited.
+5. **JWT Audience (AUD)**: Generated uniquely by Cloudflare upon application creation. Immutable for the lifetime of the application.
+6. **Issuer Origin**: Normalized HTTPS origin of the Cloudflare Access team domain (`https://<team-name>.cloudflareaccess.com`).
+7. **Assertion Forwarding**: Cloudflare Edge automatically injects `Cf-Access-Jwt-Assertion` on authenticated requests. Worker runtime performs zero-trust cryptographic verification.
+
+---
+
+### 7. Cloudflare Access Policy Design
+1. **Rule Decision**: `ALLOW` (Deny by default).
+2. **Rule Hierarchy**:
+   - Rule 1: Explicit Operational Administrator ALLOW Policy (human identities only).
+   - Default: Implicit Deny for all unauthenticated or non-matching requests.
+3. **Strict Policy Exclusions (MUST NOT AUTHORIZE)**:
+   - ❌ No company-wide or organization-wide access rules.
+   - ❌ No email domain wildcards (`*@velnar.studio` or similar).
+   - ❌ No tenant user roles (`OWNER`, `ADMIN`, `MEMBER`, etc.).
+   - ❌ No VELNAR tenant superadmin role.
+   - ❌ No service-token / machine identities on this human operational route.
+   - ❌ No mTLS identity alone without human Cloudflare Access authentication.
+   - ❌ No public bypass or IP bypass rules.
+4. **Permitted Criteria**: Explicitly enumerated corporate email addresses of authorized operational engineers, or a dedicated, tightly managed Access User Group containing vetted individuals only.
+
+---
+
+### 8. Human Identity Enrollment Contract
+1. **Current State**: `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY` entry count is **0** (strictly empty and frozen).
+2. **Future Identity Enrollment Schema**:
+   ```typescript
+   interface OperationalSuperAdminEntry {
+     readonly accessSubject: string;       // Immutable Cloudflare Access sub UUID
+     readonly expectedEmail: string;       // Verified corporate email address
+     readonly status: 'active' | 'suspended';
+     readonly registryVersion?: string;
+   }
+   ```
+3. **Dual Verification Prerequisites**:
+   - Confirmation of immutable Access `sub` and `email` from audited test session.
+   - Verification of hardware MFA token enrollment.
+   - Dual-authorization pull request signed by two authorized engineering leads.
+   - Dedicated audit evidence artifact generated and sealed prior to deployment.
+4. **Emergency Rollback / Removal Procedure**:
+   - Set status to `'suspended'` or remove the entry from `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY` in `worker/auth/cloudflareAccessOperationalAuth.ts`.
+   - Remove operator from Cloudflare Access policy or IdP group.
+   - Deploy Worker to invalidate operational standing immediately.
+
+---
+
+### 9. Service Token Separation
+Cloudflare Access service tokens produce application JWTs with:
+- `type = 'app'`
+- `sub = ""` (empty string or machine service token ID)
+- `common_name = "<service-token-name>"`
+- `email` is missing or empty string.
+
+**Worker Rejection Defense**:
+The sealed foundation (`worker/auth/cloudflareAccessOperationalAuth.ts`) guarantees that service tokens cannot gain human operational authority:
+- Rejects non-string or empty `sub` with `OperationalAuthErrorCode.HUMAN_SUBJECT_REQUIRED` (401).
+- Rejects missing, empty, or invalid `email` with `OperationalAuthErrorCode.EMAIL_REQUIRED` (401).
+- Requires presence in `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY`, which requires both subject and email. Unregistered machine identities fail with `OperationalAuthErrorCode.SUPERADMIN_NOT_AUTHORIZED` (403).
+
+Zero service tokens were created in this phase.
+
+---
+
+### 10. Access Application Audience & Team Domain Handling
+1. **Application AUD**:
+   - Must be captured directly from Cloudflare Zero Trust upon application creation.
+   - Transferred into Worker configuration as `CLOUDFLARE_ACCESS_AUD`.
+   - Never accepted from client input; never manually fabricated.
+   - Current status: **`UNRESOLVED_NOT_CREATED`**.
+2. **Team Domain**:
+   - Must be the authoritative HTTPS team origin (`https://<team-name>.cloudflareaccess.com`).
+   - Server-controlled only via `CLOUDFLARE_ACCESS_TEAM_DOMAIN`.
+   - Test domain (`velnar-test.cloudflareaccess.com`) is strictly a test fixture and is **NOT production configuration**.
+   - Current status: **`UNRESOLVED`**.
+
+---
+
+### 11. Dormant Provisioning Invariant
+**CRITICAL ARCHITECTURAL PRINCIPLE**:
+Future Cloudflare Access provisioning does **NOT** activate the operational route.
+
+Immediately following the future creation of the Access application, policies, and environment variables, the runtime safety gates will remain strictly locked:
+- `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = false`
+- `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = false`
+- `CANARY_LIVE_EXECUTION_ENABLED = false`
+- `CANARY_LIVE_EXECUTION_STATE = 'BLOCKED_PENDING_CERTIFICATION'`
+
+Resource existence in Cloudflare Zero Trust $\ne$ Ingress Readiness. Ingress readiness requires subsequent verification, end-to-end evidence capture, and independent review.
+
+---
+
+### 12. Canonical 12-Condition Safety & Readiness Ledger (All 12 Verified)
+| # | Safety / Readiness Constant | Authoritative Value | Verification Status |
+|---|---|---|---|
+| 1 | `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED` | `false` | PASS |
+| 2 | `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY` | `false` | PASS |
+| 3 | `CANARY_LIVE_EXECUTION_ENABLED` | `false` | PASS |
+| 4 | `CANARY_LIVE_EXECUTION_STATE` | `'BLOCKED_PENDING_CERTIFICATION'` | PASS |
+| 5 | `GUARDED_SOURCE_ATTESTATION_READY` | `false` | PASS |
+| 6 | `GUARDED_HUMAN_AUTH_ATTESTATION_READY` | `false` | PASS |
+| 7 | `PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED` | `false` | PASS |
+| 8 | `RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED` | `false` | PASS |
+| 9 | `D1_REPLAY_BACKEND_PRODUCTION_BOUND` | `false` | PASS |
+| 10 | `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED` | `false` | PASS |
+| 11 | `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` | `false` | PASS |
+| 12 | `productionRoutingEnforcementAllowed` | `false` | PASS |
+
+**Supplemental Auth Foundation State**:
+| Invariant / Field | Authoritative Value | Classification | Status |
+|---|---|---|---|
+| `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY.length` | `0` | `AUTH_FOUNDATION_STATE` | PASS |
+| `Object.isFrozen(PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY)` | `true` | `AUTH_FOUNDATION_STATE` | PASS |
+
+---
+
+### 13. Future Provisioning Command Plan
+> [!IMPORTANT]
+> **DIRECTIVE: DO_NOT_EXECUTE_IN_5U33D**
+> The following plan describes the future provisioning procedure. No command in this plan has been executed.
+
+```
++-----------------------------------------------------------------------------------+
+| STEP 1: CREATE CLOUDFLARE ACCESS APPLICATION                                      |
+| Status: DO_NOT_EXECUTE_IN_5U33D                                                   |
+| Resource: Access Application (self_hosted)                                        |
+| Action: Create application protecting candidate operational endpoint              |
+| Required Approval: Human Production Owner                                         |
+| Inputs:                                                                           |
+|   - Name: "VELNAR Dedicated Operational Route"                                     |
+|   - Domain: "ops.velnar.studio/api/ops/canary/deepseek-certification" (PROPOSED)    |
+|   - Session Duration: "15m"                                                       |
+|   - Auto Redirect: true                                                           |
+| Expected Result: Application created; Cloudflare assigns unique AUD tag           |
+| Verification: Query Zero Trust API / Dashboard for application status and AUD     |
+| Rollback: Delete application via Cloudflare API                                   |
++-----------------------------------------------------------------------------------+
+| STEP 2: CREATE EXPLICIT OPERATIONAL ALLOW POLICY                                  |
+| Status: DO_NOT_EXECUTE_IN_5U33D                                                   |
+| Resource: Access Policy                                                           |
+| Action: Attach ALLOW policy with explicit human identity list                     |
+| Required Approval: Human Security Lead & Production Owner                         |
+| Inputs:                                                                           |
+|   - Decision: "allow"                                                             |
+|   - Include: Explicit emails of vetted operational engineers                      |
+|   - Require: Hardware MFA rule                                                    |
+| Expected Result: Zero Trust enforces policy; denies all unlisted identities       |
+| Verification: Inspect policy via Zero Trust API; confirm zero wildcards           |
+| Rollback: Delete policy from application                                          |
++-----------------------------------------------------------------------------------+
+| STEP 3: CONFIGURE WORKER RUNTIME ENVIRONMENT VARIABLES                            |
+| Status: DO_NOT_EXECUTE_IN_5U33D                                                   |
+| Resource: Cloudflare Worker Environment Variables                                 |
+| Action: Set CLOUDFLARE_ACCESS_TEAM_DOMAIN and CLOUDFLARE_ACCESS_AUD                |
+| Required Approval: Human Production Owner                                         |
+| Inputs:                                                                           |
+|   - CLOUDFLARE_ACCESS_TEAM_DOMAIN: Authoritative HTTPS team domain                |
+|   - CLOUDFLARE_ACCESS_AUD: Application AUD generated in Step 1                    |
+| Expected Result: Worker runtime receives configuration without code changes       |
+| Verification: Read Worker environment via Wrangler/Dashboard (non-secret check)   |
+| Rollback: Unset environment variables in Worker environment                       |
++-----------------------------------------------------------------------------------+
+```
+
+---
+
+### 14. Required Human Approval Checkpoint
+Before any Cloudflare write or provisioning action may occur in a subsequent phase, every item on the following checklist must be formally satisfied and verified by human production ownership:
+
+- [ ] **Canonical Production Hostname Confirmed**: Explicit production operational hostname resolved and signed off.
+- [ ] **Cloudflare Account & Zone Confirmed**: Target Cloudflare account ID and DNS zone verified.
+- [ ] **Access Team Domain Confirmed**: Authoritative Cloudflare Access team domain verified.
+- [ ] **Access IdP Confirmed**: Corporate IdP integration and MFA enforcement verified.
+- [ ] **Access Application Scope Confirmed**: Exact URL boundary (`/api/ops/canary/deepseek-certification`) confirmed.
+- [ ] **Access Policy Subjects Confirmed**: Explicit individual engineer roster confirmed.
+- [ ] **No Wildcard Authorization Confirmed**: Zero domain wildcards or blanket rules present.
+- [ ] **Service-Token Path Excluded**: Machine tokens explicitly excluded from human operational route.
+- [ ] **Application AUD Capture Confirmed**: Secure AUD transfer procedure established.
+- [ ] **Environment Variable Storage Confirmed**: Secret/config deployment procedure verified.
+- [ ] **Rollback Procedure Reviewed**: Rollback steps reviewed and approved.
+- [x] **Runtime Gates Confirmed False**: All 12 canonical safety ledger conditions verified false.
+- [x] **No Production Identity Enrolled**: Canonical superadmin registry confirmed empty (0 entries).
+- [ ] **Human Owner Explicit Authorization**: Formal sign-off granted by human production owner.
+
+**Current Checkpoint State**: `HUMAN_PROVISIONING_APPROVAL_GRANTED = false`
+
+---
+
+### 15. Future Provisioning Rollback Plan
+In the event of an anomaly or decision to abort provisioning in a future phase:
+1. **Access Application Deletion**: Immediately disable and delete the operational Access Application in Cloudflare Zero Trust.
+2. **Access Policy Removal**: Delete all access policies associated with the operational path.
+3. **Identity Revocation**: Revoke any provisioned operator credentials or group memberships in the corporate IdP.
+4. **Worker Environment Reversion**: Unset `CLOUDFLARE_ACCESS_TEAM_DOMAIN` and `CLOUDFLARE_ACCESS_AUD` in the Worker production environment.
+5. **Runtime Gate Confirmation**: Verify that all 12 canonical safety gates remain `false` and `CANARY_LIVE_EXECUTION_STATE` remains `'BLOCKED_PENDING_CERTIFICATION'`.
+6. **Tenant Isolation Confirmation**: Verify that ordinary tenant routes and CORS behaviors remain completely unaffected.
+
+---
+
+### 16. Comprehensive Failure Modes Threat Model
+| Threat / Failure Mode | Failure Effect | Fail-Closed Expectation | Detection Mechanism | Rollback Procedure |
+|---|---|---|---|---|
+| **Wrong Hostname** | Request hits wrong host or fails DNS | Fails DNS lookup or hits standard tenant route (401/404) | Cloudflare DNS logs / HTTP 404 | Update Access application hostname |
+| **Wrong Path** | Access boundary does not cover operational endpoint | Worker router carve-out returns 404 while dormant | Edge audit / test failure | Align Access application path |
+| **Wrong Access AUD** | Worker rejects assertion token | `AUDIENCE_MISMATCH` $\to$ HTTP 401 | Safe error log: `AUDIENCE_MISMATCH` | Correct `CLOUDFLARE_ACCESS_AUD` in Worker env |
+| **Wrong Team Domain** | Worker rejects issuer or JWKS endpoint | `CONFIG_NOT_READY` $\to$ 503 or `ISSUER_MISMATCH` $\to$ 401 | Safe error log | Correct `CLOUDFLARE_ACCESS_TEAM_DOMAIN` |
+| **Wildcard Policy** | Non-operator employees pass edge | Worker rejects at `SUPERADMIN_NOT_AUTHORIZED` $\to$ 403 | Edge audit logs | Delete wildcard; replace with explicit list |
+| **Email Domain Policy** | Broad domain users pass edge | Worker rejects at `SUPERADMIN_NOT_AUTHORIZED` $\to$ 403 | Policy review audit | Restrict policy to vetted individuals |
+| **Service Token as Human** | Machine client sends service token | Worker rejects at `HUMAN_SUBJECT_REQUIRED` / `EMAIL_REQUIRED` $\to$ 401 | Safe error log | Ensure machine tokens excluded from Access |
+| **Tenant Identity Injected** | Tenant user sends bearer token | Worker rejects at `MISSING_TOKEN` $\to$ 401 (no Access assertion) | Safe error log | Tenant isolation verified; no action needed |
+| **Access Configured, Env Missing** | Access assertion reaches unconfigured Worker | Worker rejects at `CONFIG_NOT_READY` $\to$ 503 | Safe error log | Set Worker environment variables |
+| **Env Configured, Access Absent** | Unprotected request reaches Worker | Worker rejects at `MISSING_TOKEN` $\to$ 401 | Safe error log | Provision Access before allowing traffic |
+| **JWKS Unavailable** | Worker cannot fetch public keys | Worker rejects at `JWKS_UNAVAILABLE` $\to$ 503 | Safe error log | Monitor Cloudflare Access certs endpoint |
+| **IdP Unavailable** | Edge cannot authenticate operators | Cloudflare Edge blocks ingress with IdP error | Cloudflare Zero Trust error | Await IdP recovery |
+| **Access Policy Bypassed** | Request bypasses edge policy | Worker rejects at `MISSING_TOKEN` $\to$ 401 | Safe error log | Re-enable Access policy |
+| **CORS Mistaken for Authority** | Client expects CORS to authorize | Operational route returns 404 (dormant) or enforces Access assertion | Client 404/401 | Maintain route separation from CORS |
+| **Route Still Dormant** | Operator requests dormant route | Returns HTTP 404 `NOT_FOUND` (by design) | Normal test output | Expected behavior; activate in later phase |
+| **Route Prematurely Active** | Operational route gate flipped early | Gate checks block live execution (`BLOCKED_PENDING_CERTIFICATION`) | Gate audit | Reset `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED` to false |
+
+---
+
+### 17. Infrastructure State Distinction & Claims Discipline
+| Infrastructure State Dimension | State | Verification Basis |
+|---|---|---|
+| `SOURCE_INTEGRATED` | **TRUE** | Sealed in 5U.3.3C |
+| `OFFLINE_TESTED` | **TRUE** | Sealed in 5U.3.3C (60/60 dedicated, 2,507 total tests passing) |
+| `SEALED_5U33C` | **TRUE** | Sealed at commit `4b64de26fce19ccd18b9b03d6f7fe04f0bcba3fb` |
+| `ACCESS_PROVISIONING_PLANNED` | **TRUE** | Completed in 5U.3.3D package |
+| `ACCESS_PROVISIONED` | **FALSE** | Zero Cloudflare mutations performed |
+| `ACCESS_CONFIG_VERIFIED` | **FALSE** | Environment variables not set in production |
+| `INGRESS_VERIFIED` | **FALSE** | Ingress traffic has not been tested |
+| `INGRESS_READY` | **FALSE** | Canonical gate #2 remains strictly false |
+| `LIVE_VERIFIED` | **FALSE** | Live execution gate remains strictly false |
+
+---
+
+### 18. Data & Secret Classification
+- `CLOUDFLARE_ACCESS_TEAM_DOMAIN`: **Configuration, Non-Secret**.
+- `CLOUDFLARE_ACCESS_AUD`: **Configuration Identifier, Integrity-Sensitive, Non-Secret**.
+- `ACCESS_SERVICE_TOKEN_CLIENT_SECRET`: **SECRET** (Not applicable / not created in this phase).
+- `IDP_CREDENTIALS`: **SECRET** (Never stored in repository or evidence artifacts).
+- `CLOUDFLARE_API_TOKEN`: **SECRET** (Never stored in repository or evidence artifacts).
+- `JWT_SIGNING_PRIVATE_KEYS`: **Cloudflare-Managed** (Never accessible or exposed to VELNAR).
+
+---
+
+### 19. Non-Claims Declaration
+It is explicitly declared and confirmed that this phase does **NOT** claim:
+- Cloudflare Access application created: **FALSE**
+- Cloudflare Access policies created: **FALSE**
+- Cloudflare service token created: **FALSE**
+- Production hostname Access-protected: **FALSE**
+- Production identity enrolled: **FALSE**
+- Operational superadmin enrolled: **FALSE**
+- Real JWKS fetch certified: **FALSE**
+- Real JWKS rotation verified: **FALSE**
+- Operational ingress auth ready: **FALSE**
+- Operational route enabled: **FALSE**
+- Canary live execution enabled: **FALSE**
+- D1 production database provisioned or bound: **FALSE**
+- Trust anchors provisioned: **FALSE**
+- Production routing enforcement allowed: **FALSE**
+- Production success path certified: **FALSE**

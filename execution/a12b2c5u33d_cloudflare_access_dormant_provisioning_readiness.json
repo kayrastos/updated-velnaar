@@ -1,0 +1,511 @@
+{
+  "phase": "A.12B.2C-5U.3.3D",
+  "artifactType": "CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS",
+  "repository": "https://github.com/kayrastos/updated-velnaar",
+  "branch": "main",
+  "timestamp": "2026-09-07T13:06:00.000Z",
+  "baseCommit": "4b64de26fce19ccd18b9b03d6f7fe04f0bcba3fb",
+  "baseTree": "f5f9febf9251964f3104a11ed44f99f3adc38b6b",
+  "sealedPredecessors": {
+    "phase5U33B": {
+      "status": "SEALED",
+      "approvedCommit": "48178761a6c1c5f258e27785527417ed0bfe9a02",
+      "verdict": "A12B2C5U33B_PRODUCTION_OPERATIONAL_AUTH_FOUNDATION_APPROVED"
+    },
+    "phase5U33C": {
+      "status": "SEALED",
+      "sealRecordCommit": "4b64de26fce19ccd18b9b03d6f7fe04f0bcba3fb",
+      "approvedImplementationSnapshot": "52902614aaa30995cc365a346c53bfa17a5727bc",
+      "approvedImplementationTree": "22c5e5242c35ac7b9c4c1e96254c0833e2feace3",
+      "verdict": "A12B2C5U33C_PRODUCTION_OPERATIONAL_AUTH_RUNTIME_INTEGRATION_FOUNDATION_APPROVED"
+    }
+  },
+  "phase5U33BSealed": true,
+  "phase5U33CSealed": true,
+  "cloudflareMutationAllowed": false,
+  "humanProvisioningApprovalGranted": false,
+  "accessProvisioningPlanComplete": true,
+  "productionOperationalHostnameResolved": false,
+  "operationalHostnameState": "PRODUCTION_OPERATIONAL_HOSTNAME_UNRESOLVED",
+  "recommendedOperationalHostname": "ops.velnar.studio",
+  "recommendedOperationalHostnameClassification": "PROPOSED_NOT_CANONICAL",
+  "canonicalWorkerOperationalPath": "/api/ops/canary/deepseek-certification",
+  "accessTeamDomainResolved": false,
+  "accessTeamDomainState": "UNRESOLVED",
+  "recommendedAccessTeamDomain": "https://velnar.cloudflareaccess.com",
+  "recommendedAccessTeamDomainClassification": "PROPOSED_NOT_CANONICAL",
+  "accessApplicationAudResolved": false,
+  "accessApplicationAudState": "UNRESOLVED_NOT_CREATED",
+  "productionIdentityEnrollmentAllowed": false,
+  "productionSuperAdminRegistryEntryCount": 0,
+  "productionSuperAdminRegistryFrozen": true,
+  "accessApplicationCreated": false,
+  "accessPoliciesCreated": false,
+  "serviceTokenCreated": false,
+  "cloudflareAccessApplicationCreates": 0,
+  "cloudflareAccessPolicyCreates": 0,
+  "cloudflareAccessPolicyUpdates": 0,
+  "cloudflareServiceTokenCreates": 0,
+  "dnsMutations": 0,
+  "workerDeployments": 0,
+  "workerRouteMutations": 0,
+  "productionSecretOperations": 0,
+  "productionKeyOperations": 0,
+  "realJwksNetworkCalls": 0,
+  "realD1Calls": 0,
+  "providerCalls": 0,
+  "gateFlipOperations": 0,
+  "operationalRouteEnabled": false,
+  "operationalIngressReady": false,
+  "liveExecutionEnabled": false,
+  "independentReviewRequired": true,
+  "finalStatus": "A12B2C5U33D_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+  "status": "A12B2C5U33D_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_READINESS_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+  "canonicalSafetyReadinessLedger": {
+    "1_PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+    "2_PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+    "3_CANARY_LIVE_EXECUTION_ENABLED": false,
+    "4_CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+    "5_GUARDED_SOURCE_ATTESTATION_READY": false,
+    "6_GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+    "7_PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+    "8_RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+    "9_D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
+    "10_D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
+    "11_D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
+    "12_productionRoutingEnforcementAllowed": false
+  },
+  "authFoundationState": {
+    "classification": "AUTH_FOUNDATION_STATE",
+    "canonicalSuperAdminRegistryLength": 0,
+    "canonicalSuperAdminRegistryFrozen": true,
+    "separateFromSafetyLedger": true
+  },
+  "canonicalCloudflareAccessContract": {
+    "assertionHeader": "Cf-Access-Jwt-Assertion",
+    "canonicalHeaderName": "Cf-Access-Jwt-Assertion",
+    "algorithm": "RS256",
+    "expectedTokenType": "app",
+    "maxTokenSizeBytes": 16384,
+    "clockToleranceSeconds": 5,
+    "jwksPath": "/cdn-cgi/access/certs",
+    "emailSyntaxConstraint": "bounded RFC 5322 syntax <= 320 chars",
+    "subjectRequirement": "non-empty string, immutable Cloudflare Access subject",
+    "superadminRegistryRequirement": "present in frozen PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY with subject and email matching",
+    "errorMapping": {
+      "status401": [
+        "MISSING_TOKEN",
+        "TOKEN_TOO_LARGE",
+        "MALFORMED_TOKEN",
+        "SIGNATURE_INVALID",
+        "ALGORITHM_NOT_ALLOWED",
+        "ISSUER_MISMATCH",
+        "AUDIENCE_MISMATCH",
+        "TOKEN_EXPIRED",
+        "TOKEN_NOT_YET_VALID",
+        "IAT_INVALID",
+        "TOKEN_TYPE_INVALID",
+        "HUMAN_SUBJECT_REQUIRED",
+        "EMAIL_REQUIRED",
+        "IDENTITY_BINDING_MISMATCH"
+      ],
+      "status403": [
+        "SUPERADMIN_REGISTRY_EMPTY",
+        "SUPERADMIN_NOT_AUTHORIZED"
+      ],
+      "status503": [
+        "CONFIG_NOT_READY",
+        "JWKS_UNAVAILABLE",
+        "AUTH_INTERNAL_FAILURE"
+      ]
+    }
+  },
+  "requiredEnvironmentVariables": {
+    "CLOUDFLARE_ACCESS_TEAM_DOMAIN": {
+      "name": "CLOUDFLARE_ACCESS_TEAM_DOMAIN",
+      "type": "string (URL origin)",
+      "formatRequirement": "HTTPS origin ending strictly in .cloudflareaccess.com, alphanumeric subdomain with hyphens, no path/query/fragment/auth",
+      "exampleFormat": "https://velnar.cloudflareaccess.com (PROPOSED_NOT_CANONICAL)",
+      "classification": "CONFIGURATION_NON_SECRET",
+      "consumedIn": "worker/auth/cloudflareAccessOperationalAuth.ts (validateCloudflareAccessConfig)",
+      "configuredInRepository": false,
+      "configuredInProduction": "UNKNOWN"
+    },
+    "CLOUDFLARE_ACCESS_AUD": {
+      "name": "CLOUDFLARE_ACCESS_AUD",
+      "type": "string (Access application AUD tag)",
+      "formatRequirement": "Non-empty string <= 256 characters, no leading/trailing whitespace, exact match against JWT aud claim",
+      "exampleFormat": "64-character hexadecimal tag generated by Cloudflare Zero Trust upon application creation",
+      "classification": "CONFIGURATION_IDENTIFIER_NON_SECRET_INTEGRITY_SENSITIVE",
+      "consumedIn": "worker/auth/cloudflareAccessOperationalAuth.ts (validateCloudflareAccessConfig)",
+      "configuredInRepository": false,
+      "configuredInProduction": "UNKNOWN"
+    }
+  },
+  "accessApplicationDesign": {
+    "applicationType": "self_hosted",
+    "hostnameScope": "DEDICATED_OPERATIONAL_HOSTNAME (candidate: ops.velnar.studio - PROPOSED_NOT_CANONICAL)",
+    "pathScope": "/api/ops/canary/deepseek-certification",
+    "sessionDuration": "15 minutes",
+    "identityProviderRequirement": "Corporate IdP with enforced hardware-backed MFA (FIDO2/WebAuthn), no social logins, no one-time PINs",
+    "jwtAudienceCreationSemantics": "Generated uniquely and immutably by Cloudflare Zero Trust upon application creation; copied to Worker env",
+    "issuerRelationship": "Derived as normalized HTTPS origin of the Cloudflare Access Team Domain",
+    "accessAssertionForwarding": "Passed by Cloudflare Edge in Cf-Access-Jwt-Assertion request header to Worker; validated internally"
+  },
+  "accessPolicyDesign": {
+    "decision": "ALLOW",
+    "defaultPolicy": "Implicit deny by default",
+    "policyOrdering": [
+      "Explicit Operational Administrator ALLOW policy (human identity)",
+      "Implicit / Default Deny for all other requests"
+    ],
+    "explicitExclusions": {
+      "allCompanyUsersExcluded": true,
+      "allTenantUsersExcluded": true,
+      "emailDomainWildcardExcluded": true,
+      "ownerRoleExcluded": true,
+      "adminRoleExcluded": true,
+      "tenantSuperadminExcluded": true,
+      "serviceTokenIdentityExcluded": true,
+      "mtlsIdentityAloneExcluded": true,
+      "publicBypassExcluded": true
+    },
+    "allowedCriteria": "Explicitly enumerated corporate email addresses or dedicated, vetted Access User Group only"
+  },
+  "humanIdentityEnrollmentContract": {
+    "currentEnrollmentStatus": "LOCKED_EMPTY",
+    "currentRegistryCount": 0,
+    "futureEntryStructure": {
+      "accessSubject": "Immutable Cloudflare Access subject UUID",
+      "expectedEmail": "Verified individual operational engineer corporate email",
+      "status": "active",
+      "registryVersion": "Semantic version string"
+    },
+    "prerequisitesForEnrollment": [
+      "Confirmed Cloudflare Access user subject and email from verified IdP test session",
+      "Cryptographic attestation and hardware token enrollment verification",
+      "Formal dual-authorization PR and sign-off by two authorized engineering leads",
+      "Independent audit evidence record generated and sealed prior to deployment"
+    ],
+    "removalProcedure": [
+      "Change status to 'suspended' or remove entry from PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY array in worker/auth/cloudflareAccessOperationalAuth.ts",
+      "Revoke access in Cloudflare Access policy or IdP group",
+      "Deploy updated Worker build to invalidate runtime authorization immediately"
+    ]
+  },
+  "serviceTokenSeparation": {
+    "cloudflareServiceTokenJwtShape": {
+      "type": "app",
+      "sub": "empty string or machine service token ID",
+      "common_name": "service token identifier",
+      "email": "missing or empty"
+    },
+    "rejectionMechanisms": [
+      "Payload sub claim must be a non-empty string; empty string fails with OperationalAuthErrorCode.HUMAN_SUBJECT_REQUIRED (401)",
+      "Payload email claim must be present and pass isValidEmail; missing/empty email fails with OperationalAuthErrorCode.EMAIL_REQUIRED (401)",
+      "Identity must match an entry in PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY; unregistered machine identities fail with OperationalAuthErrorCode.SUPERADMIN_NOT_AUTHORIZED (403)"
+    ],
+    "serviceTokensCreated": 0
+  },
+  "dormantProvisioningInvariants": {
+    "provisioningDoesNotActivateRouting": true,
+    "postProvisioningGateStates": {
+      "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+      "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+      "CANARY_LIVE_EXECUTION_ENABLED": false,
+      "CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION"
+    },
+    "separationOfConcerns": "Infrastructure resource existence in Cloudflare Zero Trust DOES NOT equal ingress readiness or operational route activation"
+  },
+  "futureProvisioningCommandPlan": {
+    "status": "SPECIFIED_NOT_EXECUTED",
+    "executionDirective": "DO_NOT_EXECUTE_IN_5U33D",
+    "steps": [
+      {
+        "stepNumber": 1,
+        "resourceType": "Cloudflare Access Application",
+        "action": "CREATE self_hosted application",
+        "requiredApproval": "Human Production Owner",
+        "inputs": {
+          "name": "VELNAR Dedicated Operational Route",
+          "domain": "ops.velnar.studio/api/ops/canary/deepseek-certification (PROPOSED)",
+          "session_duration": "15m",
+          "auto_redirect_to_identity": true
+        },
+        "sourceOfValues": "5U.3.3D Provisioning Specification",
+        "expectedResult": "Access application created; AUD tag generated",
+        "verificationStep": "Verify application settings and AUD tag via Cloudflare Zero Trust Dashboard / API",
+        "rollbackStep": "Delete created Access Application via Cloudflare API"
+      },
+      {
+        "stepNumber": 2,
+        "resourceType": "Cloudflare Access Policy",
+        "action": "CREATE ALLOW policy on operational application",
+        "requiredApproval": "Human Security Lead & Production Owner",
+        "inputs": {
+          "name": "Velnar Operational Superadmin Allow Policy",
+          "decision": "allow",
+          "include": "Explicit email list of authorized operators (no domain wildcards)",
+          "require": "MFA enforcement rule"
+        },
+        "sourceOfValues": "Approved Operational Superadmin Roster",
+        "expectedResult": "Policy attached to operational application",
+        "verificationStep": "Query Access Policies for application; verify 0 wildcard rules and exact email list",
+        "rollbackStep": "Delete policy from application"
+      },
+      {
+        "stepNumber": 3,
+        "resourceType": "Worker Environment Variables",
+        "action": "SET CLOUDFLARE_ACCESS_TEAM_DOMAIN and CLOUDFLARE_ACCESS_AUD in Worker production environment",
+        "requiredApproval": "Human Production Owner",
+        "inputs": {
+          "CLOUDFLARE_ACCESS_TEAM_DOMAIN": "Validated team domain origin",
+          "CLOUDFLARE_ACCESS_AUD": "Application AUD from Step 1"
+        },
+        "sourceOfValues": "Cloudflare Zero Trust Dashboard / Step 1 Output",
+        "expectedResult": "Worker env variables configured in Cloudflare Dashboard / Wrangler secrets",
+        "verificationStep": "Verify worker environment contains expected keys without altering code or gates",
+        "rollbackStep": "Remove environment variables from Worker environment"
+      }
+    ]
+  },
+  "humanApprovalChecklist": {
+    "checkpointStatus": "PENDING_APPROVAL",
+    "humanProvisioningApprovalGranted": false,
+    "checklistItems": [
+      {
+        "item": "canonical production hostname confirmed",
+        "satisfied": false
+      },
+      {
+        "item": "Cloudflare account/zone confirmed",
+        "satisfied": false
+      },
+      {
+        "item": "Access team domain confirmed",
+        "satisfied": false
+      },
+      {
+        "item": "Access IdP confirmed",
+        "satisfied": false
+      },
+      {
+        "item": "Access application scope confirmed",
+        "satisfied": false
+      },
+      {
+        "item": "Access policy subjects confirmed",
+        "satisfied": false
+      },
+      {
+        "item": "no wildcard user authorization",
+        "satisfied": false
+      },
+      {
+        "item": "service-token path excluded from human auth",
+        "satisfied": false
+      },
+      {
+        "item": "application AUD capture procedure confirmed",
+        "satisfied": false
+      },
+      {
+        "item": "environment-variable storage location confirmed",
+        "satisfied": false
+      },
+      {
+        "item": "rollback procedure reviewed",
+        "satisfied": false
+      },
+      {
+        "item": "runtime gates confirmed false",
+        "satisfied": true
+      },
+      {
+        "item": "no production identity yet enrolled unless separately approved",
+        "satisfied": true
+      },
+      {
+        "item": "human owner explicitly authorizes provisioning",
+        "satisfied": false
+      }
+    ]
+  },
+  "rollbackPlan": {
+    "status": "PREPARED_BEFORE_PROVISIONING",
+    "procedures": [
+      "Disable and delete Access application in Cloudflare Zero Trust",
+      "Remove Access policies associated with the operational path",
+      "Revoke any operational identity bindings or IdP group assignments",
+      "Remove CLOUDFLARE_ACCESS_TEAM_DOMAIN and CLOUDFLARE_ACCESS_AUD from Worker environment",
+      "Confirm Worker runtime route gates remain strictly false (disabled)",
+      "Verify ordinary tenant routes and CORS behaviors remain completely unaffected"
+    ]
+  },
+  "failureModesThreatModel": [
+    {
+      "mode": "wrong_hostname",
+      "failureEffect": "Traffic routes to tenant application or fails DNS resolution",
+      "failClosedExpectation": "Access token validation will not receive correct host, or request hits non-operational route with standard tenant auth (401)",
+      "detection": "Audit logs showing DNS 404 or tenant route 401",
+      "rollback": "Correct Access Application hostname configuration"
+    },
+    {
+      "mode": "wrong_path",
+      "failureEffect": "Access boundary does not protect the exact Worker operational endpoint",
+      "failClosedExpectation": "Worker router exact carve-out returns 404 while dormant, or fails closed if path doesn't match",
+      "detection": "Path discrepancy detected in Cloudflare Access configuration audit",
+      "rollback": "Update application path to exact /api/ops/canary/deepseek-certification"
+    },
+    {
+      "mode": "wrong_access_aud",
+      "failureEffect": "Token validation fails on Worker",
+      "failClosedExpectation": "validateCloudflareAccessConfig or jwtVerify rejects token with AUDIENCE_MISMATCH (401)",
+      "detection": "Worker safe error log: AUDIENCE_MISMATCH",
+      "rollback": "Update CLOUDFLARE_ACCESS_AUD in Worker environment to match application tag"
+    },
+    {
+      "mode": "wrong_team_domain",
+      "failureEffect": "Token issuer verification fails or JWKS URL invalid",
+      "failClosedExpectation": "validateCloudflareAccessConfig rejects with CONFIG_NOT_READY (503) or token rejected with ISSUER_MISMATCH (401)",
+      "detection": "Worker safe error log: CONFIG_NOT_READY / ISSUER_MISMATCH",
+      "rollback": "Update CLOUDFLARE_ACCESS_TEAM_DOMAIN to match authoritative team origin"
+    },
+    {
+      "mode": "wildcard_policy",
+      "failureEffect": "Unintended corporate users receive Access assertion tokens",
+      "failClosedExpectation": "Worker rejects user at SUPERADMIN_REGISTRY_EMPTY (403) or SUPERADMIN_NOT_AUTHORIZED (403)",
+      "detection": "Cloudflare Access audit logs show non-superadmin users authenticated",
+      "rollback": "Delete wildcard rule and replace with explicit individual allow list"
+    },
+    {
+      "mode": "email_domain_wide_policy",
+      "failureEffect": "All company domain users pass Access edge",
+      "failClosedExpectation": "Worker registry check fails closed with SUPERADMIN_NOT_AUTHORIZED (403)",
+      "detection": "Access policy audit shows domain-wide rule",
+      "rollback": "Restrict policy to explicit superadmin emails"
+    },
+    {
+      "mode": "service_token_accepted_as_human",
+      "failureEffect": "Machine client attempts operational access",
+      "failClosedExpectation": "Worker rejects token due to missing human email / empty subject (401)",
+      "detection": "Worker log: HUMAN_SUBJECT_REQUIRED or EMAIL_REQUIRED",
+      "rollback": "Ensure machine tokens are strictly excluded from Access application"
+    },
+    {
+      "mode": "tenant_identity_admitted",
+      "failureEffect": "Tenant user attempts operational command with tenant token",
+      "failClosedExpectation": "Worker route carve-out does not process tenant tokens; fails with MISSING_TOKEN (401)",
+      "detection": "Worker log: MISSING_TOKEN",
+      "rollback": "Tenant token isolation verified; no action needed"
+    },
+    {
+      "mode": "access_configured_worker_env_missing",
+      "failureEffect": "Access token sent to Worker without env config",
+      "failClosedExpectation": "Worker fails closed with CONFIG_NOT_READY (503 AUTH_SERVICE_UNAVAILABLE)",
+      "detection": "Worker log: CONFIG_NOT_READY",
+      "rollback": "Populate required environment variables"
+    },
+    {
+      "mode": "worker_env_configured_access_resource_absent",
+      "failureEffect": "Request arrives without Access protection at edge",
+      "failClosedExpectation": "Worker fails closed with MISSING_TOKEN (401 UNAUTHORIZED)",
+      "detection": "Worker log: MISSING_TOKEN",
+      "rollback": "Provision Access application before allowing ingress"
+    },
+    {
+      "mode": "jwks_unavailable",
+      "failureEffect": "Worker cannot retrieve Cloudflare Access public keys",
+      "failClosedExpectation": "Remote JWKS resolver fails closed with JWKS_UNAVAILABLE (503 AUTH_SERVICE_UNAVAILABLE)",
+      "detection": "Worker log: JWKS_UNAVAILABLE",
+      "rollback": "Investigate Cloudflare Access certs endpoint status"
+    },
+    {
+      "mode": "idp_unavailable",
+      "failureEffect": "Operators cannot authenticate at Cloudflare Access edge",
+      "failClosedExpectation": "Cloudflare Access blocks request before reaching Worker (HTTP 403 / IdP error)",
+      "detection": "IdP outage alert; Access login failure",
+      "rollback": "Wait for IdP recovery or switch to secondary IdP if configured"
+    },
+    {
+      "mode": "access_policy_accidentally_bypassed",
+      "failureEffect": "Edge routes request without token",
+      "failClosedExpectation": "Worker fails closed with MISSING_TOKEN (401)",
+      "detection": "Worker log: MISSING_TOKEN on operational route",
+      "rollback": "Re-enable Access policy on application"
+    },
+    {
+      "mode": "cors_mistaken_for_access_authority",
+      "failureEffect": "Browser client expects CORS headers to grant operational access",
+      "failClosedExpectation": "Dormant operational route returns 404 for all methods including OPTIONS; active path enforces Cf-Access-Jwt-Assertion",
+      "detection": "Client receives 404 or 401",
+      "rollback": "Preserve operational route separation from CORS preflight"
+    },
+    {
+      "mode": "production_route_still_dormant",
+      "failureEffect": "Access provisioned but route returns 404",
+      "failClosedExpectation": "Expected dormant state; route barriers intentionally return 404 until activation phase",
+      "detection": "Normal operational verification test returns 404",
+      "rollback": "Normal state; no rollback required"
+    },
+    {
+      "mode": "production_route_unexpectedly_active",
+      "failureEffect": "Operational route activated prematurely",
+      "failClosedExpectation": "Strict gate validation prevents live execution (CANARY_LIVE_EXECUTION_STATE = BLOCKED_PENDING_CERTIFICATION)",
+      "detection": "Gate integrity check fails",
+      "rollback": "Immediately reset PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED to false"
+    }
+  ],
+  "infrastructureStateDistinction": {
+    "SOURCE_INTEGRATED": true,
+    "OFFLINE_TESTED": true,
+    "SEALED_5U33C": true,
+    "ACCESS_PROVISIONING_PLANNED": true,
+    "ACCESS_PROVISIONED": false,
+    "ACCESS_CONFIG_VERIFIED": false,
+    "INGRESS_VERIFIED": false,
+    "INGRESS_READY": false,
+    "LIVE_VERIFIED": false
+  },
+  "dataSecretClassification": {
+    "CLOUDFLARE_ACCESS_TEAM_DOMAIN": "Configuration, Non-Secret",
+    "CLOUDFLARE_ACCESS_AUD": "Configuration Identifier, Integrity-Sensitive, Non-Secret",
+    "ACCESS_SERVICE_TOKEN_CLIENT_SECRET": "SECRET — Not applicable / not created in this phase",
+    "IDP_CREDENTIALS": "SECRET — Never stored in repository or evidence",
+    "CLOUDFLARE_API_TOKEN": "SECRET — Never stored in repository or evidence",
+    "JWT_SIGNING_PRIVATE_KEYS": "Cloudflare-Managed — Never accessible or exposed to VELNAR"
+  },
+  "claimsDiscipline": {
+    "sourceIntegrated": true,
+    "offlineTested": true,
+    "sealed5U33C": true,
+    "accessProvisioningPlanned": true,
+    "accessProvisioned": false,
+    "accessConfigVerified": false,
+    "ingressVerified": false,
+    "ingressReady": false,
+    "liveVerified": false
+  },
+  "nonClaims": {
+    "cloudflareAccessApplicationCreated": false,
+    "cloudflareAccessPoliciesCreated": false,
+    "cloudflareServiceTokenCreated": false,
+    "productionHostnameAccessProtected": false,
+    "serviceTokenEnrolled": false,
+    "realProductionIdentityEnrolled": false,
+    "operationalSuperAdminEnrolled": false,
+    "productionAccessConfigLive": false,
+    "realJwksFetchCertified": false,
+    "realJwksRotationVerified": false,
+    "operationalIngressAuthReady": false,
+    "operationalRouteEnabled": false,
+    "canaryLiveExecutionEnabled": false,
+    "d1ProductionBindingExists": false,
+    "d1ProductionDatabaseProvisioned": false,
+    "d1ConcurrencyCertified": false,
+    "humanTrustAnchorProvisioned": false,
+    "sourceProvenanceTrustAnchorProvisioned": false,
+    "productionRoutingEnforcementAllowed": false,
+    "productionSuccessPathCertified": false
+  }
+}
