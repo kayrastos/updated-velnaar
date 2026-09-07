@@ -1,11 +1,11 @@
 {
   "phase": "A.12B.2C-5U.3.3B-R",
   "artifactType": "PRODUCTION_OPERATIONAL_AUTHENTICATION_FOUNDATION_REPAIR",
-  "timestamp": "2026-09-07T13:40:00Z",
+  "timestamp": "2026-09-07T10:40:26Z",
   "repository": "https://github.com/kayrastos/updated-velnaar",
-  "baseCommit": "8236c435e3238f6eaea059f925be6f27b2eea817",
-  "baseTree": "ba86bda4d1b75de55fd409abda9ecc551a6b64fb",
-  "parentCommit": "8236c435e3238f6eaea059f925be6f27b2eea817",
+  "baseCommit": "5bca1ff5b15e5f0716ab99ded68c64beb615dd11",
+  "baseTree": "8ae76238abd0d60df0ea1919aa652778d3cbf590",
+  "parentCommit": "5bca1ff5b15e5f0716ab99ded68c64beb615dd11",
   "branch": "main",
   "phase5U33ASealed": true,
   "cloudflareAccessJwtFoundationImplemented": true,
@@ -68,7 +68,7 @@
     "authenticatedEmailRequired": true,
     "emailSyntaxRFC5322Enforced": false,
     "emailSyntaxConservativeBoundedValidation": true,
-    "maxEmailLengthBytes": 320,
+    "maxEmailLengthCharacters": 320,
     "temporalRelationshipChecks": [
       "exp <= iat rejection (IAT_INVALID)",
       "nbf > exp rejection (TOKEN_NOT_YET_VALID)",
@@ -150,80 +150,111 @@
     "rawKeysLeaked": 0,
     "stackTracesLeaked": 0
   },
-  "relevantConditionsInspectLedger": [
+  "canonicalSafetyAndReadinessLedger": [
     {
       "condition": "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED",
+      "sourceFile": "worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts",
       "expectedValue": false,
       "actualValue": false,
       "status": "PASS_CLOSED"
     },
     {
       "condition": "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY",
+      "sourceFile": "worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts",
       "expectedValue": false,
       "actualValue": false,
       "status": "PASS_CLOSED"
     },
     {
       "condition": "CANARY_LIVE_EXECUTION_ENABLED",
+      "sourceFile": "worker/ai/canary/canarySpecification.ts",
       "expectedValue": false,
       "actualValue": false,
       "status": "PASS_CLOSED"
     },
     {
       "condition": "CANARY_LIVE_EXECUTION_STATE",
-      "expectedValue": "DISABLED",
-      "actualValue": "DISABLED",
+      "sourceFile": "worker/ai/canary/canarySpecification.ts",
+      "expectedValue": "BLOCKED_PENDING_CERTIFICATION",
+      "actualValue": "BLOCKED_PENDING_CERTIFICATION",
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "GUARDED_SOURCE_ATTESTATION_READY",
+      "sourceFile": "worker/ai/canary/deepSeekGuardedLiveTransport.ts",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "GUARDED_HUMAN_AUTH_ATTESTATION_READY",
+      "sourceFile": "worker/ai/canary/deepSeekGuardedLiveTransport.ts",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED",
+      "sourceFile": "worker/ai/canary/deepSeekProductionAuthorizationTrust.ts",
+      "expectedValue": false,
+      "actualValue": false,
+      "status": "PASS_CLOSED"
+    },
+    {
+      "condition": "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED",
+      "sourceFile": "worker/ai/canary/deepSeekTrustedRuntimeSourceProvenance.ts",
+      "expectedValue": false,
+      "actualValue": false,
       "status": "PASS_CLOSED"
     },
     {
       "condition": "D1_REPLAY_BACKEND_PRODUCTION_BOUND",
+      "sourceFile": "worker/ai/canary/d1AuthorizationReplayBackend.ts",
       "expectedValue": false,
       "actualValue": false,
       "status": "PASS_CLOSED"
     },
     {
-      "condition": "AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED",
+      "condition": "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED",
+      "sourceFile": "worker/ai/canary/d1AuthorizationReplayBackend.ts",
       "expectedValue": false,
       "actualValue": false,
       "status": "PASS_CLOSED"
     },
     {
-      "condition": "DEEPSEEK_PROVISIONING_CERTIFICATE.provisioningStatus",
-      "expectedValue": "UNPROVISIONED",
-      "actualValue": "UNPROVISIONED",
-      "status": "PASS_CLOSED"
-    },
-    {
-      "condition": "DEEPSEEK_PROVISIONING_CERTIFICATE.networkEgressVerified",
+      "condition": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED",
+      "sourceFile": "worker/ai/canary/d1AuthorizationReplayBackend.ts",
       "expectedValue": false,
       "actualValue": false,
       "status": "PASS_CLOSED"
     },
     {
-      "condition": "DEEPSEEK_PROVISIONING_CERTIFICATE.environmentVariablesPopulated",
+      "condition": "productionRoutingEnforcementAllowed",
+      "sourceFile": "worker/ai/canary/canarySpecification.ts",
       "expectedValue": false,
       "actualValue": false,
-      "status": "PASS_CLOSED"
-    },
-    {
-      "condition": "DEEPSEEK_PROVISIONING_CERTIFICATE.productionActivationApproved",
-      "expectedValue": false,
-      "actualValue": false,
-      "status": "PASS_CLOSED"
-    },
-    {
-      "condition": "PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY.length",
-      "expectedValue": 0,
-      "actualValue": 0,
-      "status": "PASS_CLOSED"
-    },
-    {
-      "condition": "Object.isFrozen(PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY)",
-      "expectedValue": true,
-      "actualValue": true,
       "status": "PASS_CLOSED"
     }
   ],
+  "supplementalFoundationState": {
+    "authFoundationState": {
+      "registryConstant": "PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY",
+      "registryEntryCount": 0,
+      "registryFrozen": true,
+      "classification": "AUTH_FOUNDATION_STATE"
+    },
+    "auditConceptState": {
+      "AUDIT_CONCEPT_WORKER_D1_BINDING_RUNTIME_VERIFIED": false,
+      "classification": "AUDIT_CONCEPT"
+    },
+    "preProvisioningState": {
+      "DEEPSEEK_PROVISIONING_CERTIFICATE_provisioningStatus": "UNPROVISIONED",
+      "DEEPSEEK_PROVISIONING_CERTIFICATE_networkEgressVerified": false,
+      "DEEPSEEK_PROVISIONING_CERTIFICATE_environmentVariablesPopulated": false,
+      "DEEPSEEK_PROVISIONING_CERTIFICATE_productionActivationApproved": false,
+      "classification": "PRE_PROVISIONING_METADATA"
+    }
+  },
   "verificationResults": {
     "dedicatedSecurityTestFile": "tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts",
     "dedicatedTestsPassed": 66,
