@@ -1,19 +1,30 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "v1.0-r1-reconciliation",
+  "version": "v1.1-r1-reconciliation",
   "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
-  "stage": "STAGE 3 — HARD GATE 2 AUDIT & BATCH R1 RECONCILIATION",
-  "timestamp": "2026-09-08T04:45:00.000Z",
-  "canonicalBatch": "78ce5cc93c2bba621e5794118c22136563f1977c",
-  "canonicalBatchMessage": "docs(prod): record production readiness batch R1",
+  "stage": "STAGE 3 — HARD GATE 2 AUDIT & BATCH R1 RECONCILIATION V3",
+  "timestamp": "2026-09-08T04:55:00.000Z",
+  "canonicalBatch": "5eb772639ff4ff5eee41f51951fa11912773dfae",
+  "canonicalBatchMessage": "docs(prod): repair production readiness batch R1",
+  "canonicalBatchParent": "78ce5cc93c2bba621e5794118c22136563f1977c",
   "classification": "CANONICAL_READINESS_AUDIT_RECONCILED_WITH_POST_REVIEW_SECURITY_ARCHITECTURE",
+  "upstreamR1RepairResolution": {
+    "canonicalWorkerIngressArchitecture": "CUSTOM_DOMAIN",
+    "manualDnsRecordCreationRequired": false,
+    "workerRouteRequired": false,
+    "customDomainRequired": true,
+    "targetHostname": "ops.velnar.studio",
+    "supersededCnameAssumptionStatus": "CLOSED_UPSTREAM_AND_ALIGNED",
+    "deepSeekApiKeyRequiredForDormantDeployment": false,
+    "oversizedBodyStatus": "413_PAYLOAD_TOO_LARGE"
+  },
   "auditedReadinessArtifacts": [
     {
       "phase": "5U.3.3F",
       "artifactJson": "execution/a12b2c5u33f_dormant_operational_ingress_verification_readiness.json",
       "artifactMd": "execution/a12b2c5u33f_dormant_operational_ingress_verification_readiness.md",
       "purpose": "Dormant Operational Ingress Verification Readiness Audit",
-      "status": "READINESS_AUDIT_RECONCILED"
+      "status": "READINESS_AUDIT_REPAIRED_UPSTREAM_AND_RECONCILED"
     },
     {
       "phase": "5U.3.4A",
@@ -27,7 +38,7 @@
       "artifactJson": "execution/a12b2c5u34b_worker_production_binding_deployment_readiness.json",
       "artifactMd": "execution/a12b2c5u34b_worker_production_binding_deployment_readiness.md",
       "purpose": "Worker Production Binding & Deployment Readiness Audit",
-      "status": "READINESS_AUDIT_RECONCILED_WITH_DEDICATED_CANARY_WORKER"
+      "status": "READINESS_AUDIT_REPAIRED_UPSTREAM_AND_RECONCILED_WITH_DEDICATED_CANARY_WORKER"
     }
   ],
   "canonicalSafetyFactsPreserved": {
@@ -42,23 +53,13 @@
     "d1ReplayBackendProductionBound": false,
     "trustAnchorsProvisioned": false
   },
-  "preRepairAssumptionsSupersededBySecurityArchitecture": {
-    "broadPlatformWorkerAsOpsTarget": {
-      "supersededAssumption": "Deploying broad platform worker to handle ops.velnar.studio alongside tenant traffic",
-      "repairedDesign": "Dedicated velnar-canary-ops-worker (worker/canaryOpsWorker.ts, wrangler.canary-ops.jsonc) with zero tenant routes"
-    },
-    "broadRoutingPattern": {
-      "supersededAssumption": "ops.velnar.studio/* broad routing surface on edge",
-      "repairedDesign": "Single exact path /api/ops/canary/deepseek-certification; all other paths return 404 NOT_FOUND"
-    },
-    "genericWranglerConfigRouteBinding": {
-      "supersededAssumption": "Binding route directly in primary wrangler.jsonc",
-      "repairedDesign": "Dedicated wrangler.canary-ops.jsonc completely isolated from tenant wrangler.jsonc"
-    },
-    "manualCnameGuessing": {
-      "supersededAssumption": "Manually guessed CNAME target for ops.velnar.studio",
-      "repairedDesign": "Cloudflare Worker Custom Domain mapping ops.velnar.studio directly to velnar-canary-ops-worker"
-    }
+  "dedicatedCanaryArchitecturePreserved": {
+    "workerEntry": "worker/canaryOpsWorker.ts",
+    "workerConfig": "wrangler.canary-ops.jsonc",
+    "targetCustomDomain": "ops.velnar.studio",
+    "operationalPath": "/api/ops/canary/deepseek-certification",
+    "unrelatedPathsStatus": "404_NOT_FOUND",
+    "tenantIsolation": "HOST_AND_PROCESS_ISOLATED"
   },
-  "verdict": "BATCH_R1_RECONCILED_POST_REVIEW_SECURITY_ARCHITECTURE_MAINTAINED"
+  "verdict": "BATCH_R1_REPAIRED_UPSTREAM_AND_RECONCILED_SECURITY_ARCHITECTURE_ALIGNED"
 }

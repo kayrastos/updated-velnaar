@@ -215,7 +215,7 @@
     "total": 34,
     "claim": "All 34 defined Gate-2 security tests passed"
   },
-  "status": "VELNAR_SEGMENT_B_GATE2_FINAL_REPAIR_V2_PENDING_INDEPENDENT_REREVIEW",
+  "status": "VELNAR_SEGMENT_B_GATE2_FINAL_TRUTH_RECONCILIATION_PENDING_INDEPENDENT_REREVIEW",
   "providerStateDisambiguation": {
     "principle": "CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE",
     "cloudflareAccessProviderStateVerificationFrom5U33E": "VERIFIED_AT_SEALED_5U33E_SNAPSHOT",
@@ -237,5 +237,29 @@
       "5U.3.4B"
     ],
     "status": "BATCH_R1_RECONCILED_WITH_POST_REVIEW_SECURITY_ARCHITECTURE"
+  },
+  "canonicalMainCommit": "5eb772639ff4ff5eee41f51951fa11912773dfae",
+  "operatorIdentityTruth": {
+    "intendedOperatorEmail": "kayra01.09.06@gmail.com",
+    "confirmationSource": "HUMAN_CONFIRMED_INPUT",
+    "accessPolicyCreated": false,
+    "accessSubjectVerified": false,
+    "identityEnrolled": false,
+    "superAdminRegistryCount": 0,
+    "operatorPlaceholderClassification": "operator@velnar.studio is PROPOSED_FUTURE_PLACEHOLDER_NOT_ENROLLED; kayra01.09.06@gmail.com is authoritative human input."
+  },
+  "serviceTokenMtlsClassification": {
+    "serviceTokenPermittedForHumanAuthority": false,
+    "mtlsPermittedForHumanAuthority": false,
+    "status": "SERVICE_TOKEN_MTLS_CATEGORICALLY_EXCLUDED_FROM_HUMAN_OPERATIONAL_AUTHORITY",
+    "explanation": "Human operational canary requires human Access session and human email binding (kayra01.09.06@gmail.com). Service token cannot substitute for human SuperAdmin authority."
+  },
+  "d1DatabaseTruth": {
+    "databaseName": "velnar-production-db",
+    "databaseUuid": "d65abcb3-d8d6-46fb-9403-a97ab54de303",
+    "region": "EEUR",
+    "testRunId": "cert_run_1a07f17a810_bb7dfc12",
+    "concurrencyCertificationStatus": "D1_CONCURRENCY_DATABASE_IDENTITY_BINDING_VERIFIED",
+    "proseConflictResolution": "UUID d65abcb3-d8d6-46fb-9403-a97ab54de303 verified live in Cloudflare (created 2026-09-08T03:36:03Z, 28 tables, EEUR). Errantly cited 3057e62d-05db-40a2-a9b8-3f56644f6f71 proven nonexistent."
   }
 }

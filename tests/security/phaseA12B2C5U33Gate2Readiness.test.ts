@@ -72,6 +72,14 @@ import {
   SEMANTIC_SCORE_MIN_THRESHOLD,
 } from '../../worker/ai/canary/deepSeekSuccessorCertificationStateMachine';
 
+// Cloudflare Access Operational Auth & Registry
+import {
+  PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY,
+  OperationalAuthErrorCode,
+  EXPECTED_TOKEN_TYPE,
+  authorizeOperationalPrincipalAgainstRegistry,
+} from '../../worker/auth/cloudflareAccessOperationalAuth';
+
 // Sovereign Boundary Runtime Engine
 import {
   SOVEREIGN_BOUNDARY_VERSION,
@@ -1032,9 +1040,9 @@ describe('Phase A.12B.2C-5U.3.3 Hard Gate 2 Readiness Test Suite', () => {
       expect(fs.existsSync(r1Path)).toBe(true);
 
       const r1 = JSON.parse(fs.readFileSync(r1Path, 'utf-8'));
-      expect(r1.canonicalBatch).toBe('78ce5cc93c2bba621e5794118c22136563f1977c');
+      expect(r1.canonicalBatch).toBe('5eb772639ff4ff5eee41f51951fa11912773dfae');
       expect(r1.classification).toBe('CANONICAL_READINESS_AUDIT_RECONCILED_WITH_POST_REVIEW_SECURITY_ARCHITECTURE');
-      expect(r1.verdict).toBe('BATCH_R1_RECONCILED_POST_REVIEW_SECURITY_ARCHITECTURE_MAINTAINED');
+      expect(r1.verdict).toBe('BATCH_R1_REPAIRED_UPSTREAM_AND_RECONCILED_SECURITY_ARCHITECTURE_ALIGNED');
     });
 
     it('10.2 preserves canonical safety facts from R1 audits', () => {
@@ -1057,10 +1065,94 @@ describe('Phase A.12B.2C-5U.3.3 Hard Gate 2 Readiness Test Suite', () => {
       const r1Path = path.resolve(__dirname, '../../execution/velnar_production_readiness_batch_r1_reconciliation_v1.json');
       const r1 = JSON.parse(fs.readFileSync(r1Path, 'utf-8'));
 
-      expect(r1.preRepairAssumptionsSupersededBySecurityArchitecture.broadPlatformWorkerAsOpsTarget.repairedDesign).toContain('Dedicated velnar-canary-ops-worker');
-      expect(r1.preRepairAssumptionsSupersededBySecurityArchitecture.broadRoutingPattern.repairedDesign).toContain('/api/ops/canary/deepseek-certification');
-      expect(r1.preRepairAssumptionsSupersededBySecurityArchitecture.genericWranglerConfigRouteBinding.repairedDesign).toContain('wrangler.canary-ops.jsonc');
-      expect(r1.preRepairAssumptionsSupersededBySecurityArchitecture.manualCnameGuessing.repairedDesign).toContain('Worker Custom Domain');
+      expect(r1.dedicatedCanaryArchitecturePreserved.workerEntry).toBe('worker/canaryOpsWorker.ts');
+      expect(r1.dedicatedCanaryArchitecturePreserved.workerConfig).toBe('wrangler.canary-ops.jsonc');
+      expect(r1.dedicatedCanaryArchitecturePreserved.targetCustomDomain).toBe('ops.velnar.studio');
+      expect(r1.dedicatedCanaryArchitecturePreserved.operationalPath).toBe('/api/ops/canary/deepseek-certification');
+      expect(r1.dedicatedCanaryArchitecturePreserved.unrelatedPathsStatus).toBe('404_NOT_FOUND');
+    });
+
+    it('10.4 confirms latest canonical R1 upstream adopts CUSTOM_DOMAIN and eliminates manual DNS/route requirements', () => {
+      const r1Path = path.resolve(__dirname, '../../execution/velnar_production_readiness_batch_r1_reconciliation_v1.json');
+      const r1 = JSON.parse(fs.readFileSync(r1Path, 'utf-8'));
+
+      expect(r1.upstreamR1RepairResolution.canonicalWorkerIngressArchitecture).toBe('CUSTOM_DOMAIN');
+      expect(r1.upstreamR1RepairResolution.manualDnsRecordCreationRequired).toBe(false);
+      expect(r1.upstreamR1RepairResolution.workerRouteRequired).toBe(false);
+      expect(r1.upstreamR1RepairResolution.customDomainRequired).toBe(true);
+      expect(r1.upstreamR1RepairResolution.targetHostname).toBe('ops.velnar.studio');
+      expect(r1.upstreamR1RepairResolution.supersededCnameAssumptionStatus).toBe('CLOSED_UPSTREAM_AND_ALIGNED');
+    });
+  });
+
+  // ==========================================================================
+  // GROUP 11: OPERATOR IDENTITY TRUTH, D1 DISAMBIGUATION & SERVICE TOKEN EXCLUSION
+  // ==========================================================================
+  describe('Group 11: Operator Identity Truth, D1 Disambiguation & Service Token Exclusion', () => {
+    it('11.1 verifies intended operator email is kayra01.09.06@gmail.com and operator@velnar.studio is not enrolled', () => {
+      const gate2Path = path.resolve(__dirname, '../../execution/velnar_hard_gate2_readiness_v1.json');
+      const gate2 = JSON.parse(fs.readFileSync(gate2Path, 'utf-8'));
+
+      expect(gate2.operatorIdentityTruth.intendedOperatorEmail).toBe('kayra01.09.06@gmail.com');
+      expect(gate2.operatorIdentityTruth.confirmationSource).toBe('HUMAN_CONFIRMED_INPUT');
+      expect(gate2.operatorIdentityTruth.identityEnrolled).toBe(false);
+      expect(gate2.operatorIdentityTruth.superAdminRegistryCount).toBe(0);
+
+      // Verify in runtime source: registry is empty, operator@velnar.studio is not enrolled
+      expect(PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY.length).toBe(0);
+      const isEnrolled = PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY.some(
+        (e: any) => e.expectedEmail === 'operator@velnar.studio'
+      );
+      expect(isEnrolled).toBe(false);
+    });
+
+    it('11.2 verifies D1 historical execution identity binding is d65abcb3 and no conflicting UUID is authoritative', () => {
+      const d1Path = path.resolve(__dirname, '../../execution/velnar_d1_remote_concurrency_certification_v1.json');
+      const d1Data = JSON.parse(fs.readFileSync(d1Path, 'utf-8'));
+
+      expect(d1Data.databaseId).toBe('d65abcb3-d8d6-46fb-9403-a97ab54de303');
+      expect(d1Data.databaseName).toBe('velnar-production-db');
+      expect(d1Data.region).toBe('EEUR');
+      expect(d1Data.testRunId).toBe('cert_run_1a07f17a810_bb7dfc12');
+
+      const gate2Path = path.resolve(__dirname, '../../execution/velnar_hard_gate2_readiness_v1.json');
+      const gate2 = JSON.parse(fs.readFileSync(gate2Path, 'utf-8'));
+      expect(gate2.d1DatabaseTruth.databaseUuid).toBe('d65abcb3-d8d6-46fb-9403-a97ab54de303');
+      expect(gate2.d1DatabaseTruth.concurrencyCertificationStatus).toBe('D1_CONCURRENCY_DATABASE_IDENTITY_BINDING_VERIFIED');
+
+      // Assert 3057e62d does NOT appear as authoritative database in gate2 or d1 report
+      expect(gate2.d1DatabaseTruth.databaseUuid).not.toContain('3057e62d');
+      expect(d1Data.databaseId).not.toContain('3057e62d');
+    });
+
+    it('11.3 enforces that human authority cannot be supplied by service token', () => {
+      const gate2Path = path.resolve(__dirname, '../../execution/velnar_hard_gate2_readiness_v1.json');
+      const gate2 = JSON.parse(fs.readFileSync(gate2Path, 'utf-8'));
+
+      expect(gate2.serviceTokenMtlsClassification.status).toBe(
+        'SERVICE_TOKEN_MTLS_CATEGORICALLY_EXCLUDED_FROM_HUMAN_OPERATIONAL_AUTHORITY'
+      );
+      expect(gate2.serviceTokenMtlsClassification.serviceTokenPermittedForHumanAuthority).toBe(false);
+      expect(gate2.serviceTokenMtlsClassification.mtlsPermittedForHumanAuthority).toBe(false);
+
+      // Verify that Cloudflare Access operational auth requires EXPECTED_TOKEN_TYPE === 'app'
+      expect(EXPECTED_TOKEN_TYPE).toBe('app');
+
+      // Machine client attempting to claim operational authority with empty registry is rejected
+      const machinePrincipal = {
+        subject: 'service-client-id-12345',
+        email: '',
+        authSource: 'CLOUDFLARE_ACCESS' as const,
+        isSuperAdmin: false,
+      };
+      const check = authorizeOperationalPrincipalAgainstRegistry(
+        machinePrincipal,
+        PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY
+      );
+      expect(check.success).toBe(false);
+      if (!check.success) {
+        expect((check as any).code).toBe(OperationalAuthErrorCode.SUPERADMIN_REGISTRY_EMPTY);
+      }
     });
   });
 

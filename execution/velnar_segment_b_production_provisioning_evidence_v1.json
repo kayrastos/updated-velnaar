@@ -220,7 +220,7 @@
     "status": "ALL_DEFINED_GATE2_SECURITY_TESTS_PASSED",
     "coverageClaim": "34 of 34 defined Gate-2 security tests passing without failures"
   },
-  "status": "VELNAR_SEGMENT_B_GATE2_FINAL_REPAIR_V2_PENDING_INDEPENDENT_REREVIEW",
+  "status": "VELNAR_SEGMENT_B_GATE2_FINAL_TRUTH_RECONCILIATION_PENDING_INDEPENDENT_REREVIEW",
   "providerStateDisambiguation": {
     "principle": "CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE",
     "cloudflareAccessProviderStateVerificationFrom5U33E": "VERIFIED_AT_SEALED_5U33E_SNAPSHOT",
@@ -242,5 +242,22 @@
       "5U.3.4B"
     ],
     "status": "BATCH_R1_RECONCILED_WITH_POST_REVIEW_SECURITY_ARCHITECTURE"
+  },
+  "canonicalMainCommit": "5eb772639ff4ff5eee41f51951fa11912773dfae",
+  "d1DatabaseTruth": {
+    "databaseName": "velnar-production-db",
+    "databaseUuid": "d65abcb3-d8d6-46fb-9403-a97ab54de303",
+    "region": "EEUR",
+    "testRunId": "cert_run_1a07f17a810_bb7dfc12",
+    "status": "D1_CONCURRENCY_DATABASE_IDENTITY_BINDING_VERIFIED",
+    "resolution": "UUID d65abcb3-d8d6-46fb-9403-a97ab54de303 verified in Cloudflare D1. 3057e62d was an accidental prose string and is nonexistent."
+  },
+  "operatorIdentityTruth": {
+    "intendedOperatorEmail": "kayra01.09.06@gmail.com",
+    "placeholderClassification": "operator@velnar.studio is PROPOSED_FUTURE_PLACEHOLDER_NOT_ENROLLED"
+  },
+  "serviceTokenMtlsClassification": {
+    "serviceTokenPermittedForHumanAuthority": false,
+    "status": "SERVICE_TOKEN_MTLS_CATEGORICALLY_EXCLUDED_FROM_HUMAN_OPERATIONAL_AUTHORITY"
   }
 }
