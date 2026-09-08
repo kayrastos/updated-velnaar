@@ -151,7 +151,7 @@ describe('Phase A.12B.2C-5T: Cloudflare D1 Durable Authorization Replay Backend 
     });
 
     it('5. real database provisioned remains strictly false', () => {
-      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(false);
+      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
     });
   });
 

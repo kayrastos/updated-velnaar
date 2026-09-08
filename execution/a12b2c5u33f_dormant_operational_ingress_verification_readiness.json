@@ -3,7 +3,7 @@
   "artifactType": "DORMANT_OPERATIONAL_INGRESS_VERIFICATION_READINESS_AUDIT",
   "repository": "https://github.com/kayrastos/updated-velnaar",
   "branch": "main",
-  "timestamp": "2026-09-08T04:45:00.000Z",
+  "timestamp": "2026-09-08T04:50:00.000Z",
   "canonicalBaseCommit": "78ce5cc93c2bba621e5794118c22136563f1977c",
   "canonicalBaseTree": "eb6c7574a1a003a2f2fc6aca055e459a79e1ff04",
   "sealedPredecessor": "A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED",
@@ -82,20 +82,12 @@
     "laneG_ingressVerification": "Execute structured negative test matrix (missing JWT, invalid sig, expired, wrong AUD, wrong subject, wrong email, payload > 64KB)",
     "laneG_barrierEvaluation": "Controlled unblocking of PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED and INGRESS_AUTH_READY only after separate review"
   },
-  "futureMutationBudget": {
-    "customDomainProvisioning": 1,
-    "accessAllowPolicyCreate": 1,
-    "workerAccessRuntimeConfigMutation": 1,
-    "registryCodeMutation": 1,
-    "workerDeployment": 1,
-    "explicitManualDnsRecordCreate": 0,
-    "gateFlips": 0
-  },
   "requiredHumanApprovals": [
     "HUMAN_APPROVAL_CUSTOM_DOMAIN_PROVISIONING",
     "HUMAN_APPROVAL_EXACT_SUPERADMIN_IDENTITY_ENROLLMENT",
     "HUMAN_APPROVAL_ACCESS_ALLOW_POLICY_PROVISIONING",
-    "HUMAN_APPROVAL_WORKER_ACCESS_CONFIG_UPDATE"
+    "HUMAN_APPROVAL_WORKER_ACCESS_CONFIG_UPDATE",
+    "HUMAN_APPROVAL_WORKER_PRODUCTION_DEPLOYMENT"
   ],
   "rollbackPlan": {
     "customDomainRollback": "Remove Custom Domain ops.velnar.studio from Worker immediately halts all edge ingress",
@@ -210,5 +202,99 @@
     "sourceProvenanceAnchorProvisioned": false,
     "productionRoutingEnforcementAllowed": false,
     "providerCanaryExecuted": false
+  },
+  "microRepairBaseCommit": "5eb772639ff4ff5eee41f51951fa11912773dfae",
+  "microRepairBaseTree": "0f1bf8e8a75a7a4549c473c68d1b0e2914bf0fa2",
+  "phaseCurrentMutationBudget": {
+    "customDomainProvisioning": 0,
+    "accessAllowPolicyCreate": 0,
+    "workerAccessRuntimeConfigMutation": 0,
+    "registryCodeMutation": 0,
+    "workerDeployment": 0,
+    "gateFlips": 0
+  },
+  "crossPhaseDependencyMutationInventory": {
+    "customDomainProvisioning": {
+      "count": 1,
+      "lane": "LANE E",
+      "description": "Provision Cloudflare Worker Custom Domain ops.velnar.studio (provider manages authoritative DNS and TLS certificate automatically)",
+      "ownership": "LANE E",
+      "approvalRequired": "HUMAN_APPROVAL_CUSTOM_DOMAIN_PROVISIONING"
+    },
+    "accessAllowPolicyCreate": {
+      "count": 1,
+      "lane": "LANE D",
+      "description": "Create single deny-by-default Access Allow policy restricted to verified human operator email with zero wildcards or tenant inheritance",
+      "ownership": "LANE D",
+      "approvalRequired": "HUMAN_APPROVAL_ACCESS_ALLOW_POLICY_PROVISIONING"
+    },
+    "registryCodeMutation": {
+      "count": 1,
+      "lane": "LANE D",
+      "description": "Enroll verified human operator email and opaque Access subject into PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY (treated as part of exact identity enrollment approval)",
+      "ownership": "LANE D",
+      "approvalRequired": "HUMAN_APPROVAL_EXACT_SUPERADMIN_IDENTITY_ENROLLMENT"
+    },
+    "workerAccessRuntimeConfigMutation": {
+      "count": 1,
+      "lane": "LANE C",
+      "description": "Configure non-secret vars CLOUDFLARE_ACCESS_TEAM_DOMAIN and CLOUDFLARE_ACCESS_AUD in Worker runtime",
+      "ownership": "LANE C / 5U.3.4B or later bounded Worker-config execution",
+      "approvalRequired": "HUMAN_APPROVAL_WORKER_ACCESS_CONFIG_UPDATE"
+    },
+    "workerDeployment": {
+      "count": 1,
+      "lane": "LANE C",
+      "description": "Deploy Worker bundle with dormant barriers still closed",
+      "ownership": "LANE C / 5U.3.4B or later bounded deployment execution",
+      "approvalRequired": "HUMAN_APPROVAL_WORKER_PRODUCTION_DEPLOYMENT"
+    },
+    "ingressGateEvaluation": {
+      "count": 0,
+      "lane": "LANE G",
+      "description": "Controlled unblocking of PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED and INGRESS_AUTH_READY only after separate review",
+      "ownership": "LANE G, separately reviewed after all prerequisites",
+      "gateFlips": 0
+    }
+  },
+  "crossPhaseNonDuplicationPolicy": {
+    "ingressReadinessScope": "5U.3.3F defines ingress dependency readiness only and authorizes ZERO production mutations.",
+    "workerDeploymentOwnership": "5U.3.4B owns the future Lane-C Worker binding/config/deploy execution contract. Therefore 5U.3.3F MUST NOT independently authorize or execute the same Worker deployment. No double execution budget."
+  },
+  "futureApprovalInventory": {
+    "status": "REQUIRED_IN_FUTURE / NOT_GRANTED_BY_5U33F_READINESS",
+    "registryCodeMutationApprovalScope": "Registry code mutation is treated as part of exact identity enrollment approval (HUMAN_APPROVAL_EXACT_SUPERADMIN_IDENTITY_ENROLLMENT).",
+    "approvals": [
+      {
+        "approval": "HUMAN_APPROVAL_CUSTOM_DOMAIN_PROVISIONING",
+        "lane": "LANE E",
+        "scope": "Authorize Cloudflare Worker Custom Domain ops.velnar.studio creation",
+        "status": "REQUIRED_IN_FUTURE_NOT_YET_GRANTED"
+      },
+      {
+        "approval": "HUMAN_APPROVAL_EXACT_SUPERADMIN_IDENTITY_ENROLLMENT",
+        "lane": "LANE D",
+        "scope": "Authorize exact human operator email and opaque Access subject enrollment into registry code",
+        "status": "REQUIRED_IN_FUTURE_NOT_YET_GRANTED"
+      },
+      {
+        "approval": "HUMAN_APPROVAL_ACCESS_ALLOW_POLICY_PROVISIONING",
+        "lane": "LANE D",
+        "scope": "Authorize single deny-by-default Cloudflare Access Allow policy for enrolled operator",
+        "status": "REQUIRED_IN_FUTURE_NOT_YET_GRANTED"
+      },
+      {
+        "approval": "HUMAN_APPROVAL_WORKER_ACCESS_CONFIG_UPDATE",
+        "lane": "LANE C",
+        "scope": "Authorize runtime injection of CLOUDFLARE_ACCESS_TEAM_DOMAIN and CLOUDFLARE_ACCESS_AUD",
+        "status": "REQUIRED_IN_FUTURE_NOT_YET_GRANTED"
+      },
+      {
+        "approval": "HUMAN_APPROVAL_WORKER_PRODUCTION_DEPLOYMENT",
+        "lane": "LANE C",
+        "scope": "Authorize deployment of dormant Worker bundle (owned and contracted under Lane C / 5U.3.4B; not authorized by 5U.3.3F)",
+        "status": "REQUIRED_IN_FUTURE_NOT_YET_GRANTED"
+      }
+    ]
   }
 }

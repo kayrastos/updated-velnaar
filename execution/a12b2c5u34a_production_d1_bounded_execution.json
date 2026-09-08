@@ -1,0 +1,171 @@
+{
+  "phase": "A.12B.2C-5U.3.4A",
+  "batch": "A.12B.2C_PRODUCTION_EXECUTION_BATCH_R2",
+  "artifactType": "PRODUCTION_D1_BOUNDED_EXECUTION_EVIDENCE",
+  "finalStatus": "D1_PREEXISTING_RESOURCE_REQUIRES_RECONCILIATION",
+  "stopCondition": "D1_PREEXISTING_RESOURCE_REQUIRES_RECONCILIATION",
+  "timestampUtc": "2026-09-08T08:30:00.000Z",
+  "repository": "https://github.com/kayrastos/updated-velnaar",
+  "branch": "main",
+  "canonicalBaseCommit": "f983c7ec130bbed9f6e0fca48bb217a21d1fe4aa",
+  "canonicalBaseTree": "23deb0fc4d1036737638bb63554b21ee09a94e4b",
+  "canonicalBaseParent": "d9a156f786c319a0d84d54c166f1bb3ddba0ea93",
+  "sealedReadinessPredecessor": "A12B2C_PRODUCTION_READINESS_BATCH_R1_APPROVED_AND_SEALED",
+  "humanAuthorization": {
+    "granted": true,
+    "scope": "AUTHORIZE_A12B2C5U34A_D1_ONLY_BOUNDED_EXECUTION",
+    "literal": "read-only collision preflight yap; yalnız exact velnar-production-db eşleşme sayısı 0 ise tam 1 production D1 database oluştur ve migrations 0001–0008'i uygula. DB delete, restore, Worker config/binding/deploy, secret, provider call ve gate flip yetkisi vermiyorum.",
+    "conditionEnforced": "Exact matching count == 0 required before creation. Initial check returned count = 1, stopping immediately before mutation."
+  },
+  "humanAuthorizationGranted": true,
+  "humanAuthorizationLiteral": "read-only collision preflight yap; yalnız exact velnar-production-db eşleşme sayısı 0 ise tam 1 production D1 database oluştur ve migrations 0001–0008'i uygula. DB delete, restore, Worker config/binding/deploy, secret, provider call ve gate flip yetkisi vermiyorum.",
+  "credentialState": {
+    "mode": "WRANGLER_OAUTH",
+    "authenticated": true,
+    "accountIdSha256": "ad8f1b1425c8cb608706437df199ec64f17d46e585051bb78a4c19a3a2f58301",
+    "accountIdentityMatch": true,
+    "credentialSecretCommitted": false,
+    "credentialCleanupPendingAfterIndependentReview": false
+  },
+  "accountIdSha256": "ad8f1b1425c8cb608706437df199ec64f17d46e585051bb78a4c19a3a2f58301",
+  "accountIdentityMatch": true,
+  "wranglerVersion": "4.129.1",
+  "collisionPreflight": {
+    "targetName": "velnar-production-db",
+    "commandExecuted": "npx wrangler d1 list --json",
+    "matchingCount": 1,
+    "result": "D1_PREEXISTING_RESOURCE_REQUIRES_RECONCILIATION",
+    "preExistingResourceDetails": {
+      "name": "velnar-production-db",
+      "databaseIdSha256": "62ebb801413e1f691e0a30d9d4388c7d17e0060ff0594dcd8238f25fc6857055",
+      "databaseIdFinal6": "4de303",
+      "createdAt": "2026-09-08T03:36:03.139Z",
+      "version": "production",
+      "rawDatabaseIdCommitted": false
+    },
+    "actionTaken": "STOP IMMEDIATELY. Zero mutations executed. Database was not created, migrations were not applied, bindings were not modified, and no delete or restore was performed."
+  },
+  "databaseCreation": {
+    "attempted": false,
+    "confirmed": false,
+    "databaseName": "velnar-production-db",
+    "databaseIdSha256": null,
+    "databaseIdFinal6": "4de303",
+    "rawDatabaseIdCommitted": false,
+    "preExistingDatabaseDetected": true,
+    "preExistingDatabaseIdSha256": "62ebb801413e1f691e0a30d9d4388c7d17e0060ff0594dcd8238f25fc6857055",
+    "reason": "Exact-name collision preflight returned 1 match (case B). In accordance with sealed contract and human authorization, execution stopped immediately without attempting database creation."
+  },
+  "productionBackendVerified": false,
+  "migrationPreflight": {
+    "canonicalExpectedCount": 8,
+    "providerUnappliedCount": null,
+    "exactSetMatch": false,
+    "exactOrderMatch": false,
+    "status": "NOT_PERFORMED_STOPPED_AT_STEP_0"
+  },
+  "timeTravel": {
+    "preMigrationReferenceTimestampUtc": null,
+    "preMigrationBookmarkSha256": null,
+    "rawBookmarkCommitted": false,
+    "restoreExecuted": false,
+    "status": "NOT_PERFORMED_STOPPED_AT_STEP_0"
+  },
+  "preMigrationSchema": {
+    "inspectionPerformed": false,
+    "unexpectedUserObjectsCount": null,
+    "passed": false,
+    "status": "NOT_PERFORMED_STOPPED_AT_STEP_0"
+  },
+  "migrationExecution": {
+    "applyCommandsExecuted": 0,
+    "expectedMigrations": 8,
+    "appliedMigrations": 0,
+    "result": "NOT_PERFORMED_STOPPED_AT_STEP_0"
+  },
+  "migrationLedgerReadback": {
+    "rows": 0,
+    "exactCanonicalMatch": false,
+    "status": "NOT_PERFORMED_STOPPED_AT_STEP_0"
+  },
+  "postMigrationSchema": {
+    "inspectionPerformed": false,
+    "expectedManifestSource": "migrations/0001_initial_schema.sql through migrations/0008_authorization_replay_ledger.sql",
+    "tablesMatch": false,
+    "indicesMatch": false,
+    "requiredReplayLedgerSchemaMatch": false,
+    "passed": false,
+    "status": "NOT_PERFORMED_STOPPED_AT_STEP_0"
+  },
+  "finalProviderReadback": {
+    "exactNameCount": 1,
+    "identityHashMatch": false,
+    "zeroUnappliedMigrations": false,
+    "schemaVerified": false,
+    "preExistingResourceUnchanged": true
+  },
+  "currentCanonicalGateState": {
+    "1_PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+    "2_PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+    "3_CANARY_LIVE_EXECUTION_ENABLED": false,
+    "4_CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+    "5_GUARDED_SOURCE_ATTESTATION_READY": false,
+    "6_GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+    "7_PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+    "8_RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+    "9_D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
+    "10_D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
+    "11_D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
+    "12_productionRoutingEnforcementAllowed": false,
+    "registryLength": 0,
+    "registryFrozen": true
+  },
+  "providerState": {
+    "databaseCreatedByThisExecution": false,
+    "preExistingProductionDatabaseDetected": true,
+    "preExistingDatabaseIdentityVerified": true,
+    "providerDatabaseExists": true,
+    "canonicalGateRealDatabaseProvisioned": false
+  },
+  "actionCounters": {
+    "d1DatabaseCreateAttempts": 0,
+    "confirmedD1DatabaseCreates": 0,
+    "migrationApplyCommands": 0,
+    "d1DatabaseDeletes": 0,
+    "timeTravelRestores": 0,
+    "functionalSmokeWrites": 0,
+    "workerConfigMutations": 0,
+    "workerBindingMutations": 0,
+    "workerDeployments": 0,
+    "customDomainMutations": 0,
+    "accessMutations": 0,
+    "secretMutations": 0,
+    "providerAiCalls": 0,
+    "gateFlipOperations": 0,
+    "managementPlaneReadCalls": 2,
+    "d1ReadOnlySqlCalls": 0
+  },
+  "unauthorizedMutationCount": 0,
+  "nonClaims": {
+    "databaseCreatedByThisExecution": false,
+    "migrationsAppliedByThisExecution": false,
+    "preExistingResourceOwnershipAssumed": false,
+    "providerResourceExists": true,
+    "ingressReady": false,
+    "ingressCertified": false,
+    "customDomainProvisioned": false,
+    "accessAllowPolicyProvisioned": false,
+    "humanOperationalIdentityEnrolled": false,
+    "canonicalGateRealDatabaseProvisioned": false,
+    "d1ProductionBound": false,
+    "d1RealConcurrencyCertified": false,
+    "workerProductionConfigChanged": false,
+    "workerDeployed": false,
+    "deepSeekSecretProvisioned": false,
+    "trustAnchorProvisioned": false,
+    "runtimeSourceProvenanceAnchorProvisioned": false,
+    "liveCanaryEnabled": false,
+    "productionRoutingEnabled": false
+  },
+  "credentialMode": "WRANGLER_OAUTH"
+}
