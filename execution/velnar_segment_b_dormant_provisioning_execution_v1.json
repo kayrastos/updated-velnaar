@@ -1,0 +1,94 @@
+{
+  "artifact": "VELNAR — Segment B Dormant Provisioning Execution V1",
+  "status": "VELNAR_SEGMENT_B_DORMANT_PROVISIONING_PACKAGE_EXECUTED_PENDING_POST_PROVISION_REVIEW_WITH_UI_POLICY_EVIDENCE_PENDING",
+  "recordedAt": "2026-09-09",
+  "localReconciliation": {
+    "canonicalBase": "16467a7f9affc4f695504a3925b12526b6d044bc",
+    "canonicalMain": "294f274a932b96a74a94b87da48eafd5a6558f74",
+    "canonicalMainTree": "dc9a6afbff49ea43c852459bb13e694e5f44a746",
+    "classification": "BOUNDED_CANONICAL_D1_ADOPTION_WITH_ASSOCIATED_TESTS_AND_EVIDENCE",
+    "mergeCommit": "84eaf1155a92c3798ee0c6b25ba64e9be6e22559",
+    "gate10": "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED=true",
+    "gate9": "D1_REPLAY_BACKEND_PRODUCTION_BOUND=false",
+    "gate11": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED=false"
+  },
+  "cloudflareReadOnlyEvidence": {
+    "wranglerAuthentication": {
+      "method": "sanitized child process using keyring-backed OAuth; legacy parent override omitted",
+      "email": "kayra01.09.06@gmail.com",
+      "accountId": "f74f8ad248cb1114ee6e38227166f55a"
+    },
+    "d1": {
+      "name": "velnar-production-db",
+      "uuid": "d65abcb3-d8d6-46fb-9403-a97ab54de303",
+      "region": "EEUR",
+      "tableCount": 28,
+      "remoteMigrationState": "NO_MIGRATIONS_TO_APPLY",
+      "readReplication": "disabled",
+      "verification": "wrangler d1 info with wrangler.canary-ops.jsonc; read-only"
+    },
+    "worker": {
+      "name": "velnar-canary-ops-worker",
+      "activeDeploymentId": "b219fc26-037e-4b4a-b804-2691bad6a9fb",
+      "activeVersionId": "a19d56a8-275e-42d1-a85c-a2cd40fe51e3",
+      "trafficPercent": 100,
+      "versionCreatedOn": "2026-09-08T09:19:40.050569Z",
+      "bindingNamesOnly": ["CLOUDFLARE_ACCESS_AUD", "CLOUDFLARE_ACCESS_TEAM_DOMAIN", "DB", "ENVIRONMENT"],
+      "d1BindingUuid": "d65abcb3-d8d6-46fb-9403-a97ab54de303",
+      "secretValuesRecorded": false
+    },
+    "customDomain": {
+      "hostname": "ops.velnar.studio",
+      "directApiMetadata": "NOT_AVAILABLE_FROM_THE_AUTHORIZED_WRANGLER_READ_SURFACE",
+      "operationalEvidence": "ACCESS_EDGE_AUTHENTICATION_PASSED_DORMANT_ROUTE_RETURNED_404",
+      "humanObservedResult": {"path": "/api/ops/canary/deepseek-certification", "body": {"error": "NOT_FOUND"}},
+      "interpretation": "Authenticated Access edge passage to a dormant application response; it does not authorize live execution or prove a policy's complete UI structure."
+    },
+    "access": {
+      "applicationName": "VELNAR Operational Canary — Dormant",
+      "expectedPath": "ops.velnar.studio/api/ops/canary/deepseek-certification",
+      "policyMetadata": "HUMAN_CONFIGURED_AND_OPERATIONALLY_EXERCISED_PENDING_INDEPENDENT_UI_EVIDENCE",
+      "policyNameClaimedByHuman": "allow-kayra01.09.06-velnar-ops-dormant",
+      "operatorEmail": "kayra01.09.06@gmail.com",
+      "opaqueSubject": "NOT_RECORDED; no Access user identifier is treated as an application JWT subject without direct evidence",
+      "tokensCookiesOrJwtRecorded": false
+    }
+  },
+  "trustMaterial": {
+    "offlineOnly": true,
+    "activeEncryptedBlobCount": 2,
+    "humanAuthority": {"id": "velnar-lead-ops-prod", "fingerprintSha256": "4c53b68338e118cb67deb85cab9addfef6b70b380d2eee26b610a28da6cb559d"},
+    "runtimeSourceAuthority": {"id": "velnar-lead-ops-prod", "fingerprintSha256": "25a9ea6c1eedb3101a898722778991d35833475f630aad85c29b046865e40b1e"},
+    "sourceActivation": false,
+    "privateMaterialRecorded": false
+  },
+  "dormantSafetyState": {
+    "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+    "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+    "CANARY_LIVE_EXECUTION_ENABLED": false,
+    "productionRoutingEnforcementAllowed": false,
+    "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+    "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+    "productionHumanAuthorityRegistryEntries": 0,
+    "runtimeSourceProvenanceAuthorityRegistryEntries": 0,
+    "productionOperationalSuperAdminRegistryEntries": 0,
+    "providerCalls": 0,
+    "providerSecrets": 0,
+    "providerSpendUsd": 0,
+    "gitPushes": 0
+  },
+  "validation": {
+    "lint": "PASS",
+    "gate2": "51 passed",
+    "prelive": "67 passed",
+    "operationalAuth": "67 passed",
+    "runtimeIntegration": "60 passed",
+    "canonicalD1Suites": "4 files, 343 passed",
+    "fullVitest": "64 files, 2638 passed",
+    "gitDiffCheck": "PASS"
+  },
+  "postProvisionReviewScope": [
+    "Independent UI evidence for the exact Access policy structure remains required.",
+    "No source authority registry activation, operational SuperAdmin enrollment, route/ingress enabling, or Segment C execution is authorized by this artifact."
+  ]
+}

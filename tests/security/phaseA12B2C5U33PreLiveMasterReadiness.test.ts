@@ -344,8 +344,8 @@ describe('Phase A.12B.2C-5U.3.3 Pre-Live Master Readiness Test Suite', () => {
       expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(false);
     });
 
-    it('3.13 D1 replay backend real database provisioned D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED is strictly false', () => {
-      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(false);
+    it('3.13 D1 replay backend real database provisioned is explicitly adopted while binding remains closed', () => {
+      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
     });
 
     it('3.14 D1 replay backend real concurrency certified D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED is strictly false', () => {
