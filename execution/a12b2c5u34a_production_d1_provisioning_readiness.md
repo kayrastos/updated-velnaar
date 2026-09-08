@@ -7,7 +7,8 @@
 - **Repository**: `https://github.com/kayrastos/updated-velnaar`
 - **Branch**: `main`
 - **Canonical Base Commit**: `78ce5cc93c2bba621e5794118c22136563f1977c`
-- **Canonical Base Tree**: `eb6c7574a1a003a2f2fc6aca055e459a79e1ff04`
+- **Micro-Repair Base Commit**: `5eb772639ff4ff5eee41f51951fa11912773dfae`
+- **Micro-Repair Base Tree**: `0f1bf8e8a75a7a4549c473c68d1b0e2914bf0fa2`
 - **Sealed Predecessor**: `A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED`
 - **Read-Only Audit**: `true`
 - **Readiness Result**: `READY_FOR_BOUNDED_EXECUTION`
@@ -28,12 +29,12 @@ The execution scope of Phase 5U.3.4A is strictly isolated to **`D1_ONLY_MUTATION
 1. **Create Database**: Create exactly one production D1 database: `velnar-production-db`.
 2. **Read Back Identity**: Read back exact database UUID from Cloudflare API.
 3. **Record Minimized Identity**: Record only SHA-256 digest of database UUID in evidence.
-4. **Acquire Time Travel Bookmark**: Obtain provider-supported pre-migration Time Travel point-in-time recovery reference.
+4. **Acquire Time Travel Bookmark**: Obtain provider-supported pre-migration Time Travel point-in-time recovery reference (future execution acceptance condition; none currently exists).
 5. **Pre-Migration Inspection**: Verify 0 pre-existing user tables.
 6. **Sequential Migration**: Apply canonical migrations 0001 through 0008 sequentially via `wrangler d1 migrations apply velnar-production-db --remote`.
 7. **Inspect `d1_migrations`**: Query `d1_migrations` table to confirm all 8 migrations recorded.
 8. **READ-ONLY Schema Verification**: Query table list and column schemas to verify all 24 canonical tables and indices exist without writing any data.
-9. **Retain Recovery Reference**: Document Time Travel restore reference (destructive restore is not authorized by this phase).
+9. **Retain Recovery Reference**: Document Time Travel restore reference (destructive restore is NOT authorized by this phase).
 10. **STOP**: Hand off verified D1 database identity to Phase 5U.3.4B.
 
 ---
@@ -50,8 +51,22 @@ The execution scope of Phase 5U.3.4A is strictly isolated to **`D1_ONLY_MUTATION
 ---
 
 ### 5. D1 Recovery Contract & Migration Atomicity Semantics
-- **Provider Recovery Mechanism**: **Cloudflare D1 Time Travel** (Point-in-time recovery bookmark captured before migration).
-- **Destructive Restore State**: `destructiveRestoreExecuted = false` (Restoring production state requires separate explicit human approval).
+- **Provider Recovery Mechanism**: **Cloudflare D1 Time Travel** (Point-in-time recovery bookmark to be captured in future execution).
+- **Current Production & Recovery State**:
+  - `preMigrationTimeTravelBookmarkAcquired = false`
+  - `preMigrationRecoveryReferenceRecorded = false`
+  - `postMigrationSchemaVerified = false`
+  - `destructiveRestoreExecuted = false`
+  - `d1RealCalls = 0`
+  - `d1DatabaseCreated = false`
+  - No production D1 database currently exists; no Time Travel bookmark currently exists.
+- **Future Execution Required Outcomes**:
+  - `preMigrationTimeTravelBookmarkMustBeAcquired = true`
+  - `preMigrationRecoveryReferenceMustBeRecorded = true`
+  - `postMigrationSchemaMustBeVerified = true`
+  - `destructiveRestoreMustRemainUnexecuted = true`
+  - `restoreRequiresSeparateApproval = true`
+- **Destructive Restore State**: `destructiveRestoreExecuted = false` (A Cloudflare D1 Time Travel restore is destructive and is NOT authorized; any restore strictly requires separate explicit human approval).
 - **Conservative Atomicity Semantics**: The plan does not assume whole-sequence transactional atomicity across multiple migration files. If a failure occurs, execution fails closed, inspects `d1_migrations`, inspects actual schema, and utilizes the retained Time Travel bookmark if separately authorized.
 - **Production DB Deletion**: Strictly prohibited.
 
