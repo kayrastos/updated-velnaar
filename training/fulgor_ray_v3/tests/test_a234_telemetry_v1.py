@@ -1,19 +1,22 @@
-"""Unit tests for A234 candidate telemetry data structure and invariants.
+"""Unit tests for A234 candidate telemetry data structure, invariants, and strict deserialization.
 
-Phase R1: Safe Observability (Corrected Edition).
+Phase R1: Safe Observability (Strict Deserialization Edition).
 
 Verifies:
-A. All valid candidate failure stage/subcode pairs accept
-B. Candidate telemetry rejects out-of-scope stages (DIAGNOSIS_*, PLAN_*, PRIMARY_SELECTION)
-C. Half-defined failure state rejected in both directions
-D. Exact milestone state enforced for each declared failure stage
-E. Contradictory milestone/failure states rejected
-F. No-failure partial progression remains valid
-G. Gate rejection state (I=1 H=1 S=1 G=1 A=0 V=0) without failure remains valid
-H. Deterministic serialization (to_dict, to_json, round-trip)
-I. Candidate hash validation (lowercase valid, uppercase reject, non-hex reject, length reject)
-J. Semantic leakage injection attempts
-K. Slot index bounds (0, 1, 2)
+1. Canonical to_dict -> from_dict roundtrip PASS
+2. Canonical to_json -> from_json roundtrip PASS
+3. Each missing required persisted field fails closed (iterating all 12 canonical fields)
+4. Extra unknown field fails (failure_message, source_code, raw_model_output, path)
+5. Missing schema_version fails
+6. Wrong schema_version fails
+7. Duplicate JSON key fails
+8. Non-object JSON fails ([], null, "string", 123)
+9. from_failure requires explicit six milestone flags
+10. from_failure exact valid host-binding failure succeeds with I=1 H=0 S=0 G=0 A=0 V=0
+11. from_failure contradictory explicit milestone flags reject
+12. from_failure cannot accept unknown kwargs (failure_message, raw_error, source_code, etc.)
+13. from_dict cannot silently infer failure_stage/failure_subcode
+14. Existing stage/subcode and milestone progression tests continue passing
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from training.fulgor_ray_v3.a234_contracts_v7 import (
 )
 from training.fulgor_ray_v3.a234_telemetry_v1 import (
     ALLOWED_CANDIDATE_FAILURE_STAGES,
+    CANONICAL_PERSISTED_FIELDS,
     REQUIRED_FAILURE_MILESTONES,
     SCHEMA_VERSION,
     VALID_SLOT_INDICES,
@@ -39,14 +43,249 @@ from training.fulgor_ray_v3.a234_telemetry_v1 import (
 
 
 class TestA234TelemetryV1(unittest.TestCase):
-    """Tests for CandidateTelemetryV1 data structure, invariants, and serialization."""
+    """Tests for CandidateTelemetryV1 data structure, invariants, and strict deserialization."""
 
     def setUp(self) -> None:
         self.sample_raw_id = "test_candidate_a234_slot0"
         self.sample_hash = hashlib.sha256(self.sample_raw_id.encode("utf-8")).hexdigest()
+        self.valid_canonical_dict = {
+            "schema_version": SCHEMA_VERSION,
+            "slot_index": 0,
+            "candidate_id_hash": self.sample_hash,
+            "intent_parsed": True,
+            "host_bound": True,
+            "serialized": True,
+            "gate_evaluated": True,
+            "gate_accepted": False,
+            "verifier_invoked": False,
+            "failure_stage": "CANDIDATE_STATIC_GATE",
+            "failure_subcode": "GATE_FILE_BUDGET_EXCEEDED",
+            "structural_diagnostics": {"target_file_count": 12},
+        }
 
     # --------------------------------------------------------------------------
-    # A. All valid candidate failure stage/subcode pairs accept
+    # 1. Canonical to_dict -> from_dict roundtrip PASS
+    # --------------------------------------------------------------------------
+    def test_canonical_to_dict_from_dict_roundtrip(self) -> None:
+        """Verify perfect roundtrip between dataclass and plain dictionary."""
+        telem = CandidateTelemetryV1.from_dict(self.valid_canonical_dict)
+        d = telem.to_dict()
+        self.assertEqual(d, self.valid_canonical_dict)
+        telem_roundtrip = CandidateTelemetryV1.from_dict(d)
+        self.assertEqual(telem_roundtrip, telem)
+
+    # --------------------------------------------------------------------------
+    # 2. Canonical to_json -> from_json roundtrip PASS
+    # --------------------------------------------------------------------------
+    def test_canonical_to_json_from_json_roundtrip(self) -> None:
+        """Verify perfect deterministic roundtrip between dataclass and JSON string."""
+        telem = CandidateTelemetryV1.from_dict(self.valid_canonical_dict)
+        json_str = telem.to_json()
+        telem_from_json = CandidateTelemetryV1.from_json(json_str)
+        self.assertEqual(telem_from_json, telem)
+
+    # --------------------------------------------------------------------------
+    # 3. Each missing required persisted field fails closed
+    # --------------------------------------------------------------------------
+    def test_each_missing_required_field_fails_closed(self) -> None:
+        """Verify omitting any single canonical field from from_dict() raises ValueError."""
+        self.assertEqual(len(CANONICAL_PERSISTED_FIELDS), 12)
+        for missing_field in CANONICAL_PERSISTED_FIELDS:
+            incomplete = dict(self.valid_canonical_dict)
+            del incomplete[missing_field]
+            with self.assertRaises(ValueError) as ctx:
+                CandidateTelemetryV1.from_dict(incomplete)
+            self.assertIn("missing required persisted telemetry fields", str(ctx.exception))
+            self.assertIn(missing_field, str(ctx.exception))
+
+    # --------------------------------------------------------------------------
+    # 4. Extra unknown field fails
+    # --------------------------------------------------------------------------
+    def test_extra_unknown_field_fails(self) -> None:
+        """Verify presence of any unauthorized extra field raises ValueError."""
+        forbidden_extras = [
+            "failure_message",
+            "source_code",
+            "raw_model_output",
+            "path",
+            "extra_metadata",
+            "arbitrary_field",
+        ]
+        for extra in forbidden_extras:
+            polluted = dict(self.valid_canonical_dict)
+            polluted[extra] = "UNAUTHORIZED_VALUE"
+            with self.assertRaises(ValueError) as ctx:
+                CandidateTelemetryV1.from_dict(polluted)
+            self.assertIn("unrecognized extra telemetry fields", str(ctx.exception))
+            self.assertIn(extra, str(ctx.exception))
+
+    # --------------------------------------------------------------------------
+    # 5 & 6. Missing and wrong schema_version fail
+    # --------------------------------------------------------------------------
+    def test_missing_and_wrong_schema_version_fail(self) -> None:
+        """Verify schema_version is strictly enforced in from_dict()."""
+        # Missing schema_version
+        no_version = dict(self.valid_canonical_dict)
+        del no_version["schema_version"]
+        with self.assertRaises(ValueError):
+            CandidateTelemetryV1.from_dict(no_version)
+
+        # Wrong schema_version
+        wrong_version = dict(self.valid_canonical_dict)
+        wrong_version["schema_version"] = "fulgor.candidate_telemetry.v2"
+        with self.assertRaises(ValueError) as ctx:
+            CandidateTelemetryV1.from_dict(wrong_version)
+        self.assertIn("Invalid schema_version", str(ctx.exception))
+
+    # --------------------------------------------------------------------------
+    # 7. Duplicate JSON key fails
+    # --------------------------------------------------------------------------
+    def test_duplicate_json_key_fails(self) -> None:
+        """Verify duplicate keys in telemetry JSON string fail closed with ValueError."""
+        duplicate_json = (
+            '{"schema_version":"fulgor.candidate_telemetry.v1",'
+            '"slot_index":0,"slot_index":1,'
+            f'"candidate_id_hash":"{self.sample_hash}",'
+            '"intent_parsed":false,"host_bound":false,"serialized":false,'
+            '"gate_evaluated":false,"gate_accepted":false,"verifier_invoked":false,'
+            '"failure_stage":null,"failure_subcode":null,"structural_diagnostics":{}}'
+        )
+        with self.assertRaises(ValueError) as ctx:
+            CandidateTelemetryV1.from_json(duplicate_json)
+        self.assertIn("Duplicate JSON object key detected", str(ctx.exception))
+
+    # --------------------------------------------------------------------------
+    # 8. Non-object JSON fails
+    # --------------------------------------------------------------------------
+    def test_non_object_json_fails(self) -> None:
+        """Verify non-object JSON payloads ([], null, string, number) raise ValueError/TypeError."""
+        invalid_json_payloads = [
+            "[]",
+            "null",
+            '"string"',
+            "123",
+            "true",
+        ]
+        for payload in invalid_json_payloads:
+            with self.assertRaises((ValueError, TypeError)):
+                CandidateTelemetryV1.from_json(payload)
+
+    # --------------------------------------------------------------------------
+    # 9. from_failure requires explicit six milestone flags
+    # --------------------------------------------------------------------------
+    def test_from_failure_requires_explicit_milestone_flags(self) -> None:
+        """Verify from_failure() requires all 6 milestone progression flags keyword-only."""
+        err = CandidateContractErrorV7(
+            failure_subcode="HOST_BINDING_REPO_MEMBERSHIP_FAILED",
+            failure_stage="CANDIDATE_HOST_BINDING",
+        )
+        # Calling without milestone keyword arguments must raise TypeError
+        with self.assertRaises(TypeError):
+            CandidateTelemetryV1.from_failure(
+                0,
+                self.sample_hash,
+                err,  # type: ignore
+            )
+
+    # --------------------------------------------------------------------------
+    # 10. from_failure exact valid host-binding failure succeeds
+    # --------------------------------------------------------------------------
+    def test_from_failure_valid_host_binding_succeeds(self) -> None:
+        """Verify from_failure() with exact valid flags for host binding succeeds."""
+        err = CandidateContractErrorV7(
+            failure_subcode="HOST_BINDING_READ_FAILED",
+            failure_stage="CANDIDATE_HOST_BINDING",
+            structural_diagnostics={"slot_index": 0},
+        )
+        telem = CandidateTelemetryV1.from_failure(
+            slot_index=0,
+            candidate_id_hash=self.sample_hash,
+            error=err,
+            intent_parsed=True,
+            host_bound=False,
+            serialized=False,
+            gate_evaluated=False,
+            gate_accepted=False,
+            verifier_invoked=False,
+        )
+        self.assertEqual(telem.failure_stage, "CANDIDATE_HOST_BINDING")
+        self.assertEqual(telem.failure_subcode, "HOST_BINDING_READ_FAILED")
+        self.assertTrue(telem.intent_parsed)
+        self.assertFalse(telem.host_bound)
+
+    # --------------------------------------------------------------------------
+    # 11. from_failure contradictory explicit milestone flags reject
+    # --------------------------------------------------------------------------
+    def test_from_failure_contradictory_milestones_rejected(self) -> None:
+        """Verify from_failure() validates and rejects contradictory explicit flags."""
+        err = CandidateContractErrorV7(
+            failure_subcode="HOST_BINDING_READ_FAILED",
+            failure_stage="CANDIDATE_HOST_BINDING",
+        )
+        # host_bound=True contradicts CANDIDATE_HOST_BINDING failure
+        with self.assertRaises(ValueError) as ctx:
+            CandidateTelemetryV1.from_failure(
+                slot_index=0,
+                candidate_id_hash=self.sample_hash,
+                error=err,
+                intent_parsed=True,
+                host_bound=True,
+                serialized=False,
+                gate_evaluated=False,
+                gate_accepted=False,
+                verifier_invoked=False,
+            )
+        self.assertIn("milestone contradiction", str(ctx.exception))
+
+    # --------------------------------------------------------------------------
+    # 12. from_failure rejects unknown kwargs
+    # --------------------------------------------------------------------------
+    def test_from_failure_rejects_unknown_kwargs(self) -> None:
+        """Verify from_failure() rejects arbitrary extra keyword arguments with TypeError."""
+        err = CandidateContractErrorV7(
+            failure_subcode="HOST_BINDING_READ_FAILED",
+            failure_stage="CANDIDATE_HOST_BINDING",
+        )
+        forbidden_kwargs = [
+            {"failure_message": "SECRET"},
+            {"raw_error": "RAW_ERROR"},
+            {"source_code": "def foo(): pass"},
+            {"replacement_text": "new_code"},
+            {"anchor": "def bar"},
+            {"raw_model_output": "output"},
+        ]
+        for kw in forbidden_kwargs:
+            with self.assertRaises(TypeError):
+                CandidateTelemetryV1.from_failure(
+                    slot_index=0,
+                    candidate_id_hash=self.sample_hash,
+                    error=err,
+                    intent_parsed=True,
+                    host_bound=False,
+                    serialized=False,
+                    gate_evaluated=False,
+                    gate_accepted=False,
+                    verifier_invoked=False,
+                    **kw,  # type: ignore
+                )
+
+    # --------------------------------------------------------------------------
+    # 13. from_dict cannot silently infer failure_stage/failure_subcode
+    # --------------------------------------------------------------------------
+    def test_from_dict_cannot_infer_failure_fields(self) -> None:
+        """Verify from_dict() rejects omission of failure_stage or failure_subcode."""
+        omitted_stage = dict(self.valid_canonical_dict)
+        del omitted_stage["failure_stage"]
+        with self.assertRaises(ValueError):
+            CandidateTelemetryV1.from_dict(omitted_stage)
+
+        omitted_subcode = dict(self.valid_canonical_dict)
+        del omitted_subcode["failure_subcode"]
+        with self.assertRaises(ValueError):
+            CandidateTelemetryV1.from_dict(omitted_subcode)
+
+    # --------------------------------------------------------------------------
+    # 14. Existing tests: stage/subcode, milestones, hash, bounds, sanitization
     # --------------------------------------------------------------------------
     def test_all_valid_candidate_failure_pairs_accepted(self) -> None:
         """Verify all valid candidate failure stage/subcode pairs pass validation."""
@@ -73,9 +312,6 @@ class TestA234TelemetryV1(unittest.TestCase):
                 tested += 1
         self.assertEqual(tested, 33)
 
-    # --------------------------------------------------------------------------
-    # B. Candidate telemetry rejects out-of-scope stages
-    # --------------------------------------------------------------------------
     def test_candidate_telemetry_rejects_out_of_scope_stages(self) -> None:
         """Verify candidate telemetry rejects DIAGNOSIS_*, PLAN_*, and PRIMARY_SELECTION."""
         out_of_scope = [
@@ -98,12 +334,8 @@ class TestA234TelemetryV1(unittest.TestCase):
                 "out of scope" in str(ctx.exception) or "compatibility violation" in str(ctx.exception)
             )
 
-    # --------------------------------------------------------------------------
-    # C. Half-defined failure state rejected in both directions
-    # --------------------------------------------------------------------------
     def test_half_defined_failure_states_rejected(self) -> None:
         """Verify half-defined failure states fail closed."""
-        # failure_stage set without failure_subcode
         with self.assertRaises(ValueError) as ctx:
             CandidateTelemetryV1(
                 slot_index=0,
@@ -113,7 +345,6 @@ class TestA234TelemetryV1(unittest.TestCase):
             )
         self.assertIn("Half-defined failure state violation", str(ctx.exception))
 
-        # failure_subcode set without failure_stage
         with self.assertRaises(ValueError) as ctx:
             CandidateTelemetryV1(
                 slot_index=0,
@@ -123,170 +354,16 @@ class TestA234TelemetryV1(unittest.TestCase):
             )
         self.assertIn("Half-defined failure state violation", str(ctx.exception))
 
-    # --------------------------------------------------------------------------
-    # D. Exact milestone state enforced for each declared failure stage
-    # --------------------------------------------------------------------------
-    def test_exact_failure_milestone_state_enforced(self) -> None:
-        """Verify each candidate failure stage strictly requires its defined milestone tuple."""
-        # 1. CANDIDATE_RECOVERY: (0, 0, 0, 0, 0, 0)
-        telem = CandidateTelemetryV1(
-            slot_index=0,
-            candidate_id_hash=self.sample_hash,
-            intent_parsed=False,
-            failure_stage="CANDIDATE_RECOVERY",
-            failure_subcode="CANDIDATE_MALFORMED_SYNTAX",
-        )
-        self.assertFalse(telem.intent_parsed)
-
-        # 2. CANDIDATE_INTENT: (0, 0, 0, 0, 0, 0)
-        telem = CandidateTelemetryV1(
-            slot_index=0,
-            candidate_id_hash=self.sample_hash,
-            failure_stage="CANDIDATE_INTENT",
-            failure_subcode="CANDIDATE_SCHEMA_VERSION_MISMATCH",
-        )
-        self.assertFalse(telem.intent_parsed)
-
-        # 3. CANDIDATE_HOST_BINDING: (1, 0, 0, 0, 0, 0)
-        telem = CandidateTelemetryV1(
-            slot_index=0,
-            candidate_id_hash=self.sample_hash,
-            intent_parsed=True,
-            failure_stage="CANDIDATE_HOST_BINDING",
-            failure_subcode="HOST_BINDING_REPO_MEMBERSHIP_FAILED",
-        )
-        self.assertTrue(telem.intent_parsed)
-        self.assertFalse(telem.host_bound)
-
-        # 4. CANDIDATE_SERIALIZATION: (1, 1, 0, 0, 0, 0)
-        telem = CandidateTelemetryV1(
-            slot_index=0,
-            candidate_id_hash=self.sample_hash,
-            intent_parsed=True,
-            host_bound=True,
-            failure_stage="CANDIDATE_SERIALIZATION",
-            failure_subcode="SERIALIZATION_OVERLAPPING_EDITS",
-        )
-        self.assertTrue(telem.host_bound)
-        self.assertFalse(telem.serialized)
-
-        # 5. CANDIDATE_STATIC_GATE: (1, 1, 1, 1, 0, 0)
-        telem = CandidateTelemetryV1(
-            slot_index=0,
-            candidate_id_hash=self.sample_hash,
-            intent_parsed=True,
-            host_bound=True,
-            serialized=True,
-            gate_evaluated=True,
-            failure_stage="CANDIDATE_STATIC_GATE",
-            failure_subcode="GATE_FILE_BUDGET_EXCEEDED",
-        )
-        self.assertTrue(telem.gate_evaluated)
-        self.assertFalse(telem.gate_accepted)
-
-        # 6. VERIFIER_CONTRACT: (1, 1, 1, 1, 1, 1)
-        telem = CandidateTelemetryV1(
-            slot_index=0,
-            candidate_id_hash=self.sample_hash,
-            intent_parsed=True,
-            host_bound=True,
-            serialized=True,
-            gate_evaluated=True,
-            gate_accepted=True,
-            verifier_invoked=True,
-            failure_stage="VERIFIER_CONTRACT",
-            failure_subcode="VERIFIER_INVALID_SCORE",
-        )
-        self.assertTrue(telem.verifier_invoked)
-
-    # --------------------------------------------------------------------------
-    # E. Contradictory milestone/failure states rejected
-    # --------------------------------------------------------------------------
-    def test_contradictory_milestone_failure_states_rejected(self) -> None:
-        """Verify contradictory states raise ValueError."""
-        # failure=CANDIDATE_INTENT + host_bound=true
-        with self.assertRaises(ValueError) as ctx:
-            CandidateTelemetryV1(
-                slot_index=0,
-                candidate_id_hash=self.sample_hash,
-                intent_parsed=True,
-                host_bound=True,
-                failure_stage="CANDIDATE_INTENT",
-                failure_subcode="CANDIDATE_SCHEMA_VERSION_MISMATCH",
-            )
-        self.assertIn("milestone contradiction", str(ctx.exception))
-
-        # failure=CANDIDATE_HOST_BINDING + serialized=true
-        with self.assertRaises(ValueError) as ctx:
-            CandidateTelemetryV1(
-                slot_index=0,
-                candidate_id_hash=self.sample_hash,
-                intent_parsed=True,
-                host_bound=True,
-                serialized=True,
-                failure_stage="CANDIDATE_HOST_BINDING",
-                failure_subcode="HOST_BINDING_REPO_MEMBERSHIP_FAILED",
-            )
-        self.assertIn("milestone contradiction", str(ctx.exception))
-
-        # failure=CANDIDATE_SERIALIZATION + gate_evaluated=true
-        with self.assertRaises(ValueError) as ctx:
-            CandidateTelemetryV1(
-                slot_index=0,
-                candidate_id_hash=self.sample_hash,
-                intent_parsed=True,
-                host_bound=True,
-                serialized=True,
-                gate_evaluated=True,
-                failure_stage="CANDIDATE_SERIALIZATION",
-                failure_subcode="SERIALIZATION_PATH_FAILED",
-            )
-        self.assertIn("milestone contradiction", str(ctx.exception))
-
-        # failure=CANDIDATE_STATIC_GATE + gate_accepted=true
-        with self.assertRaises(ValueError) as ctx:
-            CandidateTelemetryV1(
-                slot_index=0,
-                candidate_id_hash=self.sample_hash,
-                intent_parsed=True,
-                host_bound=True,
-                serialized=True,
-                gate_evaluated=True,
-                gate_accepted=True,
-                failure_stage="CANDIDATE_STATIC_GATE",
-                failure_subcode="GATE_FORBIDDEN_PATH",
-            )
-        self.assertIn("milestone contradiction", str(ctx.exception))
-
-        # failure=VERIFIER_CONTRACT + verifier_invoked=false
-        with self.assertRaises(ValueError) as ctx:
-            CandidateTelemetryV1(
-                slot_index=0,
-                candidate_id_hash=self.sample_hash,
-                intent_parsed=True,
-                host_bound=True,
-                serialized=True,
-                gate_evaluated=True,
-                gate_accepted=True,
-                verifier_invoked=False,
-                failure_stage="VERIFIER_CONTRACT",
-                failure_subcode="VERIFIER_INVALID_SCORE",
-            )
-        self.assertIn("milestone contradiction", str(ctx.exception))
-
-    # --------------------------------------------------------------------------
-    # F & G. Valid progression states without failure
-    # --------------------------------------------------------------------------
     def test_valid_progression_states_without_failure(self) -> None:
         """Verify normal progression and partial states remain valid when no failure is set."""
         valid_chains = [
-            (False, False, False, False, False, False),  # 000000
-            (True, False, False, False, False, False),   # 100000
-            (True, True, False, False, False, False),    # 110000
-            (True, True, True, False, False, False),     # 111000
-            (True, True, True, True, False, False),      # 111100 (gate rejection without declared error)
-            (True, True, True, True, True, False),       # 111110 (gate accepted, pre-verifier)
-            (True, True, True, True, True, True),        # 111111 (full progression)
+            (False, False, False, False, False, False),
+            (True, False, False, False, False, False),
+            (True, True, False, False, False, False),
+            (True, True, True, False, False, False),
+            (True, True, True, True, False, False),
+            (True, True, True, True, True, False),
+            (True, True, True, True, True, True),
         ]
         for i, h, s, g, a, v in valid_chains:
             telem = CandidateTelemetryV1(
@@ -306,78 +383,21 @@ class TestA234TelemetryV1(unittest.TestCase):
             self.assertEqual(telem.gate_accepted, a)
             self.assertEqual(telem.verifier_invoked, v)
 
-    # --------------------------------------------------------------------------
-    # H. Deterministic Serialization
-    # --------------------------------------------------------------------------
-    def test_deterministic_serialization(self) -> None:
-        """Verify deterministic JSON and dictionary round-trip."""
-        telem = CandidateTelemetryV1(
-            slot_index=2,
-            candidate_id_hash=self.sample_hash,
-            intent_parsed=True,
-            host_bound=True,
-            serialized=True,
-            gate_evaluated=True,
-            gate_accepted=False,
-            failure_stage="CANDIDATE_STATIC_GATE",
-            failure_subcode="GATE_FILE_BUDGET_EXCEEDED",
-            structural_diagnostics={"target_file_count": 12},
-        )
-        j1 = telem.to_json()
-        j2 = telem.to_json()
-        self.assertEqual(j1, j2)
-
-        restored = CandidateTelemetryV1.from_json(j1)
-        self.assertEqual(restored, telem)
-
-    # --------------------------------------------------------------------------
-    # I. Candidate Hash Validation
-    # --------------------------------------------------------------------------
     def test_candidate_id_hash_validation(self) -> None:
         """Verify lowercase hex accepted, uppercase, non-hex, wrong length rejected."""
         self.assertEqual(validate_candidate_id_hash(self.sample_hash), self.sample_hash)
 
-        # Uppercase rejected
         with self.assertRaises(ValueError):
             validate_candidate_id_hash(self.sample_hash.upper())
 
-        # Non-hex rejected
         with self.assertRaises(ValueError):
             validate_candidate_id_hash("g" * 64)
 
-        # Wrong length rejected
         with self.assertRaises(ValueError):
             validate_candidate_id_hash(self.sample_hash[:-1])
         with self.assertRaises(ValueError):
             validate_candidate_id_hash(self.sample_hash + "a")
 
-    # --------------------------------------------------------------------------
-    # J. Semantic Leakage Injection Attempts
-    # --------------------------------------------------------------------------
-    def test_semantic_leakage_rejection(self) -> None:
-        """Verify zero leakage into serialized telemetry."""
-        err = CandidateContractErrorV7(
-            failure_subcode="HOST_BINDING_READ_FAILED",
-            failure_stage="CANDIDATE_HOST_BINDING",
-            structural_diagnostics={"slot_index": 0},
-        )
-        telem = CandidateTelemetryV1.from_failure(
-            slot_index=0,
-            candidate_id_hash=self.sample_hash,
-            error=err,
-        )
-        self.assertEqual(telem.failure_stage, "CANDIDATE_HOST_BINDING")
-        self.assertEqual(telem.failure_subcode, "HOST_BINDING_READ_FAILED")
-        self.assertTrue(telem.intent_parsed)
-        self.assertFalse(telem.host_bound)
-
-        j = telem.to_json()
-        for forbidden in ["source_code", "file_path", "failure_message", "exception_text", "raw_error"]:
-            self.assertNotIn(forbidden, j)
-
-    # --------------------------------------------------------------------------
-    # K. Slot index bounds
-    # --------------------------------------------------------------------------
     def test_slot_index_bounds(self) -> None:
         """Verify slot indices 0, 1, 2 accepted, -1, 3 rejected."""
         for slot in (0, 1, 2):

@@ -8,20 +8,27 @@
     "PHASE_R5_FRESH_HELDOUT_EXECUTION_AUTHORIZED": false,
     "V6_RERUN_AUTHORIZED": false
   },
-  "canonical_base_commit": "e78325c076748c6135255ab71fc01f968939205e",
+  "canonical_base_lineage": {
+    "design_base": "e78325c076748c6135255ab71fc01f968939205e",
+    "initial_r1_implementation_commit": "adb8d50418912bb8354baa04b17c66a01911eaa6",
+    "correction_basis": "This correction is on top of adb8d50."
+  },
+  "canonical_base_commit": "adb8d50418912bb8354baa04b17c66a01911eaa6",
+  "post_push_github_verification_blockers_corrected": true,
   "corrected_blockers": [
-    "Enforced strict stage <-> subcode compatibility mapping (ALLOWED_SUBCODES_BY_STAGE) and fail-closed validation (validate_stage_subcode).",
-    "Enforced CandidateTelemetryV1 failure_stage scope restriction (ALLOWED_CANDIDATE_FAILURE_STAGES), rejecting DIAGNOSIS_*, PLAN_*, and PRIMARY_SELECTION.",
-    "Enforced terminal failure-stage <-> milestone compatibility (REQUIRED_FAILURE_MILESTONES), rejecting contradictory downstream milestone assertions.",
-    "Disambiguated gate budget taxonomy by replacing broad GATE_BUDGET_EXCEEDED with GATE_FILE_BUDGET_EXCEEDED, GATE_HUNK_BUDGET_EXCEEDED, and GATE_CHANGED_LINE_BUDGET_EXCEEDED.",
-    "Expanded test suite from 18 to 24 tests, thoroughly testing illegal pairings, contradictory milestones, half-defined failure states, and budget codes."
+    "strict exact-field persisted telemetry schema",
+    "no missing-field default inference",
+    "no extra-field swallowing",
+    "explicit from_failure milestone requirements",
+    "removal of open-ended **kwargs",
+    "duplicate JSON key rejection"
   ],
   "created_file_sha256": {
     "training/fulgor_ray_v3/a234_contracts_v7.py": "013dfaa55a6c126fdab907ea8a54a5e92b14265da77b1fa6d3f6d282b64a7d90",
-    "training/fulgor_ray_v3/a234_telemetry_v1.py": "8d230121ce32b686389bfaef50eaf4a050ebed08ddf83545b0319c87108e2f64",
+    "training/fulgor_ray_v3/a234_telemetry_v1.py": "5d04ff590e7e2d98a726010ca7dbbf0937ae4f64c0ccfce985f85b7eaca0af25",
     "training/fulgor_ray_v3/tests/test_a234_contracts_v7.py": "af22161606ff5bd30eb7bb4ef81662dd3c5d63e95fb29d447df26d1ef441fcdd",
-    "training/fulgor_ray_v3/tests/test_a234_telemetry_v1.py": "89cd1fc93be5ee9366fb5266b244959dd7a0c6e48ad720dcd0781109d67468d9",
-    "training/reports/fulgor_ray_v3_0_a234_r1_safe_observability_implementation.md": "a3cd2b748b5e8ee4ae5bcc0bdb2d0a3660345fc5bca25f843d8f030a1b0238b5"
+    "training/fulgor_ray_v3/tests/test_a234_telemetry_v1.py": "ed834365bb6491f6d194e5ac8d1b8dd2f5eb9a855e052f2f385218ccd38c9840",
+    "training/reports/fulgor_ray_v3_0_a234_r1_safe_observability_implementation.md": "4277f1cc8dbb7b09c82eb53224317fa72159128bf1df44c33fd9fac09f2bac26"
   },
   "created_files": [
     "training/fulgor_ray_v3/a234_contracts_v7.py",
@@ -30,6 +37,16 @@
     "training/fulgor_ray_v3/tests/test_a234_telemetry_v1.py",
     "training/reports/fulgor_ray_v3_0_a234_r1_safe_observability_implementation.json",
     "training/reports/fulgor_ray_v3_0_a234_r1_safe_observability_implementation.md"
+  ],
+  "modified_tracked_files": [
+    "training/fulgor_ray_v3/a234_telemetry_v1.py",
+    "training/fulgor_ray_v3/tests/test_a234_telemetry_v1.py",
+    "training/reports/fulgor_ray_v3_0_a234_r1_safe_observability_implementation.json",
+    "training/reports/fulgor_ray_v3_0_a234_r1_safe_observability_implementation.md"
+  ],
+  "unchanged_r1_files": [
+    "training/fulgor_ray_v3/a234_contracts_v7.py",
+    "training/fulgor_ray_v3/tests/test_a234_contracts_v7.py"
   ],
   "failure_subcode_taxonomy": {
     "count": 44,
@@ -107,7 +124,7 @@
   },
   "implementation_scope": {
     "phase": "PHASE_R1_SAFE_OBSERVABILITY",
-    "scope": "Additive non-semantic observability foundation approved under REM01 (blockers corrected).",
+    "scope": "Additive non-semantic observability foundation approved under REM01 (strict deserialization corrected).",
     "status": "COMPLETE"
   },
   "legacy_files_modified": [],
@@ -166,7 +183,7 @@
     ],
     "telemetry_future_use_only": true
   },
-  "status": "PASS_A234_R1_SAFE_OBSERVABILITY_IMPLEMENTATION",
+  "status": "PASS_A234_R1_STRICT_DESERIALIZATION_CORRECTION",
   "structural_diagnostics_policy": {
     "allowed_keys": [
       "raw_character_count",
@@ -278,7 +295,7 @@
     ],
     "candidate_id_hash_format": "sha256_hex_64",
     "dataclass_name": "CandidateTelemetryV1",
-    "fields": [
+    "canonical_persisted_fields": [
       "schema_version",
       "slot_index",
       "candidate_id_hash",
@@ -292,6 +309,10 @@
       "failure_subcode",
       "structural_diagnostics"
     ],
+    "duplicate_json_key_rejection": true,
+    "no_missing_field_inference": true,
+    "no_extra_field_swallowing": true,
+    "explicit_from_failure_milestones": true,
     "schema_version": "fulgor.candidate_telemetry.v1",
     "slot_index_bounds": [
       0,
@@ -309,13 +330,13 @@
     "test_a234_telemetry_v1": {
       "errors": 0,
       "failed": 0,
-      "passed": 10,
-      "tests_run": 10
+      "passed": 18,
+      "tests_run": 18
     },
     "total_r1_errors": 0,
     "total_r1_failed": 0,
-    "total_r1_passed": 24,
-    "total_r1_tests": 24
+    "total_r1_passed": 32,
+    "total_r1_tests": 32
   },
   "tests_run": [
     "python -m unittest training/fulgor_ray_v3/tests/test_a234_contracts_v7.py",

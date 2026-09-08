@@ -1,6 +1,6 @@
 """Fulgor Ray V3 A234 Candidate Telemetry Data Structure.
 
-Phase R1: Safe Observability (Corrected Edition).
+Phase R1: Safe Observability (Strict Deserialization Edition).
 
 PURPOSE:
 Provides a safe, immutable, future-facing candidate-stage telemetry data structure
@@ -9,7 +9,15 @@ terminal failure-stage compatibility, candidate stage scoping, bounded slot indi
 cryptographic hash safety, bounded non-semantic structural diagnostics, and
 deterministic JSON serialization.
 
-SAFETY & INTEGRITY POLICIES:
+STRICT DESERIALIZATION & INTEGRITY POLICIES:
+- Strict persisted schema: from_dict() and from_json() require exactly the 12
+  canonical persistent fields. No missing fields, no extra fields, no default
+  inference, no metadata swallowing.
+- Duplicate JSON key rejection: from_json() rejects duplicate object keys fail-closed.
+- Non-object JSON rejection: from_json() rejects non-dict JSON payloads.
+- Strict from_failure(): all six progression flags (intent_parsed, host_bound,
+  serialized, gate_evaluated, gate_accepted, verifier_invoked) are required keyword-only
+  arguments. No automatic milestone inference and no open-ended **kwargs.
 - Candidate stage scoping: failure_stage is restricted to candidate-level stages
   only (rejection of DIAGNOSIS_*, PLAN_*, and PRIMARY_SELECTION).
 - Stage ↔ subcode compatibility: enforces legal stage/subcode pairings.
@@ -43,6 +51,22 @@ from training.fulgor_ray_v3.a234_contracts_v7 import (
 SCHEMA_VERSION: str = "fulgor.candidate_telemetry.v1"
 VALID_SLOT_INDICES: tuple[int, ...] = (0, 1, 2)
 _HEX_64_PATTERN: re.Pattern[str] = re.compile(r"^[0-9a-f]{64}$")
+
+# Exact canonical set of persistent fields for CandidateTelemetryV1
+CANONICAL_PERSISTED_FIELDS: frozenset[str] = frozenset({
+    "schema_version",
+    "slot_index",
+    "candidate_id_hash",
+    "intent_parsed",
+    "host_bound",
+    "serialized",
+    "gate_evaluated",
+    "gate_accepted",
+    "verifier_invoked",
+    "failure_stage",
+    "failure_subcode",
+    "structural_diagnostics",
+})
 
 # Authorized Candidate Failure Stages (Candidate-level telemetry scope)
 ALLOWED_CANDIDATE_FAILURE_STAGES: frozenset[str] = frozenset({
@@ -88,6 +112,16 @@ def validate_candidate_id_hash(candidate_id_hash: str) -> str:
             f"candidate_id_hash must be a 64-character lowercase hex SHA-256 digest, got {candidate_id_hash!r}"
         )
     return candidate_id_hash
+
+
+def _strict_json_object_pairs_hook(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Parse JSON object pairs strictly rejecting duplicate keys."""
+    d: dict[str, Any] = {}
+    for k, v in pairs:
+        if k in d:
+            raise ValueError(f"Duplicate JSON object key detected: {k!r}")
+        d[k] = v
+    return d
 
 
 @dataclass(frozen=True)
@@ -206,15 +240,24 @@ class CandidateTelemetryV1:
         slot_index: int,
         candidate_id_hash: str,
         error: A234V7ContractError,
+        *,
+        intent_parsed: bool,
+        host_bound: bool,
+        serialized: bool,
+        gate_evaluated: bool,
+        gate_accepted: bool,
+        verifier_invoked: bool,
         extra_diagnostics: Mapping[str, Any] | None = None,
-        **kwargs: Any,
     ) -> CandidateTelemetryV1:
-        """Construct a CandidateTelemetryV1 from an A234V7ContractError.
+        """Construct a CandidateTelemetryV1 from an A234V7ContractError with explicit milestones.
 
-        SAFETY INVARIANT:
-        This factory extracts ONLY machine-readable failure_stage, failure_subcode,
-        and structural_diagnostics from the error. It NEVER extracts or persists
-        str(error), repr(error), or developer messages.
+        SAFETY & INTEGRITY INVARIANTS:
+        - All six milestone progression flags MUST be explicitly supplied by caller.
+        - Does NOT auto-fill or infer missing milestones.
+        - Does NOT accept open-ended **kwargs (unknown arguments raise TypeError).
+        - Extracts ONLY machine-readable failure_stage, failure_subcode, and
+          structural_diagnostics from the error.
+        - NEVER extracts or persists str(error), repr(error), or developer messages.
         """
         if not isinstance(error, A234V7ContractError):
             raise TypeError(
@@ -230,19 +273,15 @@ class CandidateTelemetryV1:
         if extra_diagnostics:
             combined_diag.update(extra_diagnostics)
 
-        req_flags = REQUIRED_FAILURE_MILESTONES[error.failure_stage]
-        i, h, s, g, a, v = req_flags
-
-        # Allow explicit kwargs if consistent, otherwise use required milestones
         return cls(
             slot_index=slot_index,
             candidate_id_hash=candidate_id_hash,
-            intent_parsed=kwargs.get("intent_parsed", i),
-            host_bound=kwargs.get("host_bound", h),
-            serialized=kwargs.get("serialized", s),
-            gate_evaluated=kwargs.get("gate_evaluated", g),
-            gate_accepted=kwargs.get("gate_accepted", a),
-            verifier_invoked=kwargs.get("verifier_invoked", v),
+            intent_parsed=intent_parsed,
+            host_bound=host_bound,
+            serialized=serialized,
+            gate_evaluated=gate_evaluated,
+            gate_accepted=gate_accepted,
+            verifier_invoked=verifier_invoked,
             failure_stage=error.failure_stage,
             failure_subcode=error.failure_subcode,
             structural_diagnostics=combined_diag,
@@ -251,7 +290,7 @@ class CandidateTelemetryV1:
     def to_dict(self) -> dict[str, Any]:
         """Convert telemetry to a deterministic plain dictionary.
 
-        Deterministic order and plain types only.
+        Emits the exact canonical complete persistent schema.
         """
         return {
             "schema_version": self.schema_version,
@@ -278,27 +317,60 @@ class CandidateTelemetryV1:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> CandidateTelemetryV1:
-        """Reconstruct telemetry from dictionary with full validation."""
+        """Reconstruct telemetry from dictionary with strict fail-closed validation.
+
+        STRICT PERSISTENT SCHEMA ENFORCEMENT:
+        - Must be a mapping/dict.
+        - Exact field set: every canonical field must be present.
+        - Missing fields are rejected (no default inference).
+        - Extra unknown fields are rejected (no metadata swallowing).
+        """
         if not isinstance(data, (dict, Mapping)):
             raise TypeError(f"data must be dict/Mapping, got {type(data).__name__}")
+
+        data_keys = set(data.keys())
+        missing_keys = CANONICAL_PERSISTED_FIELDS - data_keys
+        if missing_keys:
+            raise ValueError(
+                f"Strict schema violation: missing required persisted telemetry fields: {sorted(missing_keys)}"
+            )
+
+        extra_keys = data_keys - CANONICAL_PERSISTED_FIELDS
+        if extra_keys:
+            raise ValueError(
+                f"Strict schema violation: unrecognized extra telemetry fields: {sorted(extra_keys)}"
+            )
+
+        # Access all fields explicitly with zero defaulting
         return cls(
-            schema_version=data.get("schema_version", SCHEMA_VERSION),
+            schema_version=data["schema_version"],
             slot_index=data["slot_index"],
             candidate_id_hash=data["candidate_id_hash"],
-            intent_parsed=data.get("intent_parsed", False),
-            host_bound=data.get("host_bound", False),
-            serialized=data.get("serialized", False),
-            gate_evaluated=data.get("gate_evaluated", False),
-            gate_accepted=data.get("gate_accepted", False),
-            verifier_invoked=data.get("verifier_invoked", False),
-            failure_stage=data.get("failure_stage"),
-            failure_subcode=data.get("failure_subcode"),
-            structural_diagnostics=data.get("structural_diagnostics", {}),
+            intent_parsed=data["intent_parsed"],
+            host_bound=data["host_bound"],
+            serialized=data["serialized"],
+            gate_evaluated=data["gate_evaluated"],
+            gate_accepted=data["gate_accepted"],
+            verifier_invoked=data["verifier_invoked"],
+            failure_stage=data["failure_stage"],
+            failure_subcode=data["failure_subcode"],
+            structural_diagnostics=data["structural_diagnostics"],
         )
 
     @classmethod
     def from_json(cls, json_str: str) -> CandidateTelemetryV1:
-        """Reconstruct telemetry from JSON string with full validation."""
+        """Reconstruct telemetry from JSON string with strict fail-closed validation.
+
+        STRICT JSON PARSING:
+        - Must be a JSON object (rejects [], null, strings, numbers).
+        - Rejects duplicate object keys.
+        """
         if not isinstance(json_str, str):
             raise TypeError(f"json_str must be str, got {type(json_str).__name__}")
-        return cls.from_dict(json.loads(json_str))
+
+        parsed = json.loads(json_str, object_pairs_hook=_strict_json_object_pairs_hook)
+        if not isinstance(parsed, dict):
+            raise ValueError(
+                f"Strict JSON violation: telemetry root must be an object, got {type(parsed).__name__}"
+            )
+        return cls.from_dict(parsed)
