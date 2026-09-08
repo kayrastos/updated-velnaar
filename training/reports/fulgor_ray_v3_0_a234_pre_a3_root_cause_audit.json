@@ -1,0 +1,866 @@
+{
+  "a234_contract_error_subconditions": {
+    "candidate_outcome_inconsistency_note": "In V6 process_candidates_v6, C16 is the only reachable per-candidate A234ContractError site, but requires gate.accepted == True. With 0 gate accepts, candidate-level A234ContractError is code-unreachable.",
+    "inventory": [
+      {
+        "candidate_capable": false,
+        "code": "C01_OBJECT_MALFORMED_JSON",
+        "condition": "json.loads() raises JSONDecodeError or TypeError during stage parsing",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:38",
+        "stage": "generic"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C02_OBJECT_NOT_DICT",
+        "condition": "Parsed JSON value is not a dictionary",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:40",
+        "stage": "generic"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C03_OBJECT_KEYS_MISMATCH",
+        "condition": "Dictionary top-level keys do not exactly match expected schema keys",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:40",
+        "stage": "generic"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C04_STRINGS_FIELD_INVALID",
+        "condition": "Field is not a list, contains non-strings, or contains empty strings",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:47",
+        "stage": "generic"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C05_DIAGNOSIS_SCHEMA_MISMATCH",
+        "condition": "schema_version != 'fulgor.diagnosis.v1'",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:56",
+        "stage": "diagnosis"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C06_DIAGNOSIS_TARGET_COUNT",
+        "condition": "target_files count > 3 or contains duplicates",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:59",
+        "stage": "diagnosis"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C07_DIAGNOSIS_SYMBOLS_NOT_LIST",
+        "condition": "symbols field is not a list",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:61",
+        "stage": "diagnosis"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C08_DIAGNOSIS_INVALID_SYMBOL",
+        "condition": "Symbol object keys != {'file', 'qualified_name'}",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:66",
+        "stage": "diagnosis"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C09_DIAGNOSIS_POST_INIT_FAILED",
+        "condition": "DiagnosisV1 post-init validation fails (e.g. symbol outside target files)",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:71",
+        "stage": "diagnosis"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C10_PLAN_SCHEMA_MISMATCH",
+        "condition": "schema_version != 'fulgor.repair_plan.v1'",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:80",
+        "stage": "plan"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C11_PLAN_DIAGNOSIS_HASH_MISMATCH",
+        "condition": "plan.diagnosis_hash != canonical_hash(diagnosis)",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:80",
+        "stage": "plan"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C12_PLAN_STEPS_NOT_LIST",
+        "condition": "steps field is not a list",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:82",
+        "stage": "plan"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C13_PLAN_INVALID_OR_OUT_OF_SCOPE_STEP",
+        "condition": "Step keys != {'order', 'file', 'symbol', 'intent'} or step.file not in diagnosis.target_files",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:88",
+        "stage": "plan"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C14_PLAN_POST_INIT_FAILED",
+        "condition": "RepairPlanV1 post-init fails (non-consecutive order 1..N, missing preservation constraints)",
+        "pre_candidate_capable": true,
+        "raising_site": "a234_inference.py:94",
+        "stage": "plan"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C15_CANDIDATE_LEGACY_PARSE",
+        "condition": "parse_candidate failure (legacy V1 path; not called in V6 process_candidates_v6)",
+        "pre_candidate_capable": false,
+        "raising_site": "a234_inference.py:105, 107, 115, 120",
+        "stage": "candidate_legacy"
+      },
+      {
+        "candidate_capable": true,
+        "code": "C16_VERIFIER_PARSE_FAILURE",
+        "condition": "parse_verifier failure (schema mismatch, blinded ID mismatch, subscores out of bounds)",
+        "pre_candidate_capable": false,
+        "raising_site": "a234_inference.py:129, 135",
+        "stage": "verifier"
+      },
+      {
+        "candidate_capable": false,
+        "code": "C17_CANDIDATE_BUDGET_MISMATCH",
+        "condition": "len(raw_by_slot) != CANDIDATE_BUDGET (3)",
+        "pre_candidate_capable": true,
+        "raising_site": "run_fulgor_v3_0_a234_dev30_inference_v6.py:367",
+        "stage": "candidate_batch"
+      }
+    ],
+    "pre_candidate_structural_attribution": "3 pre-candidate records failed with A234ContractError. Attributable to C05-C09 (diagnosis validation) or C10-C14 (plan validation)."
+  },
+  "a3_non_invocation_causal_chain": {
+    "proximate_cause": "In run_fulgor_v3_0_a234_dev30_inference_v6.py:385, verifier invocation is strictly conditional upon 'if gate.accepted:'. Because 0/27 candidates achieved gate acceptance, verify_generate was never invoked.",
+    "upstream_causes": [
+      "21/30 records failed at pre-candidate stages (10 recovery, 6 intent, 3 contract, 2 target membership).",
+      "In the 9 records that produced candidates (27 slots), 0 candidates achieved gate acceptance.",
+      "Primary selection safely returned NoPrimary(('NO_GATE_SURVIVORS',))."
+    ]
+  },
+  "aggregate_execution_facts": {
+    "a3_verifier_invocations": 0,
+    "a3_verifier_scores": 0,
+    "a4_eligible_records": 0,
+    "candidate_outcome_failure_breakdown": {
+      "A234ContractError": 17,
+      "CandidateAnchorDerivationError": 4,
+      "CandidateHostBindingError": 3,
+      "CandidateLineSpanError": 3
+    },
+    "candidate_slots_per_record": 3,
+    "gate_accepted_candidates": 0,
+    "pre_candidate_failed_records": 21,
+    "pre_candidate_failure_breakdown": {
+      "A234ContractError": 3,
+      "DiagnosisTargetMembershipError": 2,
+      "SemanticIntentError": 6,
+      "StructuredOutputRecoveryError": 10
+    },
+    "primary_selections": 0,
+    "records_reaching_candidate_processing": 9,
+    "total_candidate_outcomes": 27,
+    "total_dev30_records": 30
+  },
+  "anchor_derivation_analysis": {
+    "brittleness_on_repetitive_code": "Brittle for small modifications on common code structures (if/else, returns, break, pass).",
+    "derivation_algorithm": "Two-tier deterministic derivation in candidate_host_binding_v1._derive_anchor: Priority 1 uses full preimage text if text.count(preimage) == 1. Priority 2 uses first non-blank line where text.count(line) == 1.",
+    "determinism_and_safety": "Deterministic and safety-preserving; prevents ambiguous patch application.",
+    "failure_conditions": "Fails when edit span content appears multiple times in file AND every individual line in edit span also appears multiple times."
+  },
+  "audit_scope": {
+    "evidence_level_definitions": {
+      "CODE_REACHABLE_REJECTION_CONDITION": "Specific programmatic conditions in the V6 code that can trigger an error class, verified through static code analysis.",
+      "OBSERVED_AGGREGATE_FACT": "Counts and statuses directly recorded in authoritative sealed receipts and pre-audit reports without opening protected semantic content.",
+      "OBSERVED_SUBCAUSE_PROVEN": "Boolean indicating whether non-semantic evidence exists to conclusively prove that a specific subcondition caused the observed failures."
+    },
+    "execution_mode": "LOCAL_ONLY_PRE_A3_FAILURE_ROOT_CAUSE_AUDIT",
+    "first_party_runtime_closure_count": 16,
+    "gpu_used": false,
+    "methodology": "Rigorous static code analysis of canonical and recovered V6 runtime sources combined with authoritative aggregate telemetry and architectural reachability reasoning.",
+    "network_used": false,
+    "protected_dev30_semantic_output_reviewed": false,
+    "recovered_dependencies_count": 12,
+    "runtime_inference_executed": false,
+    "training_started": false
+  },
+  "candidate_a234_contract_error_contradiction": {
+    "aggregate_count_claimed": 17,
+    "audit_limitation": "Without inspecting protected DEV30 semantic outputs or results.jsonl (which is strictly forbidden), the provenance of the 17 candidate-level A234ContractError outcomes cannot be reconciled with V6 code reachability. It is preserved as an authoritative aggregate metric from sealed pre-audit reports, but classified as an unresolved telemetry anomaly.",
+    "code_reachability_analysis": [
+      "In run_fulgor_v3_0_a234_dev30_inference_v6.py:process_candidates_v6, the check len(raw_by_slot) != CANDIDATE_BUDGET raises A234ContractError OUTSIDE the per-candidate try loop.",
+      "Inside the per-candidate loop, parse_semantic_patch_intent raises SemanticIntentError, not A234ContractError.",
+      "Host binding raises subclasses of CandidateHostBindingError (CandidateFileMembershipError, CandidateLineSpanError, CandidateAnchorDerivationError), none of which are A234ContractError.",
+      "Candidate serialization raises SerializationError, which inherits from schemas.ContractError, not a234_inference.A234ContractError.",
+      "The only site inside process_candidates_v6 that raises A234ContractError is parse_verifier, which is strictly guarded by 'if gate.accepted:'.",
+      "Because gate_accepted_candidate_count == 0 and a3_verifier_invocation_count == 0, the verifier block was never reached."
+    ],
+    "gate_accepted_count": 0,
+    "provenance_status": "UNRESOLVED_OR_INCONSISTENT_WITH_V6_REACHABILITY",
+    "verifier_invocation_count": 0
+  },
+  "canonical_commit": "e3190887ee4bae02e952f39b5e8834693c65d8d8",
+  "failure_class_analysis": {
+    "A234ContractError": {
+      "caller_and_catch_path": "Pre-candidate: parse_diagnosis or parse_plan in run(), caught at line 522. Candidate outcomes: caught in process_candidates_v6 line 400.",
+      "candidate_outcome_count": 17,
+      "causal_factors": [
+        "CONTRACT_STRICTNESS",
+        "TELEMETRY_GRANULARITY"
+      ],
+      "code_reachable_rejection_conditions": [
+        "Pre-candidate: diagnosis/plan schema version mismatch, diagnosis_hash lineage mismatch, target count > 3, step ordering non-consecutive, missing preservation constraints.",
+        "Candidate outcome: in V6 process_candidates_v6, A234ContractError is only reachable via parse_verifier under 'if gate.accepted:'. With gate.accepted == 0, this path is code-unreachable."
+      ],
+      "confidence": "HIGH",
+      "evidence_source": "training/fulgor_ray_v3/a234_inference.py; run_fulgor_v3_0_a234_dev30_inference_v6.py",
+      "level": "MULTI_STAGE",
+      "observed_aggregate_fact_count": 20,
+      "observed_subcause_proven": false,
+      "pipeline_stage": "pre_candidate_and_candidate_outcome",
+      "pre_candidate_count": 3,
+      "primary_causal_category": "CONTRACT_STRICTNESS_AND_TELEMETRY_INCONSISTENCY",
+      "raising_sites": [
+        "training/fulgor_ray_v3/a234_inference.py:38, 40, 47, 56, 59, 61, 66, 71, 80, 82, 88, 94, 105, 107, 115, 120, 129, 135",
+        "run_fulgor_v3_0_a234_dev30_inference_v6.py:367"
+      ],
+      "remediable_without_dev30_semantics": true,
+      "technical_details": "Pre-candidate failures (3) are code-reachable via diagnosis/plan parsing. The candidate outcome failures (17) are code-inconsistent with V6 reachability under zero gate accepts, representing an unresolved telemetry anomaly."
+    },
+    "CandidateAnchorDerivationError": {
+      "caller_and_catch_path": "Called by bind_candidate_intent_to_host_patch; caught in process_candidates_v6 line 400; recorded in CandidateOutcome.",
+      "causal_factors": [
+        "SOURCE_COORDINATE_LIMITATION",
+        "CONTRACT_STRICTNESS"
+      ],
+      "code_reachable_rejection_conditions": [
+        "Preimage text appears multiple times in file (text.count(preimage) != 1) AND every non-blank line in candidate span also appears multiple times in file (text.count(line) != 1)."
+      ],
+      "confidence": "HIGH",
+      "evidence_source": "training/fulgor_ray_v3/candidate_host_binding_v1.py:51-68",
+      "level": "CANDIDATE_OUTCOME",
+      "observed_aggregate_fact_count": 4,
+      "observed_subcause_proven": true,
+      "pipeline_stage": "candidate_outcome",
+      "primary_causal_category": "SOURCE_COORDINATE_LIMITATION",
+      "raising_sites": [
+        "training/fulgor_ray_v3/candidate_host_binding_v1.py:65"
+      ],
+      "remediable_without_dev30_semantics": true,
+      "technical_details": "Two-tier anchor derivation algorithm is deterministic and safety-preserving, but inherently brittle on repetitive or boilerplate code blocks."
+    },
+    "CandidateHostBindingError": {
+      "caller_and_catch_path": "Raised directly in bind_candidate_intent_to_host_patch; caught in process_candidates_v6 line 400; recorded in CandidateOutcome.",
+      "causal_factors": [
+        "HOST_BINDING_LIMITATION",
+        "CONTRACT_STRICTNESS"
+      ],
+      "code_reachable_rejection_conditions": [
+        "Repository root is not a directory (unlikely given earlier file reads succeeded).",
+        "_read_repository_file raises SerializationError due to unsafe path, path escaping repository, or file not found.",
+        "_read_repository_file raises SerializationError due to UTF-8 decode error / OSError.",
+        "_read_repository_file raises SerializationError due to '\\r' (CRLF) in file text.",
+        "_read_repository_file raises SerializationError due to file not ending with newline LF."
+      ],
+      "confidence": "HIGH",
+      "evidence_source": "training/fulgor_ray_v3/candidate_host_binding_v1.py:88, 111; patch_serializer.py:32-41",
+      "level": "CANDIDATE_OUTCOME",
+      "observed_aggregate_fact_count": 3,
+      "observed_subcause_proven": false,
+      "pipeline_stage": "candidate_outcome",
+      "primary_causal_category": "HOST_BINDING_LIMITATION",
+      "raising_sites": [
+        "training/fulgor_ray_v3/candidate_host_binding_v1.py:88 (repository root not a directory)",
+        "training/fulgor_ray_v3/candidate_host_binding_v1.py:111 (failed to read repository file via _read_repository_file)"
+      ],
+      "remediable_without_dev30_semantics": true,
+      "technical_details": "Candidate file membership failures raise CandidateFileMembershipError, not base CandidateHostBindingError. Direct base errors stem from strict file reading constraints in _read_repository_file."
+    },
+    "CandidateLineSpanError": {
+      "caller_and_catch_path": "Called by bind_candidate_intent_to_host_patch; caught in process_candidates_v6 line 400; recorded in CandidateOutcome.",
+      "causal_factors": [
+        "SOURCE_COORDINATE_LIMITATION"
+      ],
+      "code_reachable_rejection_conditions": [
+        "Replace/delete: edit.end_line > n_lines (exceeds file length).",
+        "Replace/delete: edit.end_line < edit.start_line (if somehow not caught upstream).",
+        "Insert: edit.start_line > n_lines + 1 (insert position beyond EOF).",
+        "Insert: edit.end_line != edit.start_line - 1 (if somehow not caught upstream).",
+        "Insert at EOF of empty file (n_lines == 0)."
+      ],
+      "confidence": "HIGH",
+      "evidence_source": "training/fulgor_ray_v3/candidate_host_binding_v1.py:118-121, 154-157",
+      "level": "CANDIDATE_OUTCOME",
+      "observed_aggregate_fact_count": 3,
+      "observed_subcause_proven": false,
+      "pipeline_stage": "candidate_outcome",
+      "primary_causal_category": "SOURCE_COORDINATE_LIMITATION",
+      "raising_sites": [
+        "training/fulgor_ray_v3/candidate_host_binding_v1.py:119 (replace/delete span bounds)",
+        "training/fulgor_ray_v3/candidate_host_binding_v1.py:155 (insert position bounds)",
+        "training/fulgor_ray_v3/candidate_host_binding_v1.py:191 (EOF insert on empty file)"
+      ],
+      "remediable_without_dev30_semantics": true,
+      "technical_details": "Upstream SemanticEditIntent already enforces start_line >= 1 and insert end_line == start_line - 1. Downstream CandidateLineSpanError is triggered primarily by line coordinates exceeding actual repository file line count."
+    },
+    "DiagnosisTargetMembershipError": {
+      "caller_and_catch_path": "Directly checked in run() after diagnosis parse; caught by line 522.",
+      "causal_factors": [
+        "MODEL_OUTPUT_CONTRACT_NONCOMPLIANCE"
+      ],
+      "code_reachable_rejection_conditions": [
+        "Target path in diagnosis.target_files is not present in repo_files_set."
+      ],
+      "confidence": "HIGH",
+      "evidence_source": "run_fulgor_v3_0_a234_dev30_inference_v6.py:444-449",
+      "level": "PRE_CANDIDATE",
+      "observed_aggregate_fact_count": 2,
+      "observed_subcause_proven": true,
+      "pipeline_stage": "pre_candidate",
+      "primary_causal_category": "MODEL_OUTPUT_CONTRACT_NONCOMPLIANCE",
+      "raising_sites": [
+        "run_fulgor_v3_0_a234_dev30_inference_v6.py:447"
+      ],
+      "remediable_without_dev30_semantics": true,
+      "technical_details": "Single specific raising site with single condition: LLM generated a target file path outside the repository file inventory."
+    },
+    "SemanticIntentError": {
+      "caller_and_catch_path": "Called in candidate generation loop via _safe_stage_parse; raises directly in outer record loop; caught by run() line 522.",
+      "causal_factors": [
+        "CONTRACT_STRICTNESS",
+        "MODEL_OUTPUT_CONTRACT_NONCOMPLIANCE_POSSIBLE"
+      ],
+      "code_reachable_rejection_conditions": [
+        "Top-level keys mismatch expected 8 keys.",
+        "candidate_id, diagnosis_hash, or plan_hash mismatch with expected parent hashes.",
+        "edits field is missing or empty list.",
+        "Edit object keys mismatch exact 5 keys (e.g. emitting expected_preimage_sha256 or anchor, or omitting replacement_text).",
+        "Invalid edit kind (not replace, insert, or delete).",
+        "Edit targets a file outside diagnosis.target_files.",
+        "Insert invariant violated (end_line != start_line - 1 or start_line < 1).",
+        "Replace/insert replacement_text does not end with LF (\\n).",
+        "Delete replacement_text is non-empty string."
+      ],
+      "confidence": "HIGH",
+      "evidence_source": "training/fulgor_ray_v3/semantic_patch_intent_v2.py:parse_semantic_patch_intent; stage_contract_prompts_v4.py:151-171",
+      "level": "PRE_CANDIDATE",
+      "observed_aggregate_fact_count": 6,
+      "observed_subcause_proven": false,
+      "pipeline_stage": "pre_candidate",
+      "primary_causal_category": "CONTRACT_STRICTNESS",
+      "raising_sites": [
+        "training/fulgor_ray_v3/semantic_patch_intent_v2.py:25, 29 (_path validation)",
+        "training/fulgor_ray_v3/semantic_patch_intent_v2.py:50-78 (SemanticEditIntent coordinate and newline constraints)",
+        "training/fulgor_ray_v3/semantic_patch_intent_v2.py:94-99 (SemanticPatchIntentV2 required fields & uniqueness)",
+        "training/fulgor_ray_v3/semantic_patch_intent_v2.py:108 (_object schema key matching)",
+        "training/fulgor_ray_v3/semantic_patch_intent_v2.py:136-165 (parse_semantic_patch_intent schema and scope validation)"
+      ],
+      "remediable_without_dev30_semantics": true,
+      "technical_details": "Prompt and parser are structurally aligned on the 5-key schema, 1-indexed coordinates, and insert convention. Failures represent model non-compliance with strict contract rules. Exact failing condition per instance is unproven."
+    },
+    "StructuredOutputRecoveryError": {
+      "caller_and_catch_path": "_safe_stage_parse() captures non-semantic structural diagnostics and re-raises; caught at record level by run() line 522.",
+      "causal_factors": [
+        "RECOVERY_LAYER_LIMITATION",
+        "MODEL_OUTPUT_CONTRACT_NONCOMPLIANCE_POSSIBLE"
+      ],
+      "code_reachable_rejection_conditions": [
+        "Output is empty string or whitespace only.",
+        "Markdown fence does not match exact lowercase ```json with newline prefix/suffix.",
+        "Output contains conversational prose before or after the JSON body.",
+        "Output contains generic markdown fences without 'json' tag (```).",
+        "Output contains multiple JSON objects or root JSON array.",
+        "Output is syntactically invalid JSON (trailing commas, single quotes, unescaped quotes, unclosed braces)."
+      ],
+      "confidence": "HIGH",
+      "evidence_source": "training/fulgor_ray_v3/structured_output_recovery.py:33-68; stage_contract_prompts_v4.py:18-36",
+      "level": "PRE_CANDIDATE",
+      "observed_aggregate_fact_count": 10,
+      "observed_subcause_proven": false,
+      "pipeline_stage": "pre_candidate",
+      "primary_causal_category": "RECOVERY_LAYER_LIMITATION_AND_MODEL_NONCOMPLIANCE",
+      "raising_sites": [
+        "training/fulgor_ray_v3/structured_output_recovery.py:40 (output is empty or not text)",
+        "training/fulgor_ray_v3/structured_output_recovery.py:58 (normalized output is malformed JSON)",
+        "training/fulgor_ray_v3/structured_output_recovery.py:60 (normalized JSON is not an object)"
+      ],
+      "remediable_without_dev30_semantics": true,
+      "technical_details": "The prompt explicitly forbids markdown fences, conversational prose, and trailing commas. The recovery layer's fail-closed behavior is deliberate and safety-preserving, but rejects outputs that deviate even slightly from the exact envelope."
+    }
+  },
+  "fresh_heldout_required": true,
+  "future_evaluation_policy": {
+    "canonical_dev30_reuse_authorized": false,
+    "fresh_heldout_required_after_remediation": true,
+    "policy_statement": "Canonical DEV30 is permanently consumed and contaminated by aggregate observation. Rerun on DEV30 is strictly prohibited."
+  },
+  "line_span_analysis": {
+    "coordinate_semantics": "Strict 1-based indexing. Replace/delete require 1 <= start <= end <= n_lines. Insert requires end == start - 1 and 1 <= start <= n_lines + 1.",
+    "upstream_filtering": "SemanticEditIntent.__post_init__ already filters start_line < 1 before host binding. CandidateLineSpanError is caused downstream by coordinates exceeding repository file length or empty file EOF insertions."
+  },
+  "pipeline_progression_map": [
+    {
+      "accepted_input_contract": "JSONL records containing exact fields: instance_id, problem_statement, repository_root (30 unique records).",
+      "boundary_id": "B01_INPUT_INGEST",
+      "exception_classes": [
+        "RuntimeError",
+        "json.JSONDecodeError"
+      ],
+      "exception_handling": "Propagated uncaught at top-level runner startup.",
+      "function_or_module": "run_fulgor_v3_0_a234_dev30_inference_v6.py:run (INPUT reading)",
+      "output_contract": "In-memory row dictionaries (instance_id, problem_statement, repository_root).",
+      "prevents_a3_progression": true,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "input"
+    },
+    {
+      "accepted_input_contract": "Valid directory path on local filesystem without directory traversal.",
+      "boundary_id": "B02_REPOSITORY_PREPARATION",
+      "exception_classes": [
+        "A1ContractError",
+        "OSError"
+      ],
+      "exception_handling": "Caught by record-level exception handler (line 522), recorded in rec['failure_code'].",
+      "function_or_module": "training.fulgor_ray_v3.a1_inference.LocalRepositoryProvider",
+      "output_contract": "Read-only repository provider instance; file list up to 4000 repository-relative normalized paths.",
+      "prevents_a3_progression": true,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "context preparation"
+    },
+    {
+      "accepted_input_contract": "Problem statement, repository file list, context budget fit within CONTEXT_WINDOW (8192 tokens), reserved generation tokens 1024.",
+      "boundary_id": "B03_DIAGNOSIS_GENERATION",
+      "exception_classes": [
+        "RuntimeError"
+      ],
+      "exception_handling": "Caught by record-level exception handler (line 522).",
+      "function_or_module": "run_fulgor_v3_0_a234_dev30_inference_v6.py:_generate",
+      "output_contract": "Raw generated text string and generation metadata (tokens, EOS status, reserve hit).",
+      "prevents_a3_progression": true,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "diagnosis generation"
+    },
+    {
+      "accepted_input_contract": "Raw diagnosis string conforming to JSON object in markdown fence or plain text; exact schema fulgor.diagnosis.v1 with 8 keys, 1-3 target files, symbols.",
+      "boundary_id": "B04_DIAGNOSIS_RECOVERY_AND_VALIDATION",
+      "exception_classes": [
+        "StructuredOutputRecoveryError",
+        "A234ContractError"
+      ],
+      "exception_handling": "Caught by _safe_stage_parse, logs non-semantic structural diagnostics, re-raises; caught by record-level handler (line 522).",
+      "function_or_module": "structured_output_recovery.normalize_single_json_object -> a234_inference.parse_diagnosis",
+      "output_contract": "DiagnosisV1 dataclass instance.",
+      "prevents_a3_progression": true,
+      "retry_bounded": true,
+      "retry_details": "Conservative markdown json code fence extraction only; no fuzzy syntax or schema repair.",
+      "retry_or_recovery_exists": true,
+      "stage": "diagnosis parsing/validation"
+    },
+    {
+      "accepted_input_contract": "Every path in diagnosis.target_files MUST strictly belong to the repository file inventory.",
+      "boundary_id": "B05_DIAGNOSIS_INVENTORY_MEMBERSHIP",
+      "exception_classes": [
+        "DiagnosisTargetMembershipError"
+      ],
+      "exception_handling": "Caught by record-level exception handler (line 522).",
+      "function_or_module": "run_fulgor_v3_0_a234_dev30_inference_v6.py:run (lines 444-449)",
+      "output_contract": "Validated target files confirming closed-world existence.",
+      "prevents_a3_progression": true,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "diagnosis closed-world validation"
+    },
+    {
+      "accepted_input_contract": "Problem statement, DiagnosisV1 dict, diagnosis canonical hash, localized target file contents, reserved tokens 1024.",
+      "boundary_id": "B06_PLAN_GENERATION",
+      "exception_classes": [
+        "RuntimeError"
+      ],
+      "exception_handling": "Caught by record-level exception handler (line 522).",
+      "function_or_module": "run_fulgor_v3_0_a234_dev30_inference_v6.py:_generate",
+      "output_contract": "Raw generated text string and generation metadata.",
+      "prevents_a3_progression": true,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "plan generation"
+    },
+    {
+      "accepted_input_contract": "Raw plan string conforming to fulgor.repair_plan.v1; diagnosis_hash matching canonical diagnosis hash; consecutive 1-indexed steps targeting diagnosis files; non-empty preservation_constraints.",
+      "boundary_id": "B07_PLAN_RECOVERY_AND_VALIDATION",
+      "exception_classes": [
+        "StructuredOutputRecoveryError",
+        "A234ContractError"
+      ],
+      "exception_handling": "Caught by _safe_stage_parse, logs structural diagnostics, re-raises; caught by record-level handler (line 522).",
+      "function_or_module": "structured_output_recovery.normalize_single_json_object -> a234_inference.parse_plan",
+      "output_contract": "RepairPlanV1 dataclass instance.",
+      "prevents_a3_progression": true,
+      "retry_bounded": true,
+      "retry_details": "Conservative markdown json code fence extraction only.",
+      "retry_or_recovery_exists": true,
+      "stage": "plan parsing/validation"
+    },
+    {
+      "accepted_input_contract": "Candidate ID, diversity directive slot, diagnosis hash, plan hash, localized contents; outputs fulgor.semantic_patch_intent.v2 with 8 keys, kind/file/start_line/end_line/replacement_text, no preimage hashes or anchors.",
+      "boundary_id": "B08_CANDIDATE_GENERATION_AND_INTENT_PARSING",
+      "exception_classes": [
+        "StructuredOutputRecoveryError",
+        "SemanticIntentError",
+        "A234ContractError"
+      ],
+      "exception_handling": "Executed inside record-level candidate generation loop (lines 472-484). Uncaught at slot level; failure aborts entire instance record in line 522.",
+      "function_or_module": "run_fulgor_v3_0_a234_dev30_inference_v6.py:_generate -> semantic_patch_intent_v2.parse_semantic_patch_intent",
+      "output_contract": "SemanticPatchIntentV2 instance.",
+      "prevents_a3_progression": true,
+      "retry_bounded": true,
+      "retry_details": "Conservative markdown fence extraction only.",
+      "retry_or_recovery_exists": true,
+      "stage": "candidate generation and semantic intent parsing"
+    },
+    {
+      "accepted_input_contract": "SemanticPatchIntentV2 instance, repository root path, repository file list, diagnosis target files.",
+      "boundary_id": "B09_CANDIDATE_HOST_BINDING",
+      "exception_classes": [
+        "CandidateFileMembershipError",
+        "CandidateLineSpanError",
+        "CandidateAnchorDerivationError",
+        "CandidateHostBindingError",
+        "SerializationError"
+      ],
+      "exception_handling": "Caught per candidate slot inside process_candidates_v6 (line 400); outcome recorded as CandidateOutcome(None, None, None, None, failure_code).",
+      "function_or_module": "candidate_host_binding_v1.bind_candidate_intent_to_host_patch",
+      "output_contract": "SemanticPatchV1 dataclass instance with host-derived preimage SHA256 and deterministic unique anchors; HostBoundEditProvenance records.",
+      "prevents_a3_progression": true,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "host binding"
+    },
+    {
+      "accepted_input_contract": "Host-bound SemanticPatchV1, repository root.",
+      "boundary_id": "B10_CANDIDATE_SERIALIZATION",
+      "exception_classes": [
+        "SerializationError"
+      ],
+      "exception_handling": "Caught per candidate slot inside process_candidates_v6 (line 400); outcome recorded with failure_code='SerializationError'.",
+      "function_or_module": "patch_serializer.serialize",
+      "output_contract": "SerializedPatchV1 containing unified diff string and DiffStats (files_changed <= 3, hunks <= 6, changed_lines <= 120).",
+      "prevents_a3_progression": true,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "serialization"
+    },
+    {
+      "accepted_input_contract": "SemanticPatchV1, SerializedPatchV1, allowed target files, LocalRepositoryProvider.dry_run.",
+      "boundary_id": "B11_STATIC_GATE_EVALUATION",
+      "exception_classes": [],
+      "exception_handling": "Returns GateResult without throwing exceptions under normal contract execution.",
+      "function_or_module": "static_gate.evaluate",
+      "output_contract": "GateResult dataclass instance (accepted: bool, reason_codes: tuple[str, ...], patch_apply_success: bool).",
+      "prevents_a3_progression": true,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "static gate"
+    },
+    {
+      "accepted_input_contract": "gate.accepted == True.",
+      "boundary_id": "B12_A3_VERIFIER_ELIGIBILITY",
+      "exception_classes": [
+        "A234ContractError"
+      ],
+      "exception_handling": "Conditional execution branch: if gate.accepted: ... else skipped completely.",
+      "function_or_module": "run_fulgor_v3_0_a234_dev30_inference_v6.py:process_candidates_v6 (lines 385-399)",
+      "output_contract": "Invocation of verify_generate and parsing of VerifierScoreV1.",
+      "prevents_a3_progression": true,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "verifier eligibility"
+    },
+    {
+      "accepted_input_contract": "Iterable of SelectableCandidate (candidates with gate.accepted == True and parsed VerifierScoreV1).",
+      "boundary_id": "B13_PRIMARY_SELECTION",
+      "exception_classes": [],
+      "exception_handling": "Fails safe to NoPrimary when candidate list is empty.",
+      "function_or_module": "selector.select_primary",
+      "output_contract": "Best SelectableCandidate according to multi-criterion ranking, or NoPrimary(('NO_GATE_SURVIVORS',)).",
+      "prevents_a3_progression": true,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "primary candidate selection"
+    },
+    {
+      "accepted_input_contract": "Primary selected candidate with valid gate acceptance and verifier score.",
+      "boundary_id": "B14_A4_FEEDBACK_ELIGIBILITY",
+      "exception_classes": [
+        "RuntimeError",
+        "A234ContractError"
+      ],
+      "exception_handling": "Strictly NO-GO on sealed V6 results; unexecuted.",
+      "function_or_module": "feedback_controller.FeedbackController",
+      "output_contract": "ExecutionResult from harness execution and single bounded refinement.",
+      "prevents_a3_progression": false,
+      "retry_bounded": false,
+      "retry_or_recovery_exists": false,
+      "stage": "A4 feedback refinement"
+    }
+  ],
+  "postrun_final_seal_sha256": "c2f2273b3ce438d73ef3c4f0ec4ae93fa2b2bfb19b145ff6974c0c0914d243a9",
+  "remediation_implementation_authorized": false,
+  "remediation_recommendations": [
+    {
+      "category": "SAFE_WITHOUT_DEV30_SEMANTICS",
+      "description": "Subclass contract errors into specific typed exceptions with subcodes and preserve error messages and structural diagnostics safely.",
+      "id": "REM01_TELEMETRY_ENRICHMENT",
+      "safety_impact": "Additive observability with zero safety regression.",
+      "title": "Typed Error Hierarchy and Non-Semantic Diagnostics"
+    },
+    {
+      "category": "SAFE_WITHOUT_DEV30_SEMANTICS",
+      "description": "Handle generic markdown code fences and balanced outermost brace extraction while maintaining strict fail-closed JSON syntax decoding.",
+      "id": "REM02_STRUCTURED_OUTPUT_ROBUSTNESS",
+      "safety_impact": "Zero safety degradation; preserves strict schema validation.",
+      "title": "Conservative Multi-Envelope JSON Extraction"
+    },
+    {
+      "category": "SAFE_WITHOUT_DEV30_SEMANTICS",
+      "description": "Isolate candidate generation and parsing per slot in run() to prevent a single slot failure from aborting the entire instance.",
+      "id": "REM03_RUNNER_SLOT_FAULT_ISOLATION",
+      "safety_impact": "Preserves K=3 fixed slot budget and diversity directives.",
+      "title": "Per-Slot Candidate Generation Exception Isolation"
+    },
+    {
+      "category": "REQUIRES_SYNTHETIC_TEST",
+      "description": "Expand anchor inspection window with immutable surrounding lines when single lines are repetitive, without altering the edit span.",
+      "id": "REM04_CONTEXT_EXPANDED_ANCHOR_DERIVATION",
+      "safety_impact": "Preserves patch uniqueness while eliminating repetitive code brittleness.",
+      "title": "Deterministic Context-Expanded Unique Anchor Derivation"
+    },
+    {
+      "category": "REQUIRES_SYNTHETIC_TEST",
+      "description": "Align prompt and binder on intuitive insertion coordinates and normalize missing trailing newlines on replacement strings.",
+      "id": "REM05_COORDINATE_AND_INSERTION_ALIGNMENT",
+      "safety_impact": "Reduces model formatting friction without sacrificing deterministic byte patching.",
+      "title": "Intuitive Insertion Coordinates and Replacement Normalization"
+    },
+    {
+      "category": "REQUIRES_FRESH_HELDOUT_EVAL",
+      "description": "Permanently freeze canonical DEV30 against reuse. Evaluate future remediations on a fresh, independently sealed held-out dataset.",
+      "id": "REM06_FRESH_HELDOUT_EVALUATION_PROTOCOL",
+      "safety_impact": "Preserves scientific integrity and prevents benchmark contamination.",
+      "title": "Mandatory Fresh Held-Out Evaluation Protocol"
+    }
+  ],
+  "root_cause_audit_complete": true,
+  "root_cause_taxonomy": [
+    {
+      "confidence": "HIGH",
+      "count_attribution_confidence": "UNRESOLVED (3 pre-candidate proven reachable; 17 candidate outcomes code-inconsistent with V6)",
+      "id": "RC1_CONTRACT_STRICTNESS_AND_TELEMETRY_COLLAPSE",
+      "observed_failure_classes": [
+        "A234ContractError"
+      ],
+      "possible_count": 20,
+      "proven_count": null,
+      "rank": 1,
+      "remediation_priority": "P0",
+      "severity": "BLOCKER"
+    },
+    {
+      "confidence": "HIGH",
+      "count_attribution_confidence": "MEDIUM (10 aggregate records observed; exact envelope subcauses unproven without semantics)",
+      "id": "RC2_STRUCTURED_OUTPUT_RECOVERY_LIMITATION",
+      "observed_failure_classes": [
+        "StructuredOutputRecoveryError"
+      ],
+      "possible_count": 10,
+      "proven_count": null,
+      "rank": 2,
+      "remediation_priority": "P0",
+      "severity": "BLOCKER"
+    },
+    {
+      "confidence": "HIGH",
+      "count_attribution_confidence": "MEDIUM (strict schema key and newline constraints reachable; exact distribution unproven)",
+      "id": "RC3_MODEL_TO_HOST_COORDINATE_BINDING",
+      "observed_failure_classes": [
+        "SemanticIntentError",
+        "CandidateHostBindingError"
+      ],
+      "possible_count": 9,
+      "proven_count": null,
+      "rank": 3,
+      "remediation_priority": "P1",
+      "severity": "HIGH"
+    },
+    {
+      "confidence": "HIGH",
+      "count_attribution_confidence": "HIGH (algorithm has single deterministic raising condition)",
+      "id": "RC4_ANCHOR_DERIVATION_BRITTLENESS",
+      "observed_failure_classes": [
+        "CandidateAnchorDerivationError"
+      ],
+      "possible_count": 4,
+      "proven_count": 4,
+      "rank": 4,
+      "remediation_priority": "P1",
+      "severity": "HIGH"
+    },
+    {
+      "confidence": "HIGH",
+      "count_attribution_confidence": "MEDIUM (start_line < 1 filtered upstream; end_line > n_lines is dominant reachable cause)",
+      "id": "RC5_LINE_SPAN_COORDINATE_BOUNDS",
+      "observed_failure_classes": [
+        "CandidateLineSpanError"
+      ],
+      "possible_count": 3,
+      "proven_count": null,
+      "rank": 5,
+      "remediation_priority": "P1",
+      "severity": "HIGH"
+    },
+    {
+      "confidence": "HIGH",
+      "count_attribution_confidence": "HIGH (cross-cutting telemetry architecture defect verified in code)",
+      "id": "RC6_TELEMETRY_GRANULARITY_DEFICIT",
+      "observed_failure_classes": [
+        "A234ContractError",
+        "All Candidate Outcomes"
+      ],
+      "possible_count": 27,
+      "proven_count": null,
+      "rank": 6,
+      "remediation_priority": "P0",
+      "severity": "HIGH"
+    },
+    {
+      "confidence": "HIGH",
+      "count_attribution_confidence": "HIGH (single unambiguous raising site in runner check)",
+      "id": "RC7_TARGET_MEMBERSHIP_HALLUCINATION",
+      "observed_failure_classes": [
+        "DiagnosisTargetMembershipError"
+      ],
+      "possible_count": 2,
+      "proven_count": 2,
+      "rank": 7,
+      "remediation_priority": "P2",
+      "severity": "MEDIUM"
+    },
+    {
+      "confidence": "HIGH",
+      "count_attribution_confidence": "HIGH (verified in runner lines 480-484; unhandled slot exception aborts instance)",
+      "id": "RC8_RUNNER_RECORD_LEVEL_CANDIDATE_ABORTION",
+      "observed_failure_classes": [
+        "SemanticIntentError"
+      ],
+      "possible_count": 6,
+      "proven_count": null,
+      "rank": 8,
+      "remediation_priority": "P1",
+      "severity": "HIGH"
+    }
+  ],
+  "safety_flags": {
+    "A4_EXECUTED": false,
+    "CANONICAL_DEV30_REUSE_AUTHORIZED": false,
+    "COMMIT_CREATED": false,
+    "GCP_USED": false,
+    "GPU_USED": false,
+    "MODEL_INFERENCE_USED": false,
+    "NETWORK_USED": false,
+    "PRODUCTION_CODE_MODIFIED": false,
+    "PROTECTED_DEV30_SEMANTIC_OUTPUT_REVIEWED": false,
+    "PUSH_PERFORMED": false,
+    "RECOVERED_RUNTIME_SOURCE_MODIFIED": false,
+    "REMEDIATION_IMPLEMENTED": false,
+    "SSH_USED": false,
+    "TRAINING_STARTED": false,
+    "V6_RERUN_AUTHORIZED": false,
+    "V6_RERUN_EXECUTED": false
+  },
+  "schema": "fulgor.a234_pre_a3_root_cause_audit.v1",
+  "semantic_intent_host_binding_analysis": {
+    "prompt_and_schema_alignment": "stage_contract_prompts_v4 and semantic_patch_intent_v2 are aligned on: 5 edit keys, exclusion of expected_preimage_sha256 and anchor, 1-based indexing, insert end_line == start_line - 1, and replacement trailing LF.",
+    "strict_validation_conditions": [
+      "Strict dictionary key equality: any extra keys (e.g. anchor from V1 habits) or missing keys fail closed.",
+      "Insert coordinate constraint: end_line must equal start_line - 1.",
+      "Replacement text LF constraint: replace and insert must end with '\\n'; delete must be empty string ''."
+    ]
+  },
+  "source_provenance_status": "PASS_A234_EXECUTION_SOURCE_RECOVERY",
+  "source_recovery_manifest_path": "training/reports/fulgor_ray_v3_0_a234_execution_source_recovery_manifest.json",
+  "static_gate_stage_accounting": {
+    "evidence_classifications": {
+      "a3_verifier_invocation_count_zero": "PROVEN (authoritative sealed telemetry)",
+      "candidates_reaching_evaluate_zero": "SUPPORTED_BY_TELEMETRY_BUT_BLOCKED_FROM_PROVEN_DUE_TO_A234_INCONSISTENCY",
+      "gate_accepted_candidate_count_zero": "PROVEN (authoritative sealed telemetry)",
+      "primary_selection_count_zero": "PROVEN (authoritative sealed telemetry)",
+      "zero_direct_static_gate_rejections": "SUPPORTED_BY_TELEMETRY (no gate rejections logged)"
+    },
+    "sequential_stage_accounting": [
+      {
+        "records_reached": 9,
+        "slots_evaluated": 27,
+        "stage": "semantic_intent_parse",
+        "status": "COMPLETED"
+      },
+      {
+        "slots_evaluated": 27,
+        "slots_failed": 10,
+        "stage": "host_binding",
+        "status": "FAILED_ON_SUBSET"
+      },
+      {
+        "slots_evaluated": "UNRESOLVED_DUE_TO_A234_INCONSISTENCY",
+        "stage": "serialization",
+        "status": "UNRESOLVED"
+      },
+      {
+        "slots_evaluated": "SUPPORTED_ZERO",
+        "stage": "evaluate_static_gate",
+        "status": "NO_RECORDED_EVALUATIONS"
+      },
+      {
+        "slots_accepted": 0,
+        "stage": "gate_accepted",
+        "status": "PROVEN_ZERO"
+      },
+      {
+        "invocations": 0,
+        "stage": "verifier_invocation",
+        "status": "PROVEN_ZERO"
+      }
+    ]
+  },
+  "status": "PASS_PRE_A3_ROOT_CAUSE_AUDIT",
+  "structured_output_recovery_analysis": {
+    "accepted_envelope_classes": [
+      "Raw JSON object with outer whitespace stripped: raw.strip().",
+      "Markdown JSON code fence matching regex: ^[ \\t]*```json[ \\t]*\\r?\\n(?P<body>.*?)\\r?\\n```[ \\t]*$"
+    ],
+    "prompt_alignment_note": "The prompt explicitly instructs models not to emit markdown fences or conversational prose. The recovery layer's fail-closed behavior enforces strict compliance. Rejections represent model non-compliance with the common syntax contract, not a prompt/runtime contradiction.",
+    "rejected_envelope_classes": [
+      "Generic markdown fences without language identifier (```\\n{...}\\n```).",
+      "Case-mismatched fences (```JSON\\n{...}\\n```).",
+      "Conversational prose preceding opening fence ('Here is the diagnosis:...').",
+      "Conversational prose following closing fence ('I hope this helps!').",
+      "Code fences with immediate inline braces (```json {...} ```).",
+      "Multiple JSON objects or root JSON array.",
+      "Syntactically malformed JSON (trailing commas, single quotes, unescaped quotes)."
+    ],
+    "strict_schema_integrity": "Preserved. Normalization delegates strictly to json.loads() and schema parsers."
+  },
+  "v6_results_sha256": "29e5935280052513a7bdb2c6203c76591f47c5e8ec9116adff5a6e6849670747"
+}
