@@ -143,14 +143,14 @@
       "name": "Operational Hostname DNS Target",
       "status": "CUSTOM_DOMAIN_PROVISIONING_APPROVAL_REQUIRED",
       "canonicalSource": "execution/velnar_segment_b_production_provisioning_evidence_v1.json",
-      "evidence": "ops.velnar.studio proposed as Cloudflare Worker Custom Domain for velnar-platform-worker; awaiting human provisioning approval"
+      "evidence": "ops.velnar.studio proposed as a Cloudflare Worker Custom Domain exclusively for velnar-canary-ops-worker; awaiting human provisioning approval"
     },
     {
       "id": "production_worker_deployment",
       "name": "Production Worker Deployment",
       "status": "PRODUCTION_CODE_DEPLOYMENT_APPROVAL_REQUIRED_AFTER_REVIEW",
-      "canonicalSource": "wrangler.jsonc",
-      "evidence": "velnar-platform-worker deployment containing worker/ai/sovereignBoundary.ts blocked pending independent review"
+      "canonicalSource": "wrangler.canary-ops.jsonc",
+      "evidence": "velnar-canary-ops-worker deployment using worker/canaryOpsWorker.ts, with dormant fail-closed barriers, is blocked pending independent review"
     },
     {
       "id": "provider_execution_time_revalidation",
@@ -211,21 +211,28 @@
   },
   "testVerification": {
     "suite": "tests/security/phaseA12B2C5U33Gate2Readiness.test.ts",
-    "passed": 34,
-    "total": 34,
-    "claim": "All 34 defined Gate-2 security tests passed"
+    "passed": 51,
+    "total": 51,
+    "claim": "All 51 defined Gate-2 security tests passed"
   },
   "status": "VELNAR_SEGMENT_B_GATE2_FINAL_TRUTH_RECONCILIATION_PENDING_INDEPENDENT_REREVIEW",
   "providerStateDisambiguation": {
-    "principle": "CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE",
-    "cloudflareAccessProviderStateVerificationFrom5U33E": "VERIFIED_AT_SEALED_5U33E_SNAPSHOT",
+    "semanticScopeArtifact": "execution/velnar_5u33e_provider_state_semantic_scope_v1.json",
+    "principle": "CLOUDFLARE_PLATFORM_VERIFICATION != AI_PROVIDER_EXECUTION_TIME_VERIFICATION",
+    "cloudflareAccessHistoricalProviderStateVerified": true,
+    "cloudflareAccessHistoricalVerificationScope": "SEALED_5U33E_SNAPSHOT_ONLY",
     "aiProviderExecutionTimeStateVerified": false,
+    "deepSeekExecutionTimeStateVerified": false,
+    "geminiExecutionTimeStateVerified": false,
+    "aiProviderPricingVerified": false,
+    "aiProviderServiceTierVerified": false,
+    "executionTimeProviderRevalidationRequired": true,
     "deepSeekExecutionTimeRevalidationRequired": true,
     "geminiExecutionTimeRevalidationRequired": true,
     "aiProviderPricingExecutionTimeRevalidationRequired": true,
     "aiProviderServiceTierExecutionTimeRevalidationRequired": true,
     "currentAIProviderCertificationStatus": "UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT",
-    "details": "The sealed 5U.3.3E field currentProviderStateIndependentlyVerified=true applies strictly to Cloudflare Access Zero Trust infrastructure state, NOT AI model provider runtime availability, pricing, or tier verification."
+    "details": "The sealed 5U.3.3E field is interpreted only through the semantic-scope artifact: it is historical Cloudflare Access platform evidence and never current AI-provider execution-time verification."
   },
   "r1Reconciliation": {
     "reconciliationArtifactJson": "execution/velnar_production_readiness_batch_r1_reconciliation_v1.json",
@@ -261,5 +268,24 @@
     "testRunId": "cert_run_1a07f17a810_bb7dfc12",
     "concurrencyCertificationStatus": "D1_CONCURRENCY_DATABASE_IDENTITY_BINDING_VERIFIED",
     "proseConflictResolution": "UUID d65abcb3-d8d6-46fb-9403-a97ab54de303 verified live in Cloudflare (created 2026-09-08T03:36:03Z, 28 tables, EEUR). Errantly cited 3057e62d-05db-40a2-a9b8-3f56644f6f71 proven nonexistent."
+  },
+  "opsDeploymentContract": {
+    "opsCustomDomainIsolationInvariant": "ops.velnar.studio MUST bind exclusively to velnar-canary-ops-worker; velnar-platform-worker is forbidden as the operational Custom Domain deployment target.",
+    "opsCustomDomainTargetWorker": "velnar-canary-ops-worker",
+    "opsDeploymentTargetWorker": "velnar-canary-ops-worker",
+    "dedicatedWorkerEntrypoint": "worker/canaryOpsWorker.ts",
+    "dedicatedWorkerConfig": "wrangler.canary-ops.jsonc",
+    "exactOperationalPath": "/api/ops/canary/deepseek-certification",
+    "recognizedOpsSurface": "EXACT_CANARY_PATH_ONLY",
+    "allOtherPaths": "404_FAIL_CLOSED",
+    "broadPlatformWorkerAllowedOnOpsHostname": false,
+    "genericAiRouterReachableFromOpsDeployment": false,
+    "dedicatedCanaryOnlySurfaceRequired": true,
+    "broadPlatformWorkerClassification": "velnar-platform-worker is a separate broad platform/application Worker outside this certification surface and is forbidden as the ops.velnar.studio Custom Domain or dormant operational canary deployment target."
+  },
+  "canonicalDocsContext": {
+    "lastCanonicalMainMerged": "5eb772639ff4ff5eee41f51951fa11912773dfae",
+    "latestCanonicalDocsContextObserved": "d9a156f786c319a0d84d54c166f1bb3ddba0ea93",
+    "classification": "CANONICAL_DOCS_ONLY_DRIFT_REVIEWED_NONBLOCKING"
   }
 }

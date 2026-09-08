@@ -673,15 +673,20 @@ describe('Phase A.12B.2C-5U.3.3 Hard Gate 2 Readiness Test Suite', () => {
       expect(res.authorizedBudgetMicroUsd).toBe(0);
     });
 
-    it('6.4 enforces epistemic disambiguation: CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE', () => {
+    it('6.4 enforces scoped Cloudflare-platform versus AI-provider execution-time disambiguation', () => {
       const provEvidencePath = path.resolve(__dirname, '../../execution/velnar_segment_b_production_provisioning_evidence_v1.json');
       const provEvidence = JSON.parse(fs.readFileSync(provEvidencePath, 'utf-8'));
 
-      expect(provEvidence.providerStateDisambiguation.principle).toBe('CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE');
-      expect(provEvidence.providerStateDisambiguation.cloudflareAccessProviderStateVerificationFrom5U33E).toBe('VERIFIED_AT_SEALED_5U33E_SNAPSHOT');
+      expect(provEvidence.providerStateDisambiguation.semanticScopeArtifact).toBe('execution/velnar_5u33e_provider_state_semantic_scope_v1.json');
+      expect(provEvidence.providerStateDisambiguation.principle).toBe('CLOUDFLARE_PLATFORM_VERIFICATION != AI_PROVIDER_EXECUTION_TIME_VERIFICATION');
+      expect(provEvidence.providerStateDisambiguation.cloudflareAccessHistoricalProviderStateVerified).toBe(true);
+      expect(provEvidence.providerStateDisambiguation.cloudflareAccessHistoricalVerificationScope).toBe('SEALED_5U33E_SNAPSHOT_ONLY');
       expect(provEvidence.providerStateDisambiguation.aiProviderExecutionTimeStateVerified).toBe(false);
+      expect(provEvidence.providerStateDisambiguation.deepSeekExecutionTimeStateVerified).toBe(false);
+      expect(provEvidence.providerStateDisambiguation.geminiExecutionTimeStateVerified).toBe(false);
       expect(provEvidence.providerStateDisambiguation.deepSeekExecutionTimeRevalidationRequired).toBe(true);
       expect(provEvidence.providerStateDisambiguation.geminiExecutionTimeRevalidationRequired).toBe(true);
+      expect(provEvidence.providerStateDisambiguation.executionTimeProviderRevalidationRequired).toBe(true);
       expect(provEvidence.providerStateDisambiguation.currentAIProviderCertificationStatus).toBe('UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT');
     });
   });
@@ -1153,6 +1158,78 @@ describe('Phase A.12B.2C-5U.3.3 Hard Gate 2 Readiness Test Suite', () => {
       if (!check.success) {
         expect((check as any).code).toBe(OperationalAuthErrorCode.SUPERADMIN_REGISTRY_EMPTY);
       }
+    });
+  });
+
+  // ===========================================================================
+  // GROUP 12: DEDICATED OPS EVIDENCE & 5U.3.3E SEMANTIC-SCOPE REPAIR
+  // ===========================================================================
+  describe('Group 12: Dedicated Ops Evidence & 5U.3.3E Semantic Scope', () => {
+    const currentMissionJsonArtifacts = [
+      'velnar_segment_b_production_provisioning_evidence_v1.json',
+      'velnar_hard_gate2_readiness_v1.json',
+      'velnar_segment_b_to_gate2_review_package_v1.json',
+    ];
+
+    const currentMissionMarkdownArtifacts = [
+      'velnar_segment_b_production_provisioning_evidence_v1.md',
+      'velnar_hard_gate2_readiness_v1.md',
+      'velnar_segment_b_to_gate2_review_package_v1.md',
+    ];
+
+    it('12.1 binds every current mission artifact to the dedicated canary-only ops deployment contract', () => {
+      for (const filename of currentMissionJsonArtifacts) {
+        const artifact = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../execution', filename), 'utf-8'));
+        expect(artifact.opsDeploymentContract.opsCustomDomainTargetWorker).toBe('velnar-canary-ops-worker');
+        expect(artifact.opsDeploymentContract.opsDeploymentTargetWorker).toBe('velnar-canary-ops-worker');
+        expect(artifact.opsDeploymentContract.dedicatedWorkerEntrypoint).toBe('worker/canaryOpsWorker.ts');
+        expect(artifact.opsDeploymentContract.dedicatedWorkerConfig).toBe('wrangler.canary-ops.jsonc');
+        expect(artifact.opsDeploymentContract.exactOperationalPath).toBe('/api/ops/canary/deepseek-certification');
+        expect(artifact.opsDeploymentContract.recognizedOpsSurface).toBe('EXACT_CANARY_PATH_ONLY');
+        expect(artifact.opsDeploymentContract.allOtherPaths).toBe('404_FAIL_CLOSED');
+        expect(artifact.opsDeploymentContract.broadPlatformWorkerAllowedOnOpsHostname).toBe(false);
+        expect(artifact.opsDeploymentContract.genericAiRouterReachableFromOpsDeployment).toBe(false);
+      }
+    });
+
+    it('12.2 contains no current Custom Domain or operational-canary deployment instruction for the broad platform worker', () => {
+      for (const filename of currentMissionJsonArtifacts) {
+        const text = fs.readFileSync(path.resolve(__dirname, '../../execution', filename), 'utf-8');
+        expect(text).not.toMatch(/Custom Domain for velnar-platform-worker/i);
+        expect(text).not.toMatch(/Deployment of velnar-platform-worker/i);
+        expect(text).not.toMatch(/deploy(?:ment)? of velnar-platform-worker/i);
+      }
+
+      for (const filename of currentMissionMarkdownArtifacts) {
+        const text = fs.readFileSync(path.resolve(__dirname, '../../execution', filename), 'utf-8');
+        expect(text).not.toMatch(/Custom Domain for `velnar-platform-worker`/i);
+        expect(text).not.toMatch(/deployment of `velnar-platform-worker`/i);
+
+        for (const line of text.split(/\r?\n/).filter(line => line.includes('velnar-platform-worker'))) {
+          expect(line).toMatch(/forbidden|HISTORICAL_PRE_REPAIR_ARCHITECTURE|SUPERSEDED_NOT_EXECUTABLE|separate broad application Worker/i);
+        }
+      }
+    });
+
+    it('12.3 scopes the immutable 5U.3.3E platform field away from current AI-provider execution readiness', () => {
+      const sealPath = path.resolve(__dirname, '../../execution/a12b2c5u33e_cloudflare_access_dormant_provisioning_execution.json');
+      const scopePath = path.resolve(__dirname, '../../execution/velnar_5u33e_provider_state_semantic_scope_v1.json');
+      const seal = JSON.parse(fs.readFileSync(sealPath, 'utf-8'));
+      const scope = JSON.parse(fs.readFileSync(scopePath, 'utf-8'));
+
+      expect(seal.currentProviderStateIndependentlyVerified).toBe(true);
+      expect(scope.sealedArtifact).toBe('A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED');
+      expect(scope.historicalField).toBe('currentProviderStateIndependentlyVerified');
+      expect(scope.historicalFieldValue).toBe(true);
+      expect(scope.historicalSemanticScope).toBe('CLOUDFLARE_ACCESS_AND_ZERO_TRUST_PLATFORM_STATE_AT_5U33E_REVIEW_SNAPSHOT');
+      expect(scope.cloudflarePlatformVerificationDoesNotEqualAiProviderExecutionTimeVerification).toBe(true);
+      expect(scope.aiProviderExecutionTimeStateVerified).toBe(false);
+      expect(scope.deepSeekExecutionTimeStateVerified).toBe(false);
+      expect(scope.geminiExecutionTimeStateVerified).toBe(false);
+      expect(scope.aiProviderPricingVerified).toBe(false);
+      expect(scope.aiProviderServiceTierVerified).toBe(false);
+      expect(scope.currentAIProviderCertificationStatus).toBe('UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT');
+      expect(scope.executionTimeProviderRevalidationRequired).toBe(true);
     });
   });
 

@@ -33,7 +33,7 @@ Segment B (Production Provisioning & Verification) and reconciliation with canon
    - Explicit scope: Records the intended operator identity input. Does NOT authorize Access policy creation, Superadmin registry mutation, subject enrollment, or key generation.
 5. **Sovereign Boundary Runtime Enforcement Implemented & Certified**:
    - `worker/ai/sovereignBoundary.ts` implemented with 10-category mandatory BLACK scanning, raw PII rejection, KMS key rejection, bounded TaskCapsule enforcement, and strict provider destination allowlists.
-   - All 34 defined security tests in `tests/security/phaseA12B2C5U33Gate2Readiness.test.ts` passing without failures.
+   - All 51 defined security tests in `tests/security/phaseA12B2C5U33Gate2Readiness.test.ts` passing without failures.
 6. **All Runtime Safety Gates Maintained Strictly Fail-Closed**:
    - `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = false`
    - `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = false`
@@ -51,7 +51,7 @@ Segment B (Production Provisioning & Verification) and reconciliation with canon
 | **Cloudflare Account** | ID: `f74f8ad248cb1114ee6e38227166f55a` (`Kayra01.09.06@gmail.com's Account`) | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **Cloudflare Zones** | `velnar.studio` (`3f84f289e9b25a494bf3e2be71356f8c`, Active), `velnarhq.com` (`335ebd95a44f0df7dae87ce697eb75be`, Active) | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **Existing Edge Workers** | `velnar-website` (Active, bindings: `ASSETS`, `DB: 8e0583cb-...`, `IYZICO_*`) | `OBSERVED_REAL_PRODUCTION_FACT` |
-| **Platform Worker** | `velnar-platform-worker` not deployed | `OBSERVED_REAL_PRODUCTION_FACT` |
+| **Platform Worker** | `velnar-platform-worker` not deployed | `HISTORICAL_PRE_REPAIR_ARCHITECTURE / SUPERSEDED_NOT_EXECUTABLE` for the operational-canary surface |
 | **Zero Trust Team Domain** | `https://velnar.cloudflareaccess.com` (Verified via live JWKS endpoint with 2 active RS256 certs) | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **Access Application** | `VELNAR Operational Canary — Dormant` (self-hosted, 15m session, dormant) | `OBSERVED_REAL_PRODUCTION_FACT (from 5U.3.3E)` |
 | **Access Application AUD** | Resolved (64 chars, SHA-256 committed, raw value safe) | `OBSERVED_REAL_PRODUCTION_FACT (from 5U.3.3E)` |
@@ -95,7 +95,7 @@ Following reconciliation with canonical 5U.3.3E and operator email confirmation,
 
 #### Remaining 4 Consolidated Decisions:
 1. **Decision A: Operational Custom Domain / DNS**:
-   - **Recommended Design**: `ops.velnar.studio` configured as a Cloudflare Worker Custom Domain for `velnar-platform-worker` (avoids manually guessing a CNAME target).
+   - **Recommended Design**: `ops.velnar.studio` configured as a Cloudflare Worker Custom Domain exclusively for `velnar-canary-ops-worker`; no manual CNAME or Worker Route is used.
    - **Classification**: `CUSTOM_DOMAIN_PROVISIONING_APPROVAL_REQUIRED`
 2. **Decision B: Human Access Policy / Identity Enrollment**:
    - **Confirmed Email**: `kayra01.09.06@gmail.com`.
@@ -104,8 +104,8 @@ Following reconciliation with canonical 5U.3.3E and operator email confirmation,
 3. **Decision C: Ed25519 Trust Anchors**:
    - **Pending Action**: Authorize generation and enrollment of public keys for `PRODUCTION_HUMAN_AUTHORITY_REGISTRY` and `PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES`.
    - **Classification**: `TRUST_ANCHOR_KEY_GENERATION_APPROVAL_REQUIRED`
-4. **Decision D: Platform Worker Deployment**:
-   - **Pending Action**: Authorize deployment of `velnar-platform-worker` containing `worker/ai/sovereignBoundary.ts` to Cloudflare edge bound to `velnar-production-db` in dormant fail-closed mode following independent Codex review.
+4. **Decision D: Dedicated Canary Worker Deployment**:
+   - **Pending Action**: Authorize deployment of `velnar-canary-ops-worker` using `worker/canaryOpsWorker.ts` and `wrangler.canary-ops.jsonc`, retaining dormant fail-closed barriers.
    - **Classification**: `PRODUCTION_CODE_DEPLOYMENT_APPROVAL_REQUIRED_AFTER_REVIEW`
 
 ---
@@ -118,12 +118,24 @@ Prior to receiving the explicit human token `SEGMENT_C_CONTROLLED_LIVE_CANARY_AP
 - Working tree remains local on `feat/prelive-to-controlled-live-mission-v1`.
 
 
-## 6. Provider State Epistemic Disambiguation
+## 6. Dedicated Ops Deployment Contract
 
-- **Principle**: `CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE`
-- **Cloudflare Access Provider State**: `VERIFIED_AT_SEALED_5U33E_SNAPSHOT`
+- **Isolation Invariant**: `ops.velnar.studio` MUST bind exclusively to `velnar-canary-ops-worker`; `velnar-platform-worker` is forbidden as the operational Custom Domain deployment target.
+- **Dedicated Entrypoint / Config**: `worker/canaryOpsWorker.ts` / `wrangler.canary-ops.jsonc`.
+- **Recognized Surface**: `EXACT_CANARY_PATH_ONLY` at `/api/ops/canary/deepseek-certification`; all other paths are `404_FAIL_CLOSED`.
+- **Broad Platform Worker**: `velnar-platform-worker` may remain a separate broad application Worker outside this certification surface, but cannot be deployed for the operational canary.
+
+## 7. Provider State Epistemic Disambiguation
+
+- **Semantic Scope Artifact**: `execution/velnar_5u33e_provider_state_semantic_scope_v1.md`.
+- **Principle**: `CLOUDFLARE_PLATFORM_VERIFICATION != AI_PROVIDER_EXECUTION_TIME_VERIFICATION`.
+- **Cloudflare Access Historical Provider State**: `true`, scoped to `SEALED_5U33E_SNAPSHOT_ONLY`.
 - **AI Provider Execution-Time State Verified**: `false`
+- **DeepSeek / Gemini Execution-Time State Verified**: `false` / `false`
+- **AI Provider Pricing / Service Tier Verified**: `false` / `false`
 - **DeepSeek Execution-Time Revalidation Required**: `true`
 - **Gemini Execution-Time Revalidation Required**: `true`
+- **Execution-Time Provider Revalidation Required**: `true`
 - **Current AI Provider Certification Status**: `UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT`
 - **Batch R1 Reconciliation Evidence**: `execution/velnar_production_readiness_batch_r1_reconciliation_v1.md`.
+- **Canonical Docs Context**: last merged `5eb772639ff4ff5eee41f51951fa11912773dfae`; latest observed docs-only context `d9a156f786c319a0d84d54c166f1bb3ddba0ea93` (`CANONICAL_DOCS_ONLY_DRIFT_REVIEWED_NONBLOCKING`).

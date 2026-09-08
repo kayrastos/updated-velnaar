@@ -37,8 +37,8 @@ Every Gate-2 requirement is classified under its verifiable status:
 | 17 | **Operator Identity Input** | `HUMAN_CONFIRMED` | Human Input | Operator email `kayra01.09.06@gmail.com` confirmed by human. |
 | 18 | **Runtime Source Provenance** | `PENDING_DECISION` | Source Provenance | Ed25519 key generation pending human approval. |
 | 19 | **Human Auth Attestation** | `PENDING_DECISION` | Authorization Trust | Ed25519 key generation pending human approval. |
-| 20 | **Operational Hostname Custom Domain** | `PENDING_DECISION` | Custom Domain Spec | Worker custom domain for `ops.velnar.studio` pending human approval. |
-| 21 | **Production Worker Deployment** | `PENDING_DECISION` | Deployment Spec | Platform worker deployment blocked pending independent review. |
+| 20 | **Operational Hostname Custom Domain** | `PENDING_DECISION` | Dedicated Canary Custom Domain Spec | `ops.velnar.studio` must bind exclusively to `velnar-canary-ops-worker`; human approval remains pending. |
+| 21 | **Dedicated Canary Worker Deployment** | `PENDING_DECISION` | Dedicated Deployment Spec | `velnar-canary-ops-worker` deployment remains blocked pending independent review. |
 | 22 | **Route / Ingress / Live Passivity** | `PROVEN_FALSE` | Route Policy | Route gate = `false`, Ingress auth = `false`, Live execution = `false`. |
 
 ---
@@ -48,7 +48,7 @@ Every Gate-2 requirement is classified under its verifiable status:
 Following reconciliation with canonical main (`5U.3.3E`), the Access application is provisioned dormant and the operator email is confirmed. The 4 remaining decisions are consolidated:
 
 1. **OPERATIONAL CUSTOM DOMAIN / DNS**:
-   - Recommended Design: `ops.velnar.studio` configured as a Cloudflare Worker Custom Domain for `velnar-platform-worker` (avoids guessing CNAME target).
+   - Recommended Design: `ops.velnar.studio` configured as a Cloudflare Worker Custom Domain exclusively for `velnar-canary-ops-worker`; no manual CNAME or Worker Route is used.
    - Classification: `CUSTOM_DOMAIN_PROVISIONING_APPROVAL_REQUIRED`
 2. **HUMAN ACCESS POLICY / IDENTITY ENROLLMENT**:
    - Confirmed Operator Email: `kayra01.09.06@gmail.com`.
@@ -56,8 +56,8 @@ Following reconciliation with canonical main (`5U.3.3E`), the Access application
 3. **ED25519 TRUST ANCHORS**:
    - Public key generation for human authority and runtime source provenance registries.
    - Classification: `TRUST_ANCHOR_KEY_GENERATION_APPROVAL_REQUIRED`
-4. **WORKER DEPLOYMENT**:
-   - Platform worker deployment containing `worker/ai/sovereignBoundary.ts` blocked until independent Codex review.
+4. **DEDICATED CANARY WORKER DEPLOYMENT**:
+   - `velnar-canary-ops-worker` deployment using `worker/canaryOpsWorker.ts` and `wrangler.canary-ops.jsonc` remains blocked until independent Codex review.
    - Classification: `PRODUCTION_CODE_DEPLOYMENT_APPROVAL_REQUIRED_AFTER_REVIEW`
 
 ---
@@ -71,12 +71,24 @@ The Sovereign Boundary runtime engine ([worker/ai/sovereignBoundary.ts](file:///
 - **Destination Allowlist**: Any unapproved host or path is blocked.
 
 
-## 3. Provider State Epistemic Disambiguation
+## 3. Dedicated Ops Deployment Contract
 
-- **Principle**: `CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE`
-- **Cloudflare Access Provider State**: `VERIFIED_AT_SEALED_5U33E_SNAPSHOT`
+- **Isolation Invariant**: `ops.velnar.studio` MUST bind exclusively to `velnar-canary-ops-worker`; `velnar-platform-worker` is forbidden as the operational Custom Domain deployment target.
+- **Dedicated Entrypoint / Config**: `worker/canaryOpsWorker.ts` / `wrangler.canary-ops.jsonc`.
+- **Recognized Surface**: `EXACT_CANARY_PATH_ONLY` at `/api/ops/canary/deepseek-certification`; all other paths are `404_FAIL_CLOSED`.
+- **Broad Platform Worker**: `velnar-platform-worker` may remain a separate broad application Worker outside this certification surface, but cannot be deployed for the operational canary.
+
+## 4. Provider State Epistemic Disambiguation
+
+- **Semantic Scope Artifact**: `execution/velnar_5u33e_provider_state_semantic_scope_v1.md`.
+- **Principle**: `CLOUDFLARE_PLATFORM_VERIFICATION != AI_PROVIDER_EXECUTION_TIME_VERIFICATION`.
+- **Cloudflare Access Historical Provider State**: `true`, scoped to `SEALED_5U33E_SNAPSHOT_ONLY`.
 - **AI Provider Execution-Time State Verified**: `false`
+- **DeepSeek / Gemini Execution-Time State Verified**: `false` / `false`
+- **AI Provider Pricing / Service Tier Verified**: `false` / `false`
 - **DeepSeek Execution-Time Revalidation Required**: `true`
 - **Gemini Execution-Time Revalidation Required**: `true`
+- **Execution-Time Provider Revalidation Required**: `true`
 - **Current AI Provider Certification Status**: `UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT`
 - **Batch R1 Reconciliation Evidence**: `execution/velnar_production_readiness_batch_r1_reconciliation_v1.md`.
+- **Canonical Docs Context**: last merged `5eb772639ff4ff5eee41f51951fa11912773dfae`; latest observed docs-only context `d9a156f786c319a0d84d54c166f1bb3ddba0ea93` (`CANONICAL_DOCS_ONLY_DRIFT_REVIEWED_NONBLOCKING`).

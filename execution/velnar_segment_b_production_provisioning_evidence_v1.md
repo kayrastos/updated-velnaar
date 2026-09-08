@@ -28,7 +28,7 @@ Segment B execution and reconciliation with canonical `origin/main` (`5U.3.3E`) 
      - AUD Resolved: `true` (64 chars, SHA-256: `9c5777a3768c6082501fd5fee8c1997cf35896cadc5e5c2b0da50e94c04884f0`, raw value not committed).
      - Policies: 0. Human identity enrolled: `false`.
      - SuperAdmin registry entries: 0.
-   - Deployed Workers: `velnar-website` active; `velnar-platform-worker` uncreated on edge.
+   - Broad platform Worker status is historical application context only. `velnar-platform-worker` is **HISTORICAL_PRE_REPAIR_ARCHITECTURE / SUPERSEDED_NOT_EXECUTABLE** for this operational-canary certification surface.
 2. **Operator Identity Input (Human Confirmed)**:
    - Authorized Operator Email: `kayra01.09.06@gmail.com`.
    - Explicit Human Authorization Scope: Authorizes recording this email as the intended operator identity input only. Does NOT authorize Access policy creation, Superadmin registry mutation, subject enrollment, or key generation.
@@ -123,7 +123,7 @@ Implemented locally in `worker/ai/sovereignBoundary.ts`:
 - **AI Provider Spend in Segment B**: Strictly **$0.00**
 - **Live Model API Calls**: Strictly **0** (0 DeepSeek, 0 Gemini, 0 OpenAI).
 - **Evidence Persistence Status**: `IMPLEMENTED_AND_OFFLINE_TESTED_PENDING_LIVE_SEGMENT_C_VERIFICATION` (offline hashing & serialization verified; live persistence to D1 verified upon Segment C authorization).
-- **Test Verification**: 34/34 defined Gate-2 security tests passing (`tests/security/phaseA12B2C5U33Gate2Readiness.test.ts`).
+- **Test Verification**: 51/51 defined Gate-2 security tests passing (`tests/security/phaseA12B2C5U33Gate2Readiness.test.ts`).
 - **Repository D1 Evidence**: Bound to `execution/velnar_d1_remote_concurrency_certification_v1.json`.
 
 ---
@@ -133,7 +133,7 @@ Implemented locally in `worker/ai/sovereignBoundary.ts`:
 Following reconciliation with canonical 5U.3.3E and operator email confirmation, the consolidated pending decisions are reduced to 4 items:
 
 1. **OPERATIONAL CUSTOM DOMAIN / DNS**:
-   - **Recommended Design**: `ops.velnar.studio` configured as a Cloudflare Worker Custom Domain for `velnar-platform-worker` (avoids manually guessing a CNAME target).
+   - **Recommended Design**: `ops.velnar.studio` configured as a Cloudflare Worker Custom Domain exclusively for `velnar-canary-ops-worker`; no manual CNAME or Worker Route is used.
    - **Classification**: `CUSTOM_DOMAIN_PROVISIONING_APPROVAL_REQUIRED`
 2. **HUMAN ACCESS POLICY / IDENTITY ENROLLMENT**:
    - **Confirmed Email**: `kayra01.09.06@gmail.com`
@@ -143,17 +143,29 @@ Following reconciliation with canonical 5U.3.3E and operator email confirmation,
    - **Pending Action**: Authorize generation and enrollment of public keys for `PRODUCTION_HUMAN_AUTHORITY_REGISTRY` and `PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES`.
    - **Classification**: `TRUST_ANCHOR_KEY_GENERATION_APPROVAL_REQUIRED`
 4. **WORKER DEPLOYMENT**:
-   - **Pending Action**: Authorize deployment of `velnar-platform-worker` containing `worker/ai/sovereignBoundary.ts` to Cloudflare edge following independent Codex review.
+   - **Pending Action**: Authorize deployment of `velnar-canary-ops-worker` using `worker/canaryOpsWorker.ts` and `wrangler.canary-ops.jsonc`, retaining dormant fail-closed barriers.
    - **Classification**: `PRODUCTION_CODE_DEPLOYMENT_APPROVAL_REQUIRED_AFTER_REVIEW`
 
 
-## 7. Provider State Epistemic Disambiguation
+## 7. Dedicated Ops Deployment Contract
 
-- **Principle**: `CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE`
-- **Cloudflare Access Provider State**: `VERIFIED_AT_SEALED_5U33E_SNAPSHOT`
+- **Isolation Invariant**: `ops.velnar.studio` MUST bind exclusively to `velnar-canary-ops-worker`; `velnar-platform-worker` is forbidden as the operational Custom Domain deployment target.
+- **Dedicated Entrypoint / Config**: `worker/canaryOpsWorker.ts` / `wrangler.canary-ops.jsonc`.
+- **Recognized Surface**: `EXACT_CANARY_PATH_ONLY` at `/api/ops/canary/deepseek-certification`; all other paths are `404_FAIL_CLOSED`.
+- **Broad Platform Worker**: `velnar-platform-worker` may remain a separate broad application Worker outside this certification surface, but is neither the Custom Domain nor dormant-canary deployment target.
+
+## 8. Provider State Epistemic Disambiguation
+
+- **Semantic Scope Artifact**: `execution/velnar_5u33e_provider_state_semantic_scope_v1.md`.
+- **Principle**: `CLOUDFLARE_PLATFORM_VERIFICATION != AI_PROVIDER_EXECUTION_TIME_VERIFICATION`.
+- **Cloudflare Access Historical Provider State**: `true`, scoped to `SEALED_5U33E_SNAPSHOT_ONLY`.
 - **AI Provider Execution-Time State Verified**: `false`
+- **DeepSeek / Gemini Execution-Time State Verified**: `false` / `false`
+- **AI Provider Pricing / Service Tier Verified**: `false` / `false`
 - **DeepSeek Execution-Time Revalidation Required**: `true`
 - **Gemini Execution-Time Revalidation Required**: `true`
+- **Execution-Time Provider Revalidation Required**: `true`
 - **AI Provider Pricing Revalidation Required**: `true`
 - **Current AI Provider Certification Status**: `UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT`
 - **Batch R1 Reconciliation**: Reconciled in `execution/velnar_production_readiness_batch_r1_reconciliation_v1.md`.
+- **Canonical Docs Context**: last merged `5eb772639ff4ff5eee41f51951fa11912773dfae`; latest observed docs-only context `d9a156f786c319a0d84d54c166f1bb3ddba0ea93` (`CANONICAL_DOCS_ONLY_DRIFT_REVIEWED_NONBLOCKING`).
