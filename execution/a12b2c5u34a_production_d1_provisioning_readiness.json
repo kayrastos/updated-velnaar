@@ -3,7 +3,7 @@
   "artifactType": "PRODUCTION_D1_PROVISIONING_READINESS_AUDIT",
   "repository": "https://github.com/kayrastos/updated-velnaar",
   "branch": "main",
-  "timestamp": "2026-09-08T04:50:00.000Z",
+  "timestamp": "2026-09-08T07:15:00.000Z",
   "canonicalBaseCommit": "78ce5cc93c2bba621e5794118c22136563f1977c",
   "canonicalBaseTree": "eb6c7574a1a003a2f2fc6aca055e459a79e1ff04",
   "sealedPredecessor": "A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED",
@@ -58,18 +58,6 @@
     "0007_ai_run_protocol_hardening.sql",
     "0008_authorization_replay_ledger.sql"
   ],
-  "executionSequenceTenSteps": [
-    "1. Create exactly one production D1 database: velnar-production-db via wrangler d1 create",
-    "2. Read back exact database UUID from Cloudflare API response",
-    "3. Record minimized database identity (SHA-256 digest of DB UUID) in evidence",
-    "4. Obtain provider-supported pre-migration Time Travel bookmark / point-in-time recovery reference (future execution acceptance condition; none currently exists)",
-    "5. Inspect pre-migration state to confirm 0 user tables",
-    "6. Apply migrations 0001 through 0008 sequentially via wrangler d1 migrations apply velnar-production-db --remote",
-    "7. Inspect d1_migrations table state to verify exact migration version record",
-    "8. Verify post-migration schema using strictly READ-ONLY table and index existence queries",
-    "9. Retain recovery bookmark/reference and document point-in-time restore procedure (destructive restore is NOT authorized)",
-    "10. STOP. Defer wrangler.jsonc database_id update and Worker binding to Phase 5U.3.4B"
-  ],
   "laneCMutationsDeferredTo5U34B": {
     "wranglerConfigMutations": 0,
     "workerBindingMutations": 0,
@@ -81,18 +69,23 @@
   },
   "recoveryContract": {
     "providerMechanism": "TIME_TRAVEL_POINT_IN_TIME_RECOVERY",
+    "canonicalBookmarkAcquired": false,
+    "liveProviderBookmarkStateVerified": false,
     "preMigrationTimeTravelBookmarkAcquired": false,
     "preMigrationRecoveryReferenceRecorded": false,
     "postMigrationSchemaVerified": false,
     "destructiveRestoreExecuted": false,
     "restoreRequiresSeparateApproval": true,
     "currentRecoveryState": {
+      "canonicalDatabaseProvisioned": false,
+      "currentProviderDatabaseExists": null,
+      "providerDatabaseExistenceVerified": false,
+      "canonicalBookmarkAcquired": false,
+      "liveProviderBookmarkStateVerified": false,
       "preMigrationTimeTravelBookmarkAcquired": false,
       "preMigrationRecoveryReferenceRecorded": false,
       "postMigrationSchemaVerified": false,
       "destructiveRestoreExecuted": false,
-      "currentDatabaseExists": false,
-      "currentBookmarkExists": false,
       "d1RealCalls": 0
     },
     "futureExecutionRequiredOutcomes": {
@@ -102,7 +95,7 @@
       "destructiveRestoreMustRemainUnexecuted": true,
       "restoreRequiresSeparateApproval": true
     },
-    "semantics": "Current state reflects readiness audit: 0 D1 real calls occurred, no production D1 database exists, and no bookmark exists. The futureExecutionRequiredOutcomes define strict acceptance criteria for future bounded execution. Cloudflare D1 Time Travel restore is destructive and is NOT authorized."
+    "semantics": "No production D1 database is currently recognized as provisioned by VELNAR's canonical readiness state. Live Cloudflare D1 resource existence was not independently queried in this readiness phase and must be verified immediately before bounded execution via Step 0 preflight. The futureExecutionRequiredOutcomes define strict acceptance criteria for future bounded execution. Cloudflare D1 Time Travel restore is destructive and is NOT authorized."
   },
   "migrationAtomicitySemantics": {
     "claim": "CONSERVATIVE_FAIL_CLOSED_INSPECTION",
@@ -130,7 +123,8 @@
     "UNSUPPORTED_D1_MIGRATION_ATOMICITY_CLAIM": "CLOSED: Replaced blanket atomicity claim with conservative fail-closed inspection of d1_migrations and schema.",
     "D1_LANE_C_CONFIG_MUTATION_SCOPE_LEAK": "CLOSED: Removed wrangler.jsonc editing and Worker binding from 5U.3.4A; deferred strictly to 5U.3.4B.",
     "UNBUDGETED_D1_SMOKE_WRITE": "CLOSED: Removed reserveIfAbsent production write; post-migration checks are strictly READ-ONLY.",
-    "TEST_BUILD_INDEPENDENCE_OVERCLAIM": "CLOSED: Separated repairAgentExecutionVerified (true) from independentReviewerExecutionVerified (false)."
+    "TEST_BUILD_INDEPENDENCE_OVERCLAIM": "CLOSED: Separated repairAgentExecutionVerified (true) from independentReviewerExecutionVerified (false).",
+    "D1_PROVIDER_STATE_OVERCLAIM": "CLOSED: Replaced unqualified live-absence claims with explicit canonicalProjectD1ProvisioningState distinction and mandatory Step 0 management-plane collision preflight."
   },
   "canonicalSafetyReadinessLedger": {
     "1_PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
@@ -177,15 +171,18 @@
     "productionRoutingEnforcementAllowed": false,
     "providerCanaryExecuted": false
   },
-  "microRepairBaseCommit": "5eb772639ff4ff5eee41f51951fa11912773dfae",
-  "microRepairBaseTree": "0f1bf8e8a75a7a4549c473c68d1b0e2914bf0fa2",
+  "microRepairBaseCommit": "3e7bc1bf99289451d8e7b59a19d982247eaf2f6b",
+  "microRepairBaseTree": "5bf99536f6baa54d400f1468283e52d6e2ffdadf",
   "currentRecoveryState": {
+    "canonicalDatabaseProvisioned": false,
+    "currentProviderDatabaseExists": null,
+    "providerDatabaseExistenceVerified": false,
+    "canonicalBookmarkAcquired": false,
+    "liveProviderBookmarkStateVerified": false,
     "preMigrationTimeTravelBookmarkAcquired": false,
     "preMigrationRecoveryReferenceRecorded": false,
     "postMigrationSchemaVerified": false,
     "destructiveRestoreExecuted": false,
-    "currentDatabaseExists": false,
-    "currentBookmarkExists": false,
     "d1RealCalls": 0
   },
   "futureExecutionRequiredOutcomes": {
@@ -193,5 +190,45 @@
     "preMigrationRecoveryReferenceMustBeRecorded": true,
     "postMigrationSchemaMustBeVerified": true,
     "destructiveRestoreMustRemainUnexecuted": true
+  },
+  "canonicalProjectD1ProvisioningState": "NOT_PROVISIONED",
+  "canonicalGateRealDatabaseProvisioned": false,
+  "liveCloudflareD1ResourceStateVerified": false,
+  "currentProviderDatabaseExistence": "UNVERIFIED_PENDING_EXECUTION_PREFLIGHT",
+  "currentProviderMatchingDatabaseCount": null,
+  "liveProviderReadPerformedInReadinessPhase": false,
+  "mandatoryPreCreateProviderPreflight": {
+    "step": "STEP 0",
+    "description": "Read-only Cloudflare D1 management-plane preflight executed before database creation",
+    "targetDatabaseName": "velnar-production-db",
+    "managementPlaneReadCommand": "wrangler d1 list --json",
+    "caseA_zeroMatches": {
+      "condition": "matchingDatabaseCount === 0",
+      "action": "Proceed with single database creation under explicit human approval"
+    },
+    "caseB_existingMatches": {
+      "condition": "matchingDatabaseCount >= 1",
+      "action": "STOP immediately. DO NOT create another database. DO NOT migrate. DO NOT bind. Return D1_PREEXISTING_RESOURCE_REQUIRES_RECONCILIATION."
+    },
+    "nonAssumption": "The existing resource must be independently identified and reviewed before any mutation. Do NOT assume a same-name database belongs to VELNAR."
+  },
+  "futureExecutionSequence": [
+    "0. Read-only D1 management-plane collision/existence preflight: List current Cloudflare D1 databases in target account and search for exact name velnar-production-db.",
+    "1. Require exact-name count = 0 (Case A: proceed under human approval; Case B: count >= 1 -> STOP immediately with D1_PREEXISTING_RESOURCE_REQUIRES_RECONCILIATION; do not create, migrate, or bind).",
+    "2. Create exactly one production D1 database: velnar-production-db via wrangler d1 create velnar-production-db under explicit human approval.",
+    "3. Read back created database identity (UUID) from Cloudflare API response.",
+    "4. Record minimized database identity (SHA-256 digest of DB UUID) in evidence.",
+    "5. Acquire provider-supported pre-migration Time Travel bookmark / point-in-time recovery reference.",
+    "6. Inspect pre-migration user-schema state to confirm 0 user tables.",
+    "7. Apply migrations 0001 through 0008 sequentially via wrangler d1 migrations apply velnar-production-db --remote.",
+    "8. Inspect d1_migrations table state to verify exact migration version record.",
+    "9. Perform strictly read-only post-migration schema verification using table and index existence queries.",
+    "10. Retain recovery reference and document point-in-time restore procedure (destructive restore is NOT authorized).",
+    "11. STOP and hand off verified D1 database identity to Lane C / Phase 5U.3.4B."
+  ],
+  "futureCallAccountingCategories": {
+    "cloudflareD1ManagementPlaneReads": "Read-only listing/inspection queries (e.g. existence preflight). Does not count toward database creation or SQL mutation.",
+    "d1SqlDataPlaneCalls": "SQL queries against the database (pre-migration check, d1_migrations check, schema verification). Strictly read-only.",
+    "d1Mutations": "Cloudflare database creation and remote migration application. Bounded strictly to budget."
   }
 }
