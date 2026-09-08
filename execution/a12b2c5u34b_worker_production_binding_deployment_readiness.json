@@ -3,16 +3,17 @@
   "artifactType": "WORKER_PRODUCTION_BINDING_DEPLOYMENT_READINESS_AUDIT",
   "repository": "https://github.com/kayrastos/updated-velnaar",
   "branch": "main",
-  "timestamp": "2026-09-08T04:30:00.000Z",
-  "canonicalBaseCommit": "3ab126c6a6176ef42c31650d8c77fcad778798d8",
-  "canonicalBaseTree": "1a1fcb6fbf98b633aef09d8b6231f01ed526aef2",
+  "timestamp": "2026-09-08T04:45:00.000Z",
+  "canonicalBaseCommit": "78ce5cc93c2bba621e5794118c22136563f1977c",
+  "canonicalBaseTree": "eb6c7574a1a003a2f2fc6aca055e459a79e1ff04",
   "sealedPredecessor": "A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED",
-  "scope": "Worker Production Binding & Deployment Readiness Audit",
+  "scope": "Worker Production Binding & Deployment Readiness Audit (Repaired)",
   "readOnly": true,
   "readinessResult": "BLOCKED_BY_EXPLICIT_PREREQUISITES",
-  "status": "A12B2C5U34B_WORKER_PRODUCTION_BINDING_DEPLOYMENT_READINESS_AUDITED",
-  "finalStatus": "A12B2C5U34B_WORKER_PRODUCTION_BINDING_DEPLOYMENT_READINESS_AUDITED",
+  "status": "A12B2C5U34B_WORKER_PRODUCTION_BINDING_DEPLOYMENT_READINESS_REPAIRED",
+  "finalStatus": "A12B2C5U34B_WORKER_PRODUCTION_BINDING_DEPLOYMENT_READINESS_REPAIRED",
   "independentReviewRequired": true,
+  "sealed": false,
   "sourceFilesInspected": [
     "worker/index.ts",
     "worker/env.ts",
@@ -22,82 +23,46 @@
     "wrangler.jsonc",
     "package.json"
   ],
-  "testsExecuted": 2508,
-  "testResults": "PASS",
-  "typecheckResult": "PASS",
-  "buildResult": "PASS",
-  "currentState": {
-    "workerBuildPassing": true,
-    "workerTypecheckPassing": true,
-    "workerMainEntry": "worker/index.ts",
-    "compatibilityDate": "2026-08-24",
-    "compatibilityFlags": [
-      "nodejs_compat"
-    ],
-    "assetsDirectory": "./dist",
-    "assetsBinding": "ASSETS",
-    "runWorkerFirst": [
-      "/api/*"
-    ],
-    "d1BindingConfiguredWithPlaceholder": true,
-    "accessVariablesConfigured": false,
-    "productionSecretsConfiguredInRepo": false,
-    "operationalRouteEnabled": false,
-    "operationalIngressReady": false,
-    "liveExecutionEnabled": false
+  "executionVerification": {
+    "repairAgentExecutionVerified": true,
+    "independentReviewerExecutionVerified": false,
+    "typecheckCommand": "npm run typecheck (tsc --noEmit)",
+    "typecheckResult": "PASS (0 errors)",
+    "buildCommand": "npm run build (vite build)",
+    "buildResult": "PASS (0 errors)",
+    "testCommand": "npm test (vitest run)",
+    "testSuitesTotal": 62,
+    "testSuitesPassed": 62,
+    "testsTotal": 2508,
+    "testsPassed": 2508,
+    "testsFailed": 0
   },
-  "deploymentPrerequisites": [
-    "PREREQ_DEPLOY_1_D1_DATABASE_PROVISIONED",
-    "PREREQ_DEPLOY_2_D1_MIGRATIONS_APPLIED",
-    "PREREQ_DEPLOY_3_WRANGLER_D1_UUID_CONFIGURED",
-    "PREREQ_DEPLOY_4_ACCESS_RUNTIME_VARS_CONFIGURED",
-    "PREREQ_DEPLOY_5_PRODUCTION_KMS_SECRETS_PROVISIONED",
-    "PREREQ_DEPLOY_6_SOURCE_PROVENANCE_BUNDLE_HASH_CAPTURED"
-  ],
+  "secretBoundarySpecification": {
+    "productionSecretsMayBeRequiredForOtherCapabilities": true,
+    "productionSecretsRequiredForProviderFreeDormantDeployment": false,
+    "deepSeekApiKeyRequiredForDormantDeployment": false,
+    "deepSeekApiKeyProvisioningDeferred": true,
+    "kmsAuditSecretsRequiredForDormantOperationalRouteVerification": false,
+    "explanation": "Dormant operational route (/api/ops/canary/deepseek-certification) evaluates route barriers and fails closed with HTTP 404 NOT_FOUND before invoking any KMS, audit hash, or DeepSeek API key capabilities. Therefore, provider secrets are not prerequisites for provider-free dormant deployment."
+  },
   "blockingPrerequisites": [
     "PREREQ_DEPLOY_1_D1_DATABASE_PROVISIONED",
     "PREREQ_DEPLOY_2_D1_MIGRATIONS_APPLIED",
-    "PREREQ_DEPLOY_3_WRANGLER_D1_UUID_CONFIGURED",
-    "PREREQ_DEPLOY_4_ACCESS_RUNTIME_VARS_CONFIGURED",
-    "PREREQ_DEPLOY_5_PRODUCTION_KMS_SECRETS_PROVISIONED"
+    "PREREQ_DEPLOY_3_REAL_D1_UUID_AVAILABLE_FOR_LANE_C_CONFIG",
+    "PREREQ_DEPLOY_4_ACCESS_RUNTIME_VARS_PREPARED",
+    "PREREQ_DEPLOY_5_EXACT_DEPLOYABLE_WORKER_BUNDLE_CAPTURED"
   ],
-  "bindingSpecifications": {
-    "d1Binding": {
-      "name": "DB",
-      "type": "D1Database",
-      "targetDb": "velnar-production-db"
-    },
-    "nonSecretVars": [
-      {
-        "key": "ENVIRONMENT",
-        "value": "production"
-      },
-      {
-        "key": "ALLOWED_ORIGINS",
-        "value": "https://app.velnar.studio,https://velnar.studio"
-      },
-      {
-        "key": "CLOUDFLARE_ACCESS_TEAM_DOMAIN",
-        "value": "https://velnar.cloudflareaccess.com"
-      },
-      {
-        "key": "CLOUDFLARE_ACCESS_AUD",
-        "value": "<64-char-aud-from-5u33e>"
-      }
-    ],
-    "productionSecrets": [
-      "VELNAR_MASTER_KMS_SECRET",
-      "AUDIT_IP_HASH_SECRET",
-      "DEEPSEEK_API_KEY"
-    ]
-  },
-  "deploymentExecutionChain": {
-    "step1_preBuildVerification": "Ensure working tree clean at reviewed commit and tsc --noEmit passes",
-    "step2_buildExecution": "Run npm run build (vite build) to generate ./dist static assets",
-    "step3_bundleHashCapture": "Compute SHA-256 hash of dist/ and compiled worker output",
-    "step4_secretsVerification": "Verify via wrangler secret list (non-disclosing) that production secrets exist",
-    "step5_dormantDeploy": "Deploy Worker via wrangler deploy without route gate activation",
-    "step6_postDeployVerification": "Verify deployment version ID, health check endpoint (/api/health), and dormant operational route (returns 404)"
+  "sourceProvenancePlan": {
+    "classification": "SOURCE_PROVENANCE_PREPARATION_ONLY",
+    "runtimeSourceProvenanceTrustAnchorProvisioned": false,
+    "step1_pinCommitTree": "Pin exact reviewed Git commit and tree",
+    "step2_pinWrangler": "Pin exact Wrangler CLI version",
+    "step3_dryRunBundleExtraction": "Execute wrangler deploy --dry-run --outdir <isolated-output-directory>",
+    "step4_emittedModuleManifest": "Capture complete emitted Worker bundle and module manifest",
+    "step5_deterministicHash": "Compute deterministic SHA-256 digest over emitted Worker deployment bundle",
+    "step6_separateAssetDigest": "Record Vite ./dist asset bundle digest separately from Worker script bundle digest",
+    "step7_deployMetadataCapture": "Capture Cloudflare Worker deployment version ID at deployment time",
+    "step8_postDeployLinkage": "Verify cryptographic linkage between reviewed bundle digest and deployed version"
   },
   "deploymentNonClaims": {
     "deploymentImpliesRouteActive": false,
@@ -117,13 +82,19 @@
     "HUMAN_APPROVAL_WORKER_PRODUCTION_DEPLOYMENT"
   ],
   "rollbackPlan": {
-    "rollbackTarget": "Immediate rollback to previous Worker deployment version via wrangler rollback or redeploying prior commit",
-    "triggerSet": [
-      "Health check /api/health fails or returns non-200",
-      "Operational route does not return 404 (dormancy leak)",
-      "Database binding DB fails initialization",
+    "rollbackTarget": "Immediate rollback to prior deployment version via wrangler rollback",
+    "triggers": [
+      "Public health endpoint /api/health fails or returns non-200",
+      "Operational route /api/ops/canary/deepseek-certification leaks non-404 status",
+      "D1 binding DB fails initialization",
       "Asset serving ASSETS returns 500"
     ]
+  },
+  "independentReviewFindingClosure": {
+    "UNPROVEN_SECRET_PREREQUISITE": "CLOSED: Removed KMS and audit secrets as unconditional prerequisites for provider-free dormant deployment.",
+    "EARLY_DEEPSEEK_SECRET_PROVISIONING": "CLOSED: Explicitly deferred DEEPSEEK_API_KEY provisioning to dedicated live provider secret phase.",
+    "INSUFFICIENT_SOURCE_PROVENANCE_ARTIFACT": "CLOSED: Replaced Vite dist hashing with Wrangler dry-run bundle extraction and separate asset/worker digest manifests.",
+    "TEST_BUILD_INDEPENDENCE_OVERCLAIM": "CLOSED: Separated repairAgentExecutionVerified (true) from independentReviewerExecutionVerified (false)."
   },
   "canonicalSafetyReadinessLedger": {
     "1_PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
@@ -148,6 +119,7 @@
     "cloudflareMutations": 0,
     "d1RealCalls": 0,
     "workerDeployments": 0,
+    "secretMutations": 0,
     "gateFlipOperations": 0
   },
   "nonClaims": {
@@ -155,6 +127,7 @@
     "ingressReady": false,
     "humanAccessPolicyProvisioned": false,
     "humanIdentityEnrolled": false,
+    "customDomainProvisioned": false,
     "dnsProvisioned": false,
     "d1DatabaseCreated": false,
     "d1ProductionBound": false,
