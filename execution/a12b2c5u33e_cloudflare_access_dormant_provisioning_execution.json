@@ -1,6 +1,6 @@
 {
   "phase": "A.12B.2C-5U.3.3E",
-  "artifactType": "CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION",
+  "artifactType": "CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_SEAL",
   "repository": "https://github.com/kayrastos/updated-velnaar",
   "branch": "main",
   "timestamp": "2026-09-08T03:50:00.000Z",
@@ -60,8 +60,8 @@
   "operationalIngressReady": false,
   "liveExecutionEnabled": false,
   "liveExecutionState": "BLOCKED_PENDING_CERTIFICATION",
-  "independentReviewRequired": true,
-  "finalStatus": "A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+  "independentReviewRequired": false,
+  "finalStatus": "A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED",
   "callAudit": {
     "cloudflareReadCalls": 9,
     "cloudflareAccessApplicationCreateCalls": 1,
@@ -88,6 +88,7 @@
   },
   "nonClaims": {
     "cloudflareAccessFullyProvisioned": false,
+    "cloudflareAccessFullyActivated": false,
     "humanAccessAllowPolicyCreated": false,
     "humanOperationalIdentityEnrolled": false,
     "serviceTokenProvisioned": false,
@@ -97,6 +98,26 @@
     "operationalRouteActive": false,
     "operationalIngressReady": false,
     "canaryExecutionUnblocked": false,
-    "productionRoutingEnforcementAllowed": false
-  }
+    "productionRoutingEnforcementAllowed": false,
+    "d1ProductionBound": false,
+    "trustAnchorProvisioned": false,
+    "sourceProvenanceAnchorProvisioned": false
+  },
+  "status": "A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED",
+  "phase5U33ESealed": true,
+  "sealed": true,
+  "independentFinalReviewPassed": true,
+  "independentFinalReviewVerdict": "A12B2C5U33E_INDEPENDENT_REVIEW_APPROVED_FOR_SEAL_PREPARATION",
+  "sealApprovedAtCommit": "ca256235d9a4d5c931c82ec1f5db951b45fbe1bd",
+  "sealApprovedAtTree": "9aa4c06b8a55b5b827e051cd6306a06e28ea3c72",
+  "remainingSecurityFindings": 0,
+  "remainingArchitectureFindings": 0,
+  "remainingProviderContractFindings": 0,
+  "remainingMaterialEvidenceFindings": 0,
+  "remainingMaterialPrivacyFindings": 0,
+  "nonBlockingPrivacyMinimizationFindings": 1,
+  "currentProviderStateIndependentlyVerified": true,
+  "providerExternalDriftDetected": false,
+  "historicalExecutionCountersIndependentlyReplayProvable": false,
+  "historicalExecutionCounterVerificationClassification": "HISTORICAL_EXECUTION_COUNTERS_EVIDENCE_CONSISTENT_BUT_NOT_INDEPENDENTLY_REPLAY_PROVABLE"
 }
