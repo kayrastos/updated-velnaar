@@ -1,0 +1,114 @@
+{
+  "artifact": "VELNAR_SEGMENT_C_PROVIDER_PREFLIGHT_V1",
+  "status": "PASS_SEGMENT_C_PROVIDER_PREFLIGHT",
+  "SEGMENT_C_PROVIDER_PREFLIGHT_CANONICAL_SEAL_ELIGIBLE": true,
+  "identity": {
+    "branch": "feat/segment-c-provider-preflight-v1",
+    "canonicalBaseHead": "9acd7436dd2604800ad96a42f220559c35bdb60b",
+    "canonicalBaseTree": "154a4647ac850bfc9d2377264b9583cc055f6906",
+    "SEGMENT_B_GATE2_CANONICAL": true
+  },
+  "callAccounting": {
+    "MAX_PROVIDER_CALLS": 2,
+    "TOTAL_PROVIDER_CALLS_EXECUTED": 1,
+    "DEEPSEEK_CALLS_EXECUTED": 1,
+    "GEMINI_CALLS_EXECUTED": 0,
+    "ADDITIONAL_PROVIDER_CALLS_AUTHORIZED": 0,
+    "CLIENT_RETRIES": 0,
+    "AUTOMATIC_RERUNS": 0,
+    "CROSS_PROVIDER_FALLBACKS": 0,
+    "CONCURRENCY": 1
+  },
+  "deepseek": {
+    "status": "DEEPSEEK_PREFLIGHT_SUCCESS",
+    "PUBLIC_METADATA_VERIFIED": true,
+    "CREDENTIAL_USABILITY_VERIFIED": true,
+    "API_ENDPOINT_REACHABILITY_VERIFIED": true,
+    "MODEL_ID_EXECUTION_TIME_VERIFIED": true,
+    "BACKEND_VERSION_EXECUTION_TIME_VERIFIED": false,
+    "PRICING_DOCUMENTATION_VERIFIED": true,
+    "HTTP_SUCCESS": true,
+    "LATENCY_MS": 1190,
+    "DISPATCH_UTC": "2026-09-08T21:01:23.7660185Z",
+    "PRICING_WINDOW": "OFF_PEAK",
+    "REQUESTED_MODEL": "deepseek-v4-flash",
+    "RETURNED_MODEL": "deepseek-v4-flash",
+    "MODEL_ID_MATCH": true,
+    "REASONING_EFFORT_REQUESTED": "low",
+    "SYSTEM_FINGERPRINT_PRESENT": true,
+    "PROMPT_TOKENS": 16,
+    "CACHE_HIT_TOKENS": 0,
+    "CACHE_MISS_TOKENS": 16,
+    "OUTPUT_TOKENS": 16,
+    "documentedBackendVersionTarget": "DeepSeek-V4-Flash-0731",
+    "executionTimeBackendVersionProof": false,
+    "systemFingerprintIsNotBackendVersionProof": true,
+    "cost": {
+      "classification": "ESTIMATED_OBSERVED_COST_FROM_TOKEN_USAGE",
+      "providerBillingLedgerTruth": false,
+      "offPeakUsdPerMillionTokens": {
+        "cacheHitInput": 0.007,
+        "cacheMissInput": 0.22,
+        "output": 0.66
+      },
+      "estimatedObservedCostUsd": 0.00001408,
+      "runtimePricingAssumptions": "VALID_FOR_PREFLIGHT_DISPATCH_TIME"
+    },
+    "publicMetadata": {
+      "officialSource": "https://api-docs.deepseek.com/quick_start/pricing/",
+      "upcomingPricingChange2026_09_10_1200Beijing": "NOT_CONFIRMED_FROM_CURRENT_OFFICIAL_DEEPSEEK_MATERIAL",
+      "currentOfficialSchedule": "PEAK_OFF_PEAK_PRICING_EFFECTIVE_2026_08_16T16_00_00Z",
+      "futurePricingChanges": "REQUIRES_SEPARATE_PRICING_UPDATE_REVIEW_BEFORE_EFFECTIVE_TIME"
+    },
+    "persistence": {
+      "RAW_RESPONSE_PERSISTED": false,
+      "RESPONSE_CONTENT_PERSISTED": false,
+      "SECRET_PERSISTED": false,
+      "SYSTEM_FINGERPRINT_VALUE_PERSISTED": false
+    }
+  },
+  "gemini": {
+    "classification": "DORMANT_UNSELECTED_PROVIDER",
+    "currentSpecArchitecture": "CURRENT_SPEC_V12_BACKGROUND_GEMINI_PRESENT",
+    "successorStrategyArchitecture": "SUCCESSOR_DEEPSEEK_ONLY_STRATEGY_GEMINI_DORMANT",
+    "PUBLIC_METADATA_VERIFIED": "UNRESOLVED",
+    "CREDENTIAL_USABILITY_VERIFIED": "UNRESOLVED",
+    "API_ENDPOINT_REACHABILITY_VERIFIED": "UNRESOLVED",
+    "MODEL_ID_EXECUTION_TIME_VERIFIED": "UNRESOLVED",
+    "FLEX_REQUEST_ACCEPTED": "UNRESOLVED",
+    "FLEX_EXECUTION_TIER_VERIFIED": "UNRESOLVED",
+    "activeDeepSeekPathBlockedByGemini": false
+  },
+  "liveAndMutationState": {
+    "CANARY_LIVE_EXECUTION_ENABLED": false,
+    "PRODUCTION_ROUTING_ENABLED": false,
+    "CANARY_LIVE_EXECUTION": false,
+    "WORKER_DEPLOYMENTS": 0,
+    "ROUTE_MUTATIONS": 0,
+    "INGRESS_MUTATIONS": 0,
+    "DNS_MUTATIONS": 0,
+    "D1_MUTATIONS": 0,
+    "CLOUDFLARE_MUTATIONS": 0,
+    "SECRET_MUTATIONS": 0
+  },
+  "safetyFlags": {
+    "RAW_PROVIDER_RESPONSES_PERSISTED": false,
+    "RESPONSE_SEMANTIC_CONTENT_PERSISTED": false,
+    "SECRET_VALUES_PERSISTED": false,
+    "GIT_ADD": false,
+    "COMMIT": false,
+    "PUSH": false
+  },
+  "validation": {
+    "npmRunLint": "PASS",
+    "gate2ReadinessTest": "PASS (1 file, 51 tests)",
+    "jsonParse": "PASS",
+    "gitDiffCheck": "PASS",
+    "expectedRepositoryChanges": "ONLY_TWO_SEGMENT_C_EVIDENCE_ARTIFACTS"
+  },
+  "unresolvedClaims": [
+    "Backend version execution time proof is false; fingerprint presence is not version proof.",
+    "The claimed 2026-09-10 pricing change is not confirmed by current official DeepSeek material.",
+    "Gemini execution-time and Flex claims are unresolved."
+  ]
+}
