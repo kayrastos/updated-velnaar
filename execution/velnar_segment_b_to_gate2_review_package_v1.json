@@ -247,5 +247,31 @@
       "No git push to remote main"
     ],
     "requiredGate2AuthorizationToken": "SEGMENT_C_CONTROLLED_LIVE_CANARY_APPROVED"
+  },
+  "costAccounting": {
+    "totalProviderSpendUsd": 0,
+    "expectedIncrementalCost": "UNRESOLVED",
+    "deepSeekCalls": 0,
+    "geminiCalls": 0,
+    "openAiCalls": 0
+  },
+  "testVerification": {
+    "testSuite": "tests/security/phaseA12B2C5U33Gate2Readiness.test.ts",
+    "testsPassed": 34,
+    "totalTests": 34,
+    "claim": "All 34 defined Gate-2 security tests passed"
+  },
+  "d1CertificationEvidence": {
+    "artifact": "execution/velnar_d1_remote_concurrency_certification_v1.json",
+    "databaseId": "d65abcb3-d8d6-46fb-9403-a97ab54de303",
+    "concurrencyLevel": 5,
+    "verdict": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED_PASS",
+    "canonicalRuntimeBound": false
+  },
+  "surfaceIsolation": {
+    "entrypoint": "worker/canaryOpsWorker.ts",
+    "wranglerConfig": "wrangler.canary-ops.jsonc",
+    "hostIsolation": "Enforced in worker/index.ts (404 for tenant routes on ops.velnar.studio)",
+    "nonCanaryPathsAccessibleOnOpsDomain": false
   }
 }

@@ -28,7 +28,7 @@ Every Gate-2 requirement is classified under its verifiable status:
 | 8 | **Request & Monetary Ceilings** | `PROVEN_TRUE` | `canarySpecification.ts` | 14 total calls max, 7 per provider, 2048 tokens, 50,000 $\mu$USD hard ceiling. |
 | 9 | **Retry & Concurrency Ceilings** | `PROVEN_TRUE` | `canarySpecification.ts` | 1 retry max (503 only), 1 fallback max, concurrency = 1, timeout = 15,000 ms. |
 | 10 | **Kill Switch Architecture** | `PROVEN_TRUE` | `canarySpecification.ts` | 17 canonical event categories terminate fail-closed immediately. |
-| 11 | **Evidence Hashing & Persistence** | `PROVEN_TRUE` | `deepSeekLiveCertificationTransportContract.ts` | Full cryptographic SHA-256 payload and response digest hashing. |
+| 11 | **Evidence Hashing & Persistence** | `IMPLEMENTED_AND_OFFLINE_TESTED_PENDING_LIVE_SEGMENT_C_VERIFICATION` | `deepSeekLiveCertificationTransportContract.ts` | Full cryptographic SHA-256 payload and response digest hashing verified offline; live persistence pending Segment C. |
 | 12 | **Fulgor Verification Requirement** | `PROVEN_TRUE` | `deepSeekSuccessorCertificationStateMachine.ts` | Aggregate semantic score $\ge 0.85$ mandatory; zero schema errors. |
 | 13 | **Human Promotion Gate** | `PROVEN_TRUE` | `deepSeekFirstProviderStrategy.ts` | Zero automatic promotion to production routing; explicit sign-off mandatory. |
 | 14 | **Model Authority Zero Invariant** | `PROVEN_TRUE` | `canarySpecification.ts` | Model outputs are UNTRUSTED CLAIMS; zero authority over IAM, D1, routing. |

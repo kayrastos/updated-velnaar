@@ -119,9 +119,12 @@ Implemented locally in `worker/ai/sovereignBoundary.ts`:
 
 ## 5. Pricing and Spend Accounting
 
-- **Infrastructure Cost Status**: `UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION` (Workers free-tier allowance of 10 D1 databases and 5GB storage applies; account subscriptions endpoint returned authentication error).
-- **AI Provider Spend in Segment B**: **$0.00**
+- **Infrastructure Cost Status**: `UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION` (Workers free-tier allowance of 10 D1 databases and 5GB storage applies; account subscriptions endpoint returned authentication error; expected incremental cost is `UNRESOLVED` pending human billing dashboard review).
+- **AI Provider Spend in Segment B**: Strictly **$0.00**
 - **Live Model API Calls**: Strictly **0** (0 DeepSeek, 0 Gemini, 0 OpenAI).
+- **Evidence Persistence Status**: `IMPLEMENTED_AND_OFFLINE_TESTED_PENDING_LIVE_SEGMENT_C_VERIFICATION` (offline hashing & serialization verified; live persistence to D1 verified upon Segment C authorization).
+- **Test Verification**: 34/34 defined Gate-2 security tests passing (`tests/security/phaseA12B2C5U33Gate2Readiness.test.ts`).
+- **Repository D1 Evidence**: Bound to `execution/velnar_d1_remote_concurrency_certification_v1.json`.
 
 ---
 

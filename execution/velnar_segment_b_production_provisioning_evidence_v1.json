@@ -153,8 +153,8 @@
   "pricingAndBillingStatus": {
     "infrastructureCostStatus": "UNRESOLVED_REQUIRES_PROVISIONING_TIME_CONFIRMATION",
     "billingRisk": "LOW (D1 database within 10 databases / 5GB free allowance; account subscription API endpoint returned auth error)",
-    "expectedIncrementalCost": "$0.00",
-    "aiProviderSpendSegmentB": "$0.00 (Zero calls by design)",
+    "expectedIncrementalCost": "UNRESOLVED (Cloudflare subscription API endpoint returned auth error; D1 operations observed within free tier allowance, but account-level incremental billing impact is unresolved pending billing dashboard confirmation)",
+    "aiProviderSpendSegmentB": "$0.00 (Zero calls by design: 0 DeepSeek, 0 Gemini, 0 OpenAI)",
     "deepSeekCalls": 0,
     "geminiCalls": 0,
     "openAiCalls": 0
@@ -198,5 +198,25 @@
     "accessSubjectVerified": false,
     "superAdminRegistryEnrolled": false,
     "scopeLimitation": "Authorizes recording email as intended operator identity input only; does not authorize policy creation, superadmin mutation, or subject enrollment"
+  },
+  "d1CanonicalReadinessState": {
+    "remoteDatabaseProvisioned": true,
+    "remoteDatabaseSchemaMigrated": true,
+    "concurrencyCertified": true,
+    "D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
+    "rationale": "Remote D1 infrastructure is fully provisioned and certified in Cloudflare, but runtime binding remains fail-closed (false) pending Hard Gate 2 review and authorized deployment."
+  },
+  "evidencePersistenceStatus": {
+    "status": "IMPLEMENTED_AND_OFFLINE_TESTED_PENDING_LIVE_SEGMENT_C_VERIFICATION",
+    "liveEvidencePersistenceVerified": false,
+    "offlineHashingAndPersistenceContractVerified": true,
+    "details": "Evidence hashing and serialization contracts are tested offline; live persistence to D1 is pending authorized Segment C execution."
+  },
+  "testVerification": {
+    "testSuite": "tests/security/phaseA12B2C5U33Gate2Readiness.test.ts",
+    "passedCount": 34,
+    "totalCount": 34,
+    "status": "ALL_DEFINED_GATE2_SECURITY_TESTS_PASSED",
+    "coverageClaim": "34 of 34 defined Gate-2 security tests passing without failures"
   }
 }

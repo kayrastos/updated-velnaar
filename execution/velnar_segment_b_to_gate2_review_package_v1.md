@@ -33,7 +33,7 @@ Segment B (Production Provisioning & Verification) and reconciliation with canon
    - Explicit scope: Records the intended operator identity input. Does NOT authorize Access policy creation, Superadmin registry mutation, subject enrollment, or key generation.
 5. **Sovereign Boundary Runtime Enforcement Implemented & Certified**:
    - `worker/ai/sovereignBoundary.ts` implemented with 10-category mandatory BLACK scanning, raw PII rejection, KMS key rejection, bounded TaskCapsule enforcement, and strict provider destination allowlists.
-   - 21 unit tests in `tests/security/phaseA12B2C5U33Gate2Readiness.test.ts` passing with 100% test coverage.
+   - All 34 defined security tests in `tests/security/phaseA12B2C5U33Gate2Readiness.test.ts` passing without failures.
 6. **All Runtime Safety Gates Maintained Strictly Fail-Closed**:
    - `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = false`
    - `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = false`
@@ -78,7 +78,7 @@ Segment B (Production Provisioning & Verification) and reconciliation with canon
 | 8 | **Request and Monetary Cost Ceilings** | **PROVEN_TRUE** | Global invocations <= 14, per-provider <= 7, cost ceiling <= $0.05 |
 | 9 | **Retry, Fallback, & Concurrency Ceilings** | **PROVEN_TRUE** | Max 1 retry on 503, max 1 fallback, concurrency strictly 1, 15s timeout |
 | 10 | **Kill Switch Architecture** | **PROVEN_TRUE** | 17 canonical event categories fail-closed immediately |
-| 11 | **Evidence Hashing & Persistence** | **PROVEN_TRUE (SPEC & CODE)** | Hashing and persistence contracts ready for live Segment C recording |
+| 11 | **Evidence Hashing & Persistence** | **IMPLEMENTED_AND_OFFLINE_TESTED_PENDING_LIVE_SEGMENT_C_VERIFICATION** | Hashing and persistence contracts verified offline; live recording pending Segment C authorization |
 | 12 | **Human Promotion Gate** | **HOLD FOR APPROVAL** | Awaiting human approval token `SEGMENT_C_CONTROLLED_LIVE_CANARY_APPROVED` |
 
 ---

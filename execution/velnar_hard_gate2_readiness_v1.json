@@ -84,9 +84,9 @@
     {
       "id": "evidence_hashing_and_persistence",
       "name": "Evidence Hashing & Persistence",
-      "status": "PROVEN_TRUE",
+      "status": "IMPLEMENTED_AND_OFFLINE_TESTED_PENDING_LIVE_SEGMENT_C_VERIFICATION",
       "canonicalSource": "worker/ai/canary/deepSeekLiveCertificationTransportContract.ts",
-      "evidence": "Full SHA-256 payload digest and response object hashing implemented"
+      "evidence": "Full SHA-256 payload digest and response object hashing implemented and verified offline; live persistence to be verified in Segment C upon authorized execution"
     },
     {
       "id": "fulgor_verification_requirement",
@@ -185,5 +185,32 @@
     "liveCallsPermitted": 0,
     "liveCallsExecuted": 0,
     "hardGate2Status": "RECONCILED_PENDING_CONSOLIDATED_HUMAN_DECISIONS_AND_INDEPENDENT_REVIEW"
+  },
+  "costAccounting": {
+    "totalProviderSpendUsd": 0,
+    "expectedIncrementalCost": "UNRESOLVED",
+    "deepSeekCalls": 0,
+    "geminiCalls": 0,
+    "openAiCalls": 0
+  },
+  "d1CertificationEvidence": {
+    "artifact": "execution/velnar_d1_remote_concurrency_certification_v1.json",
+    "databaseId": "d65abcb3-d8d6-46fb-9403-a97ab54de303",
+    "databaseName": "velnar-production-db",
+    "concurrencyLevel": 5,
+    "verdict": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED_PASS",
+    "canonicalRuntimeBound": false
+  },
+  "surfaceIsolation": {
+    "dedicatedCanaryOpsWorker": "worker/canaryOpsWorker.ts",
+    "dedicatedWranglerConfig": "wrangler.canary-ops.jsonc",
+    "hostIsolationWorkerIndex": "Enforced in worker/index.ts (rejects non-canary paths on ops.velnar.studio with 404)",
+    "nonCanaryPathsAccessibleOnOpsDomain": false
+  },
+  "testVerification": {
+    "suite": "tests/security/phaseA12B2C5U33Gate2Readiness.test.ts",
+    "passed": 34,
+    "total": 34,
+    "claim": "All 34 defined Gate-2 security tests passed"
   }
 }
