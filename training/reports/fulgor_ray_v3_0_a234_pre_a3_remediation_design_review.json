@@ -1,0 +1,450 @@
+{
+  "canonical_commit": "b2a3d878d31b3353d32b0eb9f59bbf488182adcb",
+  "canonical_dev30_reuse_authorized": false,
+  "fresh_heldout_execution_authorized": false,
+  "implementation_scope_defined": true,
+  "implementation_scope_phases": {
+    "PHASE_R1_SAFE_OBSERVABILITY": {
+      "authorized_now": false,
+      "description": "Additive typed exceptions, stage reachability flags, sanitized telemetry"
+    },
+    "PHASE_R2_SYNTHETIC_CONTRACT_HARDENING": {
+      "authorized_now": false,
+      "description": "Implementation of synthetic test matrix fixtures and verification"
+    },
+    "PHASE_R3_ADDITIVE_V7_IMPLEMENTATION": {
+      "authorized_now": false,
+      "description": "Creation of additive versioned V7 modules and dataset-neutral runner"
+    },
+    "PHASE_R4_FRESH_HELDOUT_PREP": {
+      "authorized_now": false,
+      "description": "Independent task sampling, dataset hashing, preflight verification"
+    },
+    "PHASE_R5_FRESH_HELDOUT_EXECUTION": {
+      "authorized_now": false,
+      "description": "Gated one-shot execution on fresh held-out dataset under human receipt"
+    }
+  },
+  "item_evaluations": {
+    "REM01_TELEMETRY_EXCEPTION_HIERARCHY": {
+      "additive_implementation_rule": "MUST NOT modify training/fulgor_ray_v3/a234_inference.py, run_fulgor_v3_0_a234_dev30_inference_v6.py, or any existing sealed V1-V6 source files. Existing CandidateOutcome and A234ContractError remain byte-identical. New types must be introduced additively in training/fulgor_ray_v3/a234_contracts_v7.py and training/fulgor_ray_v3/a234_telemetry_v1.py.",
+      "classification": "SAFE_NOW",
+      "compatibility_risk": "None under additive versioning.",
+      "contract_impact": "Neutral. External interfaces preserved.",
+      "determinism_impact": "Neutral. Observational telemetry only.",
+      "false_accept_risk": "None.",
+      "false_reject_risk": "None.",
+      "implementation_complexity": "Low.",
+      "provenance_impact": "Positive. Establishes unambiguous audit trail for failure attribution.",
+      "required_tests": [
+        "Verify additive exception classes, subcode mapping, and zero leakage of raw source snippets or str(exc)."
+      ],
+      "sealed_v1_v6_files_preserved": true,
+      "security_impact": "Positive. Eliminates telemetry ambiguity while strictly preventing semantic code leakage into logs.",
+      "semantic_leakage_mitigation": "Raw str(exc) MUST NOT be persisted by default. Do NOT persist source snippets, model reasoning, replacement code, anchors, full repo paths, or protected semantic text.",
+      "telemetry_impact": "High. Provides stable stage code, failure subcode, slot index, hash-safe ID, booleans for stage progression, and bounded structural metrics.",
+      "title": "Additive Typed Error Hierarchy, Stage Reachability, and Sanitized Telemetry",
+      "versioned_module_names": [
+        "training/fulgor_ray_v3/a234_contracts_v7.py",
+        "training/fulgor_ray_v3/a234_telemetry_v1.py"
+      ],
+      "versioned_module_required": true
+    },
+    "REM02_STRUCTURED_OUTPUT_RECOVERY": {
+      "classification": "NEEDS_SYNTHETIC_PROOF",
+      "compatibility_risk": "Low via additive module.",
+      "contract_impact": "Allows models emitting exact plain JSON or single code fences to normalize safely.",
+      "determinism_impact": "High. Must guarantee deterministic envelope extraction.",
+      "false_accept_risk": "None under rejected prose/fuzzy sub-behaviors.",
+      "false_reject_risk": "Reduced for valid single-fence envelopes.",
+      "implementation_complexity": "Moderate.",
+      "provenance_impact": "Positive. Logs envelope type in recovery provenance.",
+      "required_tests": [
+        "Deterministic tests with plain objects, lowercase/uppercase/generic fences, escaped quotes, braces inside string values, and rejection of multiple objects/prose."
+      ],
+      "sealed_v1_v6_files_preserved": true,
+      "security_impact": "Positive if strictly envelope normalization; high risk if prose extraction or fuzzy repair is permitted.",
+      "sub_evaluations": {
+        "A_plain_exact_single_json_object": {
+          "classification": "SAFE_NOW",
+          "notes": "Outer whitespace trimming remains safe."
+        },
+        "B_exact_lowercase_json_fence": {
+          "classification": "SAFE_NOW",
+          "notes": "Existing conservative V6 behavior."
+        },
+        "C_exact_case_insensitive_json_fence": {
+          "classification": "NEEDS_SYNTHETIC_PROOF",
+          "notes": "Requires synthetic proof that casing variations parse unambiguously."
+        },
+        "D_exact_generic_single_code_fence": {
+          "classification": "NEEDS_SYNTHETIC_PROOF",
+          "notes": "Requires synthetic proof that code fence without tag containing exactly one JSON object parses cleanly."
+        },
+        "E_leading_conversational_prose": {
+          "classification": "REJECT",
+          "notes": "Host must not extract from arbitrary prose."
+        },
+        "F_trailing_conversational_prose": {
+          "classification": "REJECT",
+          "notes": "Host must not ignore trailing text."
+        },
+        "G_first_outermost_balanced_brace_extraction": {
+          "classification": "REJECT",
+          "notes": "Brace scanning is vulnerable to braces in strings, escaped quotes, and nested code."
+        },
+        "H_multiple_json_objects": {
+          "classification": "REJECT",
+          "notes": "Selecting among multiple objects requires non-deterministic guessing."
+        },
+        "I_truncated_json_completion": {
+          "classification": "REJECT",
+          "notes": "Guessing missing braces on truncated output produces corrupt patches."
+        },
+        "J_fuzzy_malformed_json_repair": {
+          "classification": "REJECT",
+          "notes": "Heuristic syntax repair introduces false accepts."
+        }
+      },
+      "telemetry_impact": "Moderate.",
+      "title": "Conservative Multi-Envelope JSON Normalization",
+      "versioned_module_name": "training/fulgor_ray_v3/structured_output_recovery_v2.py",
+      "versioned_module_required": true
+    },
+    "REM03_RUNNER_SLOT_FAULT_ISOLATION": {
+      "classification": "NEEDS_SYNTHETIC_PROOF",
+      "classification_rationale": "Changes pipeline control flow from record-level abort to per-slot independent progression. Promising design, but requires synthetic test proof across all slot combinations before declaration of safety.",
+      "compatibility_risk": "Low via new V7 runner.",
+      "contract_impact": "Internal runner flow; external schemas preserved.",
+      "determinism_impact": "Positive. Prevents slot position collapse and guarantees deterministic slot identity.",
+      "false_accept_risk": "None. Invalid slots remain non-selectable (failure_code recorded, gate=None, score=None).",
+      "false_reject_risk": "Significantly reduced. Single slot failure no longer aborts remaining slots.",
+      "implementation_complexity": "Moderate.",
+      "provenance_impact": "High positive. Preserves distinct slot outcome statuses for slots A, B, and C.",
+      "required_tests": [
+        "slot A invalid, B/C valid",
+        "slot B invalid",
+        "slot C invalid",
+        "all slots invalid",
+        "stable candidate IDs",
+        "stable diversity directives",
+        "exactly bounded generation count",
+        "invalid slot never selectable",
+        "valid slot can still reach host binding/gate",
+        "verifier only invoked for gate-accepted valid slot",
+        "selector cannot confuse missing slot with valid candidate",
+        "all three slot positions preserved in telemetry"
+      ],
+      "sealed_v1_v6_files_preserved": true,
+      "security_impact": "Neutral. Preserves fixed K=3 slot budget and slot directives.",
+      "telemetry_impact": "High. Records per-slot progression flags.",
+      "title": "Per-Slot Candidate Generation Fault Isolation",
+      "versioned_module_name": "run_fulgor_v3_0_a234_inference_v7.py",
+      "versioned_module_required": true
+    },
+    "REM04_CONTEXT_EXPANDED_ANCHOR_DERIVATION": {
+      "classification": "NEEDS_SYNTHETIC_PROOF",
+      "compatibility_risk": "Low.",
+      "contract_impact": "Neutral. Edit coordinates and expected_preimage_sha256 remain bound only to actual edit span.",
+      "determinism_impact": "Strictly deterministic. Symmetric sequential window expansion (w=1, 2, 3).",
+      "false_accept_risk": "None. Anchor must remain globally unique in target file (count == 1).",
+      "false_reject_risk": "Significantly reduced for repetitive code patterns.",
+      "implementation_complexity": "Moderate.",
+      "provenance_impact": "Positive. Records anchor_expansion_window in HostBoundEditProvenance.",
+      "required_tests": [
+        "BOF clamp, EOF clamp, repeated functions fail-closed, adjacent identical blocks, whitespace lines, unicode."
+      ],
+      "sealed_v1_v6_files_preserved": true,
+      "security_impact": "Positive. Preserves unambiguous patch application while eliminating brittleness on repetitive code.",
+      "telemetry_impact": "Moderate.",
+      "title": "Deterministic Context-Expanded Unique Anchor Derivation",
+      "versioned_module_name": "training/fulgor_ray_v3/candidate_host_binding_v2.py",
+      "versioned_module_required": true
+    },
+    "REM05_COORDINATES_AND_NEWLINE_NORMALIZATION": {
+      "classification": "NEEDS_SYNTHETIC_PROOF",
+      "compatibility_risk": "Requires additive schema versioning.",
+      "contract_impact": "Requires new schema version fulgor.semantic_patch_intent.v3.",
+      "determinism_impact": "High. Normalization rules must be 100% deterministic and unambiguous.",
+      "false_accept_risk": "None under rejected fuzzy sub-behaviors.",
+      "false_reject_risk": "Substantially reduced.",
+      "implementation_complexity": "Moderate.",
+      "provenance_impact": "Positive. Records coordinate_convention and trailing_lf_normalized flags.",
+      "required_tests": [
+        "Insert before line 1, insert middle, insert EOF, empty file, replacement without LF, delete null."
+      ],
+      "sealed_v1_v6_files_preserved": true,
+      "security_impact": "Positive if unambiguous; high risk if coordinate guessing is permitted.",
+      "sub_evaluations": {
+        "A_insert_end_line_equals_start_line": {
+          "classification": "NEEDS_SYNTHETIC_PROOF",
+          "notes": "New explicit insert convention where end_line == start_line."
+        },
+        "B_preserve_end_line_equals_start_line_minus_one": {
+          "classification": "SAFE_NOW",
+          "notes": "Compatibility behavior in the new versioned parser."
+        },
+        "C_support_both_insert_conventions": {
+          "classification": "NEEDS_SYNTHETIC_PROOF",
+          "notes": "Only if both map deterministically to the same unambiguous insertion location."
+        },
+        "D_host_side_trailing_lf_append": {
+          "classification": "NEEDS_SYNTHETIC_PROOF",
+          "notes": "Append exactly one LF to non-empty replace/insert; must record trailing_lf_normalized=true and never rewrite content."
+        },
+        "E_delete_null_to_empty_string": {
+          "classification": "NEEDS_SYNTHETIC_PROOF",
+          "notes": "Only in new explicit V3 schema where null is documented as accepted delete representation."
+        },
+        "F_missing_replacement_text_to_empty_string": {
+          "classification": "REJECT",
+          "notes": "Missing required field is ambiguous; host must not invent intent."
+        },
+        "G_coordinate_offset_guessing": {
+          "classification": "REJECT",
+          "notes": "Fuzzy 0-based/1-based guessing risks shifting edits by 1 line."
+        }
+      },
+      "telemetry_impact": "Moderate.",
+      "title": "Intuitive Insert Coordinate Alignment and Replacement Normalization",
+      "versioned_module_name": "training/fulgor_ray_v3/semantic_patch_intent_v3.py",
+      "versioned_module_required": true
+    },
+    "REM06_FRESH_HELDOUT_EVALUATION_POLICY": {
+      "classification": "FRESH_HELDOUT_ONLY",
+      "compatibility_risk": "None.",
+      "contract_impact": "Full protocol governance.",
+      "determinism_impact": "Strictly deterministic pipeline execution.",
+      "false_accept_risk": "None.",
+      "false_reject_risk": "None.",
+      "implementation_complexity": "High operational complexity.",
+      "provenance_impact": "Authoritative. End-to-end cryptographic sealing.",
+      "required_tests": [
+        "Full non-inferencing preflight on fresh dataset before launch authorization."
+      ],
+      "sealed_v1_v6_files_preserved": true,
+      "security_impact": "Critical. Prevents benchmark contamination and overfitting.",
+      "telemetry_impact": "High.",
+      "title": "Permanent Sealing of Canonical DEV30 and Fresh Held-Out Evaluation Protocol",
+      "versioned_module_required": false
+    }
+  },
+  "rejected_subbehaviors": [
+    {
+      "classification": "REJECT",
+      "component": "Structured Output Recovery",
+      "name": "Leading conversational prose extraction",
+      "reason": "Host must not choose semantic payload from an arbitrary mixed-text response. Braces in prose or strings create ambiguity. Recovery is envelope normalization, not semantic object selection.",
+      "subbehavior_id": "REM02-E"
+    },
+    {
+      "classification": "REJECT",
+      "component": "Structured Output Recovery",
+      "name": "Trailing conversational prose extraction",
+      "reason": "Unbounded trailing text creates ambiguity and risks parsing non-canonical or trailing comments. Fail closed preserves safety.",
+      "subbehavior_id": "REM02-F"
+    },
+    {
+      "classification": "REJECT",
+      "component": "Structured Output Recovery",
+      "name": "First/outermost balanced {...} extraction from mixed prose",
+      "reason": "Balanced-brace extraction can be confused by braces inside JSON strings, escaped quotes, nested objects, and code in replacement_text. Strict schema parsing after extraction does not prove selection was unambiguous.",
+      "subbehavior_id": "REM02-G"
+    },
+    {
+      "classification": "REJECT",
+      "component": "Structured Output Recovery",
+      "name": "Multiple JSON objects selection",
+      "reason": "Silently selecting among multiple objects requires non-deterministic heuristic or semantic guessing. Violates fail-closed contract.",
+      "subbehavior_id": "REM02-H"
+    },
+    {
+      "classification": "REJECT",
+      "component": "Structured Output Recovery",
+      "name": "Truncated JSON completion",
+      "reason": "Automatically closing brackets or braces on truncated output guesses missing model intent, generating hallucinated or corrupt patches.",
+      "subbehavior_id": "REM02-I"
+    },
+    {
+      "classification": "REJECT",
+      "component": "Structured Output Recovery",
+      "name": "Fuzzy malformed JSON repair",
+      "reason": "Inserting missing commas or unescaping quotes introduces heuristic non-determinism and false-accept risks.",
+      "subbehavior_id": "REM02-J"
+    },
+    {
+      "classification": "REJECT",
+      "component": "Coordinates / Newline Normalization",
+      "name": "Missing replacement_text on delete -> empty string",
+      "reason": "A missing required property is not an unambiguous representation. The host must not invent missing model intent.",
+      "subbehavior_id": "REM05-F"
+    },
+    {
+      "classification": "REJECT",
+      "component": "Coordinates / Newline Normalization",
+      "name": "0-based / 1-based coordinate guessing or offset correction",
+      "reason": "Fuzzy coordinate guessing risks shifting edits by 1 line, causing silent semantic repository corruption. Model must emit valid 1-based coordinates.",
+      "subbehavior_id": "REM05-G"
+    }
+  ],
+  "remediation_design_review_status": "PASS_PRE_A3_REMEDIATION_DESIGN_REVIEW",
+  "remediation_implementation_authorized": false,
+  "review_classifications": {
+    "REM01_CLASSIFICATION": "SAFE_NOW",
+    "REM02_CLASSIFICATION": "NEEDS_SYNTHETIC_PROOF",
+    "REM03_CLASSIFICATION": "NEEDS_SYNTHETIC_PROOF",
+    "REM04_CLASSIFICATION": "NEEDS_SYNTHETIC_PROOF",
+    "REM05_CLASSIFICATION": "NEEDS_SYNTHETIC_PROOF",
+    "REM06_CLASSIFICATION": "FRESH_HELDOUT_ONLY"
+  },
+  "review_scope": {
+    "canonical_dev30_reuse_authorized": false,
+    "execution_mode": "LOCAL_ONLY_PRE_A3_REMEDIATION_DESIGN_REVIEW",
+    "fresh_heldout_execution_authorized": false,
+    "implementation_authorized": false,
+    "protected_dev30_semantic_output_reviewed": false,
+    "purpose": "Comprehensive architectural, safety, and contract review of proposed remediations REM01-REM06 with rigorous sub-behavior analysis.",
+    "v6_rerun_authorized": false
+  },
+  "safety_flags": {
+    "A4_EXECUTED": false,
+    "CANONICAL_DEV30_REUSE_AUTHORIZED": false,
+    "COMMIT_CREATED": false,
+    "FRESH_HELDOUT_EXECUTION_AUTHORIZED": false,
+    "GCP_USED": false,
+    "GPU_USED": false,
+    "MODEL_INFERENCE_USED": false,
+    "NETWORK_USED": false,
+    "PRODUCTION_CODE_MODIFIED": false,
+    "PROTECTED_DEV30_SEMANTIC_OUTPUT_REVIEWED": false,
+    "PUSH_PERFORMED": false,
+    "RECOVERED_RUNTIME_SOURCE_MODIFIED": false,
+    "REMEDIATION_IMPLEMENTED": false,
+    "SSH_USED": false,
+    "TRAINING_STARTED": false,
+    "V6_RERUN_AUTHORIZED": false,
+    "V6_RERUN_EXECUTED": false
+  },
+  "schema": "fulgor.a234_remediation_design_review.v1",
+  "status": "PASS_PRE_A3_REMEDIATION_DESIGN_REVIEW",
+  "synthetic_test_matrix_design": {
+    "anchor_expansion_tests": [
+      "unique_preimage_window_zero",
+      "repeated_span_unique_with_window_one",
+      "repeated_span_unique_with_window_two",
+      "repeated_span_unique_with_window_three",
+      "unresolvable_duplicate_function_fail_closed",
+      "bof_boundary_expansion_clamp",
+      "eof_boundary_expansion_clamp",
+      "whitespace_only_context_handling"
+    ],
+    "semantic_intent_tests": [
+      "valid_replace_exact_bounds",
+      "insert_convention_end_equals_start",
+      "insert_convention_end_equals_start_minus_one",
+      "insert_before_first_line",
+      "insert_middle_line",
+      "insert_eof_position",
+      "insert_empty_file_handling",
+      "replacement_text_without_trailing_lf_normalized",
+      "delete_with_null_replacement_normalized",
+      "delete_with_empty_string",
+      "rejection_of_missing_replacement_text",
+      "rejection_of_coordinate_guessing",
+      "rejection_of_out_of_bounds_coordinates",
+      "rejection_of_duplicate_edit_spans",
+      "rejection_of_extra_v1_keys"
+    ],
+    "slot_isolation_tests": [
+      "slot_a_invalid_slots_b_c_valid",
+      "slot_b_invalid_slots_a_c_valid",
+      "slot_c_invalid_slots_a_b_valid",
+      "all_slots_invalid",
+      "stable_candidate_ids",
+      "stable_diversity_directives",
+      "bounded_generation_count",
+      "invalid_slot_never_selectable",
+      "valid_slot_reaches_gate",
+      "verifier_only_for_gate_accepted",
+      "selector_missing_slot_handling",
+      "all_three_positions_in_telemetry"
+    ],
+    "structured_output_tests": [
+      "plain_object_without_fences",
+      "lowercase_json_fence_with_newlines",
+      "uppercase_json_fence",
+      "generic_fence_without_tag",
+      "string_containing_braces_and_escaped_quotes",
+      "replacement_text_containing_code_braces",
+      "rejection_of_multiple_top_level_objects",
+      "rejection_of_truncated_unclosed_json",
+      "rejection_of_trailing_comma_syntax_errors",
+      "rejection_of_leading_trailing_prose"
+    ],
+    "telemetry_tests": [
+      "machine_readable_subcode_assignment",
+      "stable_slot_index_preservation",
+      "stage_reachability_milestone_flags",
+      "zero_semantic_snippet_leakage_in_logs",
+      "zero_raw_str_exc_persistence",
+      "unresolved_exception_class_preserved_without_silent_mapping"
+    ]
+  },
+  "v6_rerun_authorized": false,
+  "v7_runner_dataset_separation": {
+    "dataset_separation_rationale": "Canonical DEV30 is permanently frozen and must not be encoded in the V7 runner filename. The V7 runner must be dataset-neutral, receiving its evaluation dataset and manifest path via explicit parameters.",
+    "future_heldout_bindings": [
+      "dataset SHA256",
+      "instance IDs",
+      "repository snapshot identity",
+      "model revision",
+      "adapter hash",
+      "runner hash",
+      "prompt hash",
+      "runtime dependency manifest",
+      "launch receipt"
+    ],
+    "recommended_runner_name": "run_fulgor_v3_0_a234_inference_v7.py",
+    "rejected_runner_name": "run_fulgor_v3_0_a234_dev30_inference_v7.py"
+  },
+  "versioning_strategy": {
+    "planned_additive_components": [
+      {
+        "path": "training/fulgor_ray_v3/a234_contracts_v7.py",
+        "role": "Contracts",
+        "status": "PLANNED"
+      },
+      {
+        "path": "training/fulgor_ray_v3/a234_telemetry_v1.py",
+        "role": "Telemetry",
+        "status": "PLANNED"
+      },
+      {
+        "path": "training/fulgor_ray_v3/stage_contract_prompts_v5.py",
+        "role": "Prompts",
+        "status": "PLANNED"
+      },
+      {
+        "path": "training/fulgor_ray_v3/structured_output_recovery_v2.py",
+        "role": "Recovery",
+        "status": "PLANNED"
+      },
+      {
+        "path": "training/fulgor_ray_v3/semantic_patch_intent_v3.py",
+        "role": "Intent Schema",
+        "status": "PLANNED"
+      },
+      {
+        "path": "training/fulgor_ray_v3/candidate_host_binding_v2.py",
+        "role": "Host Binder",
+        "status": "PLANNED"
+      },
+      {
+        "path": "run_fulgor_v3_0_a234_inference_v7.py",
+        "role": "Runner V7",
+        "status": "PLANNED"
+      }
+    ],
+    "policy": "Strict additive file creation; zero in-place mutation of existing sealed files."
+  }
+}
