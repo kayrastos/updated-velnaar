@@ -12,6 +12,7 @@
 
 - **Database Name**: `velnar-production-db`
 - **Database UUID**: `d65abcb3-d8d6-46fb-9403-a97ab54de303`
+- **Region**: `EEUR`
 - **Binding Name**: `DB`
 - **Execution Mode**: Direct Remote Cloudflare D1 API Query
 - **Started At**: `2026-09-08T03:37:31.922Z`

@@ -6,6 +6,7 @@
   "databaseBinding": "DB",
   "databaseName": "velnar-production-db",
   "databaseId": "d65abcb3-d8d6-46fb-9403-a97ab54de303",
+  "region": "EEUR",
   "startedAt": "2026-09-08T03:37:31.922Z",
   "completedAt": "2026-09-08T03:37:45.177Z",
   "concurrencyLevel": 5,

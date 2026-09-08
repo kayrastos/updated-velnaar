@@ -358,11 +358,11 @@ export class SovereignBoundaryEnforcer {
 
     // 5. GREY / WHITE classification requirements
     if (capsule.classification === 'GREY') {
-      if (!capsule.isSanitized) {
-        errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be explicitly sanitized before outbound dispatch.');
+      if (capsule.isSanitized !== true) {
+        errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be explicitly sanitized before outbound dispatch (isSanitized === true required).');
       }
-      if (!capsule.isMinimized) {
-        errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be strictly minimized to bounded task capsule context.');
+      if (capsule.isMinimized !== true) {
+        errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be strictly minimized to bounded task capsule context (isMinimized === true required).');
       }
     } else if (capsule.classification !== 'WHITE' && capsule.classification !== 'BLACK') {
       errors.push(`UNKNOWN_SOVEREIGN_CLASSIFICATION: ${capsule.classification}`);
@@ -463,11 +463,11 @@ export class SovereignBoundaryEnforcer {
       if (effectiveClassification === 'BLACK') {
         errors.push('SOVEREIGN_BOUNDARY_CLASSIFICATION_BLACK: Request classified as BLACK.');
       } else if (effectiveClassification === 'GREY') {
-        if (params.isSanitized === false) {
-          errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be sanitized before outbound dispatch.');
+        if (params.isSanitized !== true) {
+          errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be explicitly sanitized before outbound dispatch (isSanitized === true required).');
         }
-        if (params.isMinimized === false) {
-          errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be minimized before outbound dispatch.');
+        if (params.isMinimized !== true) {
+          errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be strictly minimized to bounded task context (isMinimized === true required).');
         }
       }
     }

@@ -20,7 +20,7 @@
  * 12. Human promotion mandatory; zero automatic promotion to production.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import canaryOpsWorker from '../../worker/canaryOpsWorker';
 import workerIndex from '../../worker/index';
 
@@ -36,6 +36,9 @@ import {
 import {
   executeProductionWorkerCanaryCertification,
 } from '../../worker/ai/canary/deepSeekProductionWorkerCapabilityBoundary';
+import {
+  BoundedCanaryRunner,
+} from '../../worker/ai/canary/boundedCanaryRunner';
 import {
   CANARY_LIVE_EXECUTION_ENABLED,
   CANARY_LIVE_EXECUTION_STATE,
@@ -334,6 +337,102 @@ describe('Phase A.12B.2C-5U.3.3 Hard Gate 2 Readiness Test Suite', () => {
       expect(violations).toContain('proprietary verification algorithms');
     });
 
+
+    it('2.11 strictly rejects GREY data when isSanitized or isMinimized are omitted, non-boolean, or false', () => {
+      // isSanitized omitted (undefined)
+      const omittedSanitized: any = {
+        version: '1.0',
+        classification: 'GREY',
+        taskType: 'ANOMALY_TRIAGE',
+        payload: { excerpt: 'clean code' },
+        metadata: { taskId: 'task_omitted_1', taskType: 'ANOMALY_TRIAGE' },
+        isMinimized: true,
+      };
+      const val1 = SovereignBoundaryEnforcer.validateOutboundTaskCapsule(
+        omittedSanitized,
+        'deepseek',
+        'https://api.deepseek.com/v1/chat/completions'
+      );
+      expect(val1.ok).toBe(false);
+      expect(val1.errors.some(e => e.includes('GREY_BOUNDARY_VIOLATION'))).toBe(true);
+
+      // isMinimized omitted (undefined)
+      const omittedMinimized: any = {
+        version: '1.0',
+        classification: 'GREY',
+        taskType: 'ANOMALY_TRIAGE',
+        payload: { excerpt: 'clean code' },
+        metadata: { taskId: 'task_omitted_2', taskType: 'ANOMALY_TRIAGE' },
+        isSanitized: true,
+      };
+      const val2 = SovereignBoundaryEnforcer.validateOutboundTaskCapsule(
+        omittedMinimized,
+        'deepseek',
+        'https://api.deepseek.com/v1/chat/completions'
+      );
+      expect(val2.ok).toBe(false);
+      expect(val2.errors.some(e => e.includes('GREY_BOUNDARY_VIOLATION'))).toBe(true);
+
+      // Both omitted
+      const bothOmitted: any = {
+        version: '1.0',
+        classification: 'GREY',
+        taskType: 'ANOMALY_TRIAGE',
+        payload: { excerpt: 'clean code' },
+        metadata: { taskId: 'task_omitted_3', taskType: 'ANOMALY_TRIAGE' },
+      };
+      const val3 = SovereignBoundaryEnforcer.validateOutboundTaskCapsule(
+        bothOmitted,
+        'deepseek',
+        'https://api.deepseek.com/v1/chat/completions'
+      );
+      expect(val3.ok).toBe(false);
+      expect(val3.errors.filter(e => e.includes('GREY_BOUNDARY_VIOLATION')).length).toBe(2);
+
+      // Truthy non-boolean substitutes rejected
+      const truthySubstitute: any = {
+        version: '1.0',
+        classification: 'GREY',
+        taskType: 'ANOMALY_TRIAGE',
+        payload: { excerpt: 'clean code' },
+        metadata: { taskId: 'task_omitted_4', taskType: 'ANOMALY_TRIAGE' },
+        isSanitized: 'yes',
+        isMinimized: 1,
+      };
+      const val4 = SovereignBoundaryEnforcer.validateOutboundTaskCapsule(
+        truthySubstitute,
+        'deepseek',
+        'https://api.deepseek.com/v1/chat/completions'
+      );
+      expect(val4.ok).toBe(false);
+      expect(val4.errors.filter(e => e.includes('GREY_BOUNDARY_VIOLATION')).length).toBe(2);
+    });
+
+    it('2.12 verifies GREY flags are assertions not authority: BLACK data with true/true is categorically rejected', () => {
+      const blackWithTrueFlags: TaskCapsule = {
+        version: '1.0',
+        classification: 'GREY',
+        taskType: 'ANOMALY_TRIAGE',
+        payload: {
+          excerpt: 'normal looking code',
+          embeddedLeak: 'VELNAR_MASTER_KMS_SECRET_PROD', // BLACK
+        },
+        metadata: { taskId: 'task_authority_01', taskType: 'ANOMALY_TRIAGE' },
+        isSanitized: true, // Assertion claim
+        isMinimized: true, // Assertion claim
+      };
+
+      const val = SovereignBoundaryEnforcer.validateOutboundTaskCapsule(
+        blackWithTrueFlags,
+        'deepseek',
+        'https://api.deepseek.com/v1/chat/completions'
+      );
+      expect(val.ok).toBe(false);
+      expect(val.classification).toBe('BLACK');
+      expect(val.safeForOutboundDispatch).toBe(false);
+      expect(val.violatedCategories).toContain('VELNAR master KMS keys');
+    });
+
     it('2.10 detects BLACK material in object keys', () => {
       const keyViolationPayload = {
         'VELNAR_MASTER_KMS_SECRET_PROD': 'value_is_normal',
@@ -478,6 +577,8 @@ describe('Phase A.12B.2C-5U.3.3 Hard Gate 2 Readiness Test Suite', () => {
       expect(d1Report.databaseName).toBe('velnar-production-db');
       expect(d1Report.databaseId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       expect(d1Report.databaseId).toBe('d65abcb3-d8d6-46fb-9403-a97ab54de303');
+      expect(d1Report.region).toBe('EEUR');
+      expect(d1Report.testRunId).toBe('cert_run_1a07f17a810_bb7dfc12');
       expect(d1Report.verdict).toBe('D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED_PASS');
     });
 
@@ -543,14 +644,37 @@ describe('Phase A.12B.2C-5U.3.3 Hard Gate 2 Readiness Test Suite', () => {
       expect(typeof D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe('boolean');
     });
 
-    it('6.3 verifies live evidence persistence status is IMPLEMENTED_AND_OFFLINE_TESTED_PENDING_LIVE_SEGMENT_C_VERIFICATION and zero spend ($0.00)', () => {
-      // Evidence persistence is offline tested, not claimed as live verified
-      const expectedPersistenceStatus = 'IMPLEMENTED_AND_OFFLINE_TESTED_PENDING_LIVE_SEGMENT_C_VERIFICATION';
-      expect(expectedPersistenceStatus).toContain('PENDING_LIVE_SEGMENT_C_VERIFICATION');
+        it('6.3 verifies evidence persistence contract offline testing and zero provider spend without self-assertion', async () => {
+      const provEvidencePath = path.resolve(__dirname, '../../execution/velnar_segment_b_production_provisioning_evidence_v1.json');
+      const provEvidence = JSON.parse(fs.readFileSync(provEvidencePath, 'utf-8'));
 
-      // Zero AI provider spend
-      const totalProviderSpendUsd = 0.0;
-      expect(totalProviderSpendUsd).toBe(0.0);
+      // 1. Evidence persistence is explicitly marked as offline tested pending live Segment C verification
+      expect(provEvidence.evidencePersistenceStatus.status).toBe('IMPLEMENTED_AND_OFFLINE_TESTED_PENDING_LIVE_SEGMENT_C_VERIFICATION');
+      expect(provEvidence.evidencePersistenceStatus.liveEvidencePersistenceVerified).toBe(false);
+      expect(provEvidence.evidencePersistenceStatus.offlineHashingAndPersistenceContractVerified).toBe(true);
+
+      // 2. Incremental cost is truthfully UNRESOLVED, not claimed as $0.00
+      expect(provEvidence.pricingAndBillingStatus.expectedIncrementalCost).toContain('UNRESOLVED');
+
+      // 3. Behavioral verification: invoking capability boundary returns zero network calls and zero cost
+      const mockEnv = {} as any;
+      const res = await executeProductionWorkerCanaryCertification(mockEnv, {}, {});
+      expect(res.providerNetworkCalls).toBe(0);
+      expect(res.credentialReads).toBe(0);
+      expect(res.observedTotalCostMicroUsd).toBe(0);
+      expect(res.authorizedBudgetMicroUsd).toBe(0);
+    });
+
+    it('6.4 enforces epistemic disambiguation: CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE', () => {
+      const provEvidencePath = path.resolve(__dirname, '../../execution/velnar_segment_b_production_provisioning_evidence_v1.json');
+      const provEvidence = JSON.parse(fs.readFileSync(provEvidencePath, 'utf-8'));
+
+      expect(provEvidence.providerStateDisambiguation.principle).toBe('CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE');
+      expect(provEvidence.providerStateDisambiguation.cloudflareAccessProviderStateVerificationFrom5U33E).toBe('VERIFIED_AT_SEALED_5U33E_SNAPSHOT');
+      expect(provEvidence.providerStateDisambiguation.aiProviderExecutionTimeStateVerified).toBe(false);
+      expect(provEvidence.providerStateDisambiguation.deepSeekExecutionTimeRevalidationRequired).toBe(true);
+      expect(provEvidence.providerStateDisambiguation.geminiExecutionTimeRevalidationRequired).toBe(true);
+      expect(provEvidence.providerStateDisambiguation.currentAIProviderCertificationStatus).toBe('UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT');
     });
   });
 
@@ -616,6 +740,57 @@ describe('Phase A.12B.2C-5U.3.3 Hard Gate 2 Readiness Test Suite', () => {
     });
   });
 
+
+    it('7.5 validateOutboundProviderRequest strictly rejects GREY direct requests when isSanitized or isMinimized are omitted or non-boolean', () => {
+      // isSanitized omitted
+      const res1 = SovereignBoundaryEnforcer.validateOutboundProviderRequest({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        payload: { snippet: 'code' },
+        classification: 'GREY',
+        isMinimized: true,
+      });
+      expect(res1.ok).toBe(false);
+      expect(res1.errors.some(e => e.includes('GREY_BOUNDARY_VIOLATION'))).toBe(true);
+
+      // isMinimized omitted
+      const res2 = SovereignBoundaryEnforcer.validateOutboundProviderRequest({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        payload: { snippet: 'code' },
+        classification: 'GREY',
+        isSanitized: true,
+      });
+      expect(res2.ok).toBe(false);
+      expect(res2.errors.some(e => e.includes('GREY_BOUNDARY_VIOLATION'))).toBe(true);
+
+      // Both omitted
+      const res3 = SovereignBoundaryEnforcer.validateOutboundProviderRequest({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        payload: { snippet: 'code' },
+        classification: 'GREY',
+      });
+      expect(res3.ok).toBe(false);
+      expect(res3.errors.filter(e => e.includes('GREY_BOUNDARY_VIOLATION')).length).toBe(2);
+
+      // Valid true/true passes when payload is clean
+      const res4 = SovereignBoundaryEnforcer.validateOutboundProviderRequest({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        payload: { snippet: 'clean snippet' },
+        classification: 'GREY',
+        isSanitized: true,
+        isMinimized: true,
+      });
+      expect(res4.ok).toBe(true);
+      expect(res4.safeForOutboundDispatch).toBe(true);
+    });
+
   // ==========================================================================
   // GROUP 8: SURFACE ISOLATION & DEDICATED CANARY OPS WORKER
   // ==========================================================================
@@ -676,4 +851,217 @@ describe('Phase A.12B.2C-5U.3.3 Hard Gate 2 Readiness Test Suite', () => {
       expect(jsonHealth.error).toBe('NOT_FOUND');
     });
   });
+
+  // ==========================================================================
+  // GROUP 9: TRANSPORT MOCK NETWORK COUNTER & RETRY/FALLBACK REVALIDATION
+  // ==========================================================================
+  describe('Group 9: Transport Mock Network Counter & Retry/Fallback Revalidation', () => {
+    it('9.1 current production fail-closed gates guarantee mock network calls remain strictly 0 even with valid input', async () => {
+      const mockFetch = vi.fn();
+
+      // Attempt 1: BoundedCanaryRunner with mocked customFetch fails closed at Gate 0
+      const dryRunRes = await BoundedCanaryRunner.executeDryRunPlan({
+        customFetch: mockFetch as any,
+      });
+      expect(dryRunRes.executionMode).toBe('DRY_RUN_READINESS_VERIFICATION');
+      expect(mockFetch).not.toHaveBeenCalled();
+
+      // Attempt 2: BoundedCanaryRunner.executeLiveCanary with mockFetch fails closed at Gate 0
+      const liveRes = await BoundedCanaryRunner.executeLiveCanary({
+        phase: 'A.12B.2C-5B',
+        humanApproval: {
+          approvedBy: 'operator@velnar.studio',
+          approvalTimestamp: new Date().toISOString(),
+          targetPhase: 'A.12B.2C-5B',
+          approvalToken: 'TOKEN_VALID_MOCK',
+          maxBudgetUsd: 0.05,
+          environmentTarget: 'CONTROLLED_CANARY',
+          specificationVersion: 'v1.2',
+          sourceCommitSha: 'commit_sha_mock',
+          runNonce: 'nonce_mock',
+        },
+        customFetch: mockFetch as any,
+      });
+      expect(liveRes.summaryCounts.executedInvocations).toBe(0);
+      expect(liveRes.overallStatus).toBe('CANARY_KILL_SWITCH_TERMINATED');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('9.2 pre-dispatch sovereign boundary barrier blocks mocked network dispatch for invalid payloads', async () => {
+      let mockDispatchedCalls = 0;
+      const mockDispatcher = async (url: string, init: any) => {
+        mockDispatchedCalls++;
+        return new Response(JSON.stringify({ ok: true }));
+      };
+
+      // Helper simulating transport dispatch loop with sovereign boundary enforcement
+      async function executeTransportAttempt(params: any) {
+        const check = SovereignBoundaryEnforcer.validateOutboundProviderRequest(params);
+        if (!check.ok) {
+          return { success: false, calls: 0, errors: check.errors };
+        }
+        await mockDispatcher(params.destinationUrl, { method: 'POST', body: params.serializedBody });
+        return { success: true, calls: 1, errors: [] };
+      }
+
+      // Case A: BLACK payload -> 0 calls
+      const resBlack = await executeTransportAttempt({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        payload: { secret: 'VELNAR_MASTER_KMS_SECRET_PROD' },
+        classification: 'WHITE',
+      });
+      expect(resBlack.success).toBe(false);
+      expect(mockDispatchedCalls).toBe(0);
+
+      // Case B: GREY with omitted isSanitized -> 0 calls
+      const resGreyOmitted = await executeTransportAttempt({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        payload: { snippet: 'code' },
+        classification: 'GREY',
+        isMinimized: true,
+      });
+      expect(resGreyOmitted.success).toBe(false);
+      expect(mockDispatchedCalls).toBe(0);
+
+      // Case C: GREY with isMinimized: false -> 0 calls
+      const resGreyUnmin = await executeTransportAttempt({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        payload: { snippet: 'code' },
+        classification: 'GREY',
+        isSanitized: true,
+        isMinimized: false,
+      });
+      expect(resGreyUnmin.success).toBe(false);
+      expect(mockDispatchedCalls).toBe(0);
+
+      // Case D: Oversized body -> 0 calls
+      const resOversized = await executeTransportAttempt({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        serializedBody: 'x'.repeat(MAX_TASK_CAPSULE_BYTES + 100),
+        classification: 'WHITE',
+      });
+      expect(resOversized.success).toBe(false);
+      expect(mockDispatchedCalls).toBe(0);
+
+      // Case E: Prohibited destination -> 0 calls
+      const resDest = await executeTransportAttempt({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.openai.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        payload: { sample: 'test' },
+        classification: 'WHITE',
+      });
+      expect(resDest.success).toBe(false);
+      expect(mockDispatchedCalls).toBe(0);
+
+      // Case F: Fully valid clean payload -> reaches mock dispatcher
+      const resValid = await executeTransportAttempt({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        payload: { sample: 'clean test fixture' },
+        classification: 'WHITE',
+      });
+      expect(resValid.success).toBe(true);
+      expect(mockDispatchedCalls).toBe(1);
+    });
+
+    it('9.3 retry and cross-provider fallback independently revalidate through sovereign boundary', async () => {
+      let fallbackNetworkCalls = 0;
+      const fallbackDispatcher = async (url: string, init: any) => {
+        fallbackNetworkCalls++;
+        return new Response(JSON.stringify({ ok: true }));
+      };
+
+      // Scenario: Primary attempt passed boundary, but failed with 503 HTTP
+      const primaryAttempt = SovereignBoundaryEnforcer.validateOutboundProviderRequest({
+        provider: 'deepseek',
+        destinationUrl: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-v4-flash',
+        payload: { query: 'test' },
+        classification: 'WHITE',
+      });
+      expect(primaryAttempt.ok).toBe(true);
+
+      // Fallback candidate must independently revalidate:
+      // If fallback descriptor specifies an uncertified endpoint or model, it CANNOT reuse primary approval
+      const invalidFallback = SovereignBoundaryEnforcer.validateOutboundProviderRequest({
+        provider: 'gemini',
+        destinationUrl: 'https://generativelanguage.googleapis.com/v1beta/unapproved_endpoint', // Invalid endpoint!
+        model: 'gemini-3.5-flash-lite',
+        payload: { query: 'test' },
+        classification: 'WHITE',
+      });
+      expect(invalidFallback.ok).toBe(false);
+
+      if (invalidFallback.ok) {
+        await fallbackDispatcher('https://generativelanguage.googleapis.com/v1beta/unapproved_endpoint', {});
+      }
+      expect(fallbackNetworkCalls).toBe(0);
+
+      // If fallback candidate is valid, independent revalidation succeeds
+      const validFallback = SovereignBoundaryEnforcer.validateOutboundProviderRequest({
+        provider: 'gemini',
+        destinationUrl: 'https://generativelanguage.googleapis.com/v1beta/interactions',
+        model: 'gemini-3.5-flash-lite',
+        payload: { query: 'test' },
+        classification: 'WHITE',
+      });
+      expect(validFallback.ok).toBe(true);
+      if (validFallback.ok) {
+        await fallbackDispatcher('https://generativelanguage.googleapis.com/v1beta/interactions', {});
+      }
+      expect(fallbackNetworkCalls).toBe(1);
+    });
+  });
+
+  // ==========================================================================
+  // GROUP 10: BATCH R1 ARCHITECTURE RECONCILIATION
+  // ==========================================================================
+  describe('Group 10: Batch R1 Architecture Reconciliation', () => {
+    it('10.1 reconciles Batch R1 planning audits with dedicated canary-only worker architecture', () => {
+      const r1Path = path.resolve(__dirname, '../../execution/velnar_production_readiness_batch_r1_reconciliation_v1.json');
+      expect(fs.existsSync(r1Path)).toBe(true);
+
+      const r1 = JSON.parse(fs.readFileSync(r1Path, 'utf-8'));
+      expect(r1.canonicalBatch).toBe('78ce5cc93c2bba621e5794118c22136563f1977c');
+      expect(r1.classification).toBe('CANONICAL_READINESS_AUDIT_RECONCILED_WITH_POST_REVIEW_SECURITY_ARCHITECTURE');
+      expect(r1.verdict).toBe('BATCH_R1_RECONCILED_POST_REVIEW_SECURITY_ARCHITECTURE_MAINTAINED');
+    });
+
+    it('10.2 preserves canonical safety facts from R1 audits', () => {
+      const r1Path = path.resolve(__dirname, '../../execution/velnar_production_readiness_batch_r1_reconciliation_v1.json');
+      const r1 = JSON.parse(fs.readFileSync(r1Path, 'utf-8'));
+
+      expect(r1.canonicalSafetyFactsPreserved.cloudflareAccessDormant).toBe(true);
+      expect(r1.canonicalSafetyFactsPreserved.cloudflareAccessPoliciesCount).toBe(0);
+      expect(r1.canonicalSafetyFactsPreserved.cloudflareAccessHumanIdentityEnrolled).toBe(false);
+      expect(r1.canonicalSafetyFactsPreserved.dnsOrCustomDomainAbsent).toBe(true);
+      expect(r1.canonicalSafetyFactsPreserved.productionCanaryOperationalRouteEnabled).toBe(false);
+      expect(r1.canonicalSafetyFactsPreserved.productionCanaryOperationalIngressAuthReady).toBe(false);
+      expect(r1.canonicalSafetyFactsPreserved.canaryLiveExecutionEnabled).toBe(false);
+      expect(r1.canonicalSafetyFactsPreserved.productionRoutingEnforcementAllowed).toBe(false);
+      expect(r1.canonicalSafetyFactsPreserved.d1ReplayBackendProductionBound).toBe(false);
+      expect(r1.canonicalSafetyFactsPreserved.trustAnchorsProvisioned).toBe(false);
+    });
+
+    it('10.3 confirms superseded pre-repair implementation assumptions are replaced by post-review security architecture', () => {
+      const r1Path = path.resolve(__dirname, '../../execution/velnar_production_readiness_batch_r1_reconciliation_v1.json');
+      const r1 = JSON.parse(fs.readFileSync(r1Path, 'utf-8'));
+
+      expect(r1.preRepairAssumptionsSupersededBySecurityArchitecture.broadPlatformWorkerAsOpsTarget.repairedDesign).toContain('Dedicated velnar-canary-ops-worker');
+      expect(r1.preRepairAssumptionsSupersededBySecurityArchitecture.broadRoutingPattern.repairedDesign).toContain('/api/ops/canary/deepseek-certification');
+      expect(r1.preRepairAssumptionsSupersededBySecurityArchitecture.genericWranglerConfigRouteBinding.repairedDesign).toContain('wrangler.canary-ops.jsonc');
+      expect(r1.preRepairAssumptionsSupersededBySecurityArchitecture.manualCnameGuessing.repairedDesign).toContain('Worker Custom Domain');
+    });
+  });
+
 });
