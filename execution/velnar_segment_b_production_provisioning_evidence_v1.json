@@ -1,17 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "v1.0-segment-b",
+  "version": "v1.1-segment-b-reconciled",
   "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
   "segment": "SEGMENT B — PRODUCTION PROVISIONING & VERIFICATION",
   "timestamp": "2026-09-08T03:42:00.000Z",
   "reviewedGate1Lineage": {
     "reviewedCommit": "e819471b57d37574f757a1f1d678b0169b02a8fc",
     "reviewedTree": "b32a0716588b795363126a3dac9db8420d5f69bf",
-    "canonicalMainCommit": "5f19cbc2f3a8be9ba68f5404c437392a70db4245",
+    "canonicalMainCommit": "ca256235d9a4d5c931c82ec1f5db951b45fbe1bd",
     "gate1ReviewVerdict": "VELNAR_PRELIVE_GATE1_INDEPENDENT_REREVIEW_PASS",
     "gate1ReviewFindings": "NONE",
     "humanAuthorizationTokenSupplied": "SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED",
-    "segmentBExecutionAllowed": true
+    "segmentBExecutionAllowed": true,
+    "reconciledCanonicalPhase": "A.12B.2C-5U.3.3E"
   },
   "preMutationDiscovery": {
     "cloudflareAccount": {
@@ -42,10 +43,23 @@
         "createdOn": "2026-08-23T12:55:21.287062Z",
         "modifiedOn": "2026-09-07T15:05:11.735991Z",
         "bindings": [
-          { "name": "ASSETS", "type": "assets" },
-          { "name": "DB", "type": "d1", "database_id": "8e0583cb-d5b8-4d1c-bfcd-b2b277ca381c" },
-          { "name": "IYZICO_API_KEY", "type": "secret_text" },
-          { "name": "IYZICO_SECRET_KEY", "type": "secret_text" }
+          {
+            "name": "ASSETS",
+            "type": "assets"
+          },
+          {
+            "name": "DB",
+            "type": "d1",
+            "database_id": "8e0583cb-d5b8-4d1c-bfcd-b2b277ca381c"
+          },
+          {
+            "name": "IYZICO_API_KEY",
+            "type": "secret_text"
+          },
+          {
+            "name": "IYZICO_SECRET_KEY",
+            "type": "secret_text"
+          }
         ]
       }
     ],
@@ -58,7 +72,26 @@
       "existingAccessApplicationsCount": 0,
       "existingCustomIdps": [],
       "existingCustomIdpsCount": 0,
-      "defaultIdp": "Cloudflare OTP (One-Time PIN)"
+      "defaultIdp": "Cloudflare OTP (One-Time PIN)",
+      "accessApplicationExists": true,
+      "accessApplicationSource": "CANONICAL_5U33E",
+      "accessApplicationDetails": {
+        "name": "VELNAR Operational Canary — Dormant",
+        "type": "self_hosted",
+        "targetHostname": "ops.velnar.studio",
+        "targetPath": "/api/ops/canary/deepseek-certification",
+        "targetExactAccessDomain": "ops.velnar.studio/api/ops/canary/deepseek-certification",
+        "sessionDuration": "15m",
+        "autoRedirectToIdentity": false,
+        "allowAuthenticateViaWarp": false,
+        "appLauncherVisible": false,
+        "audResolved": true,
+        "audLength": 64,
+        "audSha256": "9c5777a3768c6082501fd5fee8c1997cf35896cadc5e5c2b0da50e94c04884f0",
+        "audRawValueCommitted": false,
+        "policyCount": 0,
+        "humanIdentityEnrolled": false
+      }
     },
     "dnsStatus": {
       "opsVelnarStudio": "UNRESOLVED_NOT_CREATED (DNS query returns ENOTFOUND / ETIMEOUT)",
@@ -137,16 +170,33 @@
   },
   "remainingSegmentBBlockers": {
     "cloudflareAccessAppCreation": {
-      "status": "BLOCKED_REQUIRES_HUMAN_DECISION_OR_TOKEN",
-      "reason": "Wrangler OAuth token lacks Access write permission (auth.forbidden, code 1010). Requires either Access Application creation via Zero Trust Dashboard or Cloudflare API Token with Access edit permissions."
+      "status": "COMPLETED_FROM_CANONICAL_5U33E",
+      "details": "Application exists; no further Access app creation required; AUD resolved"
     },
     "operationalHostnameDns": {
-      "status": "BLOCKED_REQUIRES_HUMAN_DECISION",
-      "reason": "ops.velnar.studio DNS record not yet created. Requires human selection of DNS target / CNAME."
+      "status": "CUSTOM_DOMAIN_PROVISIONING_APPROVAL_REQUIRED",
+      "recommendedDesign": "ops.velnar.studio as Cloudflare Worker Custom Domain for velnar-platform-worker (avoids guessing CNAME target)"
     },
     "operatorIdentityEnrollment": {
-      "status": "BLOCKED_REQUIRES_HUMAN_INPUT",
-      "reason": "Human operator email not yet enrolled in Access policy and superadmin registry."
+      "status": "HUMAN_ACCESS_POLICY_AND_IDENTITY_ENROLLMENT_APPROVAL_REQUIRED",
+      "confirmedEmail": "kayra01.09.06@gmail.com",
+      "pendingActions": "Access Allow policy creation, operator login to capture opaque subject, and single-entry superadmin registry enrollment"
+    },
+    "trustAnchors": {
+      "status": "TRUST_ANCHOR_KEY_GENERATION_APPROVAL_REQUIRED",
+      "details": "Generation of Ed25519 public keys for registries"
+    },
+    "workerDeployment": {
+      "status": "PRODUCTION_CODE_DEPLOYMENT_APPROVAL_REQUIRED_AFTER_REVIEW",
+      "details": "Deployment of velnar-platform-worker containing worker/ai/sovereignBoundary.ts blocked until independent review"
     }
+  },
+  "operatorIdentityInput": {
+    "status": "HUMAN_CONFIRMED_INPUT",
+    "confirmedEmail": "kayra01.09.06@gmail.com",
+    "accessPolicyCreated": false,
+    "accessSubjectVerified": false,
+    "superAdminRegistryEnrolled": false,
+    "scopeLimitation": "Authorizes recording email as intended operator identity input only; does not authorize policy creation, superadmin mutation, or subject enrollment"
   }
 }

@@ -1,26 +1,37 @@
 # VELNAR Segment B — Production Provisioning Evidence Record
 
 - **Mission**: VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1
-- **Segment**: B — PRODUCTION PROVISIONING & VERIFICATION
-- **Timestamp**: `2026-09-08T03:42:00.000Z`
+- **Segment**: B — PRODUCTION PROVISIONING & VERIFICATION (RECONCILED)
+- **Timestamp**: `2026-09-08T03:55:00.000Z`
 - **Reviewed Gate-1 HEAD**: `e819471b57d37574f757a1f1d678b0169b02a8fc`
 - **Reviewed Gate-1 TREE**: `b32a0716588b795363126a3dac9db8420d5f69bf`
-- **Canonical Main**: `5f19cbc2f3a8be9ba68f5404c437392a70db4245`
+- **Latest Canonical Main**: `ca256235d9a4d5c931c82ec1f5db951b45fbe1bd` (`ops(auth): record dormant Access application provisioning`)
 - **Gate-1 Authorization Token**: `SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED`
 - **Gate-1 Verdict**: `VELNAR_PRELIVE_GATE1_INDEPENDENT_REREVIEW_PASS` (Zero findings)
+- **Status**: **RECONCILED WITH CANONICAL 5U.3.3E — HARD GATE 2 AUDITED**
 
 ---
 
 ## 1. Executive Summary & Status
 
-Segment B execution commenced following explicit human authorization. All safe and independent production discovery, D1 database provisioning, schema migration, real concurrency certification, and Sovereign Boundary runtime enforcement have been successfully completed:
+Segment B execution and reconciliation with canonical `origin/main` (`5U.3.3E`) are complete. All safe and independent production discovery, D1 database provisioning, schema migration, real concurrency certification, Sovereign Boundary runtime enforcement, and Access application state reconciliation are verified:
 
-1. **Pre-Mutation Discovery**:
+1. **Pre-Mutation Discovery & Reconciled Access Application State**:
    - Account ID: `f74f8ad248cb1114ee6e38227166f55a` (`Kayra01.09.06@gmail.com's Account`).
    - Active Zones: `velnar.studio` (`3f84f289e9b25a494bf3e2be71356f8c`), `velnarhq.com` (`335ebd95a44f0df7dae87ce697eb75be`).
-   - Team Domain: `https://velnar.cloudflareaccess.com` (Live, verified via public JWKS endpoint returning 2 active RS256 certs).
+   - Access Team Domain: `https://velnar.cloudflareaccess.com` (Live, verified via public JWKS endpoint returning 2 active RS256 certs).
+   - **Access Application Provisioned (Authoritative from 5U.3.3E)**:
+     - Name: `VELNAR Operational Canary — Dormant`
+     - Type: `self_hosted`
+     - Target: `ops.velnar.studio/api/ops/canary/deepseek-certification`
+     - Session Duration: `15m`
+     - AUD Resolved: `true` (64 chars, SHA-256: `9c5777a3768c6082501fd5fee8c1997cf35896cadc5e5c2b0da50e94c04884f0`, raw value not committed).
+     - Policies: 0. Human identity enrolled: `false`.
+     - SuperAdmin registry entries: 0.
    - Deployed Workers: `velnar-website` active; `velnar-platform-worker` uncreated on edge.
-   - Access Applications: 0 existing apps.
+2. **Operator Identity Input (Human Confirmed)**:
+   - Authorized Operator Email: `kayra01.09.06@gmail.com`.
+   - Explicit Human Authorization Scope: Authorizes recording this email as the intended operator identity input only. Does NOT authorize Access policy creation, Superadmin registry mutation, subject enrollment, or key generation.
 2. **D1 Production Provisioning**:
    - Database `velnar-production-db` created successfully in region `EEUR`.
    - Real UUID: `d65abcb3-d8d6-46fb-9403-a97ab54de303`.
@@ -49,11 +60,15 @@ Segment B execution commenced following explicit human authorization. All safe a
 | **Zone: velnar.studio** | Active (`3f84f289e9b25a494bf3e2be71356f8c`, Free Website) | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **Zone: velnarhq.com** | Active (`335ebd95a44f0df7dae87ce697eb75be`, Free Website) | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **Access Team Domain** | `https://velnar.cloudflareaccess.com` (JWKS verified) | `OBSERVED_REAL_PRODUCTION_FACT` |
+| **Access Application** | `VELNAR Operational Canary — Dormant` (self-hosted, 15m session, dormant) | `OBSERVED_REAL_PRODUCTION_FACT (from 5U.3.3E)` |
+| **Access Application AUD** | Resolved (64 chars, SHA-256 committed, raw value safe) | `OBSERVED_REAL_PRODUCTION_FACT (from 5U.3.3E)` |
+| **Access Policies** | 0 policies configured | `OBSERVED_REAL_PRODUCTION_FACT (from 5U.3.3E)` |
+| **Operator Email Input** | `kayra01.09.06@gmail.com` (Confirmed by human) | `HUMAN_CONFIRMED_INPUT` |
 | **Existing D1 (Prior)** | `velnar-payments` (`8e0583cb-d5b8-4d1c-bfcd-b2b277ca381c`) | `OBSERVED_REAL_PRODUCTION_FACT` |
+| **Production D1 (New)** | `velnar-production-db` (`d65abcb3-d8d6-46fb-9403-a97ab54de303`, EEUR) | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **Worker on Edge** | `velnar-website` (bindings: `ASSETS`, `DB`, 2 secrets) | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **Platform Worker** | Not deployed on Cloudflare account | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **Candidate Hostname** | `ops.velnar.studio` (unresolved in DNS; `ENOTFOUND`) | `PROPOSED_NOT_CANONICAL` |
-| **Access Application AUD** | Uncreated (`UNRESOLVED_NOT_CREATED`) | `OBSERVED_ONLY_AFTER_PROVISIONING` |
 
 ---
 
@@ -110,6 +125,20 @@ Implemented locally in `worker/ai/sovereignBoundary.ts`:
 
 ---
 
-## 6. Unresolved Items Requiring Consolidated Human Input
+## 6. Remaining Consolidated Human Decisions
 
-Because the installed CLI OAuth token lacks `Access: Apps and Policies: Edit` and `Zone: DNS: Edit` permissions (HTTP 403 `auth.forbidden`), Cloudflare Access Application creation and DNS CNAME configuration require either dashboard creation or scoped API credentials. All remaining decisions are consolidated into the Segment B Human Decisions Package.
+Following reconciliation with canonical 5U.3.3E and operator email confirmation, the consolidated pending decisions are reduced to 4 items:
+
+1. **OPERATIONAL CUSTOM DOMAIN / DNS**:
+   - **Recommended Design**: `ops.velnar.studio` configured as a Cloudflare Worker Custom Domain for `velnar-platform-worker` (avoids manually guessing a CNAME target).
+   - **Classification**: `CUSTOM_DOMAIN_PROVISIONING_APPROVAL_REQUIRED`
+2. **HUMAN ACCESS POLICY / IDENTITY ENROLLMENT**:
+   - **Confirmed Email**: `kayra01.09.06@gmail.com`
+   - **Pending Action**: Authorize creating an Access Allow policy for this email, performing operator login to capture opaque subject, and enrolling single entry in `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY`.
+   - **Classification**: `HUMAN_ACCESS_POLICY_AND_IDENTITY_ENROLLMENT_APPROVAL_REQUIRED`
+3. **ED25519 TRUST ANCHORS**:
+   - **Pending Action**: Authorize generation and enrollment of public keys for `PRODUCTION_HUMAN_AUTHORITY_REGISTRY` and `PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES`.
+   - **Classification**: `TRUST_ANCHOR_KEY_GENERATION_APPROVAL_REQUIRED`
+4. **WORKER DEPLOYMENT**:
+   - **Pending Action**: Authorize deployment of `velnar-platform-worker` containing `worker/ai/sovereignBoundary.ts` to Cloudflare edge following independent Codex review.
+   - **Classification**: `PRODUCTION_CODE_DEPLOYMENT_APPROVAL_REQUIRED_AFTER_REVIEW`

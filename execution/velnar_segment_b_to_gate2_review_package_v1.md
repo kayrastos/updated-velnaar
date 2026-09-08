@@ -3,35 +3,44 @@
 ## Document Metadata
 - **Mission**: VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1
 - **Document Type**: `SEGMENT_B_TO_GATE2_REVIEW_PACKAGE`
-- **Version**: `v1.0-segment-b-review-package`
+- **Version**: `v1.1-segment-b-review-package-reconciled`
 - **Date**: 2026-09-08
 - **Base Reviewed Gate 1 Commit**: `e819471b57d37574f757a1f1d678b0169b02a8fc`
 - **Base Reviewed Gate 1 Tree**: `b32a0716588b795363126a3dac9db8420d5f69bf`
-- **Canonical Origin/Main**: `5f19cbc2f3a8be9ba68f5404c437392a70db4245`
+- **Latest Canonical Main**: `ca256235d9a4d5c931c82ec1f5db951b45fbe1bd`
+- **Reconciled Phase**: `A.12B.2C-5U.3.3E` (`ops(auth): record dormant Access application provisioning`)
 - **Gate 1 Authorization Token Supplied**: `SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED`
-- **Status**: **STAGE B COMPLETE — HARD GATE 2 READINESS AUDIT COMPLETE**
+- **Status**: **SEGMENT B RECONCILED — HARD GATE 2 READINESS AUDITED**
 
 ---
 
 ## 1. Executive Summary
 
-Segment B (Production Provisioning & Verification) was executed in accordance with the strict non-negotiable boundaries established in Gate 1:
+Segment B (Production Provisioning & Verification) and reconciliation with canonical `origin/main` (`5U.3.3E`) were executed in strict adherence to fail-closed security principles:
 1. **Zero External AI Provider Calls**: Exactly 0 live DeepSeek, 0 Gemini/Google AI Studio, and 0 OpenAI calls were made. AI provider spend remains exactly **$0.00**.
-2. **Real Production Infrastructure Provisioned**:
+2. **Real Production Infrastructure Provisioned & Certified**:
    - Cloudflare D1 database `velnar-production-db` provisioned with real UUID `d65abcb3-d8d6-46fb-9403-a97ab54de303` in region `EEUR`.
    - Full migration history (migrations 0001 through 0008, including `authorization_replay_ledger`) applied cleanly.
    - Remote D1 atomic reservation, replay deduplication, and 5-parallel concurrent race certified live on edge: **`D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED_PASS`**.
    - Synthetic test records cleaned up completely with 0 residual test state.
-3. **Sovereign Boundary Runtime Enforcement Implemented & Certified**:
+3. **Cloudflare Access Application Provisioning Reconciled (from Canonical 5U.3.3E)**:
+   - Application `VELNAR Operational Canary — Dormant` exists on Cloudflare Zero Trust.
+   - Target: `ops.velnar.studio/api/ops/canary/deepseek-certification`.
+   - AUD resolved: `true` (64 chars, SHA-256 recorded, raw value safe).
+   - Policies: 0. Human identity enrolled: `false`. SuperAdmin registry: 0.
+4. **Operator Identity Input Confirmed**:
+   - Human operator email confirmed: `kayra01.09.06@gmail.com`.
+   - Explicit scope: Records the intended operator identity input. Does NOT authorize Access policy creation, Superadmin registry mutation, subject enrollment, or key generation.
+5. **Sovereign Boundary Runtime Enforcement Implemented & Certified**:
    - `worker/ai/sovereignBoundary.ts` implemented with 10-category mandatory BLACK scanning, raw PII rejection, KMS key rejection, bounded TaskCapsule enforcement, and strict provider destination allowlists.
    - 21 unit tests in `tests/security/phaseA12B2C5U33Gate2Readiness.test.ts` passing with 100% test coverage.
-4. **All Runtime Safety Gates Maintained Strictly Fail-Closed**:
+6. **All Runtime Safety Gates Maintained Strictly Fail-Closed**:
    - `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = false`
    - `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = false`
    - `CANARY_LIVE_EXECUTION_ENABLED = false`
    - `productionRoutingEnforcementAllowed = false`
    - Operational endpoint `/api/ops/canary/deepseek-certification` remains unrouted (returns 404 NOT_FOUND).
-5. **No Git Push**: Changes remain purely local on branch `feat/prelive-to-controlled-live-mission-v1`.
+7. **No Git Push**: Changes remain purely local on branch `feat/prelive-to-controlled-live-mission-v1`.
 
 ---
 
@@ -44,9 +53,10 @@ Segment B (Production Provisioning & Verification) was executed in accordance wi
 | **Existing Edge Workers** | `velnar-website` (Active, bindings: `ASSETS`, `DB: 8e0583cb-...`, `IYZICO_*`) | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **Platform Worker** | `velnar-platform-worker` not deployed | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **Zero Trust Team Domain** | `https://velnar.cloudflareaccess.com` (Verified via live JWKS endpoint with 2 active RS256 certs) | `OBSERVED_REAL_PRODUCTION_FACT` |
-| **Zero Trust Applications** | 0 Access applications exist | `OBSERVED_REAL_PRODUCTION_FACT` |
-| **Zero Trust IdPs** | 0 Custom IdPs configured; default Cloudflare OTP active | `OBSERVED_REAL_PRODUCTION_FACT` |
-| **DNS Record `ops.velnar.studio`** | Uncreated (`ENOTFOUND` / `ETIMEOUT`) | `OBSERVED_REAL_PRODUCTION_FACT` |
+| **Access Application** | `VELNAR Operational Canary — Dormant` (self-hosted, 15m session, dormant) | `OBSERVED_REAL_PRODUCTION_FACT (from 5U.3.3E)` |
+| **Access Application AUD** | Resolved (64 chars, SHA-256 committed, raw value safe) | `OBSERVED_REAL_PRODUCTION_FACT (from 5U.3.3E)` |
+| **Access Policies** | 0 policies configured | `OBSERVED_REAL_PRODUCTION_FACT (from 5U.3.3E)` |
+| **Operator Email Input** | `kayra01.09.06@gmail.com` (Confirmed by human) | `HUMAN_CONFIRMED_INPUT` |
 | **Production D1 Database** | `velnar-production-db` (`d65abcb3-d8d6-46fb-9403-a97ab54de303`, region `EEUR`) | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **D1 Schema Migrations** | 0001 through 0008 applied successfully | `OBSERVED_REAL_PRODUCTION_FACT` |
 | **D1 Concurrency Certification** | 5-race concurrency certified; atomic reservation verified | `OBSERVED_REAL_PRODUCTION_FACT` |
@@ -73,38 +83,30 @@ Segment B (Production Provisioning & Verification) was executed in accordance wi
 
 ---
 
-## 4. Consolidated Provisioning Inputs Package
+## 4. Consolidated Provisioning Decisions Package
 
-To prevent repeated interruptions and maintain strict operational safety, all remaining human provisioning decisions and external configurations are consolidated into a single actionable package:
+Following reconciliation with canonical 5U.3.3E and operator email confirmation, the consolidated package is updated:
 
-### Token: `SEGMENT_B_CONSOLIDATED_PROVISIONING_INPUTS_REQUIRED`
+### Package Token: `SEGMENT_B_CONSOLIDATED_PROVISIONING_INPUTS_REQUIRED`
 
-#### Item 1: Cloudflare Access Application Creation & AUD Capture
-Cloudflare CLI OAuth tokens do not possess write permissions for Access applications (`auth.forbidden` code 1010). Select one path:
-- **Option A (Zero Trust Dashboard)**:
-  1. Navigate to **Cloudflare Zero Trust** (`https://one.dash.cloudflare.com`) > **Access** > **Applications**.
-  2. Click **Add an application** > **Self-hosted**.
-  3. Set Application name: `Velnar Canary Ops`.
-  4. Set Application domain: `ops.velnar.studio`, Path: `/api/ops/canary/deepseek-certification`.
-  5. Session Duration: `15 minutes`.
-  6. Create an Access Policy allowing your operator email address (e.g. `kayra01.09.06@gmail.com`).
-  7. Copy the generated **Application Audience (AUD)** tag and provide it.
-- **Option B (Scoped API Token)**:
-  - Provide a scoped Cloudflare API Token with `Access: Apps and Policies: Edit` permissions on account `f74f8ad248cb1114ee6e38227166f55a`.
+#### Reconciled / Completed Items:
+- **Item 1: Cloudflare Access Application Creation**: **COMPLETED_FROM_CANONICAL_5U33E**. Application `VELNAR Operational Canary — Dormant` exists; AUD resolved. No further Access application creation required.
+- **Item 3: Authorized Operator Email**: **HUMAN_CONFIRMED_INPUT**. Email `kayra01.09.06@gmail.com` confirmed by human.
 
-#### Item 2: DNS CNAME Target for `ops.velnar.studio`
-- Confirm the DNS target for `ops.velnar.studio` (standard Cloudflare Worker custom domain target or zone apex `velnar.studio`).
-
-#### Item 3: Vetted Operator Email for Access Policy & Superadmin Registry
-- Confirm the authorized operator email address to enroll in `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY` (e.g., `kayra01.09.06@gmail.com`).
-
-#### Item 4: Cryptographic Trust Anchor Public Keys (Ed25519)
-- Confirm or authorize generating the public Ed25519 signing keys for:
-  - `PRODUCTION_HUMAN_AUTHORITY_REGISTRY`
-  - `PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES`
-
-#### Item 5: Platform Worker Deployment Authorization
-- Authorize deploying `velnar-platform-worker` to Cloudflare edge bound to the real production D1 database `velnar-production-db` (`d65abcb3-d8d6-46fb-9403-a97ab54de303`) in dormant fail-closed mode.
+#### Remaining 4 Consolidated Decisions:
+1. **Decision A: Operational Custom Domain / DNS**:
+   - **Recommended Design**: `ops.velnar.studio` configured as a Cloudflare Worker Custom Domain for `velnar-platform-worker` (avoids manually guessing a CNAME target).
+   - **Classification**: `CUSTOM_DOMAIN_PROVISIONING_APPROVAL_REQUIRED`
+2. **Decision B: Human Access Policy / Identity Enrollment**:
+   - **Confirmed Email**: `kayra01.09.06@gmail.com`.
+   - **Pending Action**: Authorize creating an Access Allow policy for this email, performing operator login to capture opaque subject, and enrolling single entry in `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY`.
+   - **Classification**: `HUMAN_ACCESS_POLICY_AND_IDENTITY_ENROLLMENT_APPROVAL_REQUIRED`
+3. **Decision C: Ed25519 Trust Anchors**:
+   - **Pending Action**: Authorize generation and enrollment of public keys for `PRODUCTION_HUMAN_AUTHORITY_REGISTRY` and `PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES`.
+   - **Classification**: `TRUST_ANCHOR_KEY_GENERATION_APPROVAL_REQUIRED`
+4. **Decision D: Platform Worker Deployment**:
+   - **Pending Action**: Authorize deployment of `velnar-platform-worker` containing `worker/ai/sovereignBoundary.ts` to Cloudflare edge bound to `velnar-production-db` in dormant fail-closed mode following independent Codex review.
+   - **Classification**: `PRODUCTION_CODE_DEPLOYMENT_APPROVAL_REQUIRED_AFTER_REVIEW`
 
 ---
 

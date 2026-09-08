@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "v1.0-segment-b-review-package",
+  "version": "v1.1-segment-b-review-package-reconciled",
   "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
   "documentType": "SEGMENT_B_TO_GATE2_REVIEW_PACKAGE",
   "timestamp": "2026-09-08T03:45:00.000Z",
@@ -9,21 +9,23 @@
     "branch": "feat/prelive-to-controlled-live-mission-v1",
     "reviewedGate1Commit": "e819471b57d37574f757a1f1d678b0169b02a8fc",
     "reviewedGate1Tree": "b32a0716588b795363126a3dac9db8420d5f69bf",
-    "canonicalMainCommit": "5f19cbc2f3a8be9ba68f5404c437392a70db4245",
+    "canonicalMainCommit": "ca256235d9a4d5c931c82ec1f5db951b45fbe1bd",
     "humanAuthorizationTokenSupplied": "SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED",
-    "segmentBExecutionAllowed": true
+    "segmentBExecutionAllowed": true,
+    "canonicalMainDelta": "A.12B.2C-5U.3.3E (dormant Access application provisioning execution)"
   },
   "executiveSummary": {
-    "segmentBExecutionStatus": "COMPLETED_STAGE_1_STAGE_2_STAGE_3",
+    "segmentBExecutionStatus": "COMPLETED_AND_RECONCILED_WITH_CANONICAL_5U33E",
     "realMutationsExecuted": [
       "Created real Cloudflare D1 database: velnar-production-db (UUID: d65abcb3-d8d6-46fb-9403-a97ab54de303, Region: EEUR)",
       "Applied database migrations 0001 through 0008 to production D1",
-      "Executed real remote D1 concurrency certification (atomic reservation, replay deduplication, 5-parallel concurrent race, bounded synthetic cleanup)"
+      "Executed real remote D1 concurrency certification (atomic reservation, replay deduplication, 5-parallel concurrent race, bounded synthetic cleanup)",
+      "Reconciled dormant Cloudflare Access application from canonical 5U.3.3E (VELNAR Operational Canary — Dormant, AUD resolved)"
     ],
     "aiProviderInvocations": 0,
     "aiProviderCost": "$0.00",
     "sovereignBoundaryStatus": "RUNTIME_ENFORCEMENT_IMPLEMENTED_AND_TEST_CERTIFIED",
-    "hardGate2Status": "READY_FOR_HARD_GATE_2_HUMAN_REVIEW",
+    "hardGate2Status": "READY_FOR_HARD_GATE_2_HUMAN_REVIEW_AND_INDEPENDENT_REVIEW",
     "nextHumanDecisionPackage": "SEGMENT_B_CONSOLIDATED_PROVISIONING_INPUTS_REQUIRED"
   },
   "productionVerificationSummary": {
@@ -71,7 +73,16 @@
       "activeKeys": 2,
       "keyAlgorithm": "RS256",
       "existingApplications": 0,
-      "epistemicTag": "OBSERVED_REAL_PRODUCTION_FACT"
+      "epistemicTag": "OBSERVED_REAL_PRODUCTION_FACT (Reconciled from canonical 5U.3.3E)",
+      "accessApplicationExists": true,
+      "accessApplicationName": "VELNAR Operational Canary — Dormant",
+      "accessApplicationAudResolved": true,
+      "accessApplicationAudLength": 64,
+      "accessApplicationAudSha256": "9c5777a3768c6082501fd5fee8c1997cf35896cadc5e5c2b0da50e94c04884f0",
+      "accessApplicationAudRawValueCommitted": false,
+      "policyCount": 0,
+      "humanIdentityEnrolled": false,
+      "superAdminRegistryEntries": 0
     }
   },
   "runtimeSafetyGates": {
@@ -179,51 +190,53 @@
   },
   "consolidatedProvisioningInputsPackage": {
     "token": "SEGMENT_B_CONSOLIDATED_PROVISIONING_INPUTS_REQUIRED",
-    "description": "All pending human decisions and external provisioning inputs consolidated into a single package to avoid incremental interruptions.",
-    "items": [
+    "reconciliationStatus": "UPDATED_AND_REDUCED",
+    "completedItems": [
       {
         "itemNumber": 1,
         "name": "Cloudflare Access Application Creation & AUD Capture",
-        "nature": "EXTERNAL_CLOUD_ACTION_OR_SCOPED_TOKEN",
-        "options": [
-          {
-            "option": "A (Console)",
-            "description": "Create a self-hosted Access Application in Cloudflare Zero Trust dashboard (https://one.dash.cloudflare.com) for application domain 'ops.velnar.studio', path '/api/ops/canary/deepseek-certification', session duration 15m. Provide the generated Application Audience (AUD) tag."
-          },
-          {
-            "option": "B (API Token)",
-            "description": "Provide a temporary Cloudflare API Token with 'Access: Apps and Policies: Edit' permissions on account f74f8ad248cb1114ee6e38227166f55a so Wrangler/API can provision it automatically."
-          }
-        ]
-      },
-      {
-        "itemNumber": 2,
-        "name": "DNS CNAME Target Confirmation for ops.velnar.studio",
-        "nature": "INFRASTRUCTURE_ROUTING_SPECIFICATION",
-        "description": "Confirm the DNS target for 'ops.velnar.studio'. Standard Cloudflare custom domain pattern points CNAME to the zone apex 'velnar.studio' or Cloudflare Workers target domain."
-      },
+        "status": "COMPLETED_FROM_CANONICAL_5U33E",
+        "details": "Application VELNAR Operational Canary — Dormant exists protecting ops.velnar.studio/api/ops/canary/deepseek-certification. AUD resolved (64 characters, SHA-256 committed, raw value safe). No further application creation required."
+      }
+    ],
+    "confirmedInputs": [
       {
         "itemNumber": 3,
-        "name": "Vetted Operator Email for Access Policy & Superadmin Registry",
-        "nature": "IDENTITY_ALLOWLIST_INPUT",
-        "description": "Specify the exact authorized operator email address (e.g., 'kayra01.09.06@gmail.com') to be enrolled in the Cloudflare Access allow policy and the single-entry PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY."
+        "name": "Authorized Operator Email Input",
+        "status": "HUMAN_CONFIRMED_INPUT",
+        "value": "kayra01.09.06@gmail.com",
+        "details": "Human explicitly confirmed operator email. Access policy creation, Access subject verification, and SuperAdmin registry enrollment remain pending operational login."
+      }
+    ],
+    "remainingDecisions": [
+      {
+        "letter": "A",
+        "name": "Operational Custom Domain / DNS",
+        "classification": "CUSTOM_DOMAIN_PROVISIONING_APPROVAL_REQUIRED",
+        "recommendedDesign": "ops.velnar.studio configured as a Cloudflare Worker Custom Domain for velnar-platform-worker (avoids guessing CNAME target)"
       },
       {
-        "itemNumber": 4,
-        "name": "Cryptographic Trust Anchor Public Keys (Ed25519)",
-        "nature": "CRYPTOGRAPHIC_CEREMONY_INPUT",
-        "description": "Provide or authorize generation of the public Ed25519 signing keys for: (a) PRODUCTION_HUMAN_AUTHORITY_REGISTRY, and (b) PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES."
+        "letter": "B",
+        "name": "Human Access Policy & Identity Enrollment",
+        "classification": "HUMAN_ACCESS_POLICY_AND_IDENTITY_ENROLLMENT_APPROVAL_REQUIRED",
+        "details": "Authorize creating an Access Allow policy for confirmed email kayra01.09.06@gmail.com, performing audited operator login to capture opaque subject, and enrolling single entry in PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY"
       },
       {
-        "itemNumber": 5,
-        "name": "Platform Worker Deployment Authorization",
-        "nature": "DEPLOYMENT_APPROVAL",
-        "description": "Authorize deploying 'velnar-platform-worker' with D1 database binding 'velnar-production-db' (d65abcb3-d8d6-46fb-9403-a97ab54de303) in dormant fail-closed mode."
+        "letter": "C",
+        "name": "Ed25519 Trust Anchors",
+        "classification": "TRUST_ANCHOR_KEY_GENERATION_APPROVAL_REQUIRED",
+        "details": "Authorize generation of Ed25519 public keys for PRODUCTION_HUMAN_AUTHORITY_REGISTRY and PRODUCTION_RUNTIME_SOURCE_PROVENANCE_AUTHORITIES"
+      },
+      {
+        "letter": "D",
+        "name": "Platform Worker Deployment",
+        "classification": "PRODUCTION_CODE_DEPLOYMENT_APPROVAL_REQUIRED_AFTER_REVIEW",
+        "details": "Authorize deployment of velnar-platform-worker containing worker/ai/sovereignBoundary.ts bound to production D1 velnar-production-db (d65abcb3-d8d6-46fb-9403-a97ab54de303) in dormant fail-closed mode following independent review"
       }
     ]
   },
   "gate2TransitionContract": {
-    "currentGate": "HARD_GATE_2_READINESS_PENDING_HUMAN_REVIEW",
+    "currentGate": "HARD_GATE_2_READINESS_RECONCILED_PENDING_REVIEW",
     "forbiddenActionsPriorToGate2": [
       "No DeepSeek API invocations",
       "No Google AI Studio / Gemini API invocations",
