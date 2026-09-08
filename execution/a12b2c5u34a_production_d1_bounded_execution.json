@@ -22,7 +22,6 @@
   "credentialState": {
     "mode": "WRANGLER_OAUTH",
     "authenticated": true,
-    "userAccount": "Kayra01.09.06@gmail.com's Account",
     "accountIdSha256": "ad8f1b1425c8cb608706437df199ec64f17d46e585051bb78a4c19a3a2f58301",
     "accountIdentityMatch": true,
     "credentialSecretCommitted": false,
@@ -122,9 +121,11 @@
     "registryFrozen": true
   },
   "providerState": {
-    "productionD1DatabaseCreated": false,
-    "productionD1MigrationsApplied": false,
-    "preExistingSameNameDatabaseDetected": true
+    "databaseCreatedByThisExecution": false,
+    "preExistingProductionDatabaseDetected": true,
+    "preExistingDatabaseIdentityVerified": true,
+    "providerDatabaseExists": true,
+    "canonicalGateRealDatabaseProvisioned": false
   },
   "actionCounters": {
     "d1DatabaseCreateAttempts": 0,
@@ -146,16 +147,16 @@
   },
   "unauthorizedMutationCount": 0,
   "nonClaims": {
-    "databaseCreatedByThisPhase": false,
-    "migrationsAppliedByThisPhase": false,
+    "databaseCreatedByThisExecution": false,
+    "migrationsAppliedByThisExecution": false,
     "preExistingResourceOwnershipAssumed": false,
+    "providerResourceExists": true,
     "ingressReady": false,
     "ingressCertified": false,
     "customDomainProvisioned": false,
     "accessAllowPolicyProvisioned": false,
     "humanOperationalIdentityEnrolled": false,
-    "productionD1DatabaseCreated": false,
-    "productionD1MigrationsExecuted": false,
+    "canonicalGateRealDatabaseProvisioned": false,
     "d1ProductionBound": false,
     "d1RealConcurrencyCertified": false,
     "workerProductionConfigChanged": false,
@@ -165,5 +166,6 @@
     "runtimeSourceProvenanceAnchorProvisioned": false,
     "liveCanaryEnabled": false,
     "productionRoutingEnabled": false
-  }
+  },
+  "credentialMode": "WRANGLER_OAUTH"
 }

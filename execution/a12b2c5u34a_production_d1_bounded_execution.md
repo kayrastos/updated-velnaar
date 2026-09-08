@@ -18,7 +18,7 @@
 > During the read-only Cloudflare D1 management-plane exact-name collision preflight, an existing production database named `velnar-production-db` was detected in the target Cloudflare account (`matchingDatabaseCount = 1`).
 > In strict adherence to the human authorization literal and the sealed 5U.3.4A contract, execution **STOPPED IMMEDIATELY** before any mutation.
 >
-> **Zero mutations were attempted or executed**:
+> **Zero mutations were attempted or executed by this run**:
 > - `d1DatabaseCreateAttempts = 0`
 > - `confirmedD1DatabaseCreates = 0`
 > - `migrationApplyCommands = 0`
@@ -38,7 +38,7 @@
 ---
 
 ### 3. Credential & Account Binding Preflight
-- **Credential Mode**: `WRANGLER_OAUTH` (Stored in `xdg.config\.wrangler\config\default.toml`)
+- **Credential Mode**: `WRANGLER_OAUTH`
 - **Credential Secret Committed**: `false`
 - **Wrangler Version**: `4.129.1`
 - **Account Identity Hash**:
@@ -122,11 +122,12 @@ All 12 safety gates remain strictly closed and untouched:
 ---
 
 ### 8. Explicit Non-Claims
-This execution record explicitly does **NOT** claim or prove:
-- Production D1 database created by this phase (`false`)
-- Production D1 migrations applied by this phase (`false`)
-- Pre-existing same-name resource ownership assumed (`false`)
-- Ingress ready or certified (`false`)
-- Worker configuration or binding mutated (`false`)
-- Worker deployed (`false`)
-- Gates unblocked (`false`)
+This execution record explicitly distinguishes between execution effects and provider state:
+- `databaseCreatedByThisExecution = false`
+- `migrationsAppliedByThisExecution = false`
+- `preExistingResourceOwnershipAssumed = false`
+- `providerResourceExists = true` (Pre-existing database detected in provider account)
+- `ingressReady = false`
+- `workerConfigurationChanged = false`
+- `workerDeployed = false`
+- `canonicalGateRealDatabaseProvisioned = false`
