@@ -7,8 +7,9 @@
   "reviewedGate1Snapshot": {
     "commit": "e819471b57d37574f757a1f1d678b0169b02a8fc",
     "tree": "b32a0716588b795363126a3dac9db8420d5f69bf",
-    "canonicalMain": "ca256235d9a4d5c931c82ec1f5db951b45fbe1bd",
-    "gate1Verdict": "VELNAR_PRELIVE_GATE1_INDEPENDENT_REREVIEW_PASS"
+    "canonicalMain": "3ab126c6a6176ef42c31650d8c77fcad778798d8",
+    "gate1Verdict": "VELNAR_PRELIVE_GATE1_INDEPENDENT_REREVIEW_PASS",
+    "phase5U33EStatus": "SEALED_AND_APPROVED"
   },
   "gate2RequirementsMatrix": [
     {

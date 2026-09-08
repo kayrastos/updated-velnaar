@@ -5,8 +5,8 @@
 - **Timestamp**: `2026-09-08T03:55:00.000Z`
 - **Reviewed Gate-1 HEAD**: `e819471b57d37574f757a1f1d678b0169b02a8fc`
 - **Reviewed Gate-1 TREE**: `b32a0716588b795363126a3dac9db8420d5f69bf`
-- **Latest Canonical Main**: `ca256235d9a4d5c931c82ec1f5db951b45fbe1bd`
-- **Reconciled Phase**: `A.12B.2C-5U.3.3E` (`ops(auth): record dormant Access application provisioning`)
+- **Latest Canonical Main**: `3ab126c6a6176ef42c31650d8c77fcad778798d8` (`docs(auth): record 5U.3.3E approval` — Phase 5U.3.3E SEALED / APPROVED)
+- **Reconciled Phase**: `A.12B.2C-5U.3.3E` (SEALED & APPROVED)
 - **Gate-1 Authorization Token**: `SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED`
 - **Status**: **`RECONCILED_PENDING_CONSOLIDATED_HUMAN_DECISIONS_AND_INDEPENDENT_REVIEW`**
 

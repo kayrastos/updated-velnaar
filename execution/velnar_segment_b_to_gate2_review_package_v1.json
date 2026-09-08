@@ -9,10 +9,10 @@
     "branch": "feat/prelive-to-controlled-live-mission-v1",
     "reviewedGate1Commit": "e819471b57d37574f757a1f1d678b0169b02a8fc",
     "reviewedGate1Tree": "b32a0716588b795363126a3dac9db8420d5f69bf",
-    "canonicalMainCommit": "ca256235d9a4d5c931c82ec1f5db951b45fbe1bd",
+    "canonicalMainCommit": "3ab126c6a6176ef42c31650d8c77fcad778798d8",
     "humanAuthorizationTokenSupplied": "SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED",
     "segmentBExecutionAllowed": true,
-    "canonicalMainDelta": "A.12B.2C-5U.3.3E (dormant Access application provisioning execution)"
+    "canonicalMainDelta": "A.12B.2C-5U.3.3E (SEALED AND APPROVED — docs(auth): record 5U.3.3E approval)"
   },
   "executiveSummary": {
     "segmentBExecutionStatus": "COMPLETED_AND_RECONCILED_WITH_CANONICAL_5U33E",
