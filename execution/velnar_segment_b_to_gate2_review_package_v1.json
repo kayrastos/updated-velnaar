@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "v1.1-segment-b-review-package-reconciled",
+  "version": "v1.2-segment-b-review-package-v2",
   "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
   "documentType": "SEGMENT_B_TO_GATE2_REVIEW_PACKAGE",
   "timestamp": "2026-09-08T03:45:00.000Z",
@@ -9,10 +9,10 @@
     "branch": "feat/prelive-to-controlled-live-mission-v1",
     "reviewedGate1Commit": "e819471b57d37574f757a1f1d678b0169b02a8fc",
     "reviewedGate1Tree": "b32a0716588b795363126a3dac9db8420d5f69bf",
-    "canonicalMainCommit": "3ab126c6a6176ef42c31650d8c77fcad778798d8",
+    "canonicalMainCommit": "78ce5cc93c2bba621e5794118c22136563f1977c",
     "humanAuthorizationTokenSupplied": "SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED",
     "segmentBExecutionAllowed": true,
-    "canonicalMainDelta": "A.12B.2C-5U.3.3E (SEALED AND APPROVED — docs(auth): record 5U.3.3E approval)"
+    "canonicalMainDelta": "Batch R1 (5U.3.3F, 5U.3.4A, 5U.3.4B) & Sealed 5U.3.3E"
   },
   "executiveSummary": {
     "segmentBExecutionStatus": "COMPLETED_AND_RECONCILED_WITH_CANONICAL_5U33E",
@@ -266,12 +266,36 @@
     "databaseId": "d65abcb3-d8d6-46fb-9403-a97ab54de303",
     "concurrencyLevel": 5,
     "verdict": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED_PASS",
-    "canonicalRuntimeBound": false
+    "canonicalRuntimeBound": false,
+    "region": "EEUR"
   },
   "surfaceIsolation": {
     "entrypoint": "worker/canaryOpsWorker.ts",
     "wranglerConfig": "wrangler.canary-ops.jsonc",
     "hostIsolation": "Enforced in worker/index.ts (404 for tenant routes on ops.velnar.studio)",
     "nonCanaryPathsAccessibleOnOpsDomain": false
+  },
+  "status": "VELNAR_SEGMENT_B_GATE2_FINAL_REPAIR_V2_PENDING_INDEPENDENT_REREVIEW",
+  "providerStateDisambiguation": {
+    "principle": "CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE",
+    "cloudflareAccessProviderStateVerificationFrom5U33E": "VERIFIED_AT_SEALED_5U33E_SNAPSHOT",
+    "aiProviderExecutionTimeStateVerified": false,
+    "deepSeekExecutionTimeRevalidationRequired": true,
+    "geminiExecutionTimeRevalidationRequired": true,
+    "aiProviderPricingExecutionTimeRevalidationRequired": true,
+    "aiProviderServiceTierExecutionTimeRevalidationRequired": true,
+    "currentAIProviderCertificationStatus": "UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT",
+    "details": "The sealed 5U.3.3E field currentProviderStateIndependentlyVerified=true applies strictly to Cloudflare Access Zero Trust infrastructure state, NOT AI model provider runtime availability, pricing, or tier verification."
+  },
+  "r1Reconciliation": {
+    "reconciliationArtifactJson": "execution/velnar_production_readiness_batch_r1_reconciliation_v1.json",
+    "reconciliationArtifactMd": "execution/velnar_production_readiness_batch_r1_reconciliation_v1.md",
+    "canonicalBatch": "78ce5cc93c2bba621e5794118c22136563f1977c",
+    "auditedReadinessPhases": [
+      "5U.3.3F",
+      "5U.3.4A",
+      "5U.3.4B"
+    ],
+    "status": "BATCH_R1_RECONCILED_WITH_POST_REVIEW_SECURITY_ARCHITECTURE"
   }
 }

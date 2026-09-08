@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "v1.1-gate2-readiness-reconciled",
+  "version": "v1.2-gate2-readiness-reconciled-v2",
   "mission": "VELNAR — PRELIVE TO CONTROLLED LIVE MISSION V1",
   "stage": "STAGE 3 — HARD GATE 2 READINESS AUDIT",
   "timestamp": "2026-09-08T03:42:00.000Z",
   "reviewedGate1Snapshot": {
     "commit": "e819471b57d37574f757a1f1d678b0169b02a8fc",
     "tree": "b32a0716588b795363126a3dac9db8420d5f69bf",
-    "canonicalMain": "3ab126c6a6176ef42c31650d8c77fcad778798d8",
+    "canonicalMain": "78ce5cc93c2bba621e5794118c22136563f1977c",
     "gate1Verdict": "VELNAR_PRELIVE_GATE1_INDEPENDENT_REREVIEW_PASS",
     "phase5U33EStatus": "SEALED_AND_APPROVED"
   },
@@ -200,7 +200,8 @@
     "databaseName": "velnar-production-db",
     "concurrencyLevel": 5,
     "verdict": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED_PASS",
-    "canonicalRuntimeBound": false
+    "canonicalRuntimeBound": false,
+    "region": "EEUR"
   },
   "surfaceIsolation": {
     "dedicatedCanaryOpsWorker": "worker/canaryOpsWorker.ts",
@@ -213,5 +214,28 @@
     "passed": 34,
     "total": 34,
     "claim": "All 34 defined Gate-2 security tests passed"
+  },
+  "status": "VELNAR_SEGMENT_B_GATE2_FINAL_REPAIR_V2_PENDING_INDEPENDENT_REREVIEW",
+  "providerStateDisambiguation": {
+    "principle": "CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE",
+    "cloudflareAccessProviderStateVerificationFrom5U33E": "VERIFIED_AT_SEALED_5U33E_SNAPSHOT",
+    "aiProviderExecutionTimeStateVerified": false,
+    "deepSeekExecutionTimeRevalidationRequired": true,
+    "geminiExecutionTimeRevalidationRequired": true,
+    "aiProviderPricingExecutionTimeRevalidationRequired": true,
+    "aiProviderServiceTierExecutionTimeRevalidationRequired": true,
+    "currentAIProviderCertificationStatus": "UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT",
+    "details": "The sealed 5U.3.3E field currentProviderStateIndependentlyVerified=true applies strictly to Cloudflare Access Zero Trust infrastructure state, NOT AI model provider runtime availability, pricing, or tier verification."
+  },
+  "r1Reconciliation": {
+    "reconciliationArtifactJson": "execution/velnar_production_readiness_batch_r1_reconciliation_v1.json",
+    "reconciliationArtifactMd": "execution/velnar_production_readiness_batch_r1_reconciliation_v1.md",
+    "canonicalBatch": "78ce5cc93c2bba621e5794118c22136563f1977c",
+    "auditedReadinessPhases": [
+      "5U.3.3F",
+      "5U.3.4A",
+      "5U.3.4B"
+    ],
+    "status": "BATCH_R1_RECONCILED_WITH_POST_REVIEW_SECURITY_ARCHITECTURE"
   }
 }

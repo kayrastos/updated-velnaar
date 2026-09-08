@@ -7,10 +7,10 @@
 - **Date**: 2026-09-08
 - **Base Reviewed Gate 1 Commit**: `e819471b57d37574f757a1f1d678b0169b02a8fc`
 - **Base Reviewed Gate 1 Tree**: `b32a0716588b795363126a3dac9db8420d5f69bf`
-- **Latest Canonical Main**: `3ab126c6a6176ef42c31650d8c77fcad778798d8` (`docs(auth): record 5U.3.3E approval` — Phase 5U.3.3E SEALED / APPROVED)
-- **Reconciled Phase**: `A.12B.2C-5U.3.3E` (SEALED & APPROVED)
+- **Latest Canonical Main**: `78ce5cc93c2bba621e5794118c22136563f1977c` (`docs(prod): record production readiness batch R1`)
+- **Reconciled Phase**: `Batch R1 (5U.3.3F, 5U.3.4A, 5U.3.4B) & Sealed 5U.3.3E`
 - **Gate 1 Authorization Token Supplied**: `SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED`
-- **Status**: **SEGMENT B RECONCILED — HARD GATE 2 READINESS AUDITED**
+- **Status**: **`VELNAR_SEGMENT_B_GATE2_FINAL_REPAIR_V2_PENDING_INDEPENDENT_REREVIEW`**
 
 ---
 
@@ -116,3 +116,14 @@ Prior to receiving the explicit human token `SEGMENT_C_CONTROLLED_LIVE_CANARY_AP
 - ZERO live AI provider invocations will occur.
 - Production route and ingress gates remain strictly `false`.
 - Working tree remains local on `feat/prelive-to-controlled-live-mission-v1`.
+
+
+## 6. Provider State Epistemic Disambiguation
+
+- **Principle**: `CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE`
+- **Cloudflare Access Provider State**: `VERIFIED_AT_SEALED_5U33E_SNAPSHOT`
+- **AI Provider Execution-Time State Verified**: `false`
+- **DeepSeek Execution-Time Revalidation Required**: `true`
+- **Gemini Execution-Time Revalidation Required**: `true`
+- **Current AI Provider Certification Status**: `UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT`
+- **Batch R1 Reconciliation Evidence**: `execution/velnar_production_readiness_batch_r1_reconciliation_v1.md`.

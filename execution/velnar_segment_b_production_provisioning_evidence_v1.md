@@ -5,10 +5,10 @@
 - **Timestamp**: `2026-09-08T03:55:00.000Z`
 - **Reviewed Gate-1 HEAD**: `e819471b57d37574f757a1f1d678b0169b02a8fc`
 - **Reviewed Gate-1 TREE**: `b32a0716588b795363126a3dac9db8420d5f69bf`
-- **Latest Canonical Main**: `3ab126c6a6176ef42c31650d8c77fcad778798d8` (`docs(auth): record 5U.3.3E approval` — Phase 5U.3.3E SEALED / APPROVED)
+- **Latest Canonical Main**: `78ce5cc93c2bba621e5794118c22136563f1977c` (`docs(prod): record production readiness batch R1`)
 - **Gate-1 Authorization Token**: `SEGMENT_B_PRODUCTION_PROVISIONING_APPROVED`
 - **Gate-1 Verdict**: `VELNAR_PRELIVE_GATE1_INDEPENDENT_REREVIEW_PASS` (Zero findings)
-- **Status**: **RECONCILED WITH CANONICAL 5U.3.3E — HARD GATE 2 AUDITED**
+- **Status**: **VELNAR_SEGMENT_B_GATE2_FINAL_REPAIR_V2_PENDING_INDEPENDENT_REREVIEW**
 
 ---
 
@@ -145,3 +145,15 @@ Following reconciliation with canonical 5U.3.3E and operator email confirmation,
 4. **WORKER DEPLOYMENT**:
    - **Pending Action**: Authorize deployment of `velnar-platform-worker` containing `worker/ai/sovereignBoundary.ts` to Cloudflare edge following independent Codex review.
    - **Classification**: `PRODUCTION_CODE_DEPLOYMENT_APPROVAL_REQUIRED_AFTER_REVIEW`
+
+
+## 7. Provider State Epistemic Disambiguation
+
+- **Principle**: `CLOUDFLARE_PROVIDER_STATE != AI_MODEL_PROVIDER_STATE`
+- **Cloudflare Access Provider State**: `VERIFIED_AT_SEALED_5U33E_SNAPSHOT`
+- **AI Provider Execution-Time State Verified**: `false`
+- **DeepSeek Execution-Time Revalidation Required**: `true`
+- **Gemini Execution-Time Revalidation Required**: `true`
+- **AI Provider Pricing Revalidation Required**: `true`
+- **Current AI Provider Certification Status**: `UNRESOLVED_PENDING_SEGMENT_C_PREFLIGHT`
+- **Batch R1 Reconciliation**: Reconciled in `execution/velnar_production_readiness_batch_r1_reconciliation_v1.md`.
