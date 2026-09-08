@@ -3,16 +3,17 @@
   "artifactType": "DORMANT_OPERATIONAL_INGRESS_VERIFICATION_READINESS_AUDIT",
   "repository": "https://github.com/kayrastos/updated-velnaar",
   "branch": "main",
-  "timestamp": "2026-09-08T04:30:00.000Z",
-  "canonicalBaseCommit": "3ab126c6a6176ef42c31650d8c77fcad778798d8",
-  "canonicalBaseTree": "1a1fcb6fbf98b633aef09d8b6231f01ed526aef2",
+  "timestamp": "2026-09-08T04:45:00.000Z",
+  "canonicalBaseCommit": "78ce5cc93c2bba621e5794118c22136563f1977c",
+  "canonicalBaseTree": "eb6c7574a1a003a2f2fc6aca055e459a79e1ff04",
   "sealedPredecessor": "A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED",
-  "scope": "Dormant Operational Ingress Verification Readiness Audit",
+  "scope": "Dormant Operational Ingress Verification Readiness Audit (Repaired)",
   "readOnly": true,
   "readinessResult": "BLOCKED_BY_EXPLICIT_PREREQUISITES",
-  "status": "A12B2C5U33F_DORMANT_OPERATIONAL_INGRESS_VERIFICATION_READINESS_AUDITED",
-  "finalStatus": "A12B2C5U33F_DORMANT_OPERATIONAL_INGRESS_VERIFICATION_READINESS_AUDITED",
+  "status": "A12B2C5U33F_DORMANT_OPERATIONAL_INGRESS_VERIFICATION_READINESS_REPAIRED",
+  "finalStatus": "A12B2C5U33F_DORMANT_OPERATIONAL_INGRESS_VERIFICATION_READINESS_REPAIRED",
   "independentReviewRequired": true,
+  "sealed": false,
   "sourceFilesInspected": [
     "worker/index.ts",
     "worker/env.ts",
@@ -21,81 +22,149 @@
     "worker/ai/canary/deepSeekProductionWorkerOperationalRoute.ts",
     "wrangler.jsonc"
   ],
-  "testsExecuted": 2508,
-  "testResults": "PASS",
-  "typecheckResult": "PASS",
-  "buildResult": "PASS",
-  "currentState": {
-    "cloudflareAccessApplicationProvisioned": true,
-    "cloudflareAccessApplicationType": "self_hosted",
-    "targetHostnameCandidate": "ops.velnar.studio",
-    "exactOperationalPath": "/api/ops/canary/deepseek-certification",
-    "exactAccessDomain": "ops.velnar.studio/api/ops/canary/deepseek-certification",
-    "applicationSessionDuration": "15m",
-    "autoRedirectToIdentity": false,
-    "allowAuthenticateViaWarp": false,
-    "appLauncherVisible": false,
-    "accessPoliciesCount": 0,
-    "authDomain": "velnar.cloudflareaccess.com",
-    "normalizedFutureWorkerTeamDomain": "https://velnar.cloudflareaccess.com",
-    "dnsState": "ABSENT",
-    "humanOperationalIdentityEnrolled": false,
-    "productionSuperAdminRegistryEntryCount": 0,
-    "productionSuperAdminRegistryFrozen": true,
-    "operationalRouteEnabled": false,
-    "ingressReady": false
+  "executionVerification": {
+    "repairAgentExecutionVerified": true,
+    "independentReviewerExecutionVerified": false,
+    "typecheckCommand": "npm run typecheck (tsc --noEmit)",
+    "typecheckResult": "PASS (0 errors)",
+    "buildCommand": "npm run build (vite build)",
+    "buildResult": "PASS (0 errors)",
+    "testCommand": "npm test (vitest run)",
+    "testSuitesTotal": 62,
+    "testSuitesPassed": 62,
+    "testsTotal": 2508,
+    "testsPassed": 2508,
+    "testsFailed": 0
   },
+  "canonicalWorkerIngressArchitecture": "CUSTOM_DOMAIN",
+  "workerIsOrigin": true,
+  "manualDnsRecordCreationRequired": false,
+  "workerRouteRequired": false,
+  "customDomainRequired": true,
+  "targetHostname": "ops.velnar.studio",
+  "exactOperationalPath": "/api/ops/canary/deepseek-certification",
+  "exactAccessDomain": "ops.velnar.studio/api/ops/canary/deepseek-certification",
+  "applicationName": "VELNAR Operational Canary — Dormant",
+  "applicationType": "self_hosted",
+  "sessionDuration": "15m",
+  "autoRedirectToIdentity": false,
+  "allowAuthenticateViaWarp": false,
+  "appLauncherVisible": false,
+  "accessPoliciesCount": 0,
+  "authDomain": "velnar.cloudflareaccess.com",
+  "normalizedFutureWorkerTeamDomain": "https://velnar.cloudflareaccess.com",
+  "dnsState": "ABSENT",
+  "humanOperationalIdentityEnrolled": false,
+  "productionSuperAdminRegistryEntryCount": 0,
+  "productionSuperAdminRegistryFrozen": true,
+  "operationalRouteEnabled": false,
+  "ingressReady": false,
   "readinessDistinction": {
     "ACCESS_APPLICATION_PROVISIONED": true,
     "INGRESS_AUTH_READY": false,
-    "explanation": "Resource existence in Cloudflare Zero Trust does not equal ingress readiness. Ingress requires DNS routing, Worker route binding, non-secret env vars, human allow policy, identity registry enrollment, and barrier unblocking."
+    "explanation": "Creation of Cloudflare Access self-hosted application in 5U.3.3E establishes Zero Trust boundary only. Ingress requires Worker Custom Domain, Access vars, human allow policy, registry enrollment, and barrier unblocking."
   },
-  "identifiedPrerequisites": [
-    "Creation of exact DNS record ops.velnar.studio (LANE E)",
-    "Creation of dedicated Worker route ops.velnar.studio/* (LANE E)",
-    "Provisioning of non-secret Worker variables CLOUDFLARE_ACCESS_TEAM_DOMAIN and CLOUDFLARE_ACCESS_AUD (LANE C)",
-    "Creation of single deny-by-default human Access Allow policy (LANE D)",
-    "Enrollment of verified human operator email and Access subject into PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY (LANE D)",
-    "Worker deployment with updated registry and configuration (LANE C)",
-    "Verification of CF-Access-JWT-Assertion resolution across all failure modes (LANE D/G)",
-    "Controlled unblocking of PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED and INGRESS_AUTH_READY (LANE G)"
-  ],
   "blockingPrerequisites": [
-    "PREREQ_INGRESS_1_DNS_ABSENT",
-    "PREREQ_INGRESS_2_WORKER_ROUTE_UNCONFIGURED",
-    "PREREQ_INGRESS_3_WORKER_ACCESS_VARS_UNCONFIGURED",
-    "PREREQ_INGRESS_4_HUMAN_ALLOW_POLICY_ABSENT",
-    "PREREQ_INGRESS_5_OPERATIONAL_IDENTITY_NOT_ENROLLED",
-    "PREREQ_INGRESS_6_SUPERADMIN_REGISTRY_EMPTY",
+    "PREREQ_INGRESS_1_CUSTOM_DOMAIN_NOT_PROVISIONED",
+    "PREREQ_INGRESS_2_WORKER_ACCESS_VARS_UNCONFIGURED",
+    "PREREQ_INGRESS_3_HUMAN_ALLOW_POLICY_ABSENT",
+    "PREREQ_INGRESS_4_OPERATIONAL_IDENTITY_NOT_ENROLLED",
+    "PREREQ_INGRESS_5_SUPERADMIN_REGISTRY_EMPTY",
+    "PREREQ_INGRESS_6_DORMANT_WORKER_NOT_DEPLOYED",
     "PREREQ_INGRESS_7_ROUTE_BARRIERS_CLOSED"
   ],
   "futureMutationPlan": {
-    "step1_dnsProvisioning": "Create CNAME ops.velnar.studio pointing to Worker host under active velnar.studio zone",
-    "step2_workerRouteBinding": "Configure Worker route ops.velnar.studio/api/ops/canary/deepseek-certification in wrangler.jsonc / dashboard",
-    "step3_workerEnvConfig": "Set CLOUDFLARE_ACCESS_TEAM_DOMAIN=\"https://velnar.cloudflareaccess.com\" and CLOUDFLARE_ACCESS_AUD=\"<64-char AUD>\"",
-    "step4_accessAllowPolicy": "Create single policy: name=\"VELNAR Human Superadmin Allow\", decision=\"allow\", include: exact human operator email",
-    "step5_identityEnrollment": "Add verified OperationalSuperAdminEntry to PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY in worker/auth/cloudflareAccessOperationalAuth.ts",
-    "step6_ingressValidation": "Execute structured negative test matrix (missing JWT, invalid sig, expired, wrong AUD, wrong subject, wrong email)",
-    "step7_ingressCertification": "Record cryptographic verification of live assertion without enabling live DeepSeek canary transport"
+    "laneE_customDomainProvisioning": "Provision Cloudflare Worker Custom Domain ops.velnar.studio (provider manages authoritative DNS and TLS certificate automatically)",
+    "laneC_workerEnvConfig": "Configure non-secret vars CLOUDFLARE_ACCESS_TEAM_DOMAIN=\"https://velnar.cloudflareaccess.com\" and CLOUDFLARE_ACCESS_AUD=\"<64-char AUD>\" in Worker runtime",
+    "laneD_accessAllowPolicy": "Create single deny-by-default Access Allow policy restricted to verified human operator email with zero wildcards or tenant inheritance",
+    "laneD_identityRegistryEnrollment": "Enroll verified human operator email and opaque Access subject into PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY",
+    "laneC_dormantDeploy": "Deploy Worker bundle with dormant barriers still closed",
+    "laneG_ingressVerification": "Execute structured negative test matrix (missing JWT, invalid sig, expired, wrong AUD, wrong subject, wrong email, payload > 64KB)",
+    "laneG_barrierEvaluation": "Controlled unblocking of PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED and INGRESS_AUTH_READY only after separate review"
   },
   "futureMutationBudget": {
-    "cloudflareAccessPolicyCreates": 1,
-    "cloudflareDnsMutations": 1,
-    "workerConfigMutations": 1,
-    "registryCodeCommits": 1,
+    "customDomainProvisioning": 1,
+    "accessAllowPolicyCreate": 1,
+    "workerAccessRuntimeConfigMutation": 1,
+    "registryCodeMutation": 1,
+    "workerDeployment": 1,
+    "explicitManualDnsRecordCreate": 0,
     "gateFlips": 0
   },
   "requiredHumanApprovals": [
-    "HUMAN_APPROVAL_OPERATIONAL_HOSTNAME_DNS_PROVISIONING",
+    "HUMAN_APPROVAL_CUSTOM_DOMAIN_PROVISIONING",
     "HUMAN_APPROVAL_EXACT_SUPERADMIN_IDENTITY_ENROLLMENT",
     "HUMAN_APPROVAL_ACCESS_ALLOW_POLICY_PROVISIONING",
     "HUMAN_APPROVAL_WORKER_ACCESS_CONFIG_UPDATE"
   ],
   "rollbackPlan": {
-    "dnsRollback": "Delete CNAME ops.velnar.studio immediately stops ingress traffic at authoritative DNS",
-    "policyRollback": "Delete human Allow policy immediately restores deny-all posture on Cloudflare Access",
-    "configRollback": "Remove CLOUDFLARE_ACCESS_AUD and CLOUDFLARE_ACCESS_TEAM_DOMAIN from Worker",
+    "customDomainRollback": "Remove Custom Domain ops.velnar.studio from Worker immediately halts all edge ingress",
+    "policyRollback": "Delete human Allow policy immediately restores absolute deny-by-default on Cloudflare Access",
+    "configRollback": "Unset CLOUDFLARE_ACCESS_AUD and CLOUDFLARE_ACCESS_TEAM_DOMAIN in Worker environment",
     "registryRollback": "Revert code commit to restore empty superadmin registry Object.freeze([])"
+  },
+  "ingressErrorMatrix": {
+    "missingJwtAssertion": {
+      "status": 401,
+      "error": "UNAUTHORIZED",
+      "detail": "MISSING_TOKEN"
+    },
+    "invalidSignatureOrMalformed": {
+      "status": 401,
+      "error": "UNAUTHORIZED",
+      "detail": "MALFORMED_TOKEN / SIGNATURE_INVALID"
+    },
+    "expiredToken": {
+      "status": 401,
+      "error": "UNAUTHORIZED",
+      "detail": "TOKEN_EXPIRED"
+    },
+    "audienceMismatch": {
+      "status": 401,
+      "error": "UNAUTHORIZED",
+      "detail": "AUDIENCE_MISMATCH"
+    },
+    "issuerMismatch": {
+      "status": 401,
+      "error": "UNAUTHORIZED",
+      "detail": "ISSUER_MISMATCH"
+    },
+    "subjectNotEnrolled": {
+      "status": 403,
+      "error": "FORBIDDEN",
+      "detail": "SUPERADMIN_NOT_AUTHORIZED / SUPERADMIN_REGISTRY_EMPTY"
+    },
+    "identityBindingMismatch": {
+      "status": 403,
+      "error": "FORBIDDEN",
+      "detail": "IDENTITY_BINDING_MISMATCH"
+    },
+    "httpMethodNotPost": {
+      "status": 405,
+      "error": "METHOD_NOT_ALLOWED",
+      "detail": "Only POST supported on operational endpoint"
+    },
+    "oversizedBodyDeclaredOrStreamed": {
+      "status": 413,
+      "error": "PAYLOAD_TOO_LARGE",
+      "detail": "Body byteLength > 65536 bytes returns HTTP 413 per worker source"
+    },
+    "malformedTopLevelEnvelope": {
+      "status": 400,
+      "error": "INVALID_REQUEST",
+      "detail": "JSON scanner rejects non-exact keys, duplicates, or syntax errors"
+    },
+    "routeDormantBarriersClosed": {
+      "status": 404,
+      "error": "NOT_FOUND",
+      "detail": "Dual barriers return 404 before body read or auth"
+    }
+  },
+  "independentReviewFindingClosure": {
+    "INCORRECT_CNAME_WORKER_ROUTE_ARCHITECTURE": "CLOSED: Architecture corrected to Cloudflare Worker Custom Domain (ops.velnar.studio) where Worker is origin; manual CNAME and Worker Route references removed.",
+    "EXACT_ROUTE_QUERY_STRING_MATCHING_RISK": "CLOSED: Custom Domain routes hostname directly to Worker; query string matching hazards eliminated by application-level exact path validation.",
+    "OVERSIZED_BODY_STATUS_MISMATCH": "CLOSED: Corrected oversized-body specification to HTTP 413 PAYLOAD_TOO_LARGE in compliance with worker/ai/canary/deepSeekProductionWorkerOperationalRoute.ts:387,420.",
+    "TEST_BUILD_INDEPENDENCE_OVERCLAIM": "CLOSED: Separated repairAgentExecutionVerified (true) from independentReviewerExecutionVerified (false)."
   },
   "canonicalSafetyReadinessLedger": {
     "1_PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
@@ -120,6 +189,7 @@
     "cloudflareMutations": 0,
     "d1RealCalls": 0,
     "workerDeployments": 0,
+    "secretMutations": 0,
     "gateFlipOperations": 0
   },
   "nonClaims": {
@@ -127,6 +197,7 @@
     "ingressReady": false,
     "humanAccessPolicyProvisioned": false,
     "humanIdentityEnrolled": false,
+    "customDomainProvisioned": false,
     "dnsProvisioned": false,
     "d1DatabaseCreated": false,
     "d1ProductionBound": false,
