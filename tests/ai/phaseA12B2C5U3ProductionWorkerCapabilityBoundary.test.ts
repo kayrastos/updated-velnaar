@@ -1064,7 +1064,7 @@ describe('VELNAR — A.12B.2C-5U.3.1 Internal Worker Runtime Capability Boundary
 
       const d1Backend = await import('../../worker/ai/canary/d1AuthorizationReplayBackend');
       expect(d1Backend.D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(false);
-      expect(d1Backend.D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(false);
+      expect(d1Backend.D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
       expect(d1Backend.D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
     });
   });

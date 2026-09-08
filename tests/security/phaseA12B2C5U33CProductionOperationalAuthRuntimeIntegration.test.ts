@@ -1374,8 +1374,8 @@ describe('Phase A.12B.2C-5U.3.3C-R: Production Operational Auth Runtime Integrat
       expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(false);
     });
 
-    it('G.10 D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED is strictly false', () => {
-      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(false);
+    it('G.10 D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED is true after explicit adoption', () => {
+      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
     });
 
     it('G.11 D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED is strictly false', () => {

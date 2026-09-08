@@ -768,8 +768,8 @@ describe('VELNAR — A.12B.2C-5U.1 Production Replay Coordinator Offline Foundat
       expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(false);
     });
 
-    it('8.3 D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED is false', () => {
-      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(false);
+    it('8.3 D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED is true after explicit adoption', () => {
+      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
     });
 
     it('8.4 D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED is false', () => {

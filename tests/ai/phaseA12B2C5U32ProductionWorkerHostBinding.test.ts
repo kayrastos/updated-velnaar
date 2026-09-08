@@ -1170,7 +1170,7 @@ describe('VELNAR — A.12B.2C-5U.3.2R Host Worker Env Binding & Hardened Operati
       expect(PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED).toBe(false);
       expect(RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED).toBe(false);
       expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(false);
-      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(false);
+      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
       expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
 
       // 2 operational route gates

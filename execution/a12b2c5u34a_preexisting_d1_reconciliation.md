@@ -40,19 +40,23 @@
   - Region: `EEUR`
   - Created At: `2026-09-08T03:36:03.139Z`
   - Database Size: `421,888` bytes (412 KB)
+  - Provider-reported `numTables`: `28` (internal-object inclusion semantics are undocumented/provider-specific)
+  - Direct `sqlite_schema` table count: `29` (`27` canonical application tables plus `2` known internal tables)
 
 ---
 
 ### 3. Current Time Travel Reference
 - **Time Travel Bookmark Acquired**: `true` (Read-only retrieval via `wrangler d1 time-travel info`)
-- **Current Bookmark SHA-256**: `366a10afe157c2d26f721d61d551e71253f9ac64c9e5ea426ce4b3aa8c2ec467`
+- **Previously Recorded Bookmark SHA-256**: `366a10afe157c2d26f721d61d551e71253f9ac64c9e5ea426ce4b3aa8c2ec467`
+- **Current Read-Only Bookmark SHA-256**: `bf7cf34aa69dce3ddc246dec8757ee1396ade461d0278d23eb91f4ce640413fa`
+- **Bookmark Hash Interpretation**: equality is not required, and a hash cannot prove bookmark ordering
 - **Raw Bookmark Committed**: `false`
 - **Restore Executed**: `false` (Destructive restore is strictly unauthorized)
 
 ---
 
 ### 4. Migration Ledger & Unapplied Inventory
-- **Unapplied Migration Count**: `0`
+- **Unapplied Migration Count**: `0` (verified no unapplied canonical migrations; list empty)
 - **Wrangler Verification**: `No migrations to apply!` (Checked against canonical migrations directory)
 - **Applied Migration Ledger (`d1_migrations` table)**:
   - Total applied migrations: `8`
@@ -149,7 +153,7 @@ All mutations remained strictly **`0`**:
 ---
 
 ### 9. Canonical Safety State & Controls
-All 12 safety gates remain closed and untouched:
+Gate 10 is explicitly adopted and true; the remaining 11 safety gates remain closed:
 1. `PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED = false`
 2. `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY = false`
 3. `CANARY_LIVE_EXECUTION_ENABLED = false`
@@ -159,7 +163,7 @@ All 12 safety gates remain closed and untouched:
 7. `PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED = false`
 8. `RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED = false`
 9. `D1_REPLAY_BACKEND_PRODUCTION_BOUND = false`
-10. `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED = false`
+10. `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED = true`
 11. `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED = false`
 12. `productionRoutingEnforcementAllowed = false`
 
