@@ -1,0 +1,143 @@
+{
+  "phase": "A.12B.2C-5U.3.3F",
+  "artifactType": "DORMANT_OPERATIONAL_INGRESS_VERIFICATION_READINESS_AUDIT",
+  "repository": "https://github.com/kayrastos/updated-velnaar",
+  "branch": "main",
+  "timestamp": "2026-09-08T04:30:00.000Z",
+  "canonicalBaseCommit": "3ab126c6a6176ef42c31650d8c77fcad778798d8",
+  "canonicalBaseTree": "1a1fcb6fbf98b633aef09d8b6231f01ed526aef2",
+  "sealedPredecessor": "A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED",
+  "scope": "Dormant Operational Ingress Verification Readiness Audit",
+  "readOnly": true,
+  "readinessResult": "BLOCKED_BY_EXPLICIT_PREREQUISITES",
+  "status": "A12B2C5U33F_DORMANT_OPERATIONAL_INGRESS_VERIFICATION_READINESS_AUDITED",
+  "finalStatus": "A12B2C5U33F_DORMANT_OPERATIONAL_INGRESS_VERIFICATION_READINESS_AUDITED",
+  "independentReviewRequired": true,
+  "sourceFilesInspected": [
+    "worker/index.ts",
+    "worker/env.ts",
+    "worker/auth/cloudflareAccessOperationalAuth.ts",
+    "worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts",
+    "worker/ai/canary/deepSeekProductionWorkerOperationalRoute.ts",
+    "wrangler.jsonc"
+  ],
+  "testsExecuted": 2508,
+  "testResults": "PASS",
+  "typecheckResult": "PASS",
+  "buildResult": "PASS",
+  "currentState": {
+    "cloudflareAccessApplicationProvisioned": true,
+    "cloudflareAccessApplicationType": "self_hosted",
+    "targetHostnameCandidate": "ops.velnar.studio",
+    "exactOperationalPath": "/api/ops/canary/deepseek-certification",
+    "exactAccessDomain": "ops.velnar.studio/api/ops/canary/deepseek-certification",
+    "applicationSessionDuration": "15m",
+    "autoRedirectToIdentity": false,
+    "allowAuthenticateViaWarp": false,
+    "appLauncherVisible": false,
+    "accessPoliciesCount": 0,
+    "authDomain": "velnar.cloudflareaccess.com",
+    "normalizedFutureWorkerTeamDomain": "https://velnar.cloudflareaccess.com",
+    "dnsState": "ABSENT",
+    "humanOperationalIdentityEnrolled": false,
+    "productionSuperAdminRegistryEntryCount": 0,
+    "productionSuperAdminRegistryFrozen": true,
+    "operationalRouteEnabled": false,
+    "ingressReady": false
+  },
+  "readinessDistinction": {
+    "ACCESS_APPLICATION_PROVISIONED": true,
+    "INGRESS_AUTH_READY": false,
+    "explanation": "Resource existence in Cloudflare Zero Trust does not equal ingress readiness. Ingress requires DNS routing, Worker route binding, non-secret env vars, human allow policy, identity registry enrollment, and barrier unblocking."
+  },
+  "identifiedPrerequisites": [
+    "Creation of exact DNS record ops.velnar.studio (LANE E)",
+    "Creation of dedicated Worker route ops.velnar.studio/* (LANE E)",
+    "Provisioning of non-secret Worker variables CLOUDFLARE_ACCESS_TEAM_DOMAIN and CLOUDFLARE_ACCESS_AUD (LANE C)",
+    "Creation of single deny-by-default human Access Allow policy (LANE D)",
+    "Enrollment of verified human operator email and Access subject into PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY (LANE D)",
+    "Worker deployment with updated registry and configuration (LANE C)",
+    "Verification of CF-Access-JWT-Assertion resolution across all failure modes (LANE D/G)",
+    "Controlled unblocking of PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED and INGRESS_AUTH_READY (LANE G)"
+  ],
+  "blockingPrerequisites": [
+    "PREREQ_INGRESS_1_DNS_ABSENT",
+    "PREREQ_INGRESS_2_WORKER_ROUTE_UNCONFIGURED",
+    "PREREQ_INGRESS_3_WORKER_ACCESS_VARS_UNCONFIGURED",
+    "PREREQ_INGRESS_4_HUMAN_ALLOW_POLICY_ABSENT",
+    "PREREQ_INGRESS_5_OPERATIONAL_IDENTITY_NOT_ENROLLED",
+    "PREREQ_INGRESS_6_SUPERADMIN_REGISTRY_EMPTY",
+    "PREREQ_INGRESS_7_ROUTE_BARRIERS_CLOSED"
+  ],
+  "futureMutationPlan": {
+    "step1_dnsProvisioning": "Create CNAME ops.velnar.studio pointing to Worker host under active velnar.studio zone",
+    "step2_workerRouteBinding": "Configure Worker route ops.velnar.studio/api/ops/canary/deepseek-certification in wrangler.jsonc / dashboard",
+    "step3_workerEnvConfig": "Set CLOUDFLARE_ACCESS_TEAM_DOMAIN=\"https://velnar.cloudflareaccess.com\" and CLOUDFLARE_ACCESS_AUD=\"<64-char AUD>\"",
+    "step4_accessAllowPolicy": "Create single policy: name=\"VELNAR Human Superadmin Allow\", decision=\"allow\", include: exact human operator email",
+    "step5_identityEnrollment": "Add verified OperationalSuperAdminEntry to PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY in worker/auth/cloudflareAccessOperationalAuth.ts",
+    "step6_ingressValidation": "Execute structured negative test matrix (missing JWT, invalid sig, expired, wrong AUD, wrong subject, wrong email)",
+    "step7_ingressCertification": "Record cryptographic verification of live assertion without enabling live DeepSeek canary transport"
+  },
+  "futureMutationBudget": {
+    "cloudflareAccessPolicyCreates": 1,
+    "cloudflareDnsMutations": 1,
+    "workerConfigMutations": 1,
+    "registryCodeCommits": 1,
+    "gateFlips": 0
+  },
+  "requiredHumanApprovals": [
+    "HUMAN_APPROVAL_OPERATIONAL_HOSTNAME_DNS_PROVISIONING",
+    "HUMAN_APPROVAL_EXACT_SUPERADMIN_IDENTITY_ENROLLMENT",
+    "HUMAN_APPROVAL_ACCESS_ALLOW_POLICY_PROVISIONING",
+    "HUMAN_APPROVAL_WORKER_ACCESS_CONFIG_UPDATE"
+  ],
+  "rollbackPlan": {
+    "dnsRollback": "Delete CNAME ops.velnar.studio immediately stops ingress traffic at authoritative DNS",
+    "policyRollback": "Delete human Allow policy immediately restores deny-all posture on Cloudflare Access",
+    "configRollback": "Remove CLOUDFLARE_ACCESS_AUD and CLOUDFLARE_ACCESS_TEAM_DOMAIN from Worker",
+    "registryRollback": "Revert code commit to restore empty superadmin registry Object.freeze([])"
+  },
+  "canonicalSafetyReadinessLedger": {
+    "1_PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+    "2_PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+    "3_CANARY_LIVE_EXECUTION_ENABLED": false,
+    "4_CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+    "5_GUARDED_SOURCE_ATTESTATION_READY": false,
+    "6_GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+    "7_PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+    "8_RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+    "9_D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
+    "10_D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
+    "11_D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
+    "12_productionRoutingEnforcementAllowed": false
+  },
+  "registryState": {
+    "length": 0,
+    "frozen": true
+  },
+  "callAudit": {
+    "providerCalls": 0,
+    "cloudflareMutations": 0,
+    "d1RealCalls": 0,
+    "workerDeployments": 0,
+    "gateFlipOperations": 0
+  },
+  "nonClaims": {
+    "ingressCertified": false,
+    "ingressReady": false,
+    "humanAccessPolicyProvisioned": false,
+    "humanIdentityEnrolled": false,
+    "dnsProvisioned": false,
+    "d1DatabaseCreated": false,
+    "d1ProductionBound": false,
+    "d1ConcurrencyCertified": false,
+    "workerProductionConfigMutated": false,
+    "workerDeployed": false,
+    "routeEnabled": false,
+    "liveExecutionEnabled": false,
+    "trustAnchorProvisioned": false,
+    "sourceProvenanceAnchorProvisioned": false,
+    "productionRoutingEnforcementAllowed": false,
+    "providerCanaryExecuted": false
+  }
+}

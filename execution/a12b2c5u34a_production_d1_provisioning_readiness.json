@@ -1,0 +1,175 @@
+{
+  "phase": "A.12B.2C-5U.3.4A",
+  "artifactType": "PRODUCTION_D1_PROVISIONING_READINESS_AUDIT",
+  "repository": "https://github.com/kayrastos/updated-velnaar",
+  "branch": "main",
+  "timestamp": "2026-09-08T04:30:00.000Z",
+  "canonicalBaseCommit": "3ab126c6a6176ef42c31650d8c77fcad778798d8",
+  "canonicalBaseTree": "1a1fcb6fbf98b633aef09d8b6231f01ed526aef2",
+  "sealedPredecessor": "A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED",
+  "scope": "Production D1 Provisioning Readiness Audit",
+  "readOnly": true,
+  "readinessResult": "READY_FOR_BOUNDED_EXECUTION",
+  "status": "A12B2C5U34A_PRODUCTION_D1_PROVISIONING_READINESS_AUDITED",
+  "finalStatus": "A12B2C5U34A_PRODUCTION_D1_PROVISIONING_READINESS_AUDITED",
+  "independentReviewRequired": true,
+  "sourceFilesInspected": [
+    "wrangler.jsonc",
+    "worker/env.ts",
+    "worker/ai/canary/d1AuthorizationReplayBackend.ts",
+    "worker/ai/canary/deepSeekDurableAuthorizationReplayLedger.ts",
+    "migrations/0001_initial_schema.sql",
+    "migrations/0002_indexes_and_performance.sql",
+    "migrations/0003_ai_intelligence_layer.sql",
+    "migrations/0004_growth_action_policy_hardening.sql",
+    "migrations/0005_appointment_concurrency_hardening.sql",
+    "migrations/0006_appointment_identity_resource_hardening.sql",
+    "migrations/0007_ai_run_protocol_hardening.sql",
+    "migrations/0008_authorization_replay_ledger.sql",
+    "tests/migrations/migrationSchema.test.ts",
+    "tests/ai/phaseA12B2C5TD1DurableAuthorizationReplayBackend.test.ts"
+  ],
+  "testsExecuted": 2508,
+  "testResults": "PASS",
+  "typecheckResult": "PASS",
+  "buildResult": "PASS",
+  "currentState": {
+    "d1ReplayBackendProductionBound": false,
+    "d1ReplayBackendRealDatabaseProvisioned": false,
+    "d1ReplayBackendRealConcurrencyCertified": false,
+    "currentBindingPlaceholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "proposedCanonicalDatabaseName": "velnar-production-db",
+    "expectedWorkerBindingName": "DB",
+    "currentWorkerSourceBindingExpected": true,
+    "migrationsDirectory": "migrations",
+    "canonicalMigrationCount": 8
+  },
+  "databaseSpecification": {
+    "proposedDatabaseName": "velnar-production-db",
+    "expectedBindingName": "DB",
+    "migrationsDir": "migrations",
+    "compatibilityFlags": [
+      "nodejs_compat"
+    ]
+  },
+  "requiredMigrations": [
+    {
+      "order": 1,
+      "file": "0001_initial_schema.sql",
+      "description": "Core 23 canonical multi-tenant tables"
+    },
+    {
+      "order": 2,
+      "file": "0002_indexes_and_performance.sql",
+      "description": "Performance and constraint indexes"
+    },
+    {
+      "order": 3,
+      "file": "0003_ai_intelligence_layer.sql",
+      "description": "AI telemetry and spend tracking tables"
+    },
+    {
+      "order": 4,
+      "file": "0004_growth_action_policy_hardening.sql",
+      "description": "Action policy hardening"
+    },
+    {
+      "order": 5,
+      "file": "0005_appointment_concurrency_hardening.sql",
+      "description": "Concurrency state transitions"
+    },
+    {
+      "order": 6,
+      "file": "0006_appointment_identity_resource_hardening.sql",
+      "description": "Identity resource constraints"
+    },
+    {
+      "order": 7,
+      "file": "0007_ai_run_protocol_hardening.sql",
+      "description": "Run protocol telemetry schemas"
+    },
+    {
+      "order": 8,
+      "file": "0008_authorization_replay_ledger.sql",
+      "description": "Canonical single-use authorization replay ledger"
+    }
+  ],
+  "schemaInvariants": {
+    "replayLedgerTableName": "authorization_replay_ledger",
+    "primaryKey": "replay_key TEXT PRIMARY KEY (64 hex characters)",
+    "atomicInsertionSql": "INSERT INTO authorization_replay_ledger (...) VALUES (...) ON CONFLICT(replay_key) DO NOTHING RETURNING replay_key;",
+    "retentionPolicy": "Append-only retention; no purge operations during reservation",
+    "integerMinorUnits": "All monetary fields enforce integer minor units (microUSD), no REAL money columns"
+  },
+  "executionSequenceSteps": {
+    "STEP_A": "Create exactly one production D1 database via wrangler d1 create velnar-production-db",
+    "STEP_B": "Read back exact database UUID from Cloudflare response and verify unambiguous ownership",
+    "STEP_C": "Record minimized database identity (SHA-256 digest of DB UUID) in evidence",
+    "STEP_D": "Perform pre-migration inspection to confirm 0 pre-existing tables",
+    "STEP_E": "Apply migrations 0001 through 0008 sequentially via wrangler d1 migrations apply velnar-production-db --remote",
+    "STEP_F": "Post-migration schema verification: verify presence of all tables and authorization_replay_ledger schema",
+    "STEP_G": "Functional smoke verification: verify reserveIfAbsent atomic conflict behavior on test nonces",
+    "STEP_H": "Verify backup / export feasibility via Cloudflare D1 automated backup snapshot",
+    "STEP_I": "Leave production binding CLOSED (database_id updated in config but route and gates remain dormant)"
+  },
+  "productionDbDeletionProhibited": true,
+  "concurrencyCertificationSeparate": true,
+  "futureMutationBudget": {
+    "d1DatabaseCreates": 1,
+    "d1DatabaseDeletes": 0,
+    "d1MigrationRuns": 1,
+    "wranglerConfigMutations": 1
+  },
+  "requiredHumanApprovals": [
+    "HUMAN_APPROVAL_PRODUCTION_D1_DATABASE_CREATION",
+    "HUMAN_APPROVAL_REMOTE_D1_MIGRATION_EXECUTION"
+  ],
+  "rollbackPlan": {
+    "failedCreationRollback": "If creation fails or produces ambiguous ID, stop immediately without updating wrangler.jsonc",
+    "failedMigrationRollback": "If migration fails midway, inspect applied migration ledger; D1 transactions prevent partial file application; do NOT delete production DB without explicit authorization",
+    "configRollback": "Revert wrangler.jsonc database_id back to placeholder xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  },
+  "canonicalSafetyReadinessLedger": {
+    "1_PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+    "2_PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+    "3_CANARY_LIVE_EXECUTION_ENABLED": false,
+    "4_CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+    "5_GUARDED_SOURCE_ATTESTATION_READY": false,
+    "6_GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+    "7_PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+    "8_RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+    "9_D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
+    "10_D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
+    "11_D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
+    "12_productionRoutingEnforcementAllowed": false
+  },
+  "registryState": {
+    "length": 0,
+    "frozen": true
+  },
+  "callAudit": {
+    "providerCalls": 0,
+    "cloudflareMutations": 0,
+    "d1RealCalls": 0,
+    "workerDeployments": 0,
+    "gateFlipOperations": 0
+  },
+  "nonClaims": {
+    "ingressCertified": false,
+    "ingressReady": false,
+    "humanAccessPolicyProvisioned": false,
+    "humanIdentityEnrolled": false,
+    "dnsProvisioned": false,
+    "d1DatabaseCreated": false,
+    "d1ProductionBound": false,
+    "d1ConcurrencyCertified": false,
+    "workerProductionConfigMutated": false,
+    "workerDeployed": false,
+    "routeEnabled": false,
+    "liveExecutionEnabled": false,
+    "trustAnchorProvisioned": false,
+    "sourceProvenanceAnchorProvisioned": false,
+    "productionRoutingEnforcementAllowed": false,
+    "providerCanaryExecuted": false
+  }
+}

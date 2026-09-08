@@ -1,0 +1,171 @@
+{
+  "phase": "A.12B.2C-5U.3.4B",
+  "artifactType": "WORKER_PRODUCTION_BINDING_DEPLOYMENT_READINESS_AUDIT",
+  "repository": "https://github.com/kayrastos/updated-velnaar",
+  "branch": "main",
+  "timestamp": "2026-09-08T04:30:00.000Z",
+  "canonicalBaseCommit": "3ab126c6a6176ef42c31650d8c77fcad778798d8",
+  "canonicalBaseTree": "1a1fcb6fbf98b633aef09d8b6231f01ed526aef2",
+  "sealedPredecessor": "A12B2C5U33E_CLOUDFLARE_ACCESS_DORMANT_PROVISIONING_EXECUTION_APPROVED",
+  "scope": "Worker Production Binding & Deployment Readiness Audit",
+  "readOnly": true,
+  "readinessResult": "BLOCKED_BY_EXPLICIT_PREREQUISITES",
+  "status": "A12B2C5U34B_WORKER_PRODUCTION_BINDING_DEPLOYMENT_READINESS_AUDITED",
+  "finalStatus": "A12B2C5U34B_WORKER_PRODUCTION_BINDING_DEPLOYMENT_READINESS_AUDITED",
+  "independentReviewRequired": true,
+  "sourceFilesInspected": [
+    "worker/index.ts",
+    "worker/env.ts",
+    "worker/routes/securityRouter.ts",
+    "worker/ai/canary/deepSeekProductionWorkerOperationalRoute.ts",
+    "worker/ai/canary/deepSeekProductionOperationalRoutePolicy.ts",
+    "wrangler.jsonc",
+    "package.json"
+  ],
+  "testsExecuted": 2508,
+  "testResults": "PASS",
+  "typecheckResult": "PASS",
+  "buildResult": "PASS",
+  "currentState": {
+    "workerBuildPassing": true,
+    "workerTypecheckPassing": true,
+    "workerMainEntry": "worker/index.ts",
+    "compatibilityDate": "2026-08-24",
+    "compatibilityFlags": [
+      "nodejs_compat"
+    ],
+    "assetsDirectory": "./dist",
+    "assetsBinding": "ASSETS",
+    "runWorkerFirst": [
+      "/api/*"
+    ],
+    "d1BindingConfiguredWithPlaceholder": true,
+    "accessVariablesConfigured": false,
+    "productionSecretsConfiguredInRepo": false,
+    "operationalRouteEnabled": false,
+    "operationalIngressReady": false,
+    "liveExecutionEnabled": false
+  },
+  "deploymentPrerequisites": [
+    "PREREQ_DEPLOY_1_D1_DATABASE_PROVISIONED",
+    "PREREQ_DEPLOY_2_D1_MIGRATIONS_APPLIED",
+    "PREREQ_DEPLOY_3_WRANGLER_D1_UUID_CONFIGURED",
+    "PREREQ_DEPLOY_4_ACCESS_RUNTIME_VARS_CONFIGURED",
+    "PREREQ_DEPLOY_5_PRODUCTION_KMS_SECRETS_PROVISIONED",
+    "PREREQ_DEPLOY_6_SOURCE_PROVENANCE_BUNDLE_HASH_CAPTURED"
+  ],
+  "blockingPrerequisites": [
+    "PREREQ_DEPLOY_1_D1_DATABASE_PROVISIONED",
+    "PREREQ_DEPLOY_2_D1_MIGRATIONS_APPLIED",
+    "PREREQ_DEPLOY_3_WRANGLER_D1_UUID_CONFIGURED",
+    "PREREQ_DEPLOY_4_ACCESS_RUNTIME_VARS_CONFIGURED",
+    "PREREQ_DEPLOY_5_PRODUCTION_KMS_SECRETS_PROVISIONED"
+  ],
+  "bindingSpecifications": {
+    "d1Binding": {
+      "name": "DB",
+      "type": "D1Database",
+      "targetDb": "velnar-production-db"
+    },
+    "nonSecretVars": [
+      {
+        "key": "ENVIRONMENT",
+        "value": "production"
+      },
+      {
+        "key": "ALLOWED_ORIGINS",
+        "value": "https://app.velnar.studio,https://velnar.studio"
+      },
+      {
+        "key": "CLOUDFLARE_ACCESS_TEAM_DOMAIN",
+        "value": "https://velnar.cloudflareaccess.com"
+      },
+      {
+        "key": "CLOUDFLARE_ACCESS_AUD",
+        "value": "<64-char-aud-from-5u33e>"
+      }
+    ],
+    "productionSecrets": [
+      "VELNAR_MASTER_KMS_SECRET",
+      "AUDIT_IP_HASH_SECRET",
+      "DEEPSEEK_API_KEY"
+    ]
+  },
+  "deploymentExecutionChain": {
+    "step1_preBuildVerification": "Ensure working tree clean at reviewed commit and tsc --noEmit passes",
+    "step2_buildExecution": "Run npm run build (vite build) to generate ./dist static assets",
+    "step3_bundleHashCapture": "Compute SHA-256 hash of dist/ and compiled worker output",
+    "step4_secretsVerification": "Verify via wrangler secret list (non-disclosing) that production secrets exist",
+    "step5_dormantDeploy": "Deploy Worker via wrangler deploy without route gate activation",
+    "step6_postDeployVerification": "Verify deployment version ID, health check endpoint (/api/health), and dormant operational route (returns 404)"
+  },
+  "deploymentNonClaims": {
+    "deploymentImpliesRouteActive": false,
+    "deploymentImpliesIngressReady": false,
+    "deploymentImpliesLiveExecution": false,
+    "deploymentImpliesProviderCertified": false,
+    "deploymentImpliesProductionRoutingAllowed": false
+  },
+  "futureMutationBudget": {
+    "workerDeployments": 1,
+    "wranglerConfigMutations": 1,
+    "secretMutations": 0,
+    "gateFlips": 0
+  },
+  "requiredHumanApprovals": [
+    "HUMAN_APPROVAL_WORKER_PRODUCTION_CONFIG_MUTATION",
+    "HUMAN_APPROVAL_WORKER_PRODUCTION_DEPLOYMENT"
+  ],
+  "rollbackPlan": {
+    "rollbackTarget": "Immediate rollback to previous Worker deployment version via wrangler rollback or redeploying prior commit",
+    "triggerSet": [
+      "Health check /api/health fails or returns non-200",
+      "Operational route does not return 404 (dormancy leak)",
+      "Database binding DB fails initialization",
+      "Asset serving ASSETS returns 500"
+    ]
+  },
+  "canonicalSafetyReadinessLedger": {
+    "1_PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+    "2_PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+    "3_CANARY_LIVE_EXECUTION_ENABLED": false,
+    "4_CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+    "5_GUARDED_SOURCE_ATTESTATION_READY": false,
+    "6_GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+    "7_PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+    "8_RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+    "9_D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
+    "10_D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
+    "11_D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
+    "12_productionRoutingEnforcementAllowed": false
+  },
+  "registryState": {
+    "length": 0,
+    "frozen": true
+  },
+  "callAudit": {
+    "providerCalls": 0,
+    "cloudflareMutations": 0,
+    "d1RealCalls": 0,
+    "workerDeployments": 0,
+    "gateFlipOperations": 0
+  },
+  "nonClaims": {
+    "ingressCertified": false,
+    "ingressReady": false,
+    "humanAccessPolicyProvisioned": false,
+    "humanIdentityEnrolled": false,
+    "dnsProvisioned": false,
+    "d1DatabaseCreated": false,
+    "d1ProductionBound": false,
+    "d1ConcurrencyCertified": false,
+    "workerProductionConfigMutated": false,
+    "workerDeployed": false,
+    "routeEnabled": false,
+    "liveExecutionEnabled": false,
+    "trustAnchorProvisioned": false,
+    "sourceProvenanceAnchorProvisioned": false,
+    "productionRoutingEnforcementAllowed": false,
+    "providerCanaryExecuted": false
+  }
+}
