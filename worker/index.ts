@@ -92,6 +92,21 @@ export function getValidatedCorsOrigin(
 export default {
   async fetch(request: Request, env: WorkerEnv, ctx?: any): Promise<Response> {
     const url = new URL(request.url);
+
+    // Host-level Surface Isolation: Operational domain ops.velnar.studio must NEVER expose tenant routes
+    if (url.hostname === 'ops.velnar.studio' || url.hostname.startsWith('ops.')) {
+      if (url.pathname === PRODUCTION_CANARY_OPERATIONAL_ROUTE_PATH) {
+        return handleProductionCanaryOperationalRoute(request, env);
+      }
+      return new Response(JSON.stringify({ error: 'NOT_FOUND' }), {
+        status: 404,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
+    }
+
     const origin = request.headers.get('Origin');
     const environment = env?.ENVIRONMENT || 'production';
     const validatedOrigin = getValidatedCorsOrigin(origin, environment, env?.ALLOWED_ORIGINS);

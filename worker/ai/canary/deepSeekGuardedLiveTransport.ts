@@ -90,6 +90,7 @@ import type {
 import { SEMANTIC_SCORE_MIN_THRESHOLD } from './deepSeekSuccessorCertificationStateMachine';
 import { OutputValidator } from '../outputValidator';
 import { EvaluationScorer } from '../evaluation/evaluationScorer';
+import { SovereignBoundaryEnforcer } from '../sovereignBoundary';
 
 // ============================================================================
 // 1. MODULE CONSTANTS
@@ -923,6 +924,41 @@ async function executeCanonicalDispatchAfterCredential(
           `REQUEST_DESCRIPTOR_INTEGRITY_FAILURE: Serialized request SHA256 '${serialization.payloadHash}' does not match sealed descriptor hash '${descriptor.requestPayloadHash}'.`,
         ],
         providerNetworkCalls,
+        credentialReads,
+        transportAttempts,
+        completedTasks: invocationRecords.length,
+        candidate: null,
+        invocationResponses,
+        invocationRecords,
+        observedTotalCostMicroUsd,
+        authorizedBudgetMicroUsd: context.maxBudgetMicroUsd,
+        aggregateSemanticScore: 0,
+        allTasksPassed: false,
+        allSchemasValid: false,
+        finalCertificationEligible: false,
+      };
+    }
+
+    // Sovereign Boundary Outbound Validation (Fail-Closed Barrier BEFORE network call)
+    const sovereignCheck = SovereignBoundaryEnforcer.validateOutboundProviderRequest({
+      provider: descriptor.provider,
+      destinationUrl: descriptor.endpoint,
+      model: descriptor.requestedModel,
+      taskType,
+      payload: descriptor.requestBody,
+      serializedBody: serialization.payloadString,
+      classification: 'GREY',
+      isSanitized: true,
+      isMinimized: true,
+    });
+
+    if (!sovereignCheck.ok) {
+      return {
+        success: false,
+        status: 'REQUEST_INTEGRITY_FAILED',
+        failureCategory: 'TASK_FAILURE',
+        errors: sovereignCheck.errors,
+        providerNetworkCalls, // Remains 0 (or previous count) - network dispatch is NEVER reached
         credentialReads,
         transportAttempts,
         completedTasks: invocationRecords.length,

@@ -1,0 +1,55 @@
+{
+  "artifactType": "OBSERVED_REMOTE_EXECUTION_EVIDENCE_REPOSITORY_BOUND",
+  "missionPhase": "SEGMENT_B_PRODUCTION_PROVISIONING",
+  "verificationTarget": "CLOUDFLARE_D1_PRODUCTION_REPLAY_BACKEND",
+  "testRunId": "cert_run_1a07f17a810_bb7dfc12",
+  "databaseBinding": "DB",
+  "databaseName": "velnar-production-db",
+  "databaseId": "d65abcb3-d8d6-46fb-9403-a97ab54de303",
+  "startedAt": "2026-09-08T03:37:31.922Z",
+  "completedAt": "2026-09-08T03:37:45.177Z",
+  "concurrencyLevel": 5,
+  "tests": [
+    {
+      "testName": "initial_atomic_reservation",
+      "replayKey": "947ee3f553af74e51fc03c9c5d94caed6e5f09f0ac4df362363230864258b72c",
+      "expectedOutcome": "1 row returned (RESERVED)",
+      "actualOutcome": "1 row returned",
+      "passed": true,
+      "durationMs": 0.3094
+    },
+    {
+      "testName": "replay_duplicate_rejection",
+      "replayKey": "947ee3f553af74e51fc03c9c5d94caed6e5f09f0ac4df362363230864258b72c",
+      "expectedOutcome": "0 rows returned (CONFLICT_DO_NOTHING)",
+      "actualOutcome": "0 rows returned",
+      "passed": true,
+      "durationMs": 0.269
+    },
+    {
+      "testName": "concurrent_race_atomicity",
+      "replayKey": "8ff413a80c5e49cbc04b658d418336ec626a2e4a3af1427f28f8d35be4cb9eae",
+      "concurrencyCount": 5,
+      "reservedCount": 1,
+      "rejectedCount": 4,
+      "expectedOutcome": "Exactly 1 reserved, exactly 4 rejected",
+      "actualOutcome": "1 reserved, 4 rejected",
+      "passed": true
+    },
+    {
+      "testName": "bounded_synthetic_cleanup",
+      "expectedDeleted": 2,
+      "actualDeleted": 2,
+      "passed": true
+    }
+  ],
+  "allTestsPassed": true,
+  "verdict": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED_PASS",
+  "canonicalReadinessState": {
+    "remoteDatabaseProvisioned": true,
+    "remoteDatabaseSchemaMigrated": true,
+    "concurrencyCertified": true,
+    "D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
+    "rationale": "Remote D1 infrastructure is fully provisioned and certified in Cloudflare, but runtime binding remains fail-closed (false) pending Hard Gate 2 review and authorized deployment."
+  }
+}

@@ -47,6 +47,7 @@ import { EvaluationSecurityGate } from '../evaluation/evaluationSecurity';
 import { EvaluationScorer } from '../evaluation/evaluationScorer';
 import { OutputValidator } from '../outputValidator';
 import { PromptRegistry } from '../promptRegistry';
+import { SovereignBoundaryEnforcer } from '../sovereignBoundary';
 
 export interface CanaryRunnerOptions {
   phase?: 'A.12B.2C-5A' | 'A.12B.2C-5B';
@@ -1035,6 +1036,28 @@ async function executeTransportPipeline(options: CanaryLiveRunnerOptions): Promi
       }
 
       const requestPayloadHash = crypto.createHash('sha256').update(requestPayloadStr).digest('hex');
+
+      // Critical Pre-Dispatch Barrier: Validate outbound provider request via Sovereign Boundary
+      const sovereignValidation = SovereignBoundaryEnforcer.validateOutboundProviderRequest({
+        provider: params.candidate.providerId,
+        destinationUrl: endpointUrl,
+        model: params.candidate.providerId === 'deepseek' ? 'deepseek-v4-flash' : 'gemini-3.5-flash-lite',
+        payload: { systemPrompt, userPrompt },
+        serializedBody: requestPayloadStr,
+        classification: 'WHITE', // Synthetic canary fixtures are strictly certified WHITE data
+        isSanitized: true,
+        isMinimized: true,
+      });
+
+      if (!sovereignValidation.ok) {
+        const killSwitch: CanaryKillSwitchEvent = {
+          timestamp: now().toISOString(),
+          reason: sovereignValidation.violatedCategories.length > 0 ? 'PRIVACY_CLASSIFICATION_VIOLATION' : 'NETWORK_DESTINATION_MISMATCH',
+          message: `Sovereign boundary pre-dispatch barrier blocked outbound request: ${sovereignValidation.errors.join('; ')}`,
+          terminatedFailClosed: true,
+        };
+        return { success: false, status: 403, killSwitch };
+      }
 
       // Enforce timeout and redirect: 'error'
       const startTime = Date.now();

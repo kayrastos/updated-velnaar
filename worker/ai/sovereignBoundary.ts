@@ -141,51 +141,149 @@ export interface TaskCapsuleValidationResult {
   readonly safeForOutboundDispatch: boolean;
 }
 
+export interface OutboundProviderValidationParams {
+  readonly provider: string;
+  readonly destinationUrl: string;
+  readonly model?: string;
+  readonly taskType?: string;
+  readonly payload?: unknown;
+  readonly serializedBody?: string;
+  readonly capsule?: TaskCapsule;
+  readonly classification?: SovereignClassification;
+  readonly isSanitized?: boolean;
+  readonly isMinimized?: boolean;
+}
+
 // ============================================================================
 // 3. SOVEREIGN BOUNDARY RUNTIME ENFORCEMENT ENGINE
 // ============================================================================
 
 export class SovereignBoundaryEnforcer {
   /**
-   * Scans an arbitrary string or serialized object for BLACK material.
+   * Deterministically and recursively scans an arbitrary value (object, array, nested object,
+   * string, primitive) for BLACK material.
+   * Traverses nested structures fail-closed.
    * Returns list of violated categories (empty if clean).
    */
   public static detectBlackMaterial(data: unknown): string[] {
     if (data === null || data === undefined) return [];
 
-    const serialized = typeof data === 'string' ? data : JSON.stringify(data);
     const violations = new Set<string>();
+    const seen = new WeakSet<object>();
 
-    // 1. Check regex patterns for explicit BLACK categories
-    for (const { category, pattern } of BLACK_MATERIAL_PATTERNS) {
-      if (pattern.test(serialized)) {
-        violations.add(category);
+    function scanString(str: string): void {
+      if (!str || typeof str !== 'string') return;
+      for (const { category, pattern } of BLACK_MATERIAL_PATTERNS) {
+        if (pattern.test(str)) {
+          violations.add(category);
+        }
+      }
+      try {
+        const cls = DataClassifier.classify(str);
+        if (cls === 'SECRET') {
+          violations.add('production secrets');
+        } else if (cls === 'PERSONAL' || cls === 'SENSITIVE') {
+          violations.add('Customer PII and raw identity data');
+        }
+      } catch {
+        // Fallback if string classification throws
       }
     }
 
-    // 2. Cross-check with DataClassifier
-    const classification = DataClassifier.classify(typeof data === 'object' && data !== null ? (data as Record<string, any>) : serialized);
-    if (classification === 'SECRET') {
-      violations.add('production secrets');
-    } else if (classification === 'PERSONAL' || classification === 'SENSITIVE') {
-      violations.add('Customer PII and raw identity data');
+    function walk(val: unknown, depth = 0): void {
+      if (depth > 32) {
+        // Excessively deep structure -> fail closed
+        violations.add('proprietary verification algorithms');
+        return;
+      }
+      if (val === null || val === undefined) return;
+
+      if (typeof val === 'string') {
+        scanString(val);
+      } else if (typeof val === 'number' || typeof val === 'boolean') {
+        // Safe primitive
+      } else if (typeof val === 'object') {
+        if (seen.has(val as object)) {
+          // Circular reference -> fail closed
+          violations.add('proprietary verification algorithms');
+          return;
+        }
+        seen.add(val as object);
+
+        if (Array.isArray(val)) {
+          for (const item of val) {
+            walk(item, depth + 1);
+          }
+        } else {
+          // Object: scan property keys AND property values
+          for (const [k, v] of Object.entries(val)) {
+            scanString(k);
+            walk(v, depth + 1);
+          }
+          // Also run DataClassifier on the object directly
+          try {
+            const cls = DataClassifier.classify(val as Record<string, any>);
+            if (cls === 'SECRET') {
+              violations.add('production secrets');
+            } else if (cls === 'PERSONAL' || cls === 'SENSITIVE') {
+              violations.add('Customer PII and raw identity data');
+            }
+          } catch {
+            violations.add('proprietary verification algorithms');
+          }
+        }
+      } else {
+        // Function, Symbol, BigInt are not permitted in task capsules -> fail closed
+        violations.add('proprietary verification algorithms');
+      }
+    }
+
+    try {
+      walk(data);
+    } catch {
+      violations.add('proprietary verification algorithms');
     }
 
     return Array.from(violations);
   }
 
   /**
-   * Verifies destination URL against certified provider allowlist.
+   * Hardened destination URL verification against certified provider allowlist.
+   * Parses using standard URL constructor and enforces:
+   * - protocol === 'https:'
+   * - No username or password (userinfo)
+   * - Exact allowed hostname (no suffix, no prefix, no substring matching)
+   * - Exact allowed pathname
+   * - Standard port only (reject unexpected ports)
+   * - No query parameters (search must be empty)
+   * - No fragments (hash must be empty)
+   * - Default fail-closed on malformed or unparseable URLs.
    */
   public static isDestinationAllowed(provider: string, destinationUrl: string): boolean {
+    if (!provider || !destinationUrl || typeof destinationUrl !== 'string') return false;
     const config = CERTIFIED_PROVIDER_DESTINATIONS[provider.toLowerCase()];
     if (!config) return false;
-    return destinationUrl === config.endpoint;
+
+    try {
+      const parsed = new URL(destinationUrl);
+      if (parsed.protocol !== 'https:') return false;
+      if (parsed.username || parsed.password) return false;
+      if (parsed.hostname !== config.host) return false;
+      if (parsed.pathname !== config.path) return false;
+      if (parsed.port && parsed.port !== '443' && parsed.port !== '') return false;
+      if (parsed.search && parsed.search !== '') return false;
+      if (parsed.hash && parsed.hash !== '') return false;
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
    * Validates a Task Capsule before outbound dispatch to an external AI model.
    * Enforces Sovereign Boundary invariants fail-closed.
+   * Classification label is NOT authority: BLACK detection is performed on all payloads,
+   * even if claimed to be WHITE or GREY.
    */
   public static validateOutboundTaskCapsule(
     capsule: TaskCapsule,
@@ -207,32 +305,38 @@ export class SovereignBoundaryEnforcer {
       };
     }
 
-    // 1. Destination verification
+    // 1. Hardened destination verification
     const destinationAllowed = this.isDestinationAllowed(targetProvider, targetDestination);
     if (!destinationAllowed) {
       errors.push(`OUTBOUND_DESTINATION_FORBIDDEN: Target destination ${targetDestination} for provider ${targetProvider} is outside certified allowlist.`);
     }
 
-    // 2. Classification rules enforcement
+    // 2. Explicit BLACK classification check
     if (capsule.classification === 'BLACK') {
       errors.push('SOVEREIGN_BOUNDARY_CLASSIFICATION_BLACK: Capsule explicitly classified as BLACK. Outbound transmission forbidden.');
+    }
+
+    // 3. Payload size bound check (fail fast before deep scan)
+    let serializedPayload = '';
+    try {
+      serializedPayload = typeof capsule.payload === 'string' ? capsule.payload : JSON.stringify(capsule.payload ?? '');
+    } catch {
+      errors.push('TASK_CAPSULE_SERIALIZATION_FAILED: Payload cannot be deterministically serialized.');
       return {
         ok: false,
-        classification: 'BLACK',
+        classification: capsule.classification || 'BLACK',
         errors,
-        violatedCategories: [],
+        violatedCategories: ['proprietary verification algorithms'],
         destinationAllowed,
         safeForOutboundDispatch: false,
       };
     }
 
-    // 3. Payload size bound check (fail fast before deep regex scan)
-    const serializedPayload = JSON.stringify(capsule.payload ?? '');
     if (Buffer.byteLength(serializedPayload, 'utf-8') > MAX_TASK_CAPSULE_BYTES) {
       errors.push(`TASK_CAPSULE_SIZE_EXCEEDED: Size exceeds maximum allowed ${MAX_TASK_CAPSULE_BYTES} bytes.`);
       return {
         ok: false,
-        classification: capsule.classification,
+        classification: capsule.classification || 'BLACK',
         errors,
         violatedCategories: [],
         destinationAllowed,
@@ -240,7 +344,7 @@ export class SovereignBoundaryEnforcer {
       };
     }
 
-    // 4. Scan entire capsule (payload + metadata) for BLACK material
+    // 4. Scan entire capsule (payload + metadata) for BLACK material regardless of claimed classification
     const payloadViolations = this.detectBlackMaterial(capsule.payload);
     const metaViolations = this.detectBlackMaterial(capsule.metadata);
     for (const v of payloadViolations) violatedCategories.push(v);
@@ -250,17 +354,9 @@ export class SovereignBoundaryEnforcer {
 
     if (violatedCategories.length > 0) {
       errors.push(`SOVEREIGN_BOUNDARY_BLACK_DATA_DETECTED: Categories: ${violatedCategories.join(', ')}`);
-      return {
-        ok: false,
-        classification: 'BLACK',
-        errors,
-        violatedCategories,
-        destinationAllowed,
-        safeForOutboundDispatch: false,
-      };
     }
 
-    // 5. GREY requirements
+    // 5. GREY / WHITE classification requirements
     if (capsule.classification === 'GREY') {
       if (!capsule.isSanitized) {
         errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be explicitly sanitized before outbound dispatch.');
@@ -268,15 +364,125 @@ export class SovereignBoundaryEnforcer {
       if (!capsule.isMinimized) {
         errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be strictly minimized to bounded task capsule context.');
       }
-    } else if (capsule.classification !== 'WHITE') {
+    } else if (capsule.classification !== 'WHITE' && capsule.classification !== 'BLACK') {
       errors.push(`UNKNOWN_SOVEREIGN_CLASSIFICATION: ${capsule.classification}`);
     }
 
-    const ok = errors.length === 0 && destinationAllowed;
+    const ok = errors.length === 0 && destinationAllowed && violatedCategories.length === 0 && capsule.classification !== 'BLACK';
 
     return {
       ok,
-      classification: capsule.classification,
+      classification: violatedCategories.length > 0 ? 'BLACK' : capsule.classification,
+      errors,
+      violatedCategories,
+      destinationAllowed,
+      safeForOutboundDispatch: ok,
+    };
+  }
+
+  /**
+   * Primary single fail-closed enforcement point called immediately before any provider network dispatch.
+   * Validates destination, provider, model, payload boundaries, BLACK data scanning, and TaskCapsule
+   * requirements in one atomic check.
+   */
+  public static validateOutboundProviderRequest(
+    params: OutboundProviderValidationParams
+  ): TaskCapsuleValidationResult {
+    const errors: string[] = [];
+    const violatedCategories: string[] = [];
+
+    if (!params || typeof params !== 'object') {
+      return {
+        ok: false,
+        classification: 'BLACK',
+        errors: ['OUTBOUND_PARAMS_NULL_OR_INVALID'],
+        violatedCategories: [],
+        destinationAllowed: false,
+        safeForOutboundDispatch: false,
+      };
+    }
+
+    const { provider, destinationUrl, model, payload, serializedBody, capsule } = params;
+
+    // 1. Destination check
+    const destinationAllowed = this.isDestinationAllowed(provider, destinationUrl);
+    if (!destinationAllowed) {
+      errors.push(`OUTBOUND_DESTINATION_FORBIDDEN: Target destination '${destinationUrl}' for provider '${provider}' is outside certified allowlist.`);
+    }
+
+    // 2. Model strategy verification
+    if (model) {
+      const allowedModel = CERTIFIED_STRATEGY_MODELS[provider?.toLowerCase()];
+      if (allowedModel && model !== allowedModel) {
+        errors.push(`UNAPPROVED_PROVIDER_MODEL: Model '${model}' is not certified for provider '${provider}'. Expected '${allowedModel}'.`);
+      }
+    }
+
+    // 3. Payload size bound check
+    if (serializedBody) {
+      if (Buffer.byteLength(serializedBody, 'utf-8') > MAX_TASK_CAPSULE_BYTES) {
+        errors.push(`OUTBOUND_PAYLOAD_SIZE_EXCEEDED: Body size ${Buffer.byteLength(serializedBody, 'utf-8')} bytes exceeds maximum ${MAX_TASK_CAPSULE_BYTES} bytes.`);
+        return {
+          ok: false,
+          classification: params.classification ?? 'BLACK',
+          errors,
+          violatedCategories: [],
+          destinationAllowed,
+          safeForOutboundDispatch: false,
+        };
+      }
+    }
+
+    // 4. Scan payload and serialized body for BLACK material (regardless of claimed classification)
+    if (payload !== undefined) {
+      for (const v of this.detectBlackMaterial(payload)) {
+        if (!violatedCategories.includes(v)) violatedCategories.push(v);
+      }
+    }
+    if (serializedBody) {
+      for (const v of this.detectBlackMaterial(serializedBody)) {
+        if (!violatedCategories.includes(v)) violatedCategories.push(v);
+      }
+    }
+
+    // 5. Delegate to TaskCapsule validation if capsule provided
+    let effectiveClassification: SovereignClassification = params.classification ?? 'GREY';
+    if (capsule) {
+      const capsuleResult = this.validateOutboundTaskCapsule(capsule, provider, destinationUrl);
+      if (!capsuleResult.ok) {
+        for (const err of capsuleResult.errors) {
+          if (!errors.includes(err)) errors.push(err);
+        }
+        for (const cat of capsuleResult.violatedCategories) {
+          if (!violatedCategories.includes(cat)) violatedCategories.push(cat);
+        }
+      }
+      effectiveClassification = capsuleResult.classification;
+    } else {
+      // Direct params without capsule envelope
+      if (effectiveClassification === 'BLACK') {
+        errors.push('SOVEREIGN_BOUNDARY_CLASSIFICATION_BLACK: Request classified as BLACK.');
+      } else if (effectiveClassification === 'GREY') {
+        if (params.isSanitized === false) {
+          errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be sanitized before outbound dispatch.');
+        }
+        if (params.isMinimized === false) {
+          errors.push('GREY_BOUNDARY_VIOLATION: GREY data must be minimized before outbound dispatch.');
+        }
+      }
+    }
+
+    if (violatedCategories.length > 0) {
+      const msg = `SOVEREIGN_BOUNDARY_BLACK_DATA_DETECTED: Categories: ${violatedCategories.join(', ')}`;
+      if (!errors.includes(msg)) errors.push(msg);
+      effectiveClassification = 'BLACK';
+    }
+
+    const ok = errors.length === 0 && destinationAllowed && violatedCategories.length === 0 && effectiveClassification !== 'BLACK';
+
+    return {
+      ok,
+      classification: effectiveClassification,
       errors,
       violatedCategories,
       destinationAllowed,
