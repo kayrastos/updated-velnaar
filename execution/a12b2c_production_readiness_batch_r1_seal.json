@@ -1,0 +1,188 @@
+{
+  "phase": "A.12B.2C_PRODUCTION_READINESS_BATCH_R1",
+  "batch": "A.12B.2C_PRODUCTION_READINESS_BATCH_R1",
+  "artifactType": "PRODUCTION_READINESS_BATCH_R1_CANONICAL_SEAL",
+  "sealed": true,
+  "batchR1Sealed": true,
+  "finalStatus": "A12B2C_PRODUCTION_READINESS_BATCH_R1_APPROVED_AND_SEALED",
+  "timestampUtc": "2026-09-08T08:20:00.000Z",
+  "repository": "https://github.com/kayrastos/updated-velnaar",
+  "branch": "main",
+  "reviewedSnapshot": {
+    "commit": "d9a156f786c319a0d84d54c166f1bb3ddba0ea93",
+    "tree": "d7cb3a2853f1ff34dfef4ae9a5840f7b57b4e4d3",
+    "parent": "3e7bc1bf99289451d8e7b59a19d982247eaf2f6b"
+  },
+  "reviewedSnapshotCommit": "d9a156f786c319a0d84d54c166f1bb3ddba0ea93",
+  "reviewedSnapshotTree": "d7cb3a2853f1ff34dfef4ae9a5840f7b57b4e4d3",
+  "reviewedSnapshotParent": "3e7bc1bf99289451d8e7b59a19d982247eaf2f6b",
+  "reviewLineage": {
+    "initialReadinessBatch": "78ce5cc93c2bba621e5794118c22136563f1977c",
+    "primaryEvidenceRepair": "5eb772639ff4ff5eee41f51951fa11912773dfae",
+    "stateSemanticsRepair": "3e7bc1bf99289451d8e7b59a19d982247eaf2f6b",
+    "finalReviewedSnapshot": "d9a156f786c319a0d84d54c166f1bb3ddba0ea93",
+    "finalReviewedTree": "d7cb3a2853f1ff34dfef4ae9a5840f7b57b4e4d3"
+  },
+  "independentFinalRereview": {
+    "independentFinalRereviewPassed": true,
+    "independentFinalRereviewVerdict": "A12B2C_PRODUCTION_READINESS_BATCH_R1_FINAL_REREVIEW_APPROVED_FOR_SEAL_PREPARATION"
+  },
+  "independentFinalRereviewPassed": true,
+  "independentFinalRereviewVerdict": "A12B2C_PRODUCTION_READINESS_BATCH_R1_FINAL_REREVIEW_APPROVED_FOR_SEAL_PREPARATION",
+  "reviewedArtifactInventory": {
+    "policy": "These reviewed artifacts remain unchanged by the seal commit. The seal binds approval to their exact content at reviewed snapshot d9a156f786c319a0d84d54c166f1bb3ddba0ea93.",
+    "artifacts": [
+      "execution/a12b2c5u33f_dormant_operational_ingress_verification_readiness.json",
+      "execution/a12b2c5u33f_dormant_operational_ingress_verification_readiness.md",
+      "execution/a12b2c5u34a_production_d1_provisioning_readiness.json",
+      "execution/a12b2c5u34a_production_d1_provisioning_readiness.md",
+      "execution/a12b2c5u34b_worker_production_binding_deployment_readiness.json",
+      "execution/a12b2c5u34b_worker_production_binding_deployment_readiness.md"
+    ]
+  },
+  "subphaseApprovalStates": {
+    "5U.3.3F": {
+      "phase": "A.12B.2C-5U.3.3F",
+      "readinessResult": "BLOCKED_BY_EXPLICIT_PREREQUISITES",
+      "readinessContractApproved": true,
+      "executionAuthorized": false,
+      "canonicalIngressArchitecture": "CUSTOM_DOMAIN",
+      "currentMutationBudgetZero": true,
+      "crossPhaseOwnershipValid": true,
+      "futureApprovalInventoryValid": true
+    },
+    "5U.3.4A": {
+      "phase": "A.12B.2C-5U.3.4A",
+      "readinessResult": "READY_FOR_BOUNDED_EXECUTION",
+      "readinessContractApproved": true,
+      "executionAuthorizedBySeal": false,
+      "executionScope": "D1_ONLY_MUTATION",
+      "providerStateOverclaimClosed": true,
+      "collisionPreflightRequired": true,
+      "collisionStopFailClosed": true,
+      "timeTravelSemanticsValid": true,
+      "functionalSmokeWriteDeferred": true,
+      "workerConfigDeferred": true
+    },
+    "5U.3.4B": {
+      "phase": "A.12B.2C-5U.3.4B",
+      "readinessResult": "BLOCKED_BY_EXPLICIT_PREREQUISITES",
+      "readinessContractApproved": true,
+      "executionAuthorized": false,
+      "deepSeekApiKeyDeferred": true,
+      "providerFreeDormantSecretBoundaryValid": true,
+      "sourceProvenancePreparationValid": true
+    }
+  },
+  "approvalBoundary": {
+    "scope": "READINESS_CONTRACTS_ONLY",
+    "description": "The seal approves READINESS CONTRACTS only. It MUST NOT itself authorize D1 database creation, remote D1 migration execution, Worker configuration mutation, Worker deployment, Custom Domain provisioning, Access Allow policy creation, identity/registry enrollment, secret provisioning, trust anchor provisioning, source provenance anchor provisioning, ingress gate activation, live canary execution, or production routing enforcement. Each real mutation still requires the separate human approval defined by its execution phase."
+  },
+  "d1BoundedExecutionContract": {
+    "canonicalDatabaseName": "velnar-production-db",
+    "futureWorkerBinding": "DB",
+    "canonicalMigrations": [
+      "0001_initial_schema.sql",
+      "0002_indexes_and_performance.sql",
+      "0003_ai_intelligence_layer.sql",
+      "0004_growth_action_policy_hardening.sql",
+      "0005_appointment_concurrency_hardening.sql",
+      "0006_appointment_identity_resource_hardening.sql",
+      "0007_ai_run_protocol_hardening.sql",
+      "0008_authorization_replay_ledger.sql"
+    ],
+    "mandatoryFirstStep": "READ-ONLY Cloudflare D1 management-plane exact-name collision preflight (wrangler d1 list --json searching for velnar-production-db).",
+    "collisionCases": {
+      "caseA_zeroMatches": "If matchingDatabaseCount == 0, creation may proceed only under future explicit human approval.",
+      "caseB_existingMatches": "If matchingDatabaseCount >= 1, STOP immediately with D1_PREEXISTING_RESOURCE_REQUIRES_RECONCILIATION. No create, no migration, no binding. Same-name resource ownership must never be assumed."
+    },
+    "approvedFutureD1MutationBudget": {
+      "d1DatabaseCreates": 1,
+      "d1DatabaseDeletes": 0,
+      "remoteMigrationApplications": 1,
+      "functionalSmokeWrites": 0,
+      "workerConfigMutations": 0,
+      "workerDeployments": 0,
+      "gateFlips": 0
+    },
+    "timeTravelContract": {
+      "futurePreMigrationRecoveryReferenceRequired": true,
+      "destructiveRestoreNotAuthorized": true,
+      "restoreRequiresSeparateHumanApproval": true
+    }
+  },
+  "independentTestVerification": {
+    "independentTestExecutionPerformed": true,
+    "testFileCount": 62,
+    "testCount": 2508,
+    "testsPassed": 2508,
+    "testsFailed": 0,
+    "typecheck": "PASS",
+    "build": "PASS",
+    "distinction": "Tests were independently executed against pinned canonical source."
+  },
+  "workingTreeReviewLimitation": {
+    "workingTreeCanonicalCheckoutVerified": false,
+    "classification": "NON_MATERIAL_TEST_VERIFICATION_OBSERVATION",
+    "reason": "Independent reviewer did not have a local Git worktree checked out at the canonical commit. Canonical commit/tree/ref were independently verified and tests were run against an isolated pinned source archive.",
+    "impact": "NONE_ON_APPROVAL_BOUNDARY_OR_EXECUTION_SEMANTICS",
+    "futureRecommendation": "For audits requiring local worktree attestation, provide a clean checkout pinned to the exact reviewed commit."
+  },
+  "finalFindingCounts": {
+    "securityMaterialFindings": 0,
+    "securityNonMaterialFindings": 0,
+    "architectureMaterialFindings": 0,
+    "architectureNonMaterialFindings": 0,
+    "providerContractMaterialFindings": 0,
+    "providerContractNonMaterialFindings": 0,
+    "evidenceIntegrityMaterialFindings": 0,
+    "evidenceIntegrityNonMaterialFindings": 0,
+    "phaseBoundaryMaterialFindings": 0,
+    "phaseBoundaryNonMaterialFindings": 0,
+    "testVerificationMaterialFindings": 0,
+    "testVerificationNonMaterialFindings": 1,
+    "totalMaterialFindings": 0
+  },
+  "canonicalSafetyState": {
+    "1_PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+    "2_PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+    "3_CANARY_LIVE_EXECUTION_ENABLED": false,
+    "4_CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+    "5_GUARDED_SOURCE_ATTESTATION_READY": false,
+    "6_GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+    "7_PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+    "8_RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+    "9_D1_REPLAY_BACKEND_PRODUCTION_BOUND": false,
+    "10_D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": false,
+    "11_D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
+    "12_productionRoutingEnforcementAllowed": false,
+    "registryLength": 0,
+    "registryFrozen": true
+  },
+  "currentProductionActionCounters": {
+    "providerCalls": 0,
+    "cloudflareMutations": 0,
+    "d1RealCalls": 0,
+    "workerDeployments": 0,
+    "secretMutations": 0,
+    "gateFlipOperations": 0
+  },
+  "nonClaims": {
+    "ingressReady": false,
+    "ingressCertified": false,
+    "customDomainProvisioned": false,
+    "accessAllowPolicyProvisioned": false,
+    "humanOperationalIdentityEnrolled": false,
+    "productionD1DatabaseCreated": false,
+    "productionD1MigrationsExecuted": false,
+    "d1ProductionBound": false,
+    "d1RealConcurrencyCertified": false,
+    "workerProductionConfigChanged": false,
+    "workerDeployed": false,
+    "deepSeekSecretProvisioned": false,
+    "trustAnchorProvisioned": false,
+    "runtimeSourceProvenanceAnchorProvisioned": false,
+    "liveCanaryEnabled": false,
+    "productionRoutingEnabled": false
+  }
+}
