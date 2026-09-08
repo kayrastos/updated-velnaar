@@ -1,0 +1,340 @@
+{
+  "authorization": {
+    "CANONICAL_DEV30_REUSE_AUTHORIZED": false,
+    "PHASE_R1_SAFE_OBSERVABILITY_AUTHORIZED": true,
+    "PHASE_R2_SYNTHETIC_CONTRACT_HARDENING_AUTHORIZED": false,
+    "PHASE_R3_ADDITIVE_V7_IMPLEMENTATION_AUTHORIZED": false,
+    "PHASE_R4_FRESH_HELDOUT_PREP_AUTHORIZED": false,
+    "PHASE_R5_FRESH_HELDOUT_EXECUTION_AUTHORIZED": false,
+    "V6_RERUN_AUTHORIZED": false
+  },
+  "canonical_base_commit": "e78325c076748c6135255ab71fc01f968939205e",
+  "corrected_blockers": [
+    "Enforced strict stage <-> subcode compatibility mapping (ALLOWED_SUBCODES_BY_STAGE) and fail-closed validation (validate_stage_subcode).",
+    "Enforced CandidateTelemetryV1 failure_stage scope restriction (ALLOWED_CANDIDATE_FAILURE_STAGES), rejecting DIAGNOSIS_*, PLAN_*, and PRIMARY_SELECTION.",
+    "Enforced terminal failure-stage <-> milestone compatibility (REQUIRED_FAILURE_MILESTONES), rejecting contradictory downstream milestone assertions.",
+    "Disambiguated gate budget taxonomy by replacing broad GATE_BUDGET_EXCEEDED with GATE_FILE_BUDGET_EXCEEDED, GATE_HUNK_BUDGET_EXCEEDED, and GATE_CHANGED_LINE_BUDGET_EXCEEDED.",
+    "Expanded test suite from 18 to 24 tests, thoroughly testing illegal pairings, contradictory milestones, half-defined failure states, and budget codes."
+  ],
+  "created_file_sha256": {
+    "training/fulgor_ray_v3/a234_contracts_v7.py": "013dfaa55a6c126fdab907ea8a54a5e92b14265da77b1fa6d3f6d282b64a7d90",
+    "training/fulgor_ray_v3/a234_telemetry_v1.py": "8d230121ce32b686389bfaef50eaf4a050ebed08ddf83545b0319c87108e2f64",
+    "training/fulgor_ray_v3/tests/test_a234_contracts_v7.py": "af22161606ff5bd30eb7bb4ef81662dd3c5d63e95fb29d447df26d1ef441fcdd",
+    "training/fulgor_ray_v3/tests/test_a234_telemetry_v1.py": "89cd1fc93be5ee9366fb5266b244959dd7a0c6e48ad720dcd0781109d67468d9",
+    "training/reports/fulgor_ray_v3_0_a234_r1_safe_observability_implementation.md": "a3cd2b748b5e8ee4ae5bcc0bdb2d0a3660345fc5bca25f843d8f030a1b0238b5"
+  },
+  "created_files": [
+    "training/fulgor_ray_v3/a234_contracts_v7.py",
+    "training/fulgor_ray_v3/a234_telemetry_v1.py",
+    "training/fulgor_ray_v3/tests/test_a234_contracts_v7.py",
+    "training/fulgor_ray_v3/tests/test_a234_telemetry_v1.py",
+    "training/reports/fulgor_ray_v3_0_a234_r1_safe_observability_implementation.json",
+    "training/reports/fulgor_ray_v3_0_a234_r1_safe_observability_implementation.md"
+  ],
+  "failure_subcode_taxonomy": {
+    "count": 44,
+    "gate_budget_split": {
+      "replacement_codes": [
+        "GATE_FILE_BUDGET_EXCEEDED",
+        "GATE_HUNK_BUDGET_EXCEEDED",
+        "GATE_CHANGED_LINE_BUDGET_EXCEEDED"
+      ],
+      "retired_code": "GATE_BUDGET_EXCEEDED"
+    },
+    "historical_dev30_claim": false,
+    "serialization_budget_granularity": "BROAD (SERIALIZATION_BUDGET_EXCEEDED preserved per Section 7)",
+    "subcodes_by_stage": {
+      "candidate_intent": [
+        "CANDIDATE_MALFORMED_SYNTAX",
+        "CANDIDATE_SCHEMA_VERSION_MISMATCH",
+        "CANDIDATE_ID_MISMATCH",
+        "CANDIDATE_DIAGNOSIS_HASH_MISMATCH",
+        "CANDIDATE_PLAN_HASH_MISMATCH",
+        "CANDIDATE_EDITS_MISSING",
+        "CANDIDATE_EDIT_KIND_INVALID",
+        "CANDIDATE_EDIT_SPAN_INVALID",
+        "CANDIDATE_DUPLICATE_SPAN",
+        "CANDIDATE_OUT_OF_SCOPE_FILE",
+        "CANDIDATE_REPLACEMENT_CONTRACT_VIOLATION"
+      ],
+      "diagnosis": [
+        "DIAGNOSIS_MALFORMED_SYNTAX",
+        "DIAGNOSIS_SCHEMA_VERSION_MISMATCH",
+        "DIAGNOSIS_TARGET_COUNT_INVALID",
+        "DIAGNOSIS_SYMBOLS_INVALID",
+        "DIAGNOSIS_TARGET_NOT_IN_INVENTORY"
+      ],
+      "host_binding": [
+        "HOST_BINDING_REPO_MEMBERSHIP_FAILED",
+        "HOST_BINDING_DIAGNOSIS_MEMBERSHIP_FAILED",
+        "HOST_BINDING_READ_FAILED",
+        "HOST_BINDING_LINE_SPAN_OUT_OF_BOUNDS",
+        "HOST_BINDING_ANCHOR_DERIVATION_FAILED"
+      ],
+      "plan": [
+        "PLAN_MALFORMED_SYNTAX",
+        "PLAN_SCHEMA_VERSION_MISMATCH",
+        "PLAN_DIAGNOSIS_HASH_MISMATCH",
+        "PLAN_STEPS_INVALID",
+        "PLAN_OUT_OF_SCOPE_STEP",
+        "PLAN_PRESERVATION_CONSTRAINTS_INVALID"
+      ],
+      "serialization": [
+        "SERIALIZATION_PATH_FAILED",
+        "SERIALIZATION_UNSUPPORTED_NEWLINE",
+        "SERIALIZATION_OVERLAPPING_EDITS",
+        "SERIALIZATION_PREIMAGE_MISMATCH",
+        "SERIALIZATION_ANCHOR_MISMATCH",
+        "SERIALIZATION_BUDGET_EXCEEDED"
+      ],
+      "static_gate": [
+        "GATE_EMPTY_PATCH",
+        "GATE_OUTSIDE_SCOPE",
+        "GATE_FORBIDDEN_PATH",
+        "GATE_FILE_BUDGET_EXCEEDED",
+        "GATE_HUNK_BUDGET_EXCEEDED",
+        "GATE_CHANGED_LINE_BUDGET_EXCEEDED",
+        "GATE_PATCH_APPLY_FAILED"
+      ],
+      "verifier": [
+        "VERIFIER_MALFORMED_SYNTAX",
+        "VERIFIER_SCHEMA_VERSION_MISMATCH",
+        "VERIFIER_BLINDED_ID_MISMATCH",
+        "VERIFIER_INVALID_SCORE"
+      ]
+    },
+    "telemetry_future_use_only": true
+  },
+  "implementation_scope": {
+    "phase": "PHASE_R1_SAFE_OBSERVABILITY",
+    "scope": "Additive non-semantic observability foundation approved under REM01 (blockers corrected).",
+    "status": "COMPLETE"
+  },
+  "legacy_files_modified": [],
+  "r1_canonical_commit_eligible": true,
+  "r1_code_review_blockers_corrected": true,
+  "safety_flags": {
+    "A4_EXECUTED": false,
+    "CANONICAL_DEV30_REUSE_AUTHORIZED": false,
+    "COMMIT_CREATED": false,
+    "GCP_USED": false,
+    "GPU_USED": false,
+    "MODEL_INFERENCE_USED": false,
+    "NETWORK_USED": false,
+    "PHASE_R2_STARTED": false,
+    "PHASE_R3_STARTED": false,
+    "PHASE_R4_STARTED": false,
+    "PHASE_R5_STARTED": false,
+    "PROTECTED_DEV30_SEMANTIC_OUTPUT_REVIEWED": false,
+    "PUSH_PERFORMED": false,
+    "SEALED_V1_V6_SOURCE_MODIFIED": false,
+    "SSH_USED": false,
+    "TRAINING_STARTED": false,
+    "V6_RERUN_AUTHORIZED": false,
+    "V6_RERUN_EXECUTED": false
+  },
+  "schema": "fulgor.a234_r1_safe_observability_implementation.v1",
+  "self_hash_policy": "Per Section 15 guidelines, JSON report binds the other five files and exposes its own SHA256 externally in terminal summary to prevent circular self-referential hash corruption.",
+  "semantic_leakage_controls": {
+    "anchors_persisted": false,
+    "failure_message_str_exc_persisted": false,
+    "model_output_persisted": false,
+    "model_reasoning_persisted": false,
+    "protected_dev30_semantics_persisted": false,
+    "raw_prompts_persisted": false,
+    "replacement_text_persisted": false,
+    "repository_paths_persisted": false,
+    "source_code_persisted": false
+  },
+  "stage_taxonomy": {
+    "count": 13,
+    "historical_dev30_claim": false,
+    "stages": [
+      "DIAGNOSIS_RECOVERY",
+      "DIAGNOSIS_CONTRACT",
+      "DIAGNOSIS_MEMBERSHIP",
+      "PLAN_RECOVERY",
+      "PLAN_CONTRACT",
+      "CANDIDATE_RECOVERY",
+      "CANDIDATE_INTENT",
+      "CANDIDATE_HOST_BINDING",
+      "CANDIDATE_SERIALIZATION",
+      "CANDIDATE_STATIC_GATE",
+      "VERIFIER_RECOVERY",
+      "VERIFIER_CONTRACT",
+      "PRIMARY_SELECTION"
+    ],
+    "telemetry_future_use_only": true
+  },
+  "status": "PASS_A234_R1_SAFE_OBSERVABILITY_IMPLEMENTATION",
+  "structural_diagnostics_policy": {
+    "allowed_keys": [
+      "raw_character_count",
+      "brace_balance",
+      "bracket_balance",
+      "double_quote_parity",
+      "json_decode_error_position",
+      "json_decode_error_line",
+      "json_decode_error_column",
+      "observed_key_count",
+      "target_file_count",
+      "step_count",
+      "edit_count",
+      "repository_file_count",
+      "file_line_count",
+      "requested_start_line",
+      "requested_end_line",
+      "slot_index"
+    ],
+    "allowed_value_types": [
+      "int",
+      "bool",
+      "None"
+    ],
+    "arbitrary_keys_rejected": true,
+    "max_diagnostic_keys": 32,
+    "max_int_value": 2147483647,
+    "min_int_value": -2147483648,
+    "strings_rejected": true
+  },
+  "telemetry_invariants": {
+    "fail_closed_on_impossible_state": true,
+    "forward_monotonic_chain": [
+      "host_bound requires intent_parsed",
+      "serialized requires host_bound",
+      "gate_evaluated requires serialized",
+      "gate_accepted requires gate_evaluated",
+      "verifier_invoked requires gate_accepted"
+    ],
+    "half_defined_failure_rejected": true,
+    "terminal_failure_milestone_compatibility": {
+      "CANDIDATE_HOST_BINDING": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "CANDIDATE_INTENT": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "CANDIDATE_RECOVERY": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "CANDIDATE_SERIALIZATION": [
+        true,
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "CANDIDATE_STATIC_GATE": [
+        true,
+        true,
+        true,
+        true,
+        false,
+        false
+      ],
+      "VERIFIER_CONTRACT": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "VERIFIER_RECOVERY": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  "telemetry_schema": {
+    "allowed_failure_stages": [
+      "CANDIDATE_RECOVERY",
+      "CANDIDATE_INTENT",
+      "CANDIDATE_HOST_BINDING",
+      "CANDIDATE_SERIALIZATION",
+      "CANDIDATE_STATIC_GATE",
+      "VERIFIER_RECOVERY",
+      "VERIFIER_CONTRACT"
+    ],
+    "candidate_id_hash_format": "sha256_hex_64",
+    "dataclass_name": "CandidateTelemetryV1",
+    "fields": [
+      "schema_version",
+      "slot_index",
+      "candidate_id_hash",
+      "intent_parsed",
+      "host_bound",
+      "serialized",
+      "gate_evaluated",
+      "gate_accepted",
+      "verifier_invoked",
+      "failure_stage",
+      "failure_subcode",
+      "structural_diagnostics"
+    ],
+    "schema_version": "fulgor.candidate_telemetry.v1",
+    "slot_index_bounds": [
+      0,
+      1,
+      2
+    ]
+  },
+  "test_results": {
+    "test_a234_contracts_v7": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 14,
+      "tests_run": 14
+    },
+    "test_a234_telemetry_v1": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 10,
+      "tests_run": 10
+    },
+    "total_r1_errors": 0,
+    "total_r1_failed": 0,
+    "total_r1_passed": 24,
+    "total_r1_tests": 24
+  },
+  "tests_run": [
+    "python -m unittest training/fulgor_ray_v3/tests/test_a234_contracts_v7.py",
+    "python -m unittest training/fulgor_ray_v3/tests/test_a234_telemetry_v1.py",
+    "python -m unittest training/fulgor_ray_v3/tests/test_a234_contracts_v7.py training/fulgor_ray_v3/tests/test_a234_telemetry_v1.py"
+  ],
+  "typed_exception_hierarchy": {
+    "base_class": "A234V7ContractError",
+    "base_inheritance": "ValueError",
+    "exception_string_format": "<stage>:<subcode>",
+    "free_form_messages_permitted": false,
+    "legacy_isolation": "Does NOT inherit from or import legacy A234ContractError.",
+    "stage_subcode_validation_enforced": true,
+    "subclasses": [
+      "DiagnosisContractErrorV7",
+      "PlanContractErrorV7",
+      "CandidateContractErrorV7",
+      "VerifierContractErrorV7"
+    ]
+  },
+  "unauthorized_phases_preserved": true
+}
