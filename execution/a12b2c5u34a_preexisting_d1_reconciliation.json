@@ -37,7 +37,9 @@
   "bookmarkOrderingProvableFromHash": false,
   "currentBookmarkRetrievalSucceeded": true,
   "bookmarkAvailable": true,
-  "referenceTimestampUtc": "2026-09-08T08:38:56.000Z",
+  "previousRecordedReferenceTimestampUtc": "2026-09-08T08:38:56.000Z",
+  "currentBookmarkReferenceTimestampUtc": null,
+  "currentBookmarkReferenceTimestampRecorded": false,
   "rawBookmarkCommitted": false,
   "restoreExecuted": false,
   "migrationInventory": {
@@ -45,8 +47,6 @@
     "unappliedMigrationListEmpty": true,
     "unappliedCount": 0,
     "unappliedNames": [],
-    "exactCanonicalUnappliedSet": true,
-    "exactCanonicalUnappliedOrder": true,
     "wranglerCheckStatus": "No migrations to apply (all 8 canonical migrations applied)"
   },
   "migrationLedger": {

@@ -48,7 +48,9 @@
 ### 3. Current Time Travel Reference
 - **Time Travel Bookmark Acquired**: `true` (Read-only retrieval via `wrangler d1 time-travel info`)
 - **Previously Recorded Bookmark SHA-256**: `366a10afe157c2d26f721d61d551e71253f9ac64c9e5ea426ce4b3aa8c2ec467`
+- **Previous Recorded Reference Timestamp**: `2026-09-08T08:38:56.000Z` (attached only to the previous bookmark)
 - **Current Read-Only Bookmark SHA-256**: `bf7cf34aa69dce3ddc246dec8757ee1396ade461d0278d23eb91f4ce640413fa`
+- **Current Bookmark Reference Timestamp**: unknown/not recorded (`null`); no timestamp is inferred or attached to the current bookmark
 - **Bookmark Hash Interpretation**: equality is not required, and a hash cannot prove bookmark ordering
 - **Raw Bookmark Committed**: `false`
 - **Restore Executed**: `false` (Destructive restore is strictly unauthorized)
@@ -56,7 +58,8 @@
 ---
 
 ### 4. Migration Ledger & Unapplied Inventory
-- **Unapplied Migration Count**: `0` (verified no unapplied canonical migrations; list empty)
+- **Applied Canonical Ledger**: `8/8` (exact canonical set and prefix)
+- **Currently Unapplied Migrations**: `0` (verified no unapplied canonical migrations; list empty)
 - **Wrangler Verification**: `No migrations to apply!` (Checked against canonical migrations directory)
 - **Applied Migration Ledger (`d1_migrations` table)**:
   - Total applied migrations: `8`
