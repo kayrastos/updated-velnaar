@@ -1,0 +1,196 @@
+{
+  "artifactType": "WORKER_PRODUCTION_D1_GATE9_DORMANT_REDEPLOYMENT_EXECUTION",
+  "phase": "A.12B.2C-5U.3.4B",
+  "operation": "GATE9_RUNTIME_ALIGNMENT_DORMANT_REDEPLOYMENT",
+  "recordedAtUtc": "2026-09-09T21:34:34.6911087Z",
+  "humanAuthorizationGranted": true,
+  "humanAuthorizationLiteral": "AUTHORIZE_A12B2C5U34B_GATE9_FLIP_AND_SINGLE_DORMANT_REDEPLOYMENT: Current canonical main 7d5197feea3b31cceff016418adace1b3537eabd ve bağımsız review verdict A12B2C5U34B_DORMANT_DEPLOYMENT_INDEPENDENT_REVIEW_APPROVED_FOR_GATE9_REDEPLOYMENT_PREPARATION temelinde, yalnız authoritative D1_REPLAY_BACKEND_PRODUCTION_BOUND Gate 9 değerini false→true yapmaya, bunun doğrudan etkilediği minimum testleri güncellemeye, exact source snapshot üzerinden dry-run/bundle hash almaya ve mevcut velnar-platform-worker için tam 1 adet provider-free dormant redeployment yapmaya izin veriyorum. Redeployment sonrası yalnız read-only active-version, exact DB binding identity, /api/health DB ATTACHED ve operational GET/POST/OPTIONS=404 doğrulamalarına izin veriyorum. Gate 10 true kalmalı, Gate 11 false kalmalı. D1 write/migration/delete/restore/concurrency test, ikinci deployment, rollback, DeepSeek/Gemini/Kimi secret veya provider AI call, Access/DNS/Custom Domain/Worker Route, identity enrollment, trust anchor, route/ingress/live execution gate, production routing veya başka herhangi bir gate değişikliğine izin vermiyorum. Deploy sonucu belirsiz veya runtime doğrulama başarısız olursa retry/redeploy/rollback yapmadan dur.",
+  "independentReviewVerdict": "A12B2C5U34B_DORMANT_DEPLOYMENT_INDEPENDENT_REVIEW_APPROVED_FOR_GATE9_REDEPLOYMENT_PREPARATION",
+  "canonicalBaseCommit": "7d5197feea3b31cceff016418adace1b3537eabd",
+  "canonicalBaseTree": "500e6341847ecf55046167f12253c797d3c615da",
+  "previousDormantDeploymentVersion": "308b6db2-44d5-41ab-a028-88a602c703e0",
+  "gate9DeploySnapshotCommit": "6e0334bb4f6010fb923781e79310b1a5c0146adc",
+  "gate9DeploySnapshotTree": "e20b2fccdcabeb69d08f65ac9259b7d47a772225",
+  "gate9DeploySnapshotParent": "7d5197feea3b31cceff016418adace1b3537eabd",
+  "gate9DeploySnapshotChangedFiles": [
+    "tests/ai/phaseA12B2C5TD1DurableAuthorizationReplayBackend.test.ts",
+    "tests/ai/phaseA12B2C5U1ProductionReplayIntegration.test.ts",
+    "tests/ai/phaseA12B2C5U32ProductionWorkerHostBinding.test.ts",
+    "tests/ai/phaseA12B2C5U3ProductionWorkerCapabilityBoundary.test.ts",
+    "tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts",
+    "tests/security/phaseA12B2C5U33CProductionOperationalAuthRuntimeIntegration.test.ts",
+    "worker/ai/canary/d1AuthorizationReplayBackend.ts"
+  ],
+  "wranglerVersion": "4.130.0",
+  "workerName": "velnar-platform-worker",
+  "databaseName": "velnar-production-db",
+  "databaseIdSha256": "62ebb801413e1f691e0a30d9d4388c7d17e0060ff0594dcd8238f25fc6857055",
+  "databaseIdFinal6": "4de303",
+  "rawDatabaseIdRepeatedInEvidence": false,
+  "gates": {
+    "gate9Before": false,
+    "gate9After": true,
+    "gate10Before": true,
+    "gate10After": true,
+    "gate11Before": false,
+    "gate11After": false,
+    "gate9RuntimeConsumed": true,
+    "gate11StillBlocksReplayReservation": true,
+    "productionReplayExecutionEnabled": false,
+    "canonicalTrueGateCount": 2,
+    "finalStates": {
+      "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+      "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+      "CANARY_LIVE_EXECUTION_ENABLED": false,
+      "CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+      "GUARDED_SOURCE_ATTESTATION_READY": false,
+      "GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+      "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+      "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+      "D1_REPLAY_BACKEND_PRODUCTION_BOUND": true,
+      "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": true,
+      "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
+      "productionRoutingEnforcementAllowed": false
+    },
+    "registryLength": 0,
+    "registryFrozen": true
+  },
+  "staticValidation": {
+    "preDeploy": {
+      "testFiles": 62,
+      "tests": 2509,
+      "failures": 0,
+      "typecheck": "PASS",
+      "build": "PASS"
+    },
+    "postDeploy": {
+      "testFiles": 62,
+      "tests": 2509,
+      "failures": 0,
+      "typecheck": "PASS",
+      "build": "PASS"
+    }
+  },
+  "dryRun": {
+    "workerBundle": {
+      "fileCount": 3,
+      "manifestSha256": "69a613363e83c2b33aaede72a8e83423ef5de16dec1e85260253dad21c53e335",
+      "aggregateSha256": "c3f824076d3e8522fa87786dd8405a3c8039bbb024f8c75d89a0e29e67b5c76a",
+      "files": [
+        {
+          "relativePath": "index.js",
+          "byteSize": 611533,
+          "sha256": "13bdedeb51ea05a67b77a9169f5c67072d131afc25eaf1000691947f6c9e20b2"
+        },
+        {
+          "relativePath": "index.js.map",
+          "byteSize": 1345025,
+          "sha256": "c19ad292f1c880ff019b286e9ea7c7ed597f9662477463500d6f58901e298f0e"
+        },
+        {
+          "relativePath": "README.md",
+          "byteSize": 123,
+          "sha256": "79e44d7bbd0dc780c57b5310c80ea386c1cf4e68268b817ee7539ecf4f8f4554"
+        }
+      ]
+    },
+    "assets": {
+      "fileCount": 4,
+      "manifestSha256": "f843214b1d12f79eac64cd4360b09cf332dc56979200cddf94b5f1553fb53e93",
+      "aggregateSha256": "d6cb5430d5fa581c946c50742651bd9ff0c6f9a75a0be3524f33a98f665e2a9f",
+      "files": [
+        {
+          "relativePath": "A12B2B_CANONICAL_ARTIFACTS.zip",
+          "byteSize": 50615,
+          "sha256": "a6d57758e76fae62af71473659ce31e049f03cc3d51a6116b9ad052ec0b083fe"
+        },
+        {
+          "relativePath": "index.html",
+          "byteSize": 1933,
+          "sha256": "68beb6fd0cc5d37d530f7d84f4d7b1471d220e491a2f026c6d3f2b85968af4b8"
+        },
+        {
+          "relativePath": "assets/index-BKOkW6xL.css",
+          "byteSize": 46511,
+          "sha256": "627062cebb28cc3b47ecb64d2b79b54b8cabd00344554be44127e80e3cdf6eda"
+        },
+        {
+          "relativePath": "assets/index-ClkWMZ6z.js",
+          "byteSize": 469704,
+          "sha256": "32354fe44b60e3c9a8211172287f96cef24c5b3ae7cb50b48fdfaa12e90f8966"
+        }
+      ]
+    },
+    "deployedByteHashesClaimed": false
+  },
+  "providerFreeSafety": {
+    "deepseekApiKeyPresent": false,
+    "geminiApiKeyPresent": false,
+    "kimiApiKeyPresent": false,
+    "providerAiCalls": 0
+  },
+  "deployment": {
+    "workerDeployCommands": 1,
+    "confirmedWorkerRedeployments": 1,
+    "outcome": "R3B_REDEPLOY_CONFIRMED_BY_READBACK",
+    "previousActiveVersionId": "308b6db2-44d5-41ab-a028-88a602c703e0",
+    "newActiveVersionId": "27449367-0171-41e3-b047-f616f97308c7",
+    "activeVersionChanged": true,
+    "bindingName": "DB",
+    "databaseIdentityHashMatch": true,
+    "databaseIdentityFinal6Match": true
+  },
+  "runtimeVerification": {
+    "workerUrl": "https://velnar-platform-worker.kayra01-09-06.workers.dev",
+    "health": {
+      "httpStatus": 200,
+      "status": "HEALTHY",
+      "environment": "production",
+      "databaseConfigured": true,
+      "d1Status": "ATTACHED",
+      "productionExternalAi": "DISABLED"
+    },
+    "operationalRoute": {
+      "get": 404,
+      "post": 404,
+      "options": 404
+    }
+  },
+  "mutationCounters": {
+    "gate9Flips": 1,
+    "gate10Flips": 0,
+    "gate11Flips": 0,
+    "otherGateFlips": 0,
+    "workerDeployCommands": 1,
+    "confirmedWorkerRedeployments": 1,
+    "d1Writes": 0,
+    "d1ConcurrencyTests": 0,
+    "migrationApplies": 0,
+    "d1Deletes": 0,
+    "timeTravelRestores": 0,
+    "rollbackOperations": 0,
+    "secretMutations": 0,
+    "accessMutations": 0,
+    "dnsMutations": 0,
+    "customDomainMutations": 0,
+    "workerRouteMutations": 0,
+    "identityMutations": 0,
+    "providerAiCalls": 0
+  },
+  "explicitNonClaims": {
+    "realD1ConcurrencyCertified": false,
+    "realReplayReservationEnabled": false,
+    "providerAiExecutionEnabled": false,
+    "customDomainProvisionedByThisBatch": false,
+    "accessMutationPerformed": false,
+    "operationalIdentityEnrolled": false,
+    "trustAnchorProvisioned": false,
+    "runtimeSourceProvenanceTrustAnchorProvisioned": false,
+    "operationalIngressAuthReady": false,
+    "operationalRouteEnabled": false,
+    "liveCanaryEnabled": false,
+    "productionRoutingAllowed": false,
+    "providerCanaryExecuted": false
+  },
+  "finalStatus": "A12B2C5U34B_GATE9_DORMANT_REDEPLOYMENT_COMPLETE_PENDING_INDEPENDENT_REVIEW"
+}
