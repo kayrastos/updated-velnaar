@@ -611,8 +611,124 @@ export function verifyRuntimeSourceProvenanceReceipt(
 }
 
 // ============================================================================
-// 9. PRODUCTION RESOLVER
+// 9. RUNTIME / BUILD IDENTITY BINDING
 // ============================================================================
+
+/**
+ * The fields a signed provenance receipt must bind to the runtime that will
+ * consume it. Signature validity and authority trust are intentionally
+ * independent from this exact identity comparison.
+ */
+export interface TrustedRuntimeIdentityBinding {
+  readonly repositoryFullName: string;
+  readonly sourceCommitSha: string;
+  readonly sourceTreeSha: string;
+  readonly buildArtifactSha256: string;
+  readonly buildId: string;
+  readonly deploymentId: string;
+  readonly environment: string;
+}
+
+export type RuntimeSourceIdentityBindingFailure =
+  | 'RUNTIME_SOURCE_BINDING_NOT_PROVISIONED'
+  | 'RUNTIME_SOURCE_COMMIT_MISMATCH'
+  | 'RUNTIME_SOURCE_TREE_MISMATCH'
+  | 'RUNTIME_BUILD_ARTIFACT_MISMATCH'
+  | 'RUNTIME_BUILD_ID_MISMATCH'
+  | 'RUNTIME_DEPLOYMENT_ID_MISMATCH'
+  | 'RUNTIME_ENVIRONMENT_MISMATCH';
+
+export interface RuntimeSourceIdentityBindingResult {
+  readonly valid: boolean;
+  readonly errors: readonly RuntimeSourceIdentityBindingFailure[];
+  readonly failureReason?: RuntimeSourceIdentityBindingFailure;
+}
+
+/**
+ * A later provisioning phase must replace null with an immutable/generated
+ * deployment manifest. No request, caller, environment value, filesystem, or
+ * network lookup can supply production expected runtime identity.
+ */
+export const PRODUCTION_RUNTIME_IDENTITY_BINDING: TrustedRuntimeIdentityBinding | null = null;
+export const SOURCE_ATTESTATION_IMPLEMENTATION_READY = true as const;
+export const SOURCE_ATTESTATION_OPERATIONAL_READY = false as const;
+
+const EXACT_RUNTIME_IDENTITY_BINDING_KEYS = Object.freeze([
+  'repositoryFullName',
+  'sourceCommitSha',
+  'sourceTreeSha',
+  'buildArtifactSha256',
+  'buildId',
+  'deploymentId',
+  'environment',
+] as const);
+
+function isTrustedRuntimeIdentityBinding(value: unknown): value is TrustedRuntimeIdentityBinding {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  const keys = Object.keys(candidate);
+  return keys.length === EXACT_RUNTIME_IDENTITY_BINDING_KEYS.length &&
+    keys.every((key) => EXACT_RUNTIME_IDENTITY_BINDING_KEYS.includes(key as any)) &&
+    EXACT_RUNTIME_IDENTITY_BINDING_KEYS.every((key) => typeof candidate[key] === 'string' && candidate[key].length > 0);
+}
+
+/** Pure binding check for offline tests and provisioning validation. */
+export function verifyRuntimeSourceIdentityBinding(
+  receipt: unknown,
+  expectedRuntimeIdentity: unknown
+): RuntimeSourceIdentityBindingResult {
+  if (!isTrustedRuntimeIdentityBinding(expectedRuntimeIdentity)) {
+    return { valid: false, errors: ['RUNTIME_SOURCE_BINDING_NOT_PROVISIONED'], failureReason: 'RUNTIME_SOURCE_BINDING_NOT_PROVISIONED' };
+  }
+  if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) {
+    return { valid: false, errors: ['RUNTIME_SOURCE_BINDING_NOT_PROVISIONED'], failureReason: 'RUNTIME_SOURCE_BINDING_NOT_PROVISIONED' };
+  }
+  const received = receipt as Record<string, unknown>;
+  const expected = expectedRuntimeIdentity as TrustedRuntimeIdentityBinding;
+  const checks: readonly [keyof TrustedRuntimeIdentityBinding, RuntimeSourceIdentityBindingFailure][] = [
+    ['repositoryFullName', 'RUNTIME_SOURCE_BINDING_NOT_PROVISIONED'],
+    ['sourceCommitSha', 'RUNTIME_SOURCE_COMMIT_MISMATCH'],
+    ['sourceTreeSha', 'RUNTIME_SOURCE_TREE_MISMATCH'],
+    ['buildArtifactSha256', 'RUNTIME_BUILD_ARTIFACT_MISMATCH'],
+    ['buildId', 'RUNTIME_BUILD_ID_MISMATCH'],
+    ['deploymentId', 'RUNTIME_DEPLOYMENT_ID_MISMATCH'],
+    ['environment', 'RUNTIME_ENVIRONMENT_MISMATCH'],
+  ];
+  const errors = checks.filter(([field]) => received[field] !== expected[field]).map(([, failure]) => failure);
+  return { valid: errors.length === 0, errors, failureReason: errors[0] };
+}
+
+/**
+ * Offline helper requiring BOTH cryptographic receipt validity and exact
+ * runtime identity binding. It never implies production operational readiness.
+ */
+export function verifyRuntimeSourceProvenanceReceiptWithBinding(
+  receipt: unknown,
+  authority: unknown,
+  expectedRuntimeIdentity: unknown,
+  options?: VerifyRuntimeSourceProvenanceOptions
+): VerifyRuntimeSourceProvenanceResult & { readonly binding: RuntimeSourceIdentityBindingResult } {
+  const cryptographic = verifyRuntimeSourceProvenanceReceipt(receipt, authority, options);
+  const binding = verifyRuntimeSourceIdentityBinding(receipt, expectedRuntimeIdentity);
+  if (!cryptographic.valid) return { ...cryptographic, binding };
+  if (!binding.valid) return { valid: false, errors: binding.errors, failureReason: binding.failureReason, binding };
+  return { ...cryptographic, binding };
+}
+
+/** Production wrapper accepts no caller-supplied expected identity or authority. */
+export function verifyProductionRuntimeSourceProvenanceBinding(
+  receipt: unknown
+): VerifyRuntimeSourceProvenanceResult & { readonly binding: RuntimeSourceIdentityBindingResult } {
+  const binding = verifyRuntimeSourceIdentityBinding(receipt, PRODUCTION_RUNTIME_IDENTITY_BINDING);
+  if (!binding.valid) return { valid: false, errors: binding.errors, failureReason: binding.failureReason, binding };
+  const cryptographic = verifyProductionRuntimeSourceProvenanceReceipt(receipt);
+  return { ...cryptographic, binding };
+}
+
+// ============================================================================
+// 10. PRODUCTION RESOLVER
+// ============================================================================
+
 
 export interface ResolveProductionAuthorityParams {
   readonly issuerId: string;
@@ -683,7 +799,7 @@ export function resolveProductionRuntimeSourceProvenanceAuthority(
 }
 
 // ============================================================================
-// 10. PRODUCTION VERIFIER
+// 11. PRODUCTION VERIFIER
 // ============================================================================
 
 /**

@@ -40,6 +40,13 @@ import {
   verifyRuntimeSourceProvenanceReceipt,
   resolveProductionRuntimeSourceProvenanceAuthority,
   verifyProductionRuntimeSourceProvenanceReceipt,
+  TrustedRuntimeIdentityBinding,
+  PRODUCTION_RUNTIME_IDENTITY_BINDING,
+  SOURCE_ATTESTATION_IMPLEMENTATION_READY,
+  SOURCE_ATTESTATION_OPERATIONAL_READY,
+  verifyRuntimeSourceIdentityBinding,
+  verifyRuntimeSourceProvenanceReceiptWithBinding,
+  verifyProductionRuntimeSourceProvenanceBinding,
 } from '../../worker/ai/canary/deepSeekTrustedRuntimeSourceProvenance';
 import * as sourceProvenanceModule from '../../worker/ai/canary/deepSeekTrustedRuntimeSourceProvenance';
 
@@ -1526,5 +1533,97 @@ describe('Phase A.12B.2C-5Q: Trusted Runtime Source Provenance Foundation', () =
     it('127. total provider network calls during entire test suite execution is exactly 0', () => {
       expect(globalFetchCalls).toBe(0);
     });
+  });
+});
+
+
+describe('Phase A.12B.2C-5Q.1: Runtime Identity Binding', () => {
+  function expectedIdentity(payload: RuntimeSourceProvenancePayload): TrustedRuntimeIdentityBinding {
+    return {
+      repositoryFullName: payload.repositoryFullName,
+      sourceCommitSha: payload.sourceCommitSha,
+      sourceTreeSha: payload.sourceTreeSha,
+      buildArtifactSha256: payload.buildArtifactSha256,
+      buildId: payload.buildId,
+      deploymentId: payload.deploymentId,
+      environment: payload.environment,
+    };
+  }
+
+  function signedFixture() {
+    const { authority, privateKeyPem } = generateSyntheticAuthorityAndSigner();
+    const payload = createValidSyntheticPayload(authority.issuerId);
+    return { authority, payload, receipt: createSignedReceipt(payload, privateKeyPem) };
+  }
+
+  it('requires a valid signature and exact binding together', () => {
+    const { authority, payload, receipt } = signedFixture();
+    const result = verifyRuntimeSourceProvenanceReceiptWithBinding(
+      receipt, authority, expectedIdentity(payload), { nowUtc: '2026-09-06T11:00:00.000Z' }
+    );
+    expect(result.valid).toBe(true);
+    expect(result.binding.valid).toBe(true);
+  });
+
+  it.each([
+    ['sourceCommitSha', 'RUNTIME_SOURCE_COMMIT_MISMATCH'],
+    ['sourceTreeSha', 'RUNTIME_SOURCE_TREE_MISMATCH'],
+    ['buildArtifactSha256', 'RUNTIME_BUILD_ARTIFACT_MISMATCH'],
+    ['buildId', 'RUNTIME_BUILD_ID_MISMATCH'],
+    ['deploymentId', 'RUNTIME_DEPLOYMENT_ID_MISMATCH'],
+    ['environment', 'RUNTIME_ENVIRONMENT_MISMATCH'],
+  ] as const)('fails closed for a mismatched %s', (field, failure) => {
+    const { payload, receipt } = signedFixture();
+    const expected = { ...expectedIdentity(payload), [field]: 'different_runtime_identity_value' };
+    const result = verifyRuntimeSourceIdentityBinding(receipt, expected);
+    expect(result.valid).toBe(false);
+    expect(result.failureReason).toBe(failure);
+  });
+
+  it('fails closed for missing or malformed expected runtime binding', () => {
+    const { receipt } = signedFixture();
+    expect(verifyRuntimeSourceIdentityBinding(receipt, null).failureReason).toBe('RUNTIME_SOURCE_BINDING_NOT_PROVISIONED');
+    expect(verifyRuntimeSourceIdentityBinding(receipt, { sourceCommitSha: 'x' }).failureReason).toBe('RUNTIME_SOURCE_BINDING_NOT_PROVISIONED');
+  });
+
+  it('does not allow production callers to override the unprovisioned identity binding', () => {
+    const { authority, payload, receipt } = signedFixture();
+    const result = (verifyProductionRuntimeSourceProvenanceBinding as any)(
+      receipt, authority, expectedIdentity(payload)
+    );
+    expect(result.valid).toBe(false);
+    expect(result.failureReason).toBe('RUNTIME_SOURCE_BINDING_NOT_PROVISIONED');
+  });
+
+  it('keeps production trust and operational readiness false despite an offline success', () => {
+    const { authority, payload, receipt } = signedFixture();
+    expect(verifyRuntimeSourceProvenanceReceipt(receipt, authority, { nowUtc: '2026-09-06T11:00:00.000Z' }).valid).toBe(true);
+    expect(SOURCE_ATTESTATION_IMPLEMENTATION_READY).toBe(true);
+    expect(SOURCE_ATTESTATION_OPERATIONAL_READY).toBe(false);
+    expect(PRODUCTION_RUNTIME_IDENTITY_BINDING).toBeNull();
+    expect(RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED).toBe(false);
+    expect(TRUSTED_RUNTIME_SOURCE_PROVENANCE_READY).toBe(false);
+    expect(GUARDED_SOURCE_ATTESTATION_READY).toBe(false);
+  });
+
+  it('does not accept private key material as a public production authority', () => {
+    const { privateKeyPem } = generateSyntheticAuthorityAndSigner();
+    const { payload, receipt } = signedFixture();
+    const result = verifyRuntimeSourceProvenanceReceipt(
+      receipt,
+      { issuerId: 'x', keyVersion: 'v1', algorithm: 'Ed25519', publicKeyFingerprintSha256: '0'.repeat(64), publicKeyPem: privateKeyPem },
+      { nowUtc: '2026-09-06T11:00:00.000Z' }
+    );
+    expect(result.valid).toBe(false);
+  });
+
+  it('preserves receipt-invalid and authority-untrusted outcomes independently of binding', () => {
+    const { authority, payload, receipt } = signedFixture();
+    const altered = { ...receipt, buildId: 'altered_build' };
+    expect(verifyRuntimeSourceProvenanceReceiptWithBinding(
+      altered, authority, expectedIdentity(payload), { nowUtc: '2026-09-06T11:00:00.000Z' }
+    ).valid).toBe(false);
+    expect(verifyProductionRuntimeSourceProvenanceBinding(receipt).failureReason)
+      .toBe('RUNTIME_SOURCE_BINDING_NOT_PROVISIONED');
   });
 });
