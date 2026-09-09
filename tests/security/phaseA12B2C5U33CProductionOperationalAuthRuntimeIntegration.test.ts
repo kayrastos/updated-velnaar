@@ -1370,8 +1370,8 @@ describe('Phase A.12B.2C-5U.3.3C-R: Production Operational Auth Runtime Integrat
       expect(RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED).toBe(false);
     });
 
-    it('G.9 D1_REPLAY_BACKEND_PRODUCTION_BOUND is strictly false', () => {
-      expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(false);
+    it('G.9 D1_REPLAY_BACKEND_PRODUCTION_BOUND reflects verified deployed D1 Worker binding', () => {
+      expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(true);
     });
 
     it('G.10 D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED is true after explicit adoption', () => {

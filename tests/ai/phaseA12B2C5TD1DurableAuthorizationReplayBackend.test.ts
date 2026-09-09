@@ -143,8 +143,8 @@ describe('Phase A.12B.2C-5T: Cloudflare D1 Durable Authorization Replay Backend 
       expect(D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED).toBe(true);
     });
 
-    it('3. production bound remains strictly false', () => {
-      expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(false);
+    it('3. production bound reflects verified deployed D1 Worker binding', () => {
+      expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(true);
     });
 
     it('4. real concurrency certified remains strictly false', () => {

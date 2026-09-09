@@ -764,8 +764,8 @@ describe('VELNAR — A.12B.2C-5U.1 Production Replay Coordinator Offline Foundat
       expect(D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED).toBe(true);
     });
 
-    it('8.2 D1_REPLAY_BACKEND_PRODUCTION_BOUND is false', () => {
-      expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(false);
+    it('8.2 D1_REPLAY_BACKEND_PRODUCTION_BOUND reflects verified deployed D1 Worker binding', () => {
+      expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(true);
     });
 
     it('8.3 D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED is true after explicit adoption', () => {
@@ -785,6 +785,17 @@ describe('VELNAR — A.12B.2C-5U.1 Production Replay Coordinator Offline Foundat
 
     it('8.6 barrier failure maps to D1_BACKEND_NOT_READY', () => {
       expect(coordinatorSource).toContain("status: 'D1_BACKEND_NOT_READY'");
+    });
+
+    it('8.6a Gate 11 remains fail-closed before D1 reservation when Gates 9 and 10 are true', () => {
+      expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(true);
+      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
+      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
+
+      const barrierIndex = coordinatorSource.indexOf("status: 'D1_BACKEND_NOT_READY'");
+      const reservationIndex = coordinatorSource.indexOf('backend.reserveIfAbsent(replayRequest)');
+      expect(barrierIndex).toBeGreaterThanOrEqual(0);
+      expect(reservationIndex).toBeGreaterThan(barrierIndex);
     });
 
     it('8.7 ALREADY_RESERVED from D1 maps to REPLAY_ALREADY_RESERVED', () => {

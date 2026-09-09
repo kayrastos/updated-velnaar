@@ -27,7 +27,7 @@ import {
 
 export const D1_REPLAY_BACKEND_ADAPTER_VERSION = 'a12b2c5t-v1';
 export const D1_REPLAY_BACKEND_ADAPTER_IMPLEMENTED = true as const;
-export const D1_REPLAY_BACKEND_PRODUCTION_BOUND = false as const;
+export const D1_REPLAY_BACKEND_PRODUCTION_BOUND = true as const;
 export const D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED = false as const;
 // True only after the exact production D1 resource has been independently
 // verified and explicitly adopted; binding and concurrency remain separate gates.
