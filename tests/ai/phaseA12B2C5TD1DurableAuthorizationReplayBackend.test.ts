@@ -13,6 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -1081,11 +1082,29 @@ describe('Phase A.12B.2C-5T: Cloudflare D1 Durable Authorization Replay Backend 
       expect(content).not.toContain('process.env');
     });
 
-    it('111. wrangler.jsonc database_id remains placeholder/unprovisioned', () => {
+    it('111. wrangler.jsonc DB binding uses the sealed canonical production D1 identity', () => {
       const wranglerPath = path.resolve(process.cwd(), 'wrangler.jsonc');
       expect(fs.existsSync(wranglerPath)).toBe(true);
+
       const content = fs.readFileSync(wranglerPath, 'utf8');
-      expect(content).toContain('"database_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"');
+
+      expect(content).toContain('"binding": "DB"');
+      expect(content).toContain('"database_name": "velnar-production-db"');
+      expect(content).toContain('"migrations_dir": "migrations"');
+      expect(content).not.toContain(
+        '"database_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"'
+      );
+
+      const match = content.match(/"database_id"\s*:\s*"([^"]+)"/);
+      expect(match).not.toBeNull();
+
+      const databaseIdSha256 = createHash('sha256')
+        .update(match![1], 'utf8')
+        .digest('hex');
+
+      expect(databaseIdSha256).toBe(
+        '62ebb801413e1f691e0a30d9d4388c7d17e0060ff0594dcd8238f25fc6857055'
+      );
     });
 
     it('112. 5R durable backend bound gate remains strictly false', () => {
