@@ -1255,7 +1255,7 @@ describe('Phase A.12B.2C-5U.3.3B-R: Hardened Production Operational Authenticati
       // 10. D1 Replay Backend Real Database Provisioned
       expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
       // 11. D1 Replay Backend Real Concurrency Certified
-      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
+      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(true);
       // 12. Production Routing Enforcement Allowed
       expect(DEEPSEEK_FIRST_PROVIDER_STRATEGY.securityInvariants.productionRoutingEnforcementAllowed).toBe(false);
     });

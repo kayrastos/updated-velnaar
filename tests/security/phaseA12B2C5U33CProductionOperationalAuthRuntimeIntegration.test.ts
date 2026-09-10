@@ -1378,8 +1378,8 @@ describe('Phase A.12B.2C-5U.3.3C-R: Production Operational Auth Runtime Integrat
       expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
     });
 
-    it('G.11 D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED is strictly false', () => {
-      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
+    it('G.11 D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED is true after real concurrency certification', () => {
+      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(true);
     });
 
     it('G.12 productionRoutingEnforcementAllowed is strictly false (Canonical Gate #12)', () => {

@@ -772,8 +772,8 @@ describe('VELNAR — A.12B.2C-5U.1 Production Replay Coordinator Offline Foundat
       expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
     });
 
-    it('8.4 D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED is false', () => {
-      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
+    it('8.4 D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED is true after real concurrency certification', () => {
+      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(true);
     });
 
     it('8.5 barrier check requires all 4 constants to be true', () => {
@@ -787,15 +787,18 @@ describe('VELNAR — A.12B.2C-5U.1 Production Replay Coordinator Offline Foundat
       expect(coordinatorSource).toContain("status: 'D1_BACKEND_NOT_READY'");
     });
 
-    it('8.6a Gate 11 remains fail-closed before D1 reservation when Gates 9 and 10 are true', () => {
+    it('8.6a closed upstream gates prevent real reservation or provider path despite Gate 11=true', async () => {
       expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(true);
       expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
-      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
+      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(true);
 
-      const barrierIndex = coordinatorSource.indexOf("status: 'D1_BACKEND_NOT_READY'");
-      const reservationIndex = coordinatorSource.indexOf('backend.reserveIfAbsent(replayRequest)');
-      expect(barrierIndex).toBeGreaterThanOrEqual(0);
-      expect(reservationIndex).toBeGreaterThan(barrierIndex);
+      const { db, getPrepareCalls } = createStrictMockD1();
+      const pkg = createSampleAuthPackage();
+      const receipt = createSampleSourceReceipt();
+
+      const result = await coordinateProductionReplayReservation(db, pkg, receipt);
+      expect(result.readyForCredentialResolution).toBe(false);
+      expect(getPrepareCalls()).toBe(0);
     });
 
     it('8.7 ALREADY_RESERVED from D1 maps to REPLAY_ALREADY_RESERVED', () => {

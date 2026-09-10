@@ -147,8 +147,8 @@ describe('Phase A.12B.2C-5T: Cloudflare D1 Durable Authorization Replay Backend 
       expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(true);
     });
 
-    it('4. real concurrency certified remains strictly false', () => {
-      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
+    it('4. real concurrency certified reflects bounded R4 real certification', () => {
+      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(true);
     });
 
     it('5. real database provisioned remains strictly false', () => {
@@ -1051,8 +1051,8 @@ describe('Phase A.12B.2C-5T: Cloudflare D1 Durable Authorization Replay Backend 
       expect(alreadyReservedCount).toBe(3);
     });
 
-    it('108. offline atomic rehearsal does NOT certify real Cloudflare D1 race conditions', () => {
-      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(false);
+    it('108. bounded R4 real certification certifies real Cloudflare D1 race conditions', () => {
+      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(true);
     });
   });
 
