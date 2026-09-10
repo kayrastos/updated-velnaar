@@ -1,0 +1,271 @@
+{
+  "phase": "A.12B.2C-5U.3.4B",
+  "artifactType": "WORKER_PRODUCTION_D1_BINDING_GATE9_DORMANT_REDEPLOYMENT_SEAL",
+  "sealed": true,
+  "phase5U34BWorkerD1BindingGate9DormantDeploymentSealed": true,
+  "reviewedSnapshotCommit": "803f8591085f84cc3a8e20be432162511466a673",
+  "reviewedSnapshotTree": "4455f0d2015cae97a0518b1c355a31c0d2d9bf16",
+  "reviewedSnapshotParent": "6e0334bb4f6010fb923781e79310b1a5c0146adc",
+  "sealedPredecessor": {
+    "commit": "03f00b4efa1c9caeec3e00545dfa07a3035e4e6a",
+    "tree": "3f59abbe177b3356dac519ce72e24f81e77b88d3",
+    "status": "A12B2C5U34A_PRODUCTION_D1_EXPLICIT_ADOPTION_APPROVED_AND_SEALED"
+  },
+  "executionLineage": {
+    "initialR3TestAlignmentCommit": "7f9d0ef2d0f15488ca598bafbb9263846beac1e9",
+    "initialProductionD1BindingDeploySnapshotCommit": "3f267cdb68b51a340c7043717b3e39a5f41b83ad",
+    "initialProductionD1BindingDeploySnapshotTree": "28c633900ef4ece5cda71debe1d32fabe3e2619e",
+    "initialDormantDeploymentExecutionCommit": "080b6783ae017d237f3e28b1882bbf0b1e90743f",
+    "initialDeploymentEvidenceRepairCommit": "7d5197feea3b31cceff016418adace1b3537eabd",
+    "initialDeploymentEvidenceRepairTree": "500e6341847ecf55046167f12253c797d3c615da"
+  },
+  "gate9DeploySnapshotCommit": "6e0334bb4f6010fb923781e79310b1a5c0146adc",
+  "gate9DeploySnapshotTree": "e20b2fccdcabeb69d08f65ac9259b7d47a772225",
+  "gate9DeploySnapshotParent": "7d5197feea3b31cceff016418adace1b3537eabd",
+  "independentReviewPassed": true,
+  "independentReviewVerdict": "A12B2C5U34B_GATE9_DORMANT_REDEPLOYMENT_INDEPENDENT_REVIEW_APPROVED_FOR_SEAL_PREPARATION",
+  "workerName": "velnar-platform-worker",
+  "databaseName": "velnar-production-db",
+  "databaseIdSha256": "62ebb801413e1f691e0a30d9d4388c7d17e0060ff0594dcd8238f25fc6857055",
+  "databaseIdFinal6": "4de303",
+  "deployedD1BindingName": "DB",
+  "rawDatabaseIdRepeatedInSeal": false,
+  "initialDormantWorkerVersion": "308b6db2-44d5-41ab-a028-88a602c703e0",
+  "activeVersionAtIndependentReview": "27449367-0171-41e3-b047-f616f97308c7",
+  "activeVersionMatchesExecutionEvidence": true,
+  "deployedD1IdentityHashMatch": true,
+  "runtimeVerification": {
+    "healthHttpStatus": 200,
+    "healthStatus": "HEALTHY",
+    "environment": "production",
+    "databaseConfigured": true,
+    "d1Status": "ATTACHED",
+    "productionExternalAi": "DISABLED",
+    "operationalGET": 404,
+    "operationalPOST": 404,
+    "operationalOPTIONS": 404,
+    "dormantOperationalRouteVerified": true,
+    "providerAiSecretsPresent": false,
+    "providerAiCalls": 0
+  },
+  "dynamicGate11FailClosed": {
+    "dynamicGate11FailClosedVerified": true,
+    "coordinatorResultStatus": "D1_BACKEND_NOT_READY",
+    "dbPrepareCalls": 0,
+    "reserveIfAbsentCalls": 0,
+    "gate11BlocksBeforeRealReservation": true,
+    "permanentRegressionIsSourceOrderingOnly": true,
+    "independentTemporaryBehavioralVerificationPerformed": true
+  },
+  "finalCanonicalGates": {
+    "states": {
+      "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+      "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+      "CANARY_LIVE_EXECUTION_ENABLED": false,
+      "CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+      "GUARDED_SOURCE_ATTESTATION_READY": false,
+      "GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+      "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+      "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+      "D1_REPLAY_BACKEND_PRODUCTION_BOUND": true,
+      "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": true,
+      "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": false,
+      "productionRoutingEnforcementAllowed": false
+    },
+    "canonicalTrueGateCount": 2,
+    "closedOrBlockedGateCount": 10,
+    "trueGates": [
+      "Gate 9",
+      "Gate 10"
+    ],
+    "registryLength": 0,
+    "registryFrozen": true
+  },
+  "gateSemantics": {
+    "workerRuntimeD1AttachmentVerified": true,
+    "productionD1BindingCanonicalGate": true,
+    "realD1ConcurrencyCertified": false,
+    "realReplayReservationEnabled": false,
+    "gate11StillBlocksReplayReservation": true
+  },
+  "dryRunEvidence": {
+    "wranglerVersion": "4.130.0",
+    "workerBundle": {
+      "fileCount": 3,
+      "manifestSha256": "69a613363e83c2b33aaede72a8e83423ef5de16dec1e85260253dad21c53e335",
+      "aggregateSha256": "c3f824076d3e8522fa87786dd8405a3c8039bbb024f8c75d89a0e29e67b5c76a"
+    },
+    "staticAssets": {
+      "fileCount": 4,
+      "manifestSha256": "f843214b1d12f79eac64cd4360b09cf332dc56979200cddf94b5f1553fb53e93",
+      "aggregateSha256": "d6cb5430d5fa581c946c50742651bd9ff0c6f9a75a0be3524f33a98f665e2a9f"
+    },
+    "deployedByteEqualityClaimed": false,
+    "runtimeSourceProvenanceTrustAnchorProvisioned": false
+  },
+  "testVerification": {
+    "independentTestExecutionPerformed": true,
+    "testFileCount": 62,
+    "testCount": 2509,
+    "passed": 2509,
+    "failed": 0,
+    "typecheck": "PASS",
+    "build": "PASS"
+  },
+  "r3bMutationAccounting": {
+    "gate9Flips": 1,
+    "gate10Flips": 0,
+    "gate11Flips": 0,
+    "otherGateFlips": 0,
+    "workerDeployCommands": 1,
+    "confirmedWorkerRedeployments": 1,
+    "d1Writes": 0,
+    "d1ConcurrencyTests": 0,
+    "migrationApplies": 0,
+    "d1Deletes": 0,
+    "timeTravelRestores": 0,
+    "rollbackOperations": 0,
+    "secretMutations": 0,
+    "accessMutations": 0,
+    "dnsMutations": 0,
+    "customDomainMutations": 0,
+    "workerRouteMutations": 0,
+    "identityMutations": 0,
+    "providerAiCalls": 0
+  },
+  "sealOperationAccounting": {
+    "sealProviderCalls": 0,
+    "sealProductionMutations": 0,
+    "sealGateFlips": 0,
+    "sealDeployments": 0
+  },
+  "historicalExecutionContext": {
+    "initialBindingDeploymentOccurred": true,
+    "initialBindingWorkerDeployCommands": 1,
+    "gate9AlignmentRedeploymentOccurred": true,
+    "gate9AlignmentWorkerDeployCommands": 1,
+    "totalWorkerDeploymentsAcross5U34B": 2,
+    "wranglerDatabaseBindingConfiguredDuring5U34B": true,
+    "gate9CanonicalFlipCountAcross5U34B": 1,
+    "d1WritesAcross5U34B": 0,
+    "providerAiCallsAcross5U34B": 0
+  },
+  "findingCounts": {
+    "SECURITY": {
+      "material": 0,
+      "nonMaterial": 0
+    },
+    "ARCHITECTURE": {
+      "material": 0,
+      "nonMaterial": 0
+    },
+    "PROVIDER_CONTRACT": {
+      "material": 0,
+      "nonMaterial": 1
+    },
+    "EVIDENCE_INTEGRITY": {
+      "material": 0,
+      "nonMaterial": 0
+    },
+    "SOURCE_PROVENANCE": {
+      "material": 0,
+      "nonMaterial": 0
+    },
+    "PHASE_BOUNDARY": {
+      "material": 0,
+      "nonMaterial": 0
+    },
+    "RUNTIME_VERIFICATION": {
+      "material": 0,
+      "nonMaterial": 0
+    },
+    "TEST_VERIFICATION": {
+      "material": 0,
+      "nonMaterial": 1
+    },
+    "GATE11_FAIL_CLOSED_VERIFICATION": {
+      "material": 0,
+      "nonMaterial": 0
+    },
+    "totalMaterialFindings": 0,
+    "totalNonMaterialFindings": 2
+  },
+  "nonMaterialObservations": [
+    {
+      "bucket": "PROVIDER_CONTRACT",
+      "observation": "Provider-side Worker Route and Custom Domain enumeration was unavailable through the permitted Wrangler read-only CLI surface.",
+      "risk": "No contradiction with verified active Worker version, D1 binding, provider-AI secret absence, health response, or dormant operational route behavior.",
+      "requiredFutureAction": "Before any later route/domain activation phase, enumerate current route and Custom Domain state through an approved management-plane read interface."
+    },
+    {
+      "bucket": "TEST_VERIFICATION",
+      "observation": "Committed test 8.6a provides source-order structural evidence rather than direct behavioral coordinator execution.",
+      "risk": "Independent final review separately performed temporary offline behavioral verification with D1_BACKEND_NOT_READY and zero D1 prepare/reserve calls.",
+      "optionalFutureAction": "Add the behavioral regression permanently in a later test-only change."
+    }
+  ],
+  "explicitNonClaims": [
+    "real D1 concurrency",
+    "Gate 11",
+    "real replay reservation",
+    "provider AI execution",
+    "DeepSeek secret provisioning",
+    "Access policy",
+    "Custom Domain",
+    "DNS",
+    "Worker Route",
+    "identity enrollment",
+    "production authority trust anchor",
+    "runtime source provenance trust anchor",
+    "operational ingress readiness",
+    "operational route enablement",
+    "live canary",
+    "production routing",
+    "provider canary execution",
+    "No later phase is implicitly authorized by this seal."
+  ],
+  "sealedScope": [
+    "exact canonical production D1 was bound to the production Worker",
+    "runtime D1 attachment was verified",
+    "Worker remained provider-free and operationally dormant",
+    "Gate 9 was aligned true in runtime-consumed Worker code",
+    "aligned Worker was redeployed exactly once",
+    "active version and exact D1 binding identity matched execution evidence",
+    "health was HEALTHY with D1 ATTACHED",
+    "operational route was 404 for GET, POST, and OPTIONS",
+    "Gate 11 remained false and real replay reservation fail-closed",
+    "no D1 write, concurrency, or provider-AI operation occurred",
+    "independent review found zero material findings"
+  ],
+  "reviewedArtifacts": [
+    {
+      "path": "execution/a12b2c5u34a_explicit_production_d1_adoption_seal.json",
+      "sha256": "5a497a4fe029b2bdeb90fabc7b37ffdfa9a41ad32af2db7a81531ac67ebc9338"
+    },
+    {
+      "path": "execution/a12b2c5u34b_worker_production_binding_dormant_deployment_execution.json",
+      "sha256": "78e3fb47b5683fb4893ab03721437fa997337c6ac63d966857c0e2f4093fc42d"
+    },
+    {
+      "path": "execution/a12b2c5u34b_worker_production_binding_dormant_deployment_execution.md",
+      "sha256": "ce69d11f2d6acdb421bbb5f5be4b01bd9da23ebb79f60ac6c19f2d6cf263d55d"
+    },
+    {
+      "path": "execution/a12b2c5u34b_gate9_dormant_redeployment_execution.json",
+      "sha256": "382314ddb7aede587ccd6447ff837f02bdda53b8deea302c1e2f077f4b0ec0ec"
+    },
+    {
+      "path": "execution/a12b2c5u34b_gate9_dormant_redeployment_execution.md",
+      "sha256": "8fae8b5621e73f981f7dfbbf98c3d2056f1c4c14b59432fe3b9b90e8ee151979"
+    },
+    {
+      "path": "worker/ai/canary/d1AuthorizationReplayBackend.ts",
+      "sha256": "fbd8509ba2d2566bb4da529aa7de004aca100848199fa430d0fc5ee4885eaf7a"
+    },
+    {
+      "path": "worker/ai/canary/deepSeekProductionReplayCoordinator.ts",
+      "sha256": "f4ff1ac5df9be4d867106f8939ab8d9cda0ebeb35110c071abaf6c7439643e39"
+    }
+  ],
+  "finalStatus": "A12B2C5U34B_GATE9_DORMANT_REDEPLOYMENT_APPROVED_AND_SEALED"
+}
