@@ -1,0 +1,390 @@
+{
+  "phase": "A.12B.2C-5U.3.4C",
+  "artifactType": "REAL_D1_CONCURRENCY_GATE11_DORMANT_ALIGNMENT_SEAL",
+  "sealed": true,
+  "phase5U34CRealD1ConcurrencyGate11DormantAlignmentSealed": true,
+  "reviewedSnapshotCommit": "446aa7d3d29eeae14ca0afefee2853b31634f0d8",
+  "reviewedSnapshotTree": "cd5151b89f632bddf8fd818f29e6d214f529ab83",
+  "reviewedSnapshotParent": "0871a9839d630a4d16e6fbc3b6c75a2d98ba5aea",
+  "sealedPredecessor": {
+    "commit": "c2a04246a508b4afd00bd1d2a550f4d9d99cc586",
+    "tree": "6c9ffd3b9a524d1b46b4e71d3d9d6590fc58310a",
+    "status": "A12B2C5U34B_GATE9_DORMANT_REDEPLOYMENT_APPROVED_AND_SEALED"
+  },
+  "r4ExecutionLineage": {
+    "canonicalBase": {
+      "commit": "c2a04246a508b4afd00bd1d2a550f4d9d99cc586",
+      "tree": "6c9ffd3b9a524d1b46b4e71d3d9d6590fc58310a"
+    },
+    "harnessSnapshot": {
+      "commit": "987bcfeb4b6bbf2691781377d6b41fe33ab2b8d1",
+      "tree": "bdd854d390ad37e5aab4a684e2ec919b681e3bab",
+      "parent": "c2a04246a508b4afd00bd1d2a550f4d9d99cc586",
+      "message": "test(d1): add bounded real concurrency certification harness"
+    },
+    "concurrencyEvidence": {
+      "commit": "b03f85b694e87c20336fce8282c8aaa2a00ccaf6",
+      "tree": "223edf32cf2aa04666381dc503a28450f55f6642",
+      "parent": "987bcfeb4b6bbf2691781377d6b41fe33ab2b8d1",
+      "message": "ops(d1): record bounded real concurrency certification"
+    },
+    "gate11DeploySnapshot": {
+      "commit": "541a9f967cd0919464e1fde6f46e9dd34792ae4a",
+      "tree": "4494166e5680ccae7b75bac05f48ba032ea7e5d5",
+      "parent": "b03f85b694e87c20336fce8282c8aaa2a00ccaf6",
+      "message": "ops(d1): activate certified real concurrency gate"
+    },
+    "dormantRuntimeAlignmentEvidence": {
+      "commit": "0871a9839d630a4d16e6fbc3b6c75a2d98ba5aea",
+      "tree": "04b44ca28a6497009701ce27317d6b841c8012bb",
+      "parent": "541a9f967cd0919464e1fde6f46e9dd34792ae4a",
+      "message": "ops(d1): record Gate 11 dormant runtime alignment"
+    },
+    "evidenceRepair": {
+      "commit": "446aa7d3d29eeae14ca0afefee2853b31634f0d8",
+      "tree": "cd5151b89f632bddf8fd818f29e6d214f529ab83",
+      "parent": "0871a9839d630a4d16e6fbc3b6c75a2d98ba5aea",
+      "message": "docs(d1): repair R4 Gate 11 alignment evidence"
+    }
+  },
+  "independentReview": {
+    "passed": true,
+    "verdict": "A12B2C5U34C_REAL_D1_CONCURRENCY_GATE11_DORMANT_ALIGNMENT_INDEPENDENT_REVIEW_APPROVED_FOR_SEAL_PREPARATION",
+    "totalMaterialFindings": 0,
+    "totalNonMaterialFindings": 2,
+    "findingCounts": {
+      "SECURITY": {
+        "material": 0,
+        "nonMaterial": 0
+      },
+      "ARCHITECTURE": {
+        "material": 0,
+        "nonMaterial": 0
+      },
+      "CONCURRENCY_CORRECTNESS": {
+        "material": 0,
+        "nonMaterial": 0
+      },
+      "D1_STATE_VERIFICATION": {
+        "material": 0,
+        "nonMaterial": 0
+      },
+      "PROVIDER_CONTRACT": {
+        "material": 0,
+        "nonMaterial": 1
+      },
+      "HARNESS_BOUNDARY": {
+        "material": 0,
+        "nonMaterial": 0
+      },
+      "EVIDENCE_INTEGRITY": {
+        "material": 0,
+        "nonMaterial": 0
+      },
+      "SOURCE_PROVENANCE": {
+        "material": 0,
+        "nonMaterial": 0
+      },
+      "PHASE_BOUNDARY": {
+        "material": 0,
+        "nonMaterial": 0
+      },
+      "RUNTIME_VERIFICATION": {
+        "material": 0,
+        "nonMaterial": 0
+      },
+      "TEST_VERIFICATION": {
+        "material": 0,
+        "nonMaterial": 1
+      },
+      "AUTHORIZATION_COMPLIANCE": {
+        "material": 0,
+        "nonMaterial": 0
+      }
+    }
+  },
+  "humanAuthorization": {
+    "humanAuthorizationVerified": true,
+    "humanAuthorizationScope": "AUTHORIZE_A12B2C5U34C_REAL_D1_CONCURRENCY_AND_GATE11_DORMANT_ALIGNMENT",
+    "humanAuthorizationLiteral": "AUTHORIZE_A12B2C5U34C_REAL_D1_CONCURRENCY_AND_GATE11_DORMANT_ALIGNMENT: Current SEALED canonical main c2a04246a508b4afd00bd1d2a550f4d9d99cc586 temelinde, yalnız exact sealed velnar-production-db üzerindeki authorization_replay_ledger için bounded real-concurrency certification yapmaya izin veriyorum. Bunun için production Worker’dan bağımsız tam 1 temporary provider-free certification Worker deploy etmeye, bu temporary Worker’a yalnız exact DB binding ve tam 1 ephemeral R4_CERT_TOKEN secret vermeye, 20 contested round × 32 concurrent identical reservation ve 20 control round × 32 concurrent unique reservation olmak üzere tam 1280 bounded synthetic reservation attempt çalıştırmaya ve en fazla/beklenen tam 660 synthetic append-only certification row oluşturmaya izin veriyorum. Test row’larını silmeye izin vermiyorum. Test sonrası yalnız read-only direct D1 verification yapmaya ve temporary certification Worker’ı tam 1 kez silmeye izin veriyorum. Yalnız tüm contested round’lar exact 1 RESERVED + 31 ALREADY_RESERVED, tüm 640 control reservation RESERVED ve direct D1 evidence exact 660 batch row / 660 distinct replay key doğrularsa D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED Gate 11 değerini false→true yapmaya, doğrudan etkilenen minimum testleri güncellemeye, full test/typecheck/build çalıştırmaya, exact dry-run/bundle snapshot almaya ve mevcut velnar-platform-worker için tam 1 provider-free dormant redeployment yapmaya izin veriyorum. Sonrasında yalnız read-only active-version, exact DB binding, /api/health ve operational GET/POST/OPTIONS=404 doğrulamalarına izin veriyorum. Gate 9 ve Gate 10 true kalmalı; diğer tüm gates kapalı kalmalı. DeepSeek/Gemini/Kimi veya başka AI provider secret/call, provider credential read, D1 migration/delete/restore/cleanup, concurrency retry, main Worker ikinci deployment, rollback, Access/DNS/Custom Domain/Worker Route, identity enrollment, trust anchor, operational ingress/route enablement, live canary veya production routing yetkisi vermiyorum. Herhangi bir concurrent request sonucu belirsiz, timeout, backend unavailable veya acceptance kriteri dışı olursa retry yapmadan fail-closed dur; Gate 11’i değiştirme. Temporary harness cleanup deletion bu durumda da izinlidir. Tüm kontroller başarılı ve origin/main değişmemişse oluşan bounded commits’i origin/main’e tek fast-forward git push ile yayımlamaya izin veriyorum"
+  },
+  "concurrencyCertification": {
+    "batchId": "r4cert_da0d929f4a15a225",
+    "authorityId": "r4cert_da0d929f4a15a225",
+    "keyVersion": "r4-v1",
+    "ledgerVersion": "a12b2c5r-v1",
+    "harnessHardMaxDistinctKeys": 660,
+    "callerCanChooseReplayKey": false,
+    "harnessUsesCanonicalBackend": true,
+    "roundsTotal": 40,
+    "contestedRounds": 20,
+    "controlRounds": 20,
+    "totalAttempts": 1280,
+    "contestedAttempts": 640,
+    "controlAttempts": 640,
+    "contestedReserved": 20,
+    "contestedAlreadyReserved": 620,
+    "controlReserved": 640,
+    "controlAlreadyReserved": 0,
+    "totalReserved": 660,
+    "totalAlreadyReserved": 620,
+    "backendUnavailable": 0,
+    "invalidRequest": 0,
+    "errors": 0,
+    "retries": 0,
+    "all20ContestedRoundsPass": true,
+    "all20ControlRoundsPass": true,
+    "concurrencyCertificationPassed": true
+  },
+  "currentD1CertificationState": {
+    "currentD1BatchRows": 660,
+    "currentD1DistinctReplayKeys": 660,
+    "currentD1DistinctRunNonces": 660,
+    "currentD1ContestedRows": 20,
+    "currentD1ControlRows": 640,
+    "currentD1LedgerVersionMismatchCount": 0,
+    "currentD1KeyVersionMismatchCount": 0,
+    "certificationRowsPreserved": true,
+    "d1DeletionUpdateCleanup": "none"
+  },
+  "resourceIdentity": {
+    "databaseName": "velnar-production-db",
+    "databaseIdSha256": "62ebb801413e1f691e0a30d9d4388c7d17e0060ff0594dcd8238f25fc6857055",
+    "databaseIdFinal6": "4de303",
+    "rawDatabaseIdRepeatedInSeal": false,
+    "productionWorkerName": "velnar-platform-worker",
+    "activeProductionWorkerVersion": "5aa1936f-bb0d-4a32-9697-955431770b92",
+    "productionD1BindingName": "DB",
+    "productionD1BindingMatch": true
+  },
+  "temporaryWorkerLifecycle": {
+    "temporaryWorkerName": "velnar-r4-d1-conc-e26c7b0a0bc5",
+    "temporaryWorkerVersion": "6b4be0cf-c5ef-4639-b430-7aebdf14c457",
+    "temporaryWorkerDeployCommands": 1,
+    "temporaryWorkerDeleteCommands": 1,
+    "temporaryWorkerDeletionEvidence": true,
+    "temporaryWorkerSecretBindingsCreated": 1,
+    "temporarySecretName": "R4_CERT_TOKEN",
+    "temporarySecretValueRecorded": false,
+    "separateSecretPutCommands": 0,
+    "separateSecretDeleteCommands": 0,
+    "temporaryWorkerCurrentEnumerationAvailable": false
+  },
+  "multiColoObservation": {
+    "observedEdgeColos": [
+      "AMS",
+      "DUS",
+      "FRA",
+      "WAW",
+      "DUB",
+      "MAN"
+    ],
+    "multiGeoObserved": true,
+    "multiGeoClaimScope": "OBSERVATIONAL_EDGE_COLO_DIVERSITY_ONLY",
+    "formalMultiRegionD1ReplicationCertified": false
+  },
+  "finalGateState": {
+    "states": {
+      "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+      "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+      "CANARY_LIVE_EXECUTION_ENABLED": false,
+      "CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+      "GUARDED_SOURCE_ATTESTATION_READY": false,
+      "GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+      "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+      "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+      "D1_REPLAY_BACKEND_PRODUCTION_BOUND": true,
+      "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": true,
+      "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": true,
+      "productionRoutingEnforcementAllowed": false
+    },
+    "canonicalTrueGateCount": 3,
+    "closedOrBlockedGateCount": 9,
+    "trueGates": [
+      "Gate 9",
+      "Gate 10",
+      "Gate 11"
+    ],
+    "registryLength": 0,
+    "registryFrozen": true
+  },
+  "behavioralFailClosedState": {
+    "behavioralUpstreamFailClosedVerified": true,
+    "dbPrepareCalls": 0,
+    "credentialResolverCallsReachable": 0,
+    "providerFetchCallsReachable": 0,
+    "productionReplayExecutionEnabled": false,
+    "semanticDistinction": "Gate 9 + Gate 10 + Gate 11 establish the real D1 replay backend foundation. They DO NOT establish permission to reach that backend in production. Upstream execution/trust/route barriers remain closed."
+  },
+  "runtimeVerification": {
+    "healthHttpStatus": 200,
+    "healthStatus": "HEALTHY",
+    "environment": "production",
+    "databaseConfigured": true,
+    "d1Status": "ATTACHED",
+    "productionExternalAi": "DISABLED",
+    "operationalGET": 404,
+    "operationalPOST": 404,
+    "operationalOPTIONS": 404,
+    "dormantOperationalRouteVerified": true,
+    "providerAiSecretsPresent": false,
+    "providerAiCalls": 0
+  },
+  "independentTestVerification": {
+    "independentTestExecutionPerformed": true,
+    "testFileCount": 63,
+    "testCount": 2523,
+    "passed": 2523,
+    "failed": 0,
+    "typecheck": "PASS",
+    "build": "PASS"
+  },
+  "provenanceLimits": {
+    "deployedByteEqualityClaimed": false,
+    "runtimeSourceProvenanceTrustAnchorProvisioned": false,
+    "gate11DeploySnapshot": {
+      "commit": "541a9f967cd0919464e1fde6f46e9dd34792ae4a",
+      "tree": "4494166e5680ccae7b75bac05f48ba032ea7e5d5",
+      "wrangler": "4.130.0"
+    },
+    "workerDryRun": {
+      "fileCount": 3,
+      "manifestSha256": "0fb5983d74e992dd999029c29d584b1b62a9deb6b34b7fd766db80b2d8ccbf82",
+      "aggregateSha256": "1f26afccb41b3a594ce7c035cf205ee2a1902621edba491685af9fc2d216c70b"
+    },
+    "staticAssets": {
+      "fileCount": 4,
+      "manifestSha256": "cdb2d1f7f6819b21fbff1596ea4f75ac9a70f746344a551f77d30b96cb9322c2",
+      "aggregateSha256": "67cc807730df47eb7d94fd7d6efa551c71aa82a49105908af39a548f234a227d"
+    }
+  },
+  "r4OverallMutationAccounting": {
+    "temporaryWorkerDeployCommands": 1,
+    "temporaryWorkerDeleteCommands": 1,
+    "temporaryWorkerSecretBindingsCreated": 1,
+    "separateSecretPutCommands": 0,
+    "separateSecretDeleteCommands": 0,
+    "syntheticReservationAttempts": 1280,
+    "insertedCertificationRows": 660,
+    "conflictNonWrites": 620,
+    "d1Deletes": 0,
+    "d1Updates": 0,
+    "migrationApplies": 0,
+    "timeTravelRestores": 0,
+    "concurrencyRetries": 0,
+    "gate11Flips": 1,
+    "gate9Flips": 0,
+    "gate10Flips": 0,
+    "otherGateFlips": 0,
+    "mainWorkerDeployCommands": 1,
+    "confirmedMainWorkerRedeployments": 1,
+    "mainWorkerRollbackCommands": 0,
+    "providerAiSecretsCreated": 0,
+    "providerAiCredentialReads": 0,
+    "providerAiCalls": 0,
+    "accessMutations": 0,
+    "dnsMutations": 0,
+    "customDomainMutations": 0,
+    "workerRouteMutations": 0,
+    "identityMutations": 0,
+    "trustAnchorMutations": 0,
+    "productionRoutingMutations": 0
+  },
+  "sealOperationAccounting": {
+    "sealProviderCalls": 0,
+    "sealD1Calls": 0,
+    "sealProductionMutations": 0,
+    "sealDeployments": 0,
+    "sealGateFlips": 0
+  },
+  "nonMaterialObservations": [
+    {
+      "bucket": "PROVIDER_CONTRACT",
+      "observation": "Worker Route and Custom Domain enumeration was unavailable through the permitted read-only CLI.",
+      "risk": "This does not contradict active Worker identity, D1 binding identity, health response, provider-AI absence, or 404 dormant route behavior.",
+      "requiredFutureAction": "Before any route/domain activation phase, enumerate current route and Custom Domain state through an approved management-plane read interface."
+    },
+    {
+      "bucket": "TEST_VERIFICATION",
+      "observation": "Current Gate 11 behavioral regression proves fail-closed readiness and db.prepare calls = 0, but does not assert the exact upstream failure status.",
+      "risk": "This is non-material for R4 certification because independent review confirmed the behavioral safety property required by this phase.",
+      "optionalFutureAction": "Add an exact upstream failure-status assertion in a later test-only refinement. Do NOT modify tests during seal generation."
+    }
+  ],
+  "sealedScope": [
+    "the bounded certification harness was constrained to a maximum of 660 distinct synthetic replay keys",
+    "the canonical D1 replay adapter was used",
+    "1280 bounded real reservation attempts were executed",
+    "all 20 contested rounds produced exact 1 RESERVED + 31 ALREADY_RESERVED",
+    "all 640 control attempts produced RESERVED",
+    "zero retries/errors/backend-unavailable occurred",
+    "exact production D1 retained 660 synthetic append-only certification rows",
+    "all 660 rows have unique replay keys and run nonces",
+    "key_version r4-v1 and ledger_version a12b2c5r-v1 were independently verified",
+    "Gate 11 was activated only after successful certification",
+    "production Worker was redeployed once with Gate11=true",
+    "exact production D1 binding remained attached",
+    "current runtime remained healthy",
+    "operational route remained dormant 404/404/404",
+    "provider AI remained disabled",
+    "all upstream production execution gates remained closed",
+    "independent review found zero material findings"
+  ],
+  "explicitNonClaims": [
+    "live canary readiness",
+    "provider AI readiness",
+    "provider AI execution",
+    "production replay execution readiness",
+    "production authority trust anchor",
+    "human authorization trust readiness",
+    "source attestation trust readiness",
+    "runtime source provenance trust anchor",
+    "Access readiness",
+    "Custom Domain readiness",
+    "Worker Route readiness",
+    "production routing readiness",
+    "deployed byte-for-byte source provenance",
+    "formal multi-region D1 replication",
+    "real customer authorization use",
+    "No later phase is implicitly authorized."
+  ],
+  "reviewedArtifacts": [
+    {
+      "path": "execution/a12b2c5u34c_real_d1_concurrency_certification.json",
+      "sha256": "07e0785716bb74c10aa410d514d3e317e3d6733cd2c768361c84c506f0f7f1f1"
+    },
+    {
+      "path": "execution/a12b2c5u34c_real_d1_concurrency_certification.md",
+      "sha256": "e93853621ef52a3fd7171d6015aba7e462daa2c9c53ecae5296eedc85795a8f1"
+    },
+    {
+      "path": "execution/a12b2c5u34c_gate11_dormant_alignment_execution.json",
+      "sha256": "a99ee6c1c76c5bdb936b9bde20366cf7967ff6c84008e0420bb3af14707b2290"
+    },
+    {
+      "path": "execution/a12b2c5u34c_gate11_dormant_alignment_execution.md",
+      "sha256": "7113870093a44cdf55dc19c7c88a6b0b163454d5daf1b21e8b2c7e4c09eb6bd6"
+    },
+    {
+      "path": "worker/ai/canary/d1AuthorizationReplayBackend.ts",
+      "sha256": "05e0703549ab811a17ae15ed68b9edf786b6ea2c9a7865d14ff59f471b5a8571"
+    },
+    {
+      "path": "worker/ai/canary/deepSeekProductionReplayCoordinator.ts",
+      "sha256": "f89f5c75d61eded1cf803d9504708e46e84b9bdde5353f41d6f44626a5cbaf36"
+    },
+    {
+      "path": "scripts/r4D1ConcurrencyCertificationWorker.ts",
+      "sha256": "17069b70096bc057bc48fd814ef3c3d2ac9026ab4cd61d02354c5400b1c3c470"
+    },
+    {
+      "path": "scripts/runR4D1ConcurrencyCertification.mjs",
+      "sha256": "1de4526c43ac503426360b2c7551abdb4483c11bd311f851ae1e13620926ad5d"
+    },
+    {
+      "path": "tests/ai/phaseA12B2C5U34CRealD1ConcurrencyHarness.test.ts",
+      "sha256": "bb4f6543b3c1662d54ad02010064000ba979ec1389b38c17b57e078406a70459"
+    }
+  ],
+  "finalStatus": "A12B2C5U34C_REAL_D1_CONCURRENCY_GATE11_DORMANT_ALIGNMENT_APPROVED_AND_SEALED"
+}
