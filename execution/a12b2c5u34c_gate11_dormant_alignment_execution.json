@@ -1,0 +1,218 @@
+{
+  "artifactType": "WORKER_PRODUCTION_D1_GATE11_DORMANT_ALIGNMENT_EXECUTION",
+  "phase": "A.12B.2C-5U.3.4C",
+  "operation": "GATE11_RUNTIME_ALIGNMENT_DORMANT_REDEPLOYMENT",
+  "recordedAtUtc": "2026-09-10T19:15:46.464Z",
+  "humanAuthorizationGranted": true,
+  "humanAuthorizationLiteral": "AUTHORIZE_A12B2C5U34C_REAL_D1_CONCURRENCY_AND_GATE11_DORMANT_ALIGNMENT: Current SEALED canonical main c2a04246a508b4afd00bd1d2a550f4d9d99cc586 temelinde, yalnız exact sealed velnar-production-db üzerindeki authorization_replay_ledger için bounded real-concurrency certification yapmaya izin veriyorum. Certification başarıyla tamamlanırsa authoritative D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED Gate 11 değerini false→true yapmaya, doğrudan etkilenen minimum testleri güncellemeye, exact source snapshot üzerinden dry-run/bundle hash almaya ve mevcut velnar-platform-worker için tam 1 adet provider-free dormant redeployment yapmaya izin veriyorum. Redeployment sonrası yalnız read-only active-version, exact DB binding identity, /api/health DB ATTACHED ve operational GET/POST/OPTIONS=404 doğrulamalarına izin veriyorum. Gate 9 ve 10 true kalmalı, Gate 11 true olmalı; diğer 9 gate false kalmalı. Certification satırlarını silme/değiştirme, ikinci deployment, rollback, DeepSeek/Gemini/Kimi secret veya provider AI call, Access/DNS/Custom Domain/Worker Route, identity enrollment, trust anchor, route/ingress/live execution gate, production routing veya başka herhangi bir gate değişikliğine izin vermiyorum. Deploy sonucu belirsiz veya runtime doğrulama başarısız olursa retry/redeploy/rollback yapmadan dur.",
+  "canonicalBaseCommit": "c2a04246a508b4afd00bd1d2a550f4d9d99cc586",
+  "canonicalBaseTree": "6c9ffd3b9a524d1b46b4e71d3d9d6590fc58310a",
+  "previousDormantDeploymentVersion": "27449367-0171-41e3-b047-f616f97308c7",
+  "gate11DeploySnapshotCommit": "541a9f967cd0919464e1fde6f46e9dd34792ae4a",
+  "gate11DeploySnapshotTree": "4494166e5680ccae7b75bac05f48ba032ea7e5d5",
+  "gate11DeploySnapshotParent": "b03f85b694e87c20336fce8282c8aaa2a00ccaf6",
+  "gate11DeploySnapshotChangedFiles": [
+    "tests/ai/phaseA12B2C5TD1DurableAuthorizationReplayBackend.test.ts",
+    "tests/ai/phaseA12B2C5U1ProductionReplayIntegration.test.ts",
+    "tests/ai/phaseA12B2C5U32ProductionWorkerHostBinding.test.ts",
+    "tests/ai/phaseA12B2C5U3ProductionWorkerCapabilityBoundary.test.ts",
+    "tests/security/phaseA12B2C5U33BProductionOperationalAuth.test.ts",
+    "tests/security/phaseA12B2C5U33CProductionOperationalAuthRuntimeIntegration.test.ts",
+    "worker/ai/canary/d1AuthorizationReplayBackend.ts"
+  ],
+  "wranglerVersion": "4.130.0",
+  "workerName": "velnar-platform-worker",
+  "databaseName": "velnar-production-db",
+  "databaseIdSha256": "62ebb801413e1f691e0a30d9d4388c7d17e0060ff0594dcd8238f25fc6857055",
+  "databaseIdFinal6": "4de303",
+  "rawDatabaseIdRepeatedInEvidence": false,
+  "gates": {
+    "gate9Before": true,
+    "gate9After": true,
+    "gate10Before": true,
+    "gate10After": true,
+    "gate11Before": false,
+    "gate11After": true,
+    "gate11RuntimeConsumed": true,
+    "gate11StillBlocksReplayReservation": false,
+    "productionReplayExecutionEnabled": false,
+    "canonicalTrueGateCount": 3,
+    "finalStates": {
+      "PRODUCTION_CANARY_OPERATIONAL_ROUTE_ENABLED": false,
+      "PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY": false,
+      "CANARY_LIVE_EXECUTION_ENABLED": false,
+      "CANARY_LIVE_EXECUTION_STATE": "BLOCKED_PENDING_CERTIFICATION",
+      "GUARDED_SOURCE_ATTESTATION_READY": false,
+      "GUARDED_HUMAN_AUTH_ATTESTATION_READY": false,
+      "PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED": false,
+      "RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED": false,
+      "D1_REPLAY_BACKEND_PRODUCTION_BOUND": true,
+      "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED": true,
+      "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED": true,
+      "productionRoutingEnforcementAllowed": false
+    },
+    "registryLength": 0,
+    "registryFrozen": true
+  },
+  "staticValidation": {
+    "preDeploy": {
+      "testFiles": 63,
+      "tests": 2523,
+      "failures": 0,
+      "typecheck": "PASS",
+      "build": "PASS"
+    },
+    "postDeploy": {
+      "testFiles": 63,
+      "tests": 2523,
+      "failures": 0,
+      "typecheck": "PASS",
+      "build": "PASS"
+    }
+  },
+  "dryRun": {
+    "workerBundle": {
+      "fileCount": 3,
+      "manifestSha256": "0fb5983d74e992dd999029c29d584b1b62a9deb6b34b7fd766db80b2d8ccbf82",
+      "aggregateSha256": "1f26afccb41b3a594ce7c035cf205ee2a1902621edba491685af9fc2d216c70b",
+      "files": [
+        {
+          "relativePath": "README.md",
+          "byteSize": 123,
+          "sha256": "657ac87504a257015bb4e6a803ed5d03af4988d0775b1fc201adf764696785b1"
+        },
+        {
+          "relativePath": "index.js",
+          "byteSize": 611532,
+          "sha256": "68df49ca0188156eb0c2d908c290df1dc4a2241cc250b2c2119eed66997c7e10"
+        },
+        {
+          "relativePath": "index.js.map",
+          "byteSize": 1340754,
+          "sha256": "36f909d28704e499a3d1dd3718a1cc2b7508881fd8659c69279e1edc09ebb647"
+        }
+      ]
+    },
+    "assets": {
+      "fileCount": 4,
+      "manifestSha256": "cdb2d1f7f6819b21fbff1596ea4f75ac9a70f746344a551f77d30b96cb9322c2",
+      "aggregateSha256": "67cc807730df47eb7d94fd7d6efa551c71aa82a49105908af39a548f234a227d",
+      "files": [
+        {
+          "relativePath": "A12B2B_CANONICAL_ARTIFACTS.zip",
+          "byteSize": 50615,
+          "sha256": "a6d57758e76fae62af71473659ce31e049f03cc3d51a6116b9ad052ec0b083fe"
+        },
+        {
+          "relativePath": "assets/index-BKOkW6xL.css",
+          "byteSize": 46511,
+          "sha256": "627062cebb28cc3b47ecb64d2b79b54b8cabd00344554be44127e80e3cdf6eda"
+        },
+        {
+          "relativePath": "assets/index-ClkWMZ6z.js",
+          "byteSize": 469704,
+          "sha256": "32354fe44b60e3c9a8211172287f96cef24c5b3ae7cb50b48fdfaa12e90f8966"
+        },
+        {
+          "relativePath": "index.html",
+          "byteSize": 1895,
+          "sha256": "829731ad87e7d73f3f2361d266c4cab175068306f4d1699af80d38cc48b94649"
+        }
+      ]
+    },
+    "deployedByteHashesClaimed": false
+  },
+  "providerFreeSafety": {
+    "deepseekApiKeyPresent": false,
+    "geminiApiKeyPresent": false,
+    "kimiApiKeyPresent": false,
+    "providerAiCalls": 0
+  },
+  "deployment": {
+    "workerDeployCommands": 1,
+    "confirmedWorkerRedeployments": 1,
+    "outcome": "R4_REDEPLOY_CONFIRMED_BY_READBACK",
+    "previousActiveVersionId": "27449367-0171-41e3-b047-f616f97308c7",
+    "newActiveVersionId": "5aa1936f-bb0d-4a32-9697-955431770b92",
+    "activeVersionChanged": true,
+    "bindingName": "DB",
+    "databaseIdentityHashMatch": true,
+    "databaseIdentityFinal6Match": true
+  },
+  "runtimeVerification": {
+    "workerUrl": "https://velnar-platform-worker.kayra01-09-06.workers.dev",
+    "health": {
+      "httpStatus": 200,
+      "status": "HEALTHY",
+      "environment": "production",
+      "databaseConfigured": true,
+      "d1Status": "ATTACHED",
+      "productionExternalAi": "DISABLED",
+      "rawBody": {
+        "status": "HEALTHY",
+        "version": "4.0.0-sprint4-intelligence",
+        "timestamp": "2026-09-10T19:14:32.837Z",
+        "environment": "production",
+        "securityArchitecture": "SERVER_SIDE_TENANT_GUARD",
+        "cryptoCapability": "AES-GCM-256",
+        "vaultCryptoCapability": "AES-GCM-256",
+        "vaultConfigured": false,
+        "databaseConfigured": true,
+        "d1Status": "ATTACHED",
+        "productionAuthProvider": "NOT_CONFIGURED",
+        "productionExternalAi": "DISABLED",
+        "roles": [
+          "OWNER",
+          "ADMIN",
+          "MANAGER",
+          "STAFF",
+          "VIEWER"
+        ],
+        "fulgorRay": {
+          "status": "DISABLED",
+          "mode": "MOCK_OFFLINE_RECEIVER"
+        }
+      }
+    },
+    "operationalRoute": {
+      "get": 404,
+      "post": 404,
+      "options": 404
+    }
+  },
+  "mutationCounters": {
+    "gate9Flips": 0,
+    "gate10Flips": 0,
+    "gate11Flips": 1,
+    "otherGateFlips": 0,
+    "workerDeployCommands": 1,
+    "confirmedWorkerRedeployments": 1,
+    "d1Writes": 0,
+    "d1ConcurrencyTests": 0,
+    "migrationApplies": 0,
+    "d1Deletes": 0,
+    "timeTravelRestores": 0,
+    "rollbackOperations": 0,
+    "secretMutations": 0,
+    "accessMutations": 0,
+    "dnsMutations": 0,
+    "customDomainMutations": 0,
+    "workerRouteMutations": 0,
+    "identityMutations": 0,
+    "providerAiCalls": 0
+  },
+  "explicitNonClaims": {
+    "providerAiExecutionEnabled": false,
+    "customDomainProvisionedByThisBatch": false,
+    "accessMutationPerformed": false,
+    "operationalIdentityEnrolled": false,
+    "trustAnchorProvisioned": false,
+    "runtimeSourceProvenanceTrustAnchorProvisioned": false,
+    "operationalIngressAuthReady": false,
+    "operationalRouteEnabled": false,
+    "liveCanaryEnabled": false,
+    "productionRoutingAllowed": false,
+    "providerCanaryExecuted": false
+  },
+  "finalStatus": "A12B2C5U34C_REAL_D1_CONCURRENCY_GATE11_DORMANT_ALIGNMENT_COMPLETE_PENDING_INDEPENDENT_REVIEW"
+}
