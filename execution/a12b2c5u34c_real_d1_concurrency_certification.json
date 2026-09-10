@@ -1,0 +1,903 @@
+{
+  "phase": "A.12B.2C-5U.3.4C",
+  "artifactType": "REAL_D1_AUTHORIZATION_REPLAY_CONCURRENCY_CERTIFICATION",
+  "finalStatus": "A12B2C5U34C_REAL_D1_CONCURRENCY_CERTIFICATION_VERIFIED",
+  "timestampUtc": "2026-09-10T19:07:08.908Z",
+  "repository": "https://github.com/kayrastos/updated-velnaar",
+  "branch": "main",
+  "canonicalBase": {
+    "commit": "c2a04246a508b4afd00bd1d2a550f4d9d99cc586",
+    "tree": "6c9ffd3b9a524d1b46b4e71d3d9d6590fc58310a",
+    "originMain": "c2a04246a508b4afd00bd1d2a550f4d9d99cc586",
+    "expectedHeadMessage": "docs(worker): seal Gate 9 dormant redeployment",
+    "predecessorStatus": "A12B2C5U34B_GATE9_DORMANT_REDEPLOYMENT_APPROVED_AND_SEALED"
+  },
+  "harnessCommit": {
+    "commit": "987bcfeb4b6bbf2691781377d6b41fe33ab2b8d1",
+    "tree": "bdd854d390ad37e5aab4a684e2ec919b681e3bab",
+    "parent": "c2a04246a508b4afd00bd1d2a550f4d9d99cc586",
+    "message": "test(d1): add bounded real concurrency certification harness",
+    "changedFiles": [
+      "scripts/r4D1ConcurrencyCertificationWorker.ts",
+      "scripts/runR4D1ConcurrencyCertification.mjs",
+      "tests/ai/phaseA12B2C5U34CRealD1ConcurrencyHarness.test.ts"
+    ]
+  },
+  "humanAuthorization": {
+    "granted": true,
+    "scope": "AUTHORIZE_A12B2C5U34C_REAL_D1_CONCURRENCY_AND_GATE11_DORMANT_ALIGNMENT",
+    "literal": "AUTHORIZE_A12B2C5U34C_REAL_D1_CONCURRENCY_AND_GATE11_DORMANT_ALIGNMENT: Current SEALED canonical main c2a04246a508b4afd00bd1d2a550f4d9d99cc586 temelinde, yalnız exact sealed velnar-production-db üzerindeki authorization_replay_ledger için bounded real-concurrency certification yapmaya izin veriyorum. Bunun için production Worker’dan bağımsız tam 1 temporary provider-free certification Worker deploy etmeye, bu temporary Worker’a yalnız exact DB binding ve tam 1 ephemeral R4_CERT_TOKEN secret vermeye, 20 contested round × 32 concurrent identical reservation ve 20 control round × 32 concurrent unique reservation olmak üzere tam 1280 bounded synthetic reservation attempt çalıştırmaya ve en fazla/beklenen tam 660 synthetic append-only certification row oluşturmaya izin veriyorum. Test row’larını silmeye izin vermiyorum. Test sonrası yalnız read-only direct D1 verification yapmaya ve temporary certification Worker’ı tam 1 kez silmeye izin veriyorum. Yalnız tüm contested round’lar exact 1 RESERVED + 31 ALREADY_RESERVED, tüm 640 control reservation RESERVED ve direct D1 evidence exact 660 batch row / 660 distinct replay key doğrularsa D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED Gate 11 değerini false→true yapmaya, doğrudan etkilenen minimum testleri güncellemeye, full test/typecheck/build çalıştırmaya, exact dry-run/bundle snapshot almaya ve mevcut velnar-platform-worker için tam 1 provider-free dormant redeployment yapmaya izin veriyorum. Sonrasında yalnız read-only active-version, exact DB binding, /api/health ve operational GET/POST/OPTIONS=404 doğrulamalarına izin veriyorum. Gate 9 ve Gate 10 true kalmalı; diğer tüm gates kapalı kalmalı. DeepSeek/Gemini/Kimi veya başka AI provider secret/call, provider credential read, D1 migration/delete/restore/cleanup, concurrency retry, main Worker ikinci deployment, rollback, Access/DNS/Custom Domain/Worker Route, identity enrollment, trust anchor, operational ingress/route enablement, live canary veya production routing yetkisi vermiyorum. Herhangi bir concurrent request sonucu belirsiz, timeout, backend unavailable veya acceptance kriteri dışı olursa retry yapmadan fail-closed dur; Gate 11’i değiştirme. Temporary harness cleanup deletion bu durumda da izinlidir. Tüm kontroller başarılı ve origin/main değişmemişse oluşan bounded commits’i origin/main’e tek fast-forward git push ile yayımlamaya izin veriyorum"
+  },
+  "batchParameters": {
+    "batchId": "r4cert_da0d929f4a15a225",
+    "batchHex": "da0d929f4a15a225",
+    "syntheticAuthorityId": "r4cert_da0d929f4a15a225",
+    "keyVersion": "r4-v1",
+    "expiresAt": "2026-09-11T18:57:51.148Z"
+  },
+  "temporaryWorker": {
+    "name": "velnar-r4-d1-conc-e26c7b0a0bc5",
+    "deployedVersionId": "6b4be0cf-c5ef-4639-b430-7aebdf14c457",
+    "workerUrl": "https://velnar-r4-d1-conc-e26c7b0a0bc5.kayra01-09-06.workers.dev",
+    "wranglerVersion": "4.130.0",
+    "deployCommands": 1,
+    "deleteCommands": 1,
+    "deletionConfirmed": true,
+    "secretBindingsCreated": 1,
+    "secretName": "R4_CERT_TOKEN",
+    "secretValueRecorded": false,
+    "separateSecretPutCommands": 0,
+    "separateSecretDeleteCommands": 0,
+    "dryRunBundleHashes": {
+      "fileCount": 3,
+      "manifestSha256": "4cc13a43256d6fe5fc786af2cde7c09350919ea103155421e15c053b07a75398",
+      "aggregateSha256": "90f3244bde9aca12788faf8b272af856c8b8949d99dc4e5ede123ad4ceb0fb62",
+      "manifest": [
+        {
+          "file": "README.md",
+          "size": 131,
+          "sha256": "ab8156fda94a3a55d1fd267c1a46453a855d002dc0aa3481590e3209e76a40df"
+        },
+        {
+          "file": "r4D1ConcurrencyCertificationWorker.js",
+          "size": 72546,
+          "sha256": "94a9fbff61a0f4530761b835ae6683c0d94af49231fc6dc6e9f5e45d3860aa6e"
+        },
+        {
+          "file": "r4D1ConcurrencyCertificationWorker.js.map",
+          "size": 299593,
+          "sha256": "814c21c5d38f80e7c06f024db971d20b9b42eea4dea3bfd89dc756c6d40a96d0"
+        }
+      ]
+    },
+    "boundaryVerification": {
+      "singleD1BindingNamedDB": true,
+      "databaseName": "velnar-production-db",
+      "databaseIdSha256": "62ebb801413e1f691e0a30d9d4388c7d17e0060ff0594dcd8238f25fc6857055",
+      "databaseIdFinal6": "4de303",
+      "endpointPostOnly": true,
+      "unauthenticated401Verified": true,
+      "wrongBearer401Verified": true,
+      "unknownPath404Verified": true,
+      "noAiBindings": true,
+      "noExternalRoutesOrDomains": true
+    }
+  },
+  "concurrencyMatrixExecution": {
+    "totalAttempts": 1280,
+    "contestedAttempts": 640,
+    "controlAttempts": 640,
+    "totalReserved": 660,
+    "contestedReserved": 20,
+    "controlReserved": 640,
+    "totalAlreadyReserved": 620,
+    "backendUnavailable": 0,
+    "invalidRequest": 0,
+    "errors": 0,
+    "retries": 0,
+    "observedColos": [
+      "AMS",
+      "DUS",
+      "FRA",
+      "WAW",
+      "DUB",
+      "MAN"
+    ],
+    "multiGeoObserved": true,
+    "acceptanceCriteriaMet": true,
+    "contestedRounds": [
+      {
+        "round": 1,
+        "mode": "contested",
+        "roundDurationMs": 449.26279999999997,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 2,
+        "mode": "contested",
+        "roundDurationMs": 213.01249999999993,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 3,
+        "mode": "contested",
+        "roundDurationMs": 231.08139999999992,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 4,
+        "mode": "contested",
+        "roundDurationMs": 222.34149999999988,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 5,
+        "mode": "contested",
+        "roundDurationMs": 227.1911,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 6,
+        "mode": "contested",
+        "roundDurationMs": 221.36339999999996,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 7,
+        "mode": "contested",
+        "roundDurationMs": 207.99720000000002,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 8,
+        "mode": "contested",
+        "roundDurationMs": 280.10169999999994,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 9,
+        "mode": "contested",
+        "roundDurationMs": 237.8415,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 10,
+        "mode": "contested",
+        "roundDurationMs": 194.70479999999998,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 11,
+        "mode": "contested",
+        "roundDurationMs": 197.6601999999998,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 12,
+        "mode": "contested",
+        "roundDurationMs": 208.64000000000033,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 13,
+        "mode": "contested",
+        "roundDurationMs": 228.46439999999984,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 14,
+        "mode": "contested",
+        "roundDurationMs": 180.37310000000025,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 15,
+        "mode": "contested",
+        "roundDurationMs": 220.11239999999998,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 16,
+        "mode": "contested",
+        "roundDurationMs": 193.39120000000003,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 17,
+        "mode": "contested",
+        "roundDurationMs": 194.17720000000008,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 18,
+        "mode": "contested",
+        "roundDurationMs": 295.43589999999995,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 19,
+        "mode": "contested",
+        "roundDurationMs": 185.08750000000055,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 20,
+        "mode": "contested",
+        "roundDurationMs": 181.1902,
+        "totalAttempts": 32,
+        "reserved": 1,
+        "alreadyReserved": 31,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      }
+    ],
+    "controlRounds": [
+      {
+        "round": 1,
+        "mode": "control",
+        "roundDurationMs": 278.0582000000004,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 2,
+        "mode": "control",
+        "roundDurationMs": 902.2416000000003,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 3,
+        "mode": "control",
+        "roundDurationMs": 203.6158000000005,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 4,
+        "mode": "control",
+        "roundDurationMs": 226.58899999999994,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 5,
+        "mode": "control",
+        "roundDurationMs": 204.44760000000042,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 6,
+        "mode": "control",
+        "roundDurationMs": 202.35490000000027,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 7,
+        "mode": "control",
+        "roundDurationMs": 242.23040000000037,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 8,
+        "mode": "control",
+        "roundDurationMs": 227.1845000000003,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 9,
+        "mode": "control",
+        "roundDurationMs": 225.9371000000001,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 10,
+        "mode": "control",
+        "roundDurationMs": 230.69869999999992,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 11,
+        "mode": "control",
+        "roundDurationMs": 198.5607999999993,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 12,
+        "mode": "control",
+        "roundDurationMs": 209.23859999999968,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 13,
+        "mode": "control",
+        "roundDurationMs": 242.9947999999995,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 14,
+        "mode": "control",
+        "roundDurationMs": 202.0576000000001,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 15,
+        "mode": "control",
+        "roundDurationMs": 250.3832999999995,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 16,
+        "mode": "control",
+        "roundDurationMs": 258.15630000000056,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 17,
+        "mode": "control",
+        "roundDurationMs": 352.6495999999988,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 18,
+        "mode": "control",
+        "roundDurationMs": 209.40730000000076,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 19,
+        "mode": "control",
+        "roundDurationMs": 223.83109999999942,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      },
+      {
+        "round": 20,
+        "mode": "control",
+        "roundDurationMs": 220.0079999999998,
+        "totalAttempts": 32,
+        "reserved": 32,
+        "alreadyReserved": 0,
+        "backendUnavailable": 0,
+        "invalidRequest": 0,
+        "errors": 0,
+        "colos": [
+          "AMS",
+          "DUS",
+          "FRA",
+          "WAW",
+          "DUB",
+          "MAN"
+        ]
+      }
+    ]
+  },
+  "directD1PostVerification": {
+    "verified": true,
+    "authorityId": "r4cert_da0d929f4a15a225",
+    "batchRowsAfter": 660,
+    "batchDistinctReplayKeysAfter": 660,
+    "batchDistinctRunNoncesAfter": 660,
+    "contestedRows": 20,
+    "controlRows": 640,
+    "ledgerVersion": "a12b2c5r-v1",
+    "globalLedgerRowsBefore": 0,
+    "globalLedgerRowsAfter": 660,
+    "globalLedgerRowDelta": 660,
+    "appendOnlyInvariantsHonored": {
+      "noDeletes": true,
+      "noUpdates": true,
+      "noDrops": true,
+      "noTruncates": true,
+      "noRestores": true,
+      "certificationRowsPermanent": true
+    }
+  },
+  "postCleanupProviderState": {
+    "temporaryWorkerAbsent": true,
+    "productionWorkerExists": true,
+    "productionWorkerActiveVersion": "27449367-0171-41e3-b047-f616f97308c7",
+    "productionD1Exists": true,
+    "d1DatabaseIdentityHashMatch": true,
+    "certificationRowsRetained": 660,
+    "providerAiCalls": 0
+  }
+}
