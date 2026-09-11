@@ -3,7 +3,7 @@
   "artifactType": "REMAINING_PRODUCTION_GATE_TRUST_INGRESS_READINESS",
   "repository": "https://github.com/kayrastos/updated-velnaar",
   "branch": "main",
-  "timestamp": "2026-09-11T09:45:00.000Z",
+  "timestamp": "2026-09-11T10:10:00.000Z",
   "canonicalBaseCommit": "12f9bc3c9f8a4c0c628253caa2cebdf841927b0f",
   "canonicalBaseTree": "9f00039a5df09ef744bc629a66c100d5e669c9c7",
   "requiredPredecessor": "A12B2C5U34C_REAL_D1_CONCURRENCY_GATE11_DORMANT_ALIGNMENT_APPROVED_AND_SEALED",
@@ -12,9 +12,11 @@
   "scope": "Remaining Gate Dependency Audit + Dual Trust Preparation + Cloudflare Access / Ingress Preparation (Repaired)",
   "readOnly": true,
   "sealed": false,
-  "status": "A12B2C5U35A_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW",
-  "finalStatus": "A12B2C5U35A_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW",
+  "status": "A12B2C5U35A_FINAL_EVIDENCE_HYGIENE_COMPLETE_PENDING_INDEPENDENT_REREVIEW",
+  "finalStatus": "A12B2C5U35A_FINAL_EVIDENCE_HYGIENE_COMPLETE_PENDING_INDEPENDENT_REREVIEW",
   "independentReviewRequired": true,
+  "rawAccessKidRecordedInR5AEvidence": false,
+  "rawAccessAudRecordedInR5AEvidence": false,
   "rawDatabaseIdRepeatedInR5AEvidence": false,
   "productionMutationCounters": {
     "providerAiCalls": 0,
@@ -29,8 +31,8 @@
     "testCommand": "npm test (vitest run)",
     "testFilesTotal": 64,
     "testFilesPassed": 64,
-    "testsTotal": 2551,
-    "testsPassed": 2551,
+    "testsTotal": 2557,
+    "testsPassed": 2557,
     "testsFailed": 0,
     "typecheckCommand": "npm run typecheck (tsc --noEmit)",
     "typecheckResult": "PASS (0 errors)",
@@ -50,11 +52,14 @@
       "status": "RESOLVED_TO_CLOUDFLARE_EDGE"
     },
     "edgeProbe": {
-      "url": "https://ops.velnar.studio/api/ops/canary/deepseek-certification",
+      "hostname": "ops.velnar.studio",
       "statusCode": 302,
-      "location": "https://velnar.cloudflareaccess.com/cdn-cgi/access/login/ops.velnar.studio?kid=ae9535e1ba251615c0a20f1b55aacc4faed76f9c6bf55516c546596899c3acd4&redirect_url=%2Fapi%2Fops%2Fcanary%2Fdeepseek-certification",
-      "audDigestSha256": "9c5777a3768c6082501fd5fee8c1997cf35896cadc5e5c2b0da50e94c04884f0",
-      "audMatchExpected": true
+      "accessLoginHost": "velnar.cloudflareaccess.com",
+      "accessLoginObserved": true,
+      "redirectPathObserved": "/cdn-cgi/access/login/ops.velnar.studio",
+      "observedKidSha256": "9c5777a3768c6082501fd5fee8c1997cf35896cadc5e5c2b0da50e94c04884f0",
+      "rawKidRecorded": false,
+      "managementPlaneAudReadAvailable": false
     },
     "managementPlaneCliReadAvailability": {
       "customDomains": "MANAGEMENT_PLANE_READ_UNAVAILABLE",
@@ -361,7 +366,16 @@
       "canCombineWithR5B": false,
       "mustRemainSeparate": false,
       "blockerStatus": "SATISFIED_AND_SEALED",
-      "explanation": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED = true as const at line 31 of worker/ai/canary/d1AuthorizationReplayBackend.ts. 100-worker concurrent collision certification succeeded with zero duplicate reservations."
+      "explanation": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED = true as const at line 31 of worker/ai/canary/d1AuthorizationReplayBackend.ts. Real D1 concurrency certified by 20 contested rounds × 32 concurrent contenders plus 640 independent control attempts: 1280 total attempts, 660 RESERVED / inserted certification rows, 620 ALREADY_RESERVED conflict non-writes, zero retries.",
+      "concurrencyCertificationStatistics": {
+        "totalAttempts": 1280,
+        "totalReserved": 660,
+        "totalAlreadyReserved": 620,
+        "concurrencyRetries": 0,
+        "contestedRounds": 20,
+        "contendersPerRound": 32,
+        "controlAttempts": 640
+      }
     },
     {
       "gate": 12,

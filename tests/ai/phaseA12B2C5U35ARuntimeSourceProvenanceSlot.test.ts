@@ -478,4 +478,77 @@ describe('Phase A.12B.2C-5U.3.5A — Runtime Source Provenance Slot & Gate Invar
       expect(mdRaw).toContain('Private keys NEVER enter repository, Worker runtime, ChatGPT, Antigravity, Codex, Gemini, or any AI agent context');
     });
   });
+
+  // ==========================================================================
+  // 7. EVIDENCE HYGIENE & DATA MINIMIZATION REGRESSION SUITE
+  // ==========================================================================
+  describe('Evidence Hygiene & Data Minimization Regressions', () => {
+    const jsonPath = path.resolve(
+      __dirname,
+      '../../execution/a12b2c5u35a_remaining_gate_dependency_readiness.json'
+    );
+    const mdPath = path.resolve(
+      __dirname,
+      '../../execution/a12b2c5u35a_remaining_gate_dependency_readiness.md'
+    );
+
+    const jsonRaw = fs.readFileSync(jsonPath, 'utf8');
+    const mdRaw = fs.readFileSync(mdPath, 'utf8');
+    const jsonData = JSON.parse(jsonRaw);
+
+    it('1. Readiness JSON and Markdown do NOT contain the literal string "100-worker"', () => {
+      expect(jsonRaw).not.toContain('100-worker');
+      expect(mdRaw).not.toContain('100-worker');
+    });
+
+    it('2. Gate 11 evidence contains exact bounded R4 concurrency statistics', () => {
+      const gate11 = jsonData.gateLedger.find((g: { gate: number }) => g.gate === 11);
+      expect(gate11).toBeDefined();
+      expect(gate11.concurrencyCertificationStatistics).toEqual({
+        totalAttempts: 1280,
+        totalReserved: 660,
+        totalAlreadyReserved: 620,
+        concurrencyRetries: 0,
+        contestedRounds: 20,
+        contendersPerRound: 32,
+        controlAttempts: 640,
+      });
+
+      // Textual verification in explanation and markdown
+      const expectedText =
+        'Real D1 concurrency certified by 20 contested rounds × 32 concurrent contenders plus 640 independent control attempts: 1280 total attempts, 660 RESERVED / inserted certification rows, 620 ALREADY_RESERVED conflict non-writes, zero retries';
+      expect(gate11.explanation).toContain(expectedText);
+      expect(mdRaw).toContain(expectedText);
+    });
+
+    it('3. Readiness JSON and Markdown do NOT contain "?kid=" or "&kid=" or unredacted query kid values', () => {
+      expect(jsonRaw).not.toContain('?kid=');
+      expect(jsonRaw).not.toContain('&kid=');
+      expect(mdRaw).not.toContain('?kid=');
+      expect(mdRaw).not.toContain('&kid=');
+      expect(jsonRaw).not.toMatch(/[?&]kid=[a-zA-Z0-9_-]+/);
+      expect(mdRaw).not.toMatch(/[?&]kid=[a-zA-Z0-9_-]+/);
+    });
+
+    it('4. rawAccessKidRecordedInR5AEvidence is strictly false', () => {
+      expect(jsonData.rawAccessKidRecordedInR5AEvidence).toBe(false);
+      expect(jsonData.cloudflareManagementPlaneSnapshot.edgeProbe.rawKidRecorded).toBe(false);
+      expect(mdRaw).toContain('rawAccessKidRecordedInR5AEvidence = false');
+    });
+
+    it('5. rawAccessAudRecordedInR5AEvidence is strictly false', () => {
+      expect(jsonData.rawAccessAudRecordedInR5AEvidence).toBe(false);
+      expect(
+        jsonData.cloudflareManagementPlaneSnapshot.edgeProbe.managementPlaneAudReadAvailable
+      ).toBe(false);
+      expect(mdRaw).toContain('rawAccessAudRecordedInR5AEvidence = false');
+    });
+
+    it('6. rawDatabaseIdRepeatedInR5AEvidence is strictly false', () => {
+      expect(jsonData.rawDatabaseIdRepeatedInR5AEvidence).toBe(false);
+      expect(mdRaw).toContain('rawDatabaseIdRepeatedInR5AEvidence = false');
+      expect(jsonRaw).not.toContain('71221bb0');
+      expect(mdRaw).not.toContain('71221bb0');
+    });
+  });
 });

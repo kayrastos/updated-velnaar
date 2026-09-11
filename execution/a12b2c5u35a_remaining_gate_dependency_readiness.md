@@ -5,13 +5,13 @@
 **Artifact Type:** `REMAINING_PRODUCTION_GATE_TRUST_INGRESS_READINESS`  
 **Repository:** `https://github.com/kayrastos/updated-velnaar`  
 **Branch:** `main`  
-**Timestamp:** `2026-09-11T09:45:00.000Z`  
+**Timestamp:** `2026-09-11T10:10:00.000Z`  
 **Canonical Base Commit:** `12f9bc3c9f8a4c0c628253caa2cebdf841927b0f`  
 **Canonical Base Tree:** `9f00039a5df09ef744bc629a66c100d5e669c9c7`  
 **Required Predecessor:** `A12B2C5U34C_REAL_D1_CONCURRENCY_GATE11_DORMANT_ALIGNMENT_APPROVED_AND_SEALED`  
 **Implementation Commit (Commit A):** `fc5c5d9ea9e2419dfb761329cc8a949906c40f51`  
 **Implementation Tree:** `53f686b4fd1cfcf7c63e59ffa241fb5e8f4c9f63`  
-**Final Status:** `A12B2C5U35A_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW`  
+**Final Status:** `A12B2C5U35A_FINAL_EVIDENCE_HYGIENE_COMPLETE_PENDING_INDEPENDENT_REREVIEW`  
 **Mode:** ONE-SHOT PREPARATION / READ-ONLY PROVIDER / REPOSITORY IMPLEMENTATION  
 **Sealed:** `false` (Pending independent review)  
 
@@ -46,7 +46,7 @@ The 12-gate architecture has been comprehensively audited across all worker modu
 | **8** | `RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED` | `deepSeekTrustedRuntimeSourceProvenance.ts` | `false` | RUNTIME_CONSUMED | `verifyProductionRuntimeSourceProvenanceReceipt`, `deepSeekProductionReplayCoordinator.ts` | Offline Runtime Provenance Ceremony per operator packet. Public artifact ingestion. | **R5B** |
 | **9** | `D1_REPLAY_BACKEND_PRODUCTION_BOUND` | `d1AuthorizationReplayBackend.ts` | `true` | RUNTIME_CONSUMED | `worker/ai/canary/d1AuthorizationReplayBackend.ts`, `worker/ai/canary/deepSeekProductionReplayCoordinator.ts` | **SATISFIED & SEALED** (`velnar-production-db` bound). | Sealed |
 | **10** | `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED` | `d1AuthorizationReplayBackend.ts` | `true` | RUNTIME_CONSUMED | `worker/ai/canary/d1AuthorizationReplayBackend.ts`, `worker/ai/canary/deepSeekProductionReplayCoordinator.ts` | **SATISFIED & SEALED** (Real database provisioned and migrations 0001–0008 applied). | Sealed |
-| **11** | `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` | `d1AuthorizationReplayBackend.ts` | `true` | RUNTIME_CONSUMED | `worker/ai/canary/d1AuthorizationReplayBackend.ts`, `worker/ai/canary/deepSeekProductionReplayCoordinator.ts` | **SATISFIED & SEALED** (100-worker real concurrency certified). | Sealed |
+| **11** | `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` | `d1AuthorizationReplayBackend.ts` | `true` | RUNTIME_CONSUMED | `worker/ai/canary/d1AuthorizationReplayBackend.ts`, `worker/ai/canary/deepSeekProductionReplayCoordinator.ts` | **SATISFIED & SEALED** (Real D1 concurrency certified by 20 contested rounds × 32 concurrent contenders plus 640 independent control attempts: 1280 total attempts, 660 RESERVED / inserted certification rows, 620 ALREADY_RESERVED conflict non-writes, zero retries). | Sealed |
 | **12** | `productionRoutingEnforcementAllowed` | `canarySpecification.ts` | `false` | RUNTIME_CONSUMED | `auditExecutor.ts`, `boundedCanaryRunner.ts`, `deepSeekFirstProviderStrategy.ts`, `deepSeekSuccessorCertificationStateMachine.ts` | Production traffic routing cutover. Strictly reserved for post-canary certification. | **R5D** |
 
 ### Critical Architectural Finding: Gate 5 & Gate 6 Semantics
@@ -72,14 +72,22 @@ Live read-only observation through Cloudflare APIs and edge probes confirms:
    - Active deployment version: `5aa1936f-bb0d-4a32-9697-955431770b92` (aligned in R4).
    - Worker secrets: `[]` (0 secrets; zero provider API keys provisioned).
 3. **Live Ingress & Cloudflare Access Edge Probe:**
-   - Probed URL: `https://ops.velnar.studio/api/ops/canary/deepseek-certification`.
+   - Probed Hostname: `ops.velnar.studio`.
    - HTTP Response: `302 Found`.
-   - Redirect Location: `https://velnar.cloudflareaccess.com/cdn-cgi/access/login/ops.velnar.studio?kid=ae9535e1ba251615c0a20f1b55aacc4faed76f9c6bf55516c546596899c3acd4&redirect_url=%2Fapi%2Fops%2Fcanary%2Fdeepseek-certification`.
-   - Key ID (`kid` / AUD token) SHA-256: `9c5777a3768c6082501fd5fee8c1997cf35896cadc5e5c2b0da50e94c04884f0` (`MATCHES EXACT`).
+   - Access Login Host: `velnar.cloudflareaccess.com`.
+   - Access Login Enforcement: Observed at edge (`redirectPathObserved = /cdn-cgi/access/login/ops.velnar.studio`).
+   - Observed Edge Login Key Identifier Digest: SHA-256 = `9c5777a3768c6082501fd5fee8c1997cf35896cadc5e5c2b0da50e94c04884f0` (locally hashed; raw kid not recorded; data-minimized).
+   - Management Plane AUD / Policy Enumeration: `MANAGEMENT_PLANE_READ_UNAVAILABLE` (raw AUD not independently read from management plane).
 4. **DNS Edge Resolution:**
    - Hostname `ops.velnar.studio` resolves to Cloudflare Anycast edge IP addresses: `172.67.155.52`, `104.21.89.2`.
-5. **Management Plane CLI Read Availability:**
-   - Detailed Access policies, Custom Domain bindings, and Worker route listings report `MANAGEMENT_PLANE_READ_UNAVAILABLE` via Wrangler CLI v4.130.0 due to CLI scope boundaries. Direct probe confirms live Access enforcement.
+5. **Management Plane CLI Read Availability & Data Minimization:**
+   - Detailed Access policies, Custom Domain bindings, and Worker route listings report `MANAGEMENT_PLANE_READ_UNAVAILABLE` via Wrangler CLI v4.130.0 due to CLI scope boundaries. Direct probe confirms live Access enforcement at edge.
+   - `rawAccessKidRecordedInR5AEvidence = false`
+   - `rawAccessAudRecordedInR5AEvidence = false`
+   - `rawDatabaseIdRepeatedInR5AEvidence = false`
+   - `managementPlaneCliReadAvailability.accessPolicies = "MANAGEMENT_PLANE_READ_UNAVAILABLE"`
+   - `customDomains = "MANAGEMENT_PLANE_READ_UNAVAILABLE"`
+   - `workerRoutes = "MANAGEMENT_PLANE_READ_UNAVAILABLE"`
 6. **Operational Superadmin Registry:**
    - `PRODUCTION_OPERATIONAL_SUPERADMIN_REGISTRY` entry count = 0 (frozen empty in `cloudflareAccessOperationalAuth.ts`).
 
@@ -195,8 +203,8 @@ To eliminate fragmentation, all remaining production activities are structured i
 
 - **Unit Tests:** `npm test` (vitest run)
   - Test files: **64** (Baseline: 63, +1 new file)
-  - Total tests: **2551** (Baseline: 2523, +28 new tests)
-  - Passed: **2551**, Failed: **0**
+  - Total tests: **2557** (Baseline: 2523, +34 new tests)
+  - Passed: **2557**, Failed: **0**
 - **Typecheck:** `npm run typecheck` (`tsc --noEmit`) -> **PASS (0 errors)**
 - **Build:** `npm run build` (`vite build`) -> **PASS (0 errors)**
 
@@ -220,4 +228,4 @@ To eliminate fragmentation, all remaining production activities are structured i
 
 ## 10. Final Status Determination
 
-$$\mathbf{A12B2C5U35A\_REPAIR\_COMPLETE\_PENDING\_INDEPENDENT\_REREVIEW}$$
+$$\mathbf{A12B2C5U35A\_FINAL\_EVIDENCE\_HYGIENE\_COMPLETE\_PENDING\_INDEPENDENT\_REREVIEW}$$
