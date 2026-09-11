@@ -5,13 +5,13 @@
 **Artifact Type:** `REMAINING_PRODUCTION_GATE_TRUST_INGRESS_READINESS`  
 **Repository:** `https://github.com/kayrastos/updated-velnaar`  
 **Branch:** `main`  
-**Timestamp:** `2026-09-10T23:25:00.000Z`  
+**Timestamp:** `2026-09-11T09:45:00.000Z`  
 **Canonical Base Commit:** `12f9bc3c9f8a4c0c628253caa2cebdf841927b0f`  
 **Canonical Base Tree:** `9f00039a5df09ef744bc629a66c100d5e669c9c7`  
 **Required Predecessor:** `A12B2C5U34C_REAL_D1_CONCURRENCY_GATE11_DORMANT_ALIGNMENT_APPROVED_AND_SEALED`  
 **Implementation Commit (Commit A):** `fc5c5d9ea9e2419dfb761329cc8a949906c40f51`  
 **Implementation Tree:** `53f686b4fd1cfcf7c63e59ffa241fb5e8f4c9f63`  
-**Final Status:** `A12B2C5U35A_REMAINING_GATE_TRUST_INGRESS_READINESS_COMPLETE_PENDING_INDEPENDENT_REVIEW`  
+**Final Status:** `A12B2C5U35A_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW`  
 **Mode:** ONE-SHOT PREPARATION / READ-ONLY PROVIDER / REPOSITORY IMPLEMENTATION  
 **Sealed:** `false` (Pending independent review)  
 
@@ -40,14 +40,14 @@ The 12-gate architecture has been comprehensively audited across all worker modu
 | **2** | `PRODUCTION_CANARY_OPERATIONAL_INGRESS_AUTH_READY` | `deepSeekProductionOperationalRoutePolicy.ts` | `false` | RUNTIME_CONSUMED | `worker/index.ts`, `deepSeekProductionWorkerOperationalRoute.ts` | Cloudflare Access Allow policy, Worker env vars (`TEAM_DOMAIN`, `AUD`), Superadmin enrollment. | **R5B** |
 | **3** | `CANARY_LIVE_EXECUTION_ENABLED` | `canarySpecification.ts` | `false` | RUNTIME_CONSUMED | `deepSeekProductionWorkerCapabilityBoundary.ts`, `boundedCanaryRunner.ts` | Held `false` until bounded live certification authorization. | **R5C** |
 | **4** | `CANARY_LIVE_EXECUTION_STATE` | `canarySpecification.ts` | `BLOCKED_PENDING_CERTIFICATION` | RUNTIME_CONSUMED | `deepSeekProductionWorkerCapabilityBoundary.ts` | Held blocked until Gate 3 live activation. | **R5C** |
-| **5** | `GUARDED_SOURCE_ATTESTATION_READY` | `deepSeekGuardedTransportIdentity.ts` | `false` | HISTORICAL_LEGACY_ONLY | `deepSeekGuardedLiveTransport.ts` (legacy) | Permanently disabled via `LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false`. Replaced by Gate 8. | **N/A** |
-| **6** | `GUARDED_HUMAN_AUTH_ATTESTATION_READY` | `deepSeekGuardedTransportIdentity.ts` | `false` | HISTORICAL_LEGACY_ONLY | `deepSeekGuardedLiveTransport.ts` (legacy) | Permanently disabled via `LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false`. Replaced by Gate 7. | **N/A** |
+| **5** | `GUARDED_SOURCE_ATTESTATION_READY` | `deepSeekGuardedLiveTransport.ts` | `false` | HISTORICAL_LEGACY_ONLY | `worker/ai/canary/deepSeekGuardedLiveTransport.ts` (internal helper only) | Permanently disabled via `LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false`. Replaced by Gate 8. | **N/A** |
+| **6** | `GUARDED_HUMAN_AUTH_ATTESTATION_READY` | `deepSeekGuardedLiveTransport.ts` | `false` | HISTORICAL_LEGACY_ONLY | `worker/ai/canary/deepSeekGuardedLiveTransport.ts` (internal helper only) | Permanently disabled via `LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false`. Replaced by Gate 7. | **N/A** |
 | **7** | `PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED` | `deepSeekProductionAuthorizationTrust.ts` | `false` | RUNTIME_CONSUMED | `verifyProductionHumanAuthorizationPackage`, `deepSeekProductionReplayCoordinator.ts` | Offline Human Authorization Ceremony per operator packet. Public artifact ingestion. | **R5B** |
 | **8** | `RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED` | `deepSeekTrustedRuntimeSourceProvenance.ts` | `false` | RUNTIME_CONSUMED | `verifyProductionRuntimeSourceProvenanceReceipt`, `deepSeekProductionReplayCoordinator.ts` | Offline Runtime Provenance Ceremony per operator packet. Public artifact ingestion. | **R5B** |
-| **9** | `PRODUCTION_D1_PROVISIONED_AND_BOUND` | Sealed in R3/R4 | `true` | RUNTIME_CONSUMED | `d1AuthorizationReplayBackend.ts` | **SATISFIED & SEALED** (`velnar-production-db` bound). | Sealed |
-| **10** | `PRODUCTION_REPLAY_LEDGER_ACTIVE` | Sealed in R4 | `true` | RUNTIME_CONSUMED | `d1AuthorizationReplayBackend.ts` | **SATISFIED & SEALED** (100-worker concurrency certified). | Sealed |
-| **11** | `GATE11_DORMANT_RUNTIME_ALIGNED` | Sealed in R4 | `true` | RUNTIME_CONSUMED | `worker/index.ts` | **SATISFIED & SEALED** (Worker `5aa1936f` aligned). | Sealed |
-| **12** | `productionRoutingEnforcementAllowed` | `deepSeekFirstProviderStrategy.ts` | `false` | RUNTIME_CONSUMED | `auditExecutor.ts`, `boundedCanaryRunner.ts` | Production traffic routing cutover. Strictly reserved for post-canary certification. | **R5D** |
+| **9** | `D1_REPLAY_BACKEND_PRODUCTION_BOUND` | `d1AuthorizationReplayBackend.ts` | `true` | RUNTIME_CONSUMED | `worker/ai/canary/d1AuthorizationReplayBackend.ts`, `worker/ai/canary/deepSeekProductionReplayCoordinator.ts` | **SATISFIED & SEALED** (`velnar-production-db` bound). | Sealed |
+| **10** | `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED` | `d1AuthorizationReplayBackend.ts` | `true` | RUNTIME_CONSUMED | `worker/ai/canary/d1AuthorizationReplayBackend.ts`, `worker/ai/canary/deepSeekProductionReplayCoordinator.ts` | **SATISFIED & SEALED** (Real database provisioned and migrations 0001–0008 applied). | Sealed |
+| **11** | `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` | `d1AuthorizationReplayBackend.ts` | `true` | RUNTIME_CONSUMED | `worker/ai/canary/d1AuthorizationReplayBackend.ts`, `worker/ai/canary/deepSeekProductionReplayCoordinator.ts` | **SATISFIED & SEALED** (100-worker real concurrency certified). | Sealed |
+| **12** | `productionRoutingEnforcementAllowed` | `canarySpecification.ts` | `false` | RUNTIME_CONSUMED | `auditExecutor.ts`, `boundedCanaryRunner.ts`, `deepSeekFirstProviderStrategy.ts`, `deepSeekSuccessorCertificationStateMachine.ts` | Production traffic routing cutover. Strictly reserved for post-canary certification. | **R5D** |
 
 ### Critical Architectural Finding: Gate 5 & Gate 6 Semantics
 - **Gate 5 (`GUARDED_SOURCE_ATTESTATION_READY`)** and **Gate 6 (`GUARDED_HUMAN_AUTH_ATTESTATION_READY`)** belong exclusively to the legacy `executeGuardedDeepSeekCertificationTransport` pathway.
@@ -117,7 +117,7 @@ Two independent cryptographic trust domains are established to prevent privilege
 ### Boundary & Isolation Invariants
 - **NEVER SHOW PRIVATE KEYS TO AI:** Operator packets explicitly instruct operators that private keys must NEVER be input to or shown to ChatGPT, Antigravity, or Codex.
 - **Pure Public Ingestion:** Only public keys, fingerprints, provisioning records, and manual handoff receipts enter the repository.
-- **Fingerprint Verification:** SHA-256 over raw SPKI DER representation is recomputed cryptographically upon ingestion.
+- **Fingerprint Verification:** SHA-256 over normalized SPKI PEM UTF-8 text (`pem.trim().replace(/\r\n/g, '\n')`) is recomputed cryptographically upon ingestion, matching canonical verifier `computePublicKeyFingerprintSha256` and `scripts/computePublicKeyFingerprint.mjs`.
 
 ---
 
@@ -142,10 +142,11 @@ Both scripts perform ZERO signing, import NO private keys, make ZERO network cal
 - **Byte Readback Limitation:** The Cloudflare management plane does not provide literal deployed-byte readback of minified Worker code.
 - **Truthful Provenance Linkage:** Rather than falsely asserting deployed-byte equality, the platform enforces cryptographic provenance:
   $$\text{Source Tree SHA} \longrightarrow \text{Esbuild Deterministic Artifact SHA} \longrightarrow \text{Deployment ID} \longrightarrow \text{Signed Provenance Receipt}$$
-- **Receipt Lifetime Semantics:**
+- **Receipt Lifetime Semantics & Verification Policy:**
   - `issuedAt` must be a valid ISO-8601 UTC timestamp not in the future.
   - `expiresAt` must be strictly after `issuedAt`.
-  - Provenance receipts are issued at build/deployment time with a bounded validity window (e.g. 7–30 days), matching the lifecycle of an immutable Worker deployment.
+  - `runtimeSourceProvenanceMaximumLifetimeEnforced = false`: The canonical verifier (`worker/ai/canary/deepSeekTrustedRuntimeSourceProvenance.ts`) enforces `issuedAt <= now` and `expiresAt > now`, but does NOT enforce any upper bound on maximum lifetime.
+  - `runtimeSourceProvenanceLifetimePolicyStatus = UNRESOLVED_REQUIRES_EXPLICIT_POLICY_BEFORE_R5B_OR_R5C`: No operational lifetime such as 7 days or 30 days is invented or enforced. An explicit lifetime policy must be determined and approved prior to creating signed production receipts in R5B/R5C.
 
 ---
 
@@ -176,7 +177,7 @@ To eliminate fragmentation, all remaining production activities are structured i
 - **Nature:** Bounded live canary run.
 - **Candidate Scope:**
   1. Provision `DEEPSEEK_API_KEY` secret.
-  2. Generate signed `RuntimeSourceProvenanceReceipt` and `HumanAuthorizationPackage`.
+  2. Ingest and verify a `RuntimeSourceProvenanceReceipt` signed externally inside the approved offline provenance signing boundary, and ingest and verify a `HumanAuthorizationPackage` signed externally inside the approved offline human-authorization signing boundary. (Private keys NEVER enter repository, Worker runtime, ChatGPT, Antigravity, Codex, Gemini, or any AI agent context).
   3. Enable Gate 1, Gate 3, Gate 4 (`LIVE_EXECUTION_ALLOWED`).
   4. Deploy Worker and trigger authenticated 7-task sequential canary through Access ingress.
   5. Verify single-use reservation in D1 `authorization_replay_ledger`.
@@ -194,8 +195,8 @@ To eliminate fragmentation, all remaining production activities are structured i
 
 - **Unit Tests:** `npm test` (vitest run)
   - Test files: **64** (Baseline: 63, +1 new file)
-  - Total tests: **2542** (Baseline: 2523, +19 new tests)
-  - Passed: **2542**, Failed: **0**
+  - Total tests: **2551** (Baseline: 2523, +28 new tests)
+  - Passed: **2551**, Failed: **0**
 - **Typecheck:** `npm run typecheck` (`tsc --noEmit`) -> **PASS (0 errors)**
 - **Build:** `npm run build` (`vite build`) -> **PASS (0 errors)**
 
@@ -219,4 +220,4 @@ To eliminate fragmentation, all remaining production activities are structured i
 
 ## 10. Final Status Determination
 
-$$\mathbf{A12B2C5U35A\_REMAINING\_GATE\_TRUST\_INGRESS\_READINESS\_COMPLETE\_PENDING\_INDEPENDENT\_REVIEW}$$
+$$\mathbf{A12B2C5U35A\_REPAIR\_COMPLETE\_PENDING\_INDEPENDENT\_REREVIEW}$$

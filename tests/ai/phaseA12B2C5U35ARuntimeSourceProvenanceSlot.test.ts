@@ -49,8 +49,18 @@ import {
 } from '../../worker/ai/canary/deepSeekRuntimeSourceProvenanceProvisioningSlot';
 
 import { computePublicKeyFingerprintSha256 } from '../../worker/ai/canary/deepSeekCertificationAttestation';
+import {
+  GUARDED_SOURCE_ATTESTATION_READY,
+  GUARDED_HUMAN_AUTH_ATTESTATION_READY,
+} from '../../worker/ai/canary/deepSeekGuardedLiveTransport';
+import {
+  D1_REPLAY_BACKEND_PRODUCTION_BOUND,
+  D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED,
+  D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED,
+} from '../../worker/ai/canary/d1AuthorizationReplayBackend';
 import { buildHumanAuthorizationSigningPayload } from '../../scripts/buildHumanAuthorizationSigningPayload.mjs';
 import { buildRuntimeSourceProvenanceSigningPayload } from '../../scripts/buildRuntimeSourceProvenanceSigningPayload.mjs';
+import { computeNormalizedPublicKeyFingerprint } from '../../scripts/computePublicKeyFingerprint.mjs';
 
 describe('Phase A.12B.2C-5U.3.5A — Runtime Source Provenance Slot & Gate Invariants', () => {
   // ==========================================================================
@@ -343,6 +353,129 @@ describe('Phase A.12B.2C-5U.3.5A — Runtime Source Provenance Slot & Gate Invar
       expect(content).not.toContain('XMLHttpRequest');
       expect(content).not.toContain('http.request');
       expect(content).not.toContain('https.request');
+    });
+  });
+
+  // ==========================================================================
+  // 6. INDEPENDENT REVIEW CANONICAL EVIDENCE & CONTRACT REGRESSION SUITE
+  // ==========================================================================
+  describe('Independent Review Canonical Evidence & Contract Regression Suite', () => {
+    const jsonPath = path.resolve(
+      __dirname,
+      '../../execution/a12b2c5u35a_remaining_gate_dependency_readiness.json'
+    );
+    const mdPath = path.resolve(
+      __dirname,
+      '../../execution/a12b2c5u35a_remaining_gate_dependency_readiness.md'
+    );
+
+    const jsonRaw = fs.readFileSync(jsonPath, 'utf8');
+    const mdRaw = fs.readFileSync(mdPath, 'utf8');
+    const jsonData = JSON.parse(jsonRaw);
+
+    it('1. Public fingerprint ceremony calculation equals computePublicKeyFingerprintSha256(publicPem)', () => {
+      const { publicKey } = crypto.generateKeyPairSync('ed25519');
+      const publicPemLf = publicKey.export({ type: 'spki', format: 'pem' }) as string;
+      const publicPemCrlf = publicPemLf.replace(/\n/g, '\r\n');
+      const publicPemWithSpaces = `  \n  ${publicPemCrlf}  \n  `;
+
+      const canonicalFingerprint = computePublicKeyFingerprintSha256(publicPemLf);
+      const scriptFingerprint = computeNormalizedPublicKeyFingerprint(publicPemLf);
+      const crlfFingerprint = computeNormalizedPublicKeyFingerprint(publicPemCrlf);
+      const whitespaceFingerprint = computeNormalizedPublicKeyFingerprint(publicPemWithSpaces);
+
+      expect(scriptFingerprint).toBe(canonicalFingerprint);
+      expect(crlfFingerprint).toBe(canonicalFingerprint);
+      expect(whitespaceFingerprint).toBe(canonicalFingerprint);
+
+      // Verify rejection of private keys
+      const { privateKey } = crypto.generateKeyPairSync('ed25519');
+      const privatePem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+      expect(() => computeNormalizedPublicKeyFingerprint(privatePem)).toThrow(/SECURITY_VIOLATION/);
+    });
+
+    it('2. R5A evidence Gate 5 owner is exactly worker/ai/canary/deepSeekGuardedLiveTransport.ts', () => {
+      const gate5 = jsonData.gateLedger.find((g: { gate: number }) => g.gate === 5);
+      expect(gate5).toBeDefined();
+      expect(gate5.owner).toBe('worker/ai/canary/deepSeekGuardedLiveTransport.ts');
+      expect(gate5.symbol).toBe('GUARDED_SOURCE_ATTESTATION_READY');
+      expect(gate5.currentValue).toBe(false);
+      expect(GUARDED_SOURCE_ATTESTATION_READY).toBe(false);
+      expect(mdRaw).toContain('| **5** | `GUARDED_SOURCE_ATTESTATION_READY` | `deepSeekGuardedLiveTransport.ts`');
+    });
+
+    it('3. R5A evidence Gate 6 owner is exactly worker/ai/canary/deepSeekGuardedLiveTransport.ts', () => {
+      const gate6 = jsonData.gateLedger.find((g: { gate: number }) => g.gate === 6);
+      expect(gate6).toBeDefined();
+      expect(gate6.owner).toBe('worker/ai/canary/deepSeekGuardedLiveTransport.ts');
+      expect(gate6.symbol).toBe('GUARDED_HUMAN_AUTH_ATTESTATION_READY');
+      expect(gate6.currentValue).toBe(false);
+      expect(GUARDED_HUMAN_AUTH_ATTESTATION_READY).toBe(false);
+      expect(mdRaw).toContain('| **6** | `GUARDED_HUMAN_AUTH_ATTESTATION_READY` | `deepSeekGuardedLiveTransport.ts`');
+    });
+
+    it('4. Gate 9 exact symbol is D1_REPLAY_BACKEND_PRODUCTION_BOUND and owner is worker/ai/canary/d1AuthorizationReplayBackend.ts', () => {
+      const gate9 = jsonData.gateLedger.find((g: { gate: number }) => g.gate === 9);
+      expect(gate9).toBeDefined();
+      expect(gate9.symbol).toBe('D1_REPLAY_BACKEND_PRODUCTION_BOUND');
+      expect(gate9.owner).toBe('worker/ai/canary/d1AuthorizationReplayBackend.ts');
+      expect(gate9.currentValue).toBe(true);
+      expect(D1_REPLAY_BACKEND_PRODUCTION_BOUND).toBe(true);
+      expect(mdRaw).toContain('| **9** | `D1_REPLAY_BACKEND_PRODUCTION_BOUND` | `d1AuthorizationReplayBackend.ts` | `true`');
+    });
+
+    it('5. Gate 10 exact symbol is D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED and owner is worker/ai/canary/d1AuthorizationReplayBackend.ts', () => {
+      const gate10 = jsonData.gateLedger.find((g: { gate: number }) => g.gate === 10);
+      expect(gate10).toBeDefined();
+      expect(gate10.symbol).toBe('D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED');
+      expect(gate10.owner).toBe('worker/ai/canary/d1AuthorizationReplayBackend.ts');
+      expect(gate10.currentValue).toBe(true);
+      expect(D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED).toBe(true);
+      expect(mdRaw).toContain('| **10** | `D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED` | `d1AuthorizationReplayBackend.ts` | `true`');
+    });
+
+    it('6. Gate 11 exact symbol is D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED and owner is worker/ai/canary/d1AuthorizationReplayBackend.ts', () => {
+      const gate11 = jsonData.gateLedger.find((g: { gate: number }) => g.gate === 11);
+      expect(gate11).toBeDefined();
+      expect(gate11.symbol).toBe('D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED');
+      expect(gate11.owner).toBe('worker/ai/canary/d1AuthorizationReplayBackend.ts');
+      expect(gate11.currentValue).toBe(true);
+      expect(D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED).toBe(true);
+      expect(mdRaw).toContain('| **11** | `D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED` | `d1AuthorizationReplayBackend.ts` | `true`');
+    });
+
+    it('7. R5A evidence contains zero raw D1 database identifiers', () => {
+      expect(jsonRaw).not.toContain('71221bb0');
+      expect(mdRaw).not.toContain('71221bb0');
+      expect(jsonData.rawDatabaseIdRepeatedInR5AEvidence).toBe(false);
+      const gate9 = jsonData.gateLedger.find((g: { gate: number }) => g.gate === 9);
+      expect(gate9.requiredProviderResources[0]).toContain(
+        '62ebb801413e1f691e0a30d9d4388c7d17e0060ff0594dcd8238f25fc6857055'
+      );
+      expect(gate9.requiredProviderResources[0]).toContain('4de303');
+    });
+
+    it('8. Runtime provenance evidence does NOT claim a maximum lifetime is enforced', () => {
+      expect(
+        jsonData.provenanceGapAnalysis.receiptLifetimePolicy.runtimeSourceProvenanceMaximumLifetimeEnforced
+      ).toBe(false);
+      expect(
+        jsonData.provenanceGapAnalysis.receiptLifetimePolicy.runtimeSourceProvenanceLifetimePolicyStatus
+      ).toBe('UNRESOLVED_REQUIRES_EXPLICIT_POLICY_BEFORE_R5B_OR_R5C');
+      expect(mdRaw).toContain('runtimeSourceProvenanceMaximumLifetimeEnforced = false');
+      expect(mdRaw).toContain('UNRESOLVED_REQUIRES_EXPLICIT_POLICY_BEFORE_R5B_OR_R5C');
+      expect(mdRaw).not.toContain('bounded validity window (e.g. 7–30 days)');
+    });
+
+    it('9. R5C planning text contains explicit EXTERNAL/OFFLINE signing boundary without repository/agent signing', () => {
+      const r5cScopeJson = JSON.stringify(jsonData.futureMasterBatches.R5C);
+      expect(r5cScopeJson).toContain('signed externally inside the approved offline provenance signing boundary');
+      expect(r5cScopeJson).toContain('signed externally inside the approved offline human-authorization signing boundary');
+      expect(r5cScopeJson).toContain('Private keys NEVER enter');
+
+      expect(mdRaw).toContain('signed externally inside the approved offline provenance signing boundary');
+      expect(mdRaw).toContain('signed externally inside the approved offline human-authorization signing boundary');
+      expect(mdRaw).toContain('Private keys NEVER enter repository, Worker runtime, ChatGPT, Antigravity, Codex, Gemini, or any AI agent context');
     });
   });
 });

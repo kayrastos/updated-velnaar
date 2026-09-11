@@ -35,7 +35,7 @@ The ceremony and subsequent validation engines strictly enforce the following ca
 | **Key Version** | `2026-v1` | Pinned initial key version |
 | **Cryptographic Algorithm** | `Ed25519` | Pure Edwards-curve Digital Signature Algorithm |
 | **Public Key Format** | SPKI PEM (`BEGIN PUBLIC KEY`) | SubjectPublicKeyInfo format |
-| **Fingerprint Format** | SHA-256 of SPKI DER bytes | 64 lowercase hexadecimal characters |
+| **Fingerprint Format** | SHA-256 of normalized SPKI PEM UTF-8 text | 64 lowercase hexadecimal characters |
 | **Isolation Level** | `AIR_GAPPED_OFFLINE` | No networking allowed during generation |
 | **Custody Mode** | `OFFLINE_OPERATOR_CUSTODY` | Secure hardware token or encrypted air-gapped vault |
 | **Minimum Witnesses** | `3` | Independent roles required |
@@ -102,11 +102,20 @@ openssl pkey -in velnar_lead_ops_prod_2026_v1.key -pubout -out velnar_lead_ops_p
 > `-----BEGIN PUBLIC KEY-----` and NOT `-----BEGIN PRIVATE KEY-----`.
 
 ### Step 5.3: Compute Public Key Fingerprint
-The fingerprint is defined canonically as the SHA-256 hash of the DER-encoded SPKI public key:
+The fingerprint is defined canonically by the repository verifier (`worker/ai/canary/deepSeekCertificationAttestation.ts:computePublicKeyFingerprintSha256`) as the SHA-256 hash of the normalized SPKI PEM UTF-8 text:
+$$\text{Fingerprint} = \text{SHA-256}(\text{pem.trim().replace}(/\r\n/g, '\n'))$$
+
+Execute the following offline command on the public key file (`.pub`):
 ```bash
-# Extract DER representation and compute SHA-256
-openssl pkey -pubin -in velnar_lead_ops_prod_2026_v1.pub -outform DER | sha256sum | awk '{print $1}'
+# Using Node.js (reads ONLY the public key, normalizes CRLF -> LF, trims, computes SHA-256 of UTF-8 string):
+node -e "const fs = require('node:fs'), crypto = require('node:crypto'); const pem = fs.readFileSync(process.argv[1], 'utf8').trim().replace(/\r\n/g, '\n'); console.log(crypto.createHash('sha256').update(pem, 'utf8').digest('hex'));" velnar_lead_ops_prod_2026_v1.pub
+
+# Or using the offline public-key-only helper script:
+node scripts/computePublicKeyFingerprint.mjs velnar_lead_ops_prod_2026_v1.pub
 ```
+
+> **SAFETY CHECK:** This tool/command accepts and inspects strictly the public key file (`velnar_lead_ops_prod_2026_v1.pub`). It NEVER reads, processes, or handles any private key material.
+
 All three witnesses must record and verify this exact 64-character lowercase hex string.
 
 ### Step 5.4: Secure Private Key Custody

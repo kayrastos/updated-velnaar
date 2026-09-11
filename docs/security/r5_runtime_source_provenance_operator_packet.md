@@ -109,7 +109,7 @@ Assign the base64 signature string to `signatureBase64` in the final `RuntimeSou
 Only public artifacts may be brought into the repository or execution evidence:
 
 1. **Public Key PEM:** SPKI format (`-----BEGIN PUBLIC KEY-----`).
-2. **Public Key Fingerprint:** SHA-256 of the SPKI DER representation.
+2. **Public Key Fingerprint:** SHA-256 of normalized SPKI PEM UTF-8 text (`pem.trim().replace(/\r\n/g, '\n')`).
 3. **Provisioning Candidate:** JSON containing `provisioningRecord` and `publicAuthorityEntry`.
 4. **Manual Handoff Receipt:** JSON certifying isolated custody and review.
 5. **Completed Receipt:** Signed `RuntimeSourceProvenanceReceipt`.

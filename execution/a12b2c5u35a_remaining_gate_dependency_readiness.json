@@ -3,18 +3,19 @@
   "artifactType": "REMAINING_PRODUCTION_GATE_TRUST_INGRESS_READINESS",
   "repository": "https://github.com/kayrastos/updated-velnaar",
   "branch": "main",
-  "timestamp": "2026-09-10T23:25:00.000Z",
+  "timestamp": "2026-09-11T09:45:00.000Z",
   "canonicalBaseCommit": "12f9bc3c9f8a4c0c628253caa2cebdf841927b0f",
   "canonicalBaseTree": "9f00039a5df09ef744bc629a66c100d5e669c9c7",
   "requiredPredecessor": "A12B2C5U34C_REAL_D1_CONCURRENCY_GATE11_DORMANT_ALIGNMENT_APPROVED_AND_SEALED",
   "implementationCommit": "fc5c5d9ea9e2419dfb761329cc8a949906c40f51",
   "implementationTree": "53f686b4fd1cfcf7c63e59ffa241fb5e8f4c9f63",
-  "scope": "Remaining Gate Dependency Audit + Dual Trust Preparation + Cloudflare Access / Ingress Preparation",
+  "scope": "Remaining Gate Dependency Audit + Dual Trust Preparation + Cloudflare Access / Ingress Preparation (Repaired)",
   "readOnly": true,
   "sealed": false,
-  "status": "A12B2C5U35A_REMAINING_GATE_TRUST_INGRESS_READINESS_COMPLETE_PENDING_INDEPENDENT_REVIEW",
-  "finalStatus": "A12B2C5U35A_REMAINING_GATE_TRUST_INGRESS_READINESS_COMPLETE_PENDING_INDEPENDENT_REVIEW",
+  "status": "A12B2C5U35A_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW",
+  "finalStatus": "A12B2C5U35A_REPAIR_COMPLETE_PENDING_INDEPENDENT_REREVIEW",
   "independentReviewRequired": true,
+  "rawDatabaseIdRepeatedInR5AEvidence": false,
   "productionMutationCounters": {
     "providerAiCalls": 0,
     "D1Writes": 0,
@@ -28,8 +29,8 @@
     "testCommand": "npm test (vitest run)",
     "testFilesTotal": 64,
     "testFilesPassed": 64,
-    "testsTotal": 2542,
-    "testsPassed": 2542,
+    "testsTotal": 2551,
+    "testsPassed": 2551,
     "testsFailed": 0,
     "typecheckCommand": "npm run typecheck (tsc --noEmit)",
     "typecheckResult": "PASS (0 errors)",
@@ -69,12 +70,14 @@
     "status": "FROZEN_EMPTY_IN_R5A"
   },
   "trustCeremonyStatus": {
+    "fingerprintContract": "SHA-256 of normalized SPKI PEM UTF-8 text: pem.trim().replace(/\\r\\n/g, '\\n')",
     "humanAuthorizationCeremony": {
       "required": true,
       "minimumWitnessCount": 3,
       "targetAuthorityId": "velnar-lead-ops-prod",
       "targetKeyVersion": "2026-v1",
       "targetAlgorithm": "Ed25519",
+      "fingerprintFormat": "SHA-256(pem.trim().replace(/\\r\\n/g, '\\n'))",
       "isolationLevel": "AIR_GAPPED_OFFLINE",
       "privateKeyCustodyMode": "OFFLINE_OPERATOR_CUSTODY",
       "privateKeyEnteredAIContext": false,
@@ -88,6 +91,7 @@
       "targetIssuerId": "velnar-runtime-provenance-prod",
       "targetKeyVersion": "2026-v1",
       "targetAlgorithm": "Ed25519",
+      "fingerprintFormat": "SHA-256(pem.trim().replace(/\\r\\n/g, '\\n'))",
       "separateTrustDomain": true,
       "domainSeparationVerified": true,
       "isolationLevel": "AIR_GAPPED_OFFLINE",
@@ -102,24 +106,28 @@
   "offlineSigningPayloadBuilders": {
     "humanAuthorizationBuilder": "scripts/buildHumanAuthorizationSigningPayload.mjs",
     "runtimeSourceProvenanceBuilder": "scripts/buildRuntimeSourceProvenanceSigningPayload.mjs",
-    "zeroPrivateKeysEnforced": true
+    "publicKeyFingerprintTool": "scripts/computePublicKeyFingerprint.mjs",
+    "zeroPrivateKeysEnforced": true,
+    "payloadBuildersDoNotSign": true
   },
   "gateClassificationAnalysis": {
     "gate5": {
       "symbol": "GUARDED_SOURCE_ATTESTATION_READY",
+      "authoritativeOwner": "worker/ai/canary/deepSeekGuardedLiveTransport.ts",
       "currentValue": false,
       "classification": "HISTORICAL_LEGACY_ONLY",
       "runtimePath": "worker/ai/canary/deepSeekGuardedLiveTransport.ts",
       "governingInvariant": "LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false as const",
-      "explanation": "Gate 5 is strictly consumed by executeGuardedDeepSeekCertificationTransport, which is permanently disabled in production. The active production Worker route executes executeProductionReplayProtectedDeepSeekCertificationTransport, which enforces Gate 8 (RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED). Gate 5 does NOT need activation."
+      "explanation": "Gate 5 is strictly declared and consumed by executeGuardedDeepSeekCertificationTransport in worker/ai/canary/deepSeekGuardedLiveTransport.ts, which is permanently disabled in production. The active production Worker route executes executeProductionReplayProtectedDeepSeekCertificationTransport, which enforces Gate 8 (RUNTIME_SOURCE_PROVENANCE_TRUST_ANCHOR_PROVISIONED). Gate 5 does NOT need activation."
     },
     "gate6": {
       "symbol": "GUARDED_HUMAN_AUTH_ATTESTATION_READY",
+      "authoritativeOwner": "worker/ai/canary/deepSeekGuardedLiveTransport.ts",
       "currentValue": false,
       "classification": "HISTORICAL_LEGACY_ONLY",
       "runtimePath": "worker/ai/canary/deepSeekGuardedLiveTransport.ts",
       "governingInvariant": "LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false as const",
-      "explanation": "Gate 6 is strictly consumed by executeGuardedDeepSeekCertificationTransport, which is permanently disabled in production. The active production Worker route executes executeProductionReplayProtectedDeepSeekCertificationTransport, which enforces Gate 7 (PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED). Gate 6 does NOT need activation."
+      "explanation": "Gate 6 is strictly declared and consumed by executeGuardedDeepSeekCertificationTransport in worker/ai/canary/deepSeekGuardedLiveTransport.ts, which is permanently disabled in production. The active production Worker route executes executeProductionReplayProtectedDeepSeekCertificationTransport, which enforces Gate 7 (PRODUCTION_AUTHORITY_TRUST_ANCHOR_PROVISIONED). Gate 6 does NOT need activation."
     }
   },
   "gateLedger": [
@@ -211,7 +219,7 @@
     {
       "gate": 5,
       "symbol": "GUARDED_SOURCE_ATTESTATION_READY",
-      "owner": "worker/ai/canary/deepSeekGuardedTransportIdentity.ts",
+      "owner": "worker/ai/canary/deepSeekGuardedLiveTransport.ts",
       "currentValue": false,
       "type": "HISTORICAL_LEGACY_ONLY",
       "runtimeConsumers": ["worker/ai/canary/deepSeekGuardedLiveTransport.ts (legacy)"],
@@ -224,12 +232,12 @@
       "canCombineWithR5B": false,
       "mustRemainSeparate": false,
       "blockerStatus": "PERMANENTLY_DISABLED_LEGACY",
-      "explanation": "Legacy guarded transport is disabled by LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false. Production uses Gate 8."
+      "explanation": "Declared at line 127 of worker/ai/canary/deepSeekGuardedLiveTransport.ts. Legacy guarded transport is disabled by LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false. Production uses Gate 8."
     },
     {
       "gate": 6,
       "symbol": "GUARDED_HUMAN_AUTH_ATTESTATION_READY",
-      "owner": "worker/ai/canary/deepSeekGuardedTransportIdentity.ts",
+      "owner": "worker/ai/canary/deepSeekGuardedLiveTransport.ts",
       "currentValue": false,
       "type": "HISTORICAL_LEGACY_ONLY",
       "runtimeConsumers": ["worker/ai/canary/deepSeekGuardedLiveTransport.ts (legacy)"],
@@ -242,7 +250,7 @@
       "canCombineWithR5B": false,
       "mustRemainSeparate": false,
       "blockerStatus": "PERMANENTLY_DISABLED_LEGACY",
-      "explanation": "Legacy guarded transport is disabled by LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false. Production uses Gate 7."
+      "explanation": "Declared at line 133 of worker/ai/canary/deepSeekGuardedLiveTransport.ts. Legacy guarded transport is disabled by LEGACY_GUARDED_TRANSPORT_PRODUCTION_ALLOWED = false. Production uses Gate 7."
     },
     {
       "gate": 7,
@@ -297,16 +305,15 @@
     },
     {
       "gate": 9,
-      "symbol": "PRODUCTION_D1_PROVISIONED_AND_BOUND",
-      "owner": "execution/a12b2c5u34b_gate9_dormant_redeployment_seal.json",
+      "symbol": "D1_REPLAY_BACKEND_PRODUCTION_BOUND",
+      "owner": "worker/ai/canary/d1AuthorizationReplayBackend.ts",
       "currentValue": true,
       "type": "RUNTIME_CONSUMED",
       "runtimeConsumers": [
-        "worker/ai/canary/d1AuthorizationReplayBackend.ts",
         "worker/ai/canary/deepSeekProductionReplayCoordinator.ts"
       ],
       "requiredPredecessors": ["R2 D1 Adoption & Migrations 0001-0008"],
-      "requiredProviderResources": ["velnar-production-db (UUID: 71221bb0-85f0-47b1-9be0-155fe55d3151)"],
+      "requiredProviderResources": ["velnar-production-db (SHA-256: 62ebb801413e1f691e0a30d9d4388c7d17e0060ff0594dcd8238f25fc6857055, final6: 4de303)"],
       "requiredPublicArtifacts": [],
       "requiredHumanAction": ["Sealed in R3/R4"],
       "productionMutationRequired": false,
@@ -314,20 +321,19 @@
       "canCombineWithR5B": false,
       "mustRemainSeparate": false,
       "blockerStatus": "SATISFIED_AND_SEALED",
-      "explanation": "Database is provisioned, migrations 0001-0008 applied, and Worker binding active."
+      "explanation": "D1_REPLAY_BACKEND_PRODUCTION_BOUND = true as const at line 30 of worker/ai/canary/d1AuthorizationReplayBackend.ts. Database is provisioned, migrations 0001-0008 applied, and Worker binding active."
     },
     {
       "gate": 10,
-      "symbol": "PRODUCTION_REPLAY_LEDGER_ACTIVE",
-      "owner": "execution/a12b2c5u34c_real_d1_concurrency_gate11_dormant_alignment_seal.json",
+      "symbol": "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED",
+      "owner": "worker/ai/canary/d1AuthorizationReplayBackend.ts",
       "currentValue": true,
       "type": "RUNTIME_CONSUMED",
       "runtimeConsumers": [
-        "worker/ai/canary/d1AuthorizationReplayBackend.ts",
         "worker/ai/canary/deepSeekProductionReplayCoordinator.ts"
       ],
       "requiredPredecessors": ["R4 Real D1 Concurrency Certification"],
-      "requiredProviderResources": ["authorization_replay_ledger table in D1"],
+      "requiredProviderResources": ["velnar-production-db authorization_replay_ledger table"],
       "requiredPublicArtifacts": [],
       "requiredHumanAction": ["Certified in R4"],
       "productionMutationRequired": false,
@@ -335,28 +341,27 @@
       "canCombineWithR5B": false,
       "mustRemainSeparate": false,
       "blockerStatus": "SATISFIED_AND_SEALED",
-      "explanation": "100-worker concurrent collision certification succeeded with zero duplicate reservations."
+      "explanation": "D1_REPLAY_BACKEND_REAL_DATABASE_PROVISIONED = true as const at line 34 of worker/ai/canary/d1AuthorizationReplayBackend.ts. Confirms real database table backing."
     },
     {
       "gate": 11,
-      "symbol": "GATE11_DORMANT_RUNTIME_ALIGNED",
-      "owner": "execution/a12b2c5u34c_real_d1_concurrency_gate11_dormant_alignment_seal.json",
+      "symbol": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED",
+      "owner": "worker/ai/canary/d1AuthorizationReplayBackend.ts",
       "currentValue": true,
       "type": "RUNTIME_CONSUMED",
       "runtimeConsumers": [
-        "worker/index.ts",
-        "worker/ai/canary/deepSeekProductionWorkerOperationalRoute.ts"
+        "worker/ai/canary/deepSeekProductionReplayCoordinator.ts"
       ],
-      "requiredPredecessors": ["R4 Worker Redeployment"],
-      "requiredProviderResources": ["velnar-platform-worker (version: 5aa1936f-bb0d-4a32-9697-955431770b92)"],
+      "requiredPredecessors": ["R4 Real D1 Concurrency Certification"],
+      "requiredProviderResources": ["velnar-platform-worker", "velnar-production-db"],
       "requiredPublicArtifacts": [],
-      "requiredHumanAction": ["Aligned in R4"],
+      "requiredHumanAction": ["Certified in R4"],
       "productionMutationRequired": false,
       "redeployRequired": false,
       "canCombineWithR5B": false,
       "mustRemainSeparate": false,
       "blockerStatus": "SATISFIED_AND_SEALED",
-      "explanation": "Active deployed Worker is confirmed aligned with canonical repository code."
+      "explanation": "D1_REPLAY_BACKEND_REAL_CONCURRENCY_CERTIFIED = true as const at line 31 of worker/ai/canary/d1AuthorizationReplayBackend.ts. 100-worker concurrent collision certification succeeded with zero duplicate reservations."
     },
     {
       "gate": 12,
@@ -415,6 +420,7 @@
     "R5C": {
       "name": "BOUNDED LIVE CANARY CERTIFICATION",
       "nature": "ONE BOUNDED LIVE RUN BATCH",
+      "boundaryInvariant": "Private keys NEVER enter repository, Worker runtime, ChatGPT, Antigravity, Codex, Gemini, or any AI agent context. Signing payload builders remain payload-only and MUST NOT sign.",
       "prerequisites": [
         "Sealed R5B activation",
         "Explicit in-chat human authorization for bounded live certification",
@@ -422,8 +428,8 @@
       ],
       "candidateScope": [
         "Provision DEEPSEEK_API_KEY Worker secret",
-        "Generate signed RuntimeSourceProvenanceReceipt for deployed Worker",
-        "Generate signed HumanAuthorizationPackage for bounded 7-call certification",
+        "Ingest and verify a RuntimeSourceProvenanceReceipt signed externally inside the approved offline provenance signing boundary",
+        "Ingest and verify a HumanAuthorizationPackage signed externally inside the approved offline human-authorization signing boundary",
         "Set Gate 1 to true, Gate 3 to true, Gate 4 to LIVE_EXECUTION_ALLOWED",
         "Deploy Worker with live gates enabled",
         "Issue authenticated POST request to /api/ops/canary/deepseek-certification through Cloudflare Access",
@@ -454,8 +460,10 @@
     "bundleArtifactSha256Linkage": "Deterministic build-time esbuild artifact hashing will bind source tree to deployed bundle artifact digest. Since Cloudflare management plane does not provide literal byte readback of minified edge code, cryptographic attestation binds (sourceCommitSha, sourceTreeSha, buildArtifactSha256, buildId, deploymentId) into the signed RuntimeSourceProvenanceReceipt.",
     "receiptLifetimePolicy": {
       "issuedAtSemantics": "Must be valid ISO-8601 UTC timestamp, not in the future relative to verification time.",
-      "expiresAtSemantics": "Must be strictly after issuedAt. A deployment provenance receipt remains valid for the operational lifecycle of that specific immutable Worker deployment (e.g. 7-30 days), renewed on each new production deployment.",
-      "gapResolution": "Sufficient for bounded live certification; receipt will be issued at deployment time with bounded validity."
+      "expiresAtSemantics": "Must be strictly after issuedAt.",
+      "runtimeSourceProvenanceMaximumLifetimeEnforced": false,
+      "runtimeSourceProvenanceLifetimePolicyStatus": "UNRESOLVED_REQUIRES_EXPLICIT_POLICY_BEFORE_R5B_OR_R5C",
+      "gapResolution": "No maximum receipt lifetime is currently enforced by deepSeekTrustedRuntimeSourceProvenance.ts. An explicit architecture decision is required before R5B or R5C production receipt issuance. Do NOT assume 7-day, 30-day, or other arbitrary lifetimes."
     }
   }
 }
