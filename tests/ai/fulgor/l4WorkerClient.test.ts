@@ -24,18 +24,15 @@ function config() {
       'velnar-fulgor',
 
     FULGOR_GCP_REGION:
-      'europe-west4',
+      'us-central1',
 
     FULGOR_CONTROLLER_STATE_PATH:
       'D:/fulgor/state.json',
 
-    FULGOR_L4_WORKER_ENDPOINT:
-      'https://fulgor-l4.internal/v1/verify',
+    FULGOR_L4_WORKER_ORIGIN:
+      'https://fulgor-l4-worker-abc-uc.a.run.app',
 
-    FULGOR_L4_WORKER_AUDIENCE:
-      'https://fulgor-l4.internal',
-
-    FULGOR_L4_WORKER_IDENTITY:
+    FULGOR_L4_WORKER_RUNTIME_SERVICE_ACCOUNT:
       'fulgor-l4-worker@velnar.iam.gserviceaccount.com',
 
     FULGOR_L4_EXPECTED_MODEL_ID:
@@ -80,7 +77,6 @@ function successfulTransport(
   overrides: Partial<{
     status: number;
     contentType: string | null;
-    authenticatedPeer: string;
     modelId: string;
     blindedId: string;
     rawBody: string;
@@ -119,10 +115,6 @@ function successfulTransport(
       contentType:
         overrides.contentType ??
         'application/json',
-
-      authenticatedPeer:
-        overrides.authenticatedPeer ??
-        c.workerIdentity,
 
       body,
     });
@@ -170,7 +162,7 @@ describe('Fulgor L4 worker client', () => {
 
     expect(
       transportRequest.audience,
-    ).toBe(c.workerAudience);
+    ).toBe(c.workerOrigin);
 
     const decoded =
       JSON.parse(
@@ -207,17 +199,33 @@ describe('Fulgor L4 worker client', () => {
     ]);
   });
 
-  it('rejects mismatched authenticated peer identity', async () => {
+  it('rejects response self-asserted peer identity as an unexpected envelope field', async () => {
+    const c = config();
+
+    const rawBody =
+      JSON.stringify({
+        schemaVersion:
+          'FULGOR_L4_RESPONSE_V1',
+        modelId:
+          c.expectedModelId,
+        claimedPeerIdentity:
+          c.workerRuntimeServiceAccount,
+        response: {
+          blindedId: 'blind-1',
+          verdict: 'SUPPORTED',
+          rationale: 'verified',
+        },
+      });
+
     const {
       transport,
     } = successfulTransport({
-      authenticatedPeer:
-        'attacker@example.invalid',
+      rawBody,
     });
 
     const client =
       new L4WorkerClient(
-        config(),
+        c,
         transport,
       );
 
@@ -225,7 +233,7 @@ describe('Fulgor L4 worker client', () => {
       client.verify(request()),
     ).rejects.toEqual(
       new L4WorkerClientError(
-        'AUTHENTICATED_PEER_MISMATCH',
+        'INVALID_ENVELOPE',
       ),
     );
   });

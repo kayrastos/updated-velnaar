@@ -11,6 +11,10 @@ import type {
 } from '../automation/supervisor';
 
 import {
+  CloudRunIdTokenTransport,
+} from './cloudRunIdTokenTransport';
+
+import {
   L4WorkerClient,
 } from './l4WorkerClient';
 
@@ -29,6 +33,11 @@ export function createControllerStateStore(
     config.statePath,
     config.queueMaxDepth,
   );
+}
+
+export function createCloudRunControllerTransport():
+L4WorkerTransport {
+  return new CloudRunIdTokenTransport();
 }
 
 export async function runGcpControllerOnce(
@@ -55,5 +64,20 @@ export async function runGcpControllerOnce(
     store,
     worker,
     config.maxJobsPerRun,
+  );
+}
+
+export async function runAuthenticatedGcpControllerOnce(
+  config: FulgorGcpConfig,
+): Promise<SupervisorRunSummary> {
+  /*
+   * Production Cloud Run path: Google-signed ID
+   * token + exact pinned audience/origin. Runtime
+   * service-account identity remains deployment
+   * evidence and is not inferred from HTTP body.
+   */
+  return runGcpControllerOnce(
+    config,
+    createCloudRunControllerTransport(),
   );
 }

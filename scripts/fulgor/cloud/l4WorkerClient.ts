@@ -24,7 +24,6 @@ export type L4WorkerFailureCode =
   | 'REQUEST_TOO_LARGE'
   | 'TIMEOUT'
   | 'TRANSPORT_ERROR'
-  | 'AUTHENTICATED_PEER_MISMATCH'
   | 'HTTP_STATUS'
   | 'INVALID_CONTENT_TYPE'
   | 'RESPONSE_TOO_LARGE'
@@ -60,16 +59,6 @@ export interface L4WorkerTransportRequest {
 export interface L4WorkerTransportResponse {
   status: number;
   contentType: string | null;
-
-  /*
-   * This value must come from the transport's
-   * independently verified peer identity.
-   * It must NOT be copied from the worker body.
-   *
-   * reachable != authorized
-   */
-  authenticatedPeer: string;
-
   body: string;
 }
 
@@ -254,19 +243,14 @@ implements FulgorVerifierWorker {
     }
 
     /*
-     * Peer identity is verified before any
-     * response body is trusted.
+     * reachable != authorized
+     *
+     * Authorization is established by the Cloud Run
+     * IAM boundary before this response exists:
+     * exact pinned origin + exact audience + Google-
+     * signed ID token + roles/run.invoker. The body
+     * is never allowed to self-assert peer identity.
      */
-    if (
-      transportResponse
-        .authenticatedPeer !==
-      this.config.workerIdentity
-    ) {
-      throw new L4WorkerClientError(
-        'AUTHENTICATED_PEER_MISMATCH',
-      );
-    }
-
     if (transportResponse.status !== 200) {
       throw new L4WorkerClientError(
         'HTTP_STATUS',

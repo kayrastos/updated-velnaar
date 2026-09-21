@@ -5,8 +5,7 @@ import {
 export type GcpConfigFailureCode =
   | 'MISSING_VALUE'
   | 'INVALID_VALUE'
-  | 'INVALID_ENDPOINT'
-  | 'INVALID_AUDIENCE'
+  | 'INVALID_ORIGIN'
   | 'OUT_OF_RANGE';
 
 export class GcpConfigError extends Error {
@@ -29,9 +28,21 @@ export interface FulgorGcpConfig {
   region: string;
   statePath: string;
 
+  /*
+   * Single source of truth for the Cloud Run target.
+   * Endpoint and ID-token audience are derived from
+   * this exact origin so they cannot drift apart.
+   */
+  workerOrigin: string;
   workerEndpoint: string;
   workerAudience: string;
-  workerIdentity: string;
+
+  /*
+   * Deployment/config evidence only. The controller
+   * must never treat an HTTP response field as proof
+   * of the worker runtime service-account identity.
+   */
+  workerRuntimeServiceAccount: string;
   expectedModelId: string;
 
   timeoutMs: number;
@@ -121,7 +132,7 @@ function boundedInteger(
   return parsed;
 }
 
-function workerEndpoint(
+function cloudRunWorkerOrigin(
   value: string,
 ): string {
   let parsed: URL;
@@ -130,56 +141,36 @@ function workerEndpoint(
     parsed = new URL(value);
   } catch {
     throw new GcpConfigError(
-      'INVALID_ENDPOINT',
-      'FULGOR_L4_WORKER_ENDPOINT',
+      'INVALID_ORIGIN',
+      'FULGOR_L4_WORKER_ORIGIN',
     );
   }
+
+  const hostname =
+    parsed.hostname.toLowerCase();
 
   if (
     parsed.protocol !== 'https:' ||
     parsed.username.length !== 0 ||
     parsed.password.length !== 0 ||
+    parsed.port.length !== 0 ||
     parsed.search.length !== 0 ||
     parsed.hash.length !== 0 ||
-    parsed.pathname !== '/v1/verify'
+    parsed.pathname !== '/' ||
+    !hostname.endsWith('.run.app') ||
+    hostname === 'run.app'
   ) {
     throw new GcpConfigError(
-      'INVALID_ENDPOINT',
-      'FULGOR_L4_WORKER_ENDPOINT',
+      'INVALID_ORIGIN',
+      'FULGOR_L4_WORKER_ORIGIN',
     );
   }
 
-  return parsed.toString();
-}
-
-function workerAudience(
-  value: string,
-): string {
-  let parsed: URL;
-
-  try {
-    parsed = new URL(value);
-  } catch {
-    throw new GcpConfigError(
-      'INVALID_AUDIENCE',
-      'FULGOR_L4_WORKER_AUDIENCE',
-    );
-  }
-
-  if (
-    parsed.protocol !== 'https:' ||
-    parsed.username.length !== 0 ||
-    parsed.password.length !== 0 ||
-    parsed.search.length !== 0 ||
-    parsed.hash.length !== 0 ||
-    parsed.pathname !== '/'
-  ) {
-    throw new GcpConfigError(
-      'INVALID_AUDIENCE',
-      'FULGOR_L4_WORKER_AUDIENCE',
-    );
-  }
-
+  /*
+   * URL.origin deliberately removes the trailing slash.
+   * That exact value is both the pinned origin and the
+   * Cloud Run ID-token audience.
+   */
   return parsed.origin;
 }
 
@@ -210,29 +201,21 @@ export function loadFulgorGcpConfig(
       'FULGOR_CONTROLLER_STATE_PATH',
     );
 
-  const endpoint =
-    workerEndpoint(
+  const origin =
+    cloudRunWorkerOrigin(
       required(
         env,
-        'FULGOR_L4_WORKER_ENDPOINT',
+        'FULGOR_L4_WORKER_ORIGIN',
       ),
     );
 
-  const audience =
-    workerAudience(
-      required(
-        env,
-        'FULGOR_L4_WORKER_AUDIENCE',
-      ),
-    );
-
-  const identity =
+  const runtimeServiceAccount =
     simpleToken(
       required(
         env,
-        'FULGOR_L4_WORKER_IDENTITY',
+        'FULGOR_L4_WORKER_RUNTIME_SERVICE_ACCOUNT',
       ),
-      'FULGOR_L4_WORKER_IDENTITY',
+      'FULGOR_L4_WORKER_RUNTIME_SERVICE_ACCOUNT',
     );
 
   const expectedModelId =
@@ -281,9 +264,12 @@ export function loadFulgorGcpConfig(
     projectId,
     region,
     statePath,
-    workerEndpoint: endpoint,
-    workerAudience: audience,
-    workerIdentity: identity,
+    workerOrigin: origin,
+    workerEndpoint:
+      `${origin}/v1/verify`,
+    workerAudience: origin,
+    workerRuntimeServiceAccount:
+      runtimeServiceAccount,
     expectedModelId,
     timeoutMs,
     maxJobsPerRun,

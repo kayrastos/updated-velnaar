@@ -15,18 +15,15 @@ function environment() {
       'velnar-fulgor',
 
     FULGOR_GCP_REGION:
-      'europe-west4',
+      'us-central1',
 
     FULGOR_CONTROLLER_STATE_PATH:
       'D:/fulgor/state.json',
 
-    FULGOR_L4_WORKER_ENDPOINT:
-      'https://fulgor-l4.internal/v1/verify',
+    FULGOR_L4_WORKER_ORIGIN:
+      'https://fulgor-l4-worker-abc-uc.a.run.app',
 
-    FULGOR_L4_WORKER_AUDIENCE:
-      'https://fulgor-l4.internal',
-
-    FULGOR_L4_WORKER_IDENTITY:
+    FULGOR_L4_WORKER_RUNTIME_SERVICE_ACCOUNT:
       'fulgor-l4-worker@velnar.iam.gserviceaccount.com',
 
     FULGOR_L4_EXPECTED_MODEL_ID:
@@ -44,7 +41,7 @@ function environment() {
 }
 
 describe('Fulgor GCP configuration', () => {
-  it('parses bounded valid configuration', () => {
+  it('derives exact endpoint and audience from one pinned Cloud Run origin', () => {
     const config =
       loadFulgorGcpConfig(
         environment(),
@@ -59,58 +56,108 @@ describe('Fulgor GCP configuration', () => {
     expect(config.queueMaxDepth)
       .toBe(32);
 
+    expect(config.workerOrigin)
+      .toBe(
+        'https://fulgor-l4-worker-abc-uc.a.run.app',
+      );
+
+    expect(config.workerAudience)
+      .toBe(config.workerOrigin);
+
     expect(config.workerEndpoint)
       .toBe(
-        'https://fulgor-l4.internal/v1/verify',
+        `${config.workerOrigin}/v1/verify`,
+      );
+
+    expect(
+      config.workerRuntimeServiceAccount,
+    ).toBe(
+      'fulgor-l4-worker@velnar.iam.gserviceaccount.com',
+    );
+  });
+
+  it('canonicalizes a trailing slash without changing the pinned origin', () => {
+    const env = environment();
+
+    env.FULGOR_L4_WORKER_ORIGIN =
+      'https://fulgor-l4-worker-abc-uc.a.run.app/';
+
+    const config =
+      loadFulgorGcpConfig(env);
+
+    expect(config.workerOrigin)
+      .toBe(
+        'https://fulgor-l4-worker-abc-uc.a.run.app',
       );
   });
 
-  it('rejects non-HTTPS worker endpoint', () => {
+  it('rejects non-HTTPS worker origin', () => {
     const env = environment();
 
-    env.FULGOR_L4_WORKER_ENDPOINT =
-      'http://fulgor-l4.internal/v1/verify';
+    env.FULGOR_L4_WORKER_ORIGIN =
+      'http://fulgor-l4-worker-abc-uc.a.run.app';
 
     expect(() =>
       loadFulgorGcpConfig(env),
     ).toThrowError(
       new GcpConfigError(
-        'INVALID_ENDPOINT',
-        'FULGOR_L4_WORKER_ENDPOINT',
+        'INVALID_ORIGIN',
+        'FULGOR_L4_WORKER_ORIGIN',
       ),
     );
   });
 
-  it('rejects worker endpoint outside exact verify path', () => {
+  it('rejects non-Cloud-Run hostnames', () => {
     const env = environment();
 
-    env.FULGOR_L4_WORKER_ENDPOINT =
-      'https://fulgor-l4.internal/admin';
+    env.FULGOR_L4_WORKER_ORIGIN =
+      'https://fulgor-l4.internal';
 
     expect(() =>
       loadFulgorGcpConfig(env),
     ).toThrowError(
       new GcpConfigError(
-        'INVALID_ENDPOINT',
-        'FULGOR_L4_WORKER_ENDPOINT',
+        'INVALID_ORIGIN',
+        'FULGOR_L4_WORKER_ORIGIN',
       ),
     );
   });
 
-  it('rejects audience containing a path', () => {
+  it('rejects origin containing a path', () => {
     const env = environment();
 
-    env.FULGOR_L4_WORKER_AUDIENCE =
-      'https://fulgor-l4.internal/private';
+    env.FULGOR_L4_WORKER_ORIGIN =
+      'https://fulgor-l4-worker-abc-uc.a.run.app/v1/verify';
 
     expect(() =>
       loadFulgorGcpConfig(env),
     ).toThrowError(
       new GcpConfigError(
-        'INVALID_AUDIENCE',
-        'FULGOR_L4_WORKER_AUDIENCE',
+        'INVALID_ORIGIN',
+        'FULGOR_L4_WORKER_ORIGIN',
       ),
     );
+  });
+
+  it('rejects origin containing query or fragment material', () => {
+    for (const suffix of [
+      '?x=1',
+      '#fragment',
+    ]) {
+      const env = environment();
+
+      env.FULGOR_L4_WORKER_ORIGIN =
+        `https://fulgor-l4-worker-abc-uc.a.run.app/${suffix}`;
+
+      expect(() =>
+        loadFulgorGcpConfig(env),
+      ).toThrowError(
+        new GcpConfigError(
+          'INVALID_ORIGIN',
+          'FULGOR_L4_WORKER_ORIGIN',
+        ),
+      );
+    }
   });
 
   it('rejects timeout outside safety bound', () => {

@@ -83,18 +83,15 @@ async function config(
       'velnar-fulgor',
 
     FULGOR_GCP_REGION:
-      'europe-west4',
+      'us-central1',
 
     FULGOR_CONTROLLER_STATE_PATH:
       join(root, 'state.json'),
 
-    FULGOR_L4_WORKER_ENDPOINT:
-      'https://fulgor-l4.internal/v1/verify',
+    FULGOR_L4_WORKER_ORIGIN:
+      'https://fulgor-l4-worker-abc-uc.a.run.app',
 
-    FULGOR_L4_WORKER_AUDIENCE:
-      'https://fulgor-l4.internal',
-
-    FULGOR_L4_WORKER_IDENTITY:
+    FULGOR_L4_WORKER_RUNTIME_SERVICE_ACCOUNT:
       'fulgor-l4-worker@velnar.iam.gserviceaccount.com',
 
     FULGOR_L4_EXPECTED_MODEL_ID:
@@ -114,7 +111,7 @@ async function config(
 function transport() {
   const send =
     vi.fn().mockImplementation(
-      async (transportRequest) => {
+      async (transportRequest: { body: string }) => {
         const decoded =
           JSON.parse(
             transportRequest.body,
@@ -124,9 +121,6 @@ function transport() {
           status: 200,
           contentType:
             'application/json',
-
-          authenticatedPeer:
-            'fulgor-l4-worker@velnar.iam.gserviceaccount.com',
 
           body: JSON.stringify({
             schemaVersion:
@@ -161,7 +155,7 @@ function transport() {
 }
 
 describe('Fulgor GCP controller runtime', () => {
-  it('processes one persistent job through authenticated L4 boundary', async () => {
+  it('processes one persistent job through the L4 verification boundary', async () => {
     const c = await config();
 
     const store =
@@ -235,7 +229,7 @@ describe('Fulgor GCP controller runtime', () => {
       .toHaveBeenCalledTimes(1);
   });
 
-  it('fails closed when transport peer is not authorized worker', async () => {
+  it('fails closed on an invalid worker response without retry', async () => {
     const c = await config();
 
     const store =
@@ -251,10 +245,17 @@ describe('Fulgor GCP controller runtime', () => {
         contentType:
           'application/json',
 
-        authenticatedPeer:
-          'unauthorized@example.invalid',
-
-        body: '{}',
+        body: JSON.stringify({
+          schemaVersion:
+            'FULGOR_L4_RESPONSE_V1',
+          modelId:
+            'unexpected-model',
+          response: {
+            blindedId: 'blind-1',
+            verdict: 'SUPPORTED',
+            rationale: 'verified',
+          },
+        }),
       });
 
     const summary =
