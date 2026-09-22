@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * @file scripts/buildHumanAuthorizationSigningPayload.mjs
  * @description VELNAR — Offline Canonical Human Authorization Signing Payload Builder.

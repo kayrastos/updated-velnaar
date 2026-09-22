@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * @file scripts/computePublicKeyFingerprint.mjs
  * @description VELNAR — Offline Public Key Fingerprint Generator.

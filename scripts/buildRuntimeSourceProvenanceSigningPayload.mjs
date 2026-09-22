@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * @file scripts/buildRuntimeSourceProvenanceSigningPayload.mjs
  * @description VELNAR — Offline Canonical Runtime Source Provenance Signing Payload Builder.
