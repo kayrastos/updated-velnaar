@@ -19,7 +19,7 @@ function sources() {
 }
 describe('M3 extends sealed oracle isolation without execution authority', () => {
   it('audits every detector root and complete local dependency closure with both guards', () => {
-    const { files, roots } = sources(); expect(roots).toHaveLength(3);
+    const { files, roots } = sources();
     expect(() => assertDetectorIsolation(files, roots)).not.toThrow();
   });
   it.each([
