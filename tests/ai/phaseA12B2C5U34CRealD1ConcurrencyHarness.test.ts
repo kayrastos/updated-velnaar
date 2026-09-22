@@ -4,7 +4,7 @@
  * Phase: A.12B.2C-5U.3.4C
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import worker, {
@@ -51,6 +51,7 @@ function createMockD1Database(mockResult?: unknown) {
 
 describe('Phase A.12B.2C-5U.3.4C: R4 D1 Concurrency Certification Harness', () => {
   const TEST_TOKEN = 'test_token_r4_secret_0123456789abcdef';
+  afterEach(() => vi.restoreAllMocks());
 
   describe('1. Canonical Reservation Request Derivation & Key Uniqueness', () => {
     it('contested round: all 32 contenders derive the EXACT SAME canonical request', () => {
@@ -221,6 +222,8 @@ describe('Phase A.12B.2C-5U.3.4C: R4 D1 Concurrency Certification Harness', () =
     });
 
     it('successfully processes valid request and invokes canonical D1 backend', async () => {
+      const historicalNow = Date.parse(R4_EXPIRES_AT) - 1000;
+      vi.spyOn(Date, 'now').mockReturnValue(historicalNow);
       const { db, prepareCalls } = createMockD1Database();
       const req = new Request('http://localhost/r4/reserve', {
         method: 'POST',
