@@ -17,6 +17,7 @@ import type {
 
 export interface GithubAdvisoryFetchOptions {
   perPage?: number;
+  ghsaId?: string;
   cwes?: readonly string[];
   severity?:
     | 'unknown'
@@ -393,6 +394,23 @@ export async function fetchGithubAdvisoryCandidates(
     'sort',
     'updated',
   );
+
+  if (options.ghsaId) {
+    if (
+      !/^GHSA-[A-Za-z0-9-]+$/.test(
+        options.ghsaId,
+      )
+    ) {
+      throw new Error(
+        'GHSA_INVALID_FILTER_ID',
+      );
+    }
+
+    url.searchParams.set(
+      'ghsa_id',
+      options.ghsaId,
+    );
+  }
 
   if (options.severity) {
     url.searchParams.set(
