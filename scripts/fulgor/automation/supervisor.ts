@@ -32,10 +32,22 @@ export interface SupervisorRunSummary {
   needsReview: number;
 }
 
+export interface SupervisorCompletionContext {
+  jobId: string;
+  result: Awaited<
+    ReturnType<typeof runAutomationJob>
+  >;
+}
+
+export type SupervisorCompletionHook = (
+  context: SupervisorCompletionContext,
+) => Promise<void>;
+
 export async function runBoundedSupervisorOnce(
   store: PersistentFulgorStateStore,
   worker: FulgorVerifierWorker,
   maxJobsPerRun = 1,
+  completionHook?: SupervisorCompletionHook,
 ): Promise<SupervisorRunSummary> {
   if (
     !Number.isInteger(maxJobsPerRun) ||
@@ -70,6 +82,13 @@ export async function runBoundedSupervisorOnce(
           job,
           worker,
         );
+
+      if (completionHook) {
+        await completionHook({
+          jobId: job.jobId,
+          result,
+        });
+      }
 
       await store.complete(
         job.jobId,

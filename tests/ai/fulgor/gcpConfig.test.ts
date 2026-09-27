@@ -160,11 +160,23 @@ describe('Fulgor GCP configuration', () => {
     }
   });
 
+  it('accepts the 360-second cold-start safety bound', () => {
+    const env = environment();
+
+    env.FULGOR_L4_TIMEOUT_MS =
+      '360000';
+
+    const config =
+      loadFulgorGcpConfig(env);
+
+    expect(config.timeoutMs)
+      .toBe(360000);
+  });
   it('rejects timeout outside safety bound', () => {
     const env = environment();
 
     env.FULGOR_L4_TIMEOUT_MS =
-      '500000';
+      '360001';
 
     expect(() =>
       loadFulgorGcpConfig(env),

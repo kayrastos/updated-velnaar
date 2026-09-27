@@ -126,6 +126,42 @@ describe('llama.cpp runtime configuration', () => {
     ).toBe(false);
 
     expect(
+      plan.env.LD_LIBRARY_PATH,
+    ).toBe(
+      '/app:/usr/local/nvidia/lib64',
+    );
+
+    const withoutInheritedLibraryPath =
+      buildLlamaCppLaunchPlan(
+        config,
+        {
+          PATH: '/usr/bin',
+        },
+      );
+
+    expect(
+      withoutInheritedLibraryPath.env
+        .LD_LIBRARY_PATH,
+    ).toBe('/app');
+
+    const alreadyPinnedLibraryPath =
+      buildLlamaCppLaunchPlan(
+        config,
+        {
+          PATH: '/usr/bin',
+          LD_LIBRARY_PATH:
+            '/app:/usr/local/nvidia/lib64',
+        },
+      );
+
+    expect(
+      alreadyPinnedLibraryPath.env
+        .LD_LIBRARY_PATH,
+    ).toBe(
+      '/app:/usr/local/nvidia/lib64',
+    );
+
+    expect(
       plan.env
         .FULGOR_SECRET_SHOULD_NOT_LEAK,
     ).toBeUndefined();

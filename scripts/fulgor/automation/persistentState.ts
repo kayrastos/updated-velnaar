@@ -429,6 +429,109 @@ function emptyState():
   };
 }
 
+const WINDOWS_TRANSIENT_FS_RETRY_DELAYS_MS = [
+  20,
+  40,
+  80,
+  160,
+  320,
+] as const;
+
+type FsMutationRetryOptions = {
+  retryEperm?: boolean;
+};
+
+function fsMutationErrorCode(
+  error: unknown,
+): unknown {
+  return isRecord(error)
+    ? error.code
+    : undefined;
+}
+
+function isRetryableFsMutationError(
+  error: unknown,
+  retryEperm: boolean,
+): boolean {
+  const code =
+    fsMutationErrorCode(error);
+
+  return (
+    code === 'EBUSY' ||
+    code === 'EACCES' ||
+    (
+      retryEperm &&
+      code === 'EPERM'
+    )
+  );
+}
+
+async function delay(
+  milliseconds: number,
+): Promise<void> {
+  await new Promise<void>(
+    (resolve) => {
+      setTimeout(
+        resolve,
+        milliseconds,
+      );
+    },
+  );
+}
+
+async function retryTransientFsMutation<T>(
+  operation: () => Promise<T>,
+  options: FsMutationRetryOptions = {},
+): Promise<T> {
+  const retryEperm =
+    options.retryEperm ?? true;
+
+  for (
+    let attempt = 0;
+    ;
+    attempt += 1
+  ) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (
+        !isRetryableFsMutationError(
+          error,
+          retryEperm,
+        ) ||
+        attempt >=
+          WINDOWS_TRANSIENT_FS_RETRY_DELAYS_MS.length
+      ) {
+        throw error;
+      }
+
+      await delay(
+        WINDOWS_TRANSIENT_FS_RETRY_DELAYS_MS[
+          attempt
+        ],
+      );
+    }
+  }
+}
+
+async function bestEffortRemove(
+  path: string,
+): Promise<void> {
+  try {
+    await retryTransientFsMutation(
+      () =>
+        rm(
+          path,
+          { force: true },
+        ),
+    );
+  } catch {
+    // Cleanup must never replace
+    // the primary filesystem failure.
+  }
+}
+
+// FULGOR_WINDOWS_PERSISTENT_STATE_FS_RETRY_V1
 export class PersistentFulgorStateStore {
   readonly statePath: string;
   readonly maxDepth: number;
@@ -504,9 +607,12 @@ export class PersistentFulgorStateStore {
   ): Promise<void> {
     const parsed = parseState(state);
 
-    await mkdir(
-      dirname(this.statePath),
-      { recursive: true },
+    await retryTransientFsMutation(
+      () =>
+        mkdir(
+          dirname(this.statePath),
+          { recursive: true },
+        ),
     );
 
     const temp =
@@ -526,62 +632,75 @@ export class PersistentFulgorStateStore {
     );
 
     try {
-      await rename(
-        temp,
-        this.statePath,
+      await retryTransientFsMutation(
+        () =>
+          rename(
+            temp,
+            this.statePath,
+          ),
+        {
+          // On Windows, EPERM is also the
+          // existing-destination fallback
+          // signal for this first rename.
+          retryEperm: false,
+        },
       );
     } catch (error) {
       const code =
-        isRecord(error)
-          ? error.code
-          : undefined;
+        fsMutationErrorCode(error);
 
       if (
         code !== 'EEXIST' &&
         code !== 'EPERM'
       ) {
-        await rm(
-          temp,
-          { force: true },
-        );
+        await bestEffortRemove(temp);
 
         throw error;
       }
 
-      await rm(
-        backup,
-        { force: true },
+      await retryTransientFsMutation(
+        () =>
+          rm(
+            backup,
+            { force: true },
+          ),
       );
 
       try {
-        await rename(
-          this.statePath,
-          backup,
+        await retryTransientFsMutation(
+          () =>
+            rename(
+              this.statePath,
+              backup,
+            ),
         );
       } catch (backupError) {
         const backupCode =
-          isRecord(backupError)
-            ? backupError.code
-            : undefined;
+          fsMutationErrorCode(
+            backupError,
+          );
 
         if (backupCode !== 'ENOENT') {
-          await rm(
-            temp,
-            { force: true },
-          );
+          await bestEffortRemove(temp);
 
           throw backupError;
         }
       }
 
-      await rename(
-        temp,
-        this.statePath,
+      await retryTransientFsMutation(
+        () =>
+          rename(
+            temp,
+            this.statePath,
+          ),
       );
 
-      await rm(
-        backup,
-        { force: true },
+      await retryTransientFsMutation(
+        () =>
+          rm(
+            backup,
+            { force: true },
+          ),
       );
     }
   }

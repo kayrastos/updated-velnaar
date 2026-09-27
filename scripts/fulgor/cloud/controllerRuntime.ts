@@ -7,6 +7,7 @@ import {
 } from '../automation/supervisor';
 
 import type {
+  SupervisorCompletionHook,
   SupervisorRunSummary,
 } from '../automation/supervisor';
 
@@ -26,6 +27,14 @@ import type {
   FulgorGcpConfig,
 } from './gcpConfig';
 
+import {
+  createGcpSignedEvidenceCompletionHook,
+} from './gcpSignedEvidenceCompletion';
+
+import type {
+  GcpSignedEvidenceCompletionOptions,
+} from './gcpSignedEvidenceCompletion';
+
 export function createControllerStateStore(
   config: FulgorGcpConfig,
 ): PersistentFulgorStateStore {
@@ -43,6 +52,7 @@ L4WorkerTransport {
 export async function runGcpControllerOnce(
   config: FulgorGcpConfig,
   transport: L4WorkerTransport,
+  completionHook?: SupervisorCompletionHook,
 ): Promise<SupervisorRunSummary> {
   const store =
     createControllerStateStore(
@@ -64,9 +74,24 @@ export async function runGcpControllerOnce(
     store,
     worker,
     config.maxJobsPerRun,
+    completionHook,
   );
 }
 
+export async function runSignedGcpControllerOnce(
+  config: FulgorGcpConfig,
+  transport: L4WorkerTransport,
+  signing:
+    GcpSignedEvidenceCompletionOptions,
+): Promise<SupervisorRunSummary> {
+  return runGcpControllerOnce(
+    config,
+    transport,
+    createGcpSignedEvidenceCompletionHook(
+      signing,
+    ),
+  );
+}
 export async function runAuthenticatedGcpControllerOnce(
   config: FulgorGcpConfig,
 ): Promise<SupervisorRunSummary> {
@@ -79,5 +104,17 @@ export async function runAuthenticatedGcpControllerOnce(
   return runGcpControllerOnce(
     config,
     createCloudRunControllerTransport(),
+  );
+}
+
+export async function runAuthenticatedSignedGcpControllerOnce(
+  config: FulgorGcpConfig,
+  signing:
+    GcpSignedEvidenceCompletionOptions,
+): Promise<SupervisorRunSummary> {
+  return runSignedGcpControllerOnce(
+    config,
+    createCloudRunControllerTransport(),
+    signing,
   );
 }

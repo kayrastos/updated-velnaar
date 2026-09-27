@@ -508,4 +508,70 @@ describe('Cloud Run ID-token transport', () => {
     expect(fetchImpl)
       .toHaveBeenCalledTimes(1);
   });
+
+  it('accepts the 360-second transport timeout bound', async () => {
+    const fetchIdToken =
+      vi.fn().mockResolvedValue(
+        'signed.google.id.token',
+      );
+
+    const fetchImpl =
+      vi.fn().mockResolvedValue(
+        okResponse(),
+      );
+
+    const transport =
+      new CloudRunIdTokenTransport(
+        { fetchIdToken },
+        fetchImpl,
+      );
+
+    await expect(
+      transport.send(
+        request({
+          timeoutMs: 360000,
+        }),
+      ),
+    ).resolves.toMatchObject({
+      status: 200,
+    });
+
+    expect(fetchIdToken)
+      .toHaveBeenCalledTimes(1);
+
+    expect(fetchImpl)
+      .toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects timeout above the 360-second transport bound before token or network use', async () => {
+    const fetchIdToken =
+      vi.fn();
+
+    const fetchImpl =
+      vi.fn();
+
+    const transport =
+      new CloudRunIdTokenTransport(
+        { fetchIdToken },
+        fetchImpl,
+      );
+
+    await expect(
+      transport.send(
+        request({
+          timeoutMs: 360001,
+        }),
+      ),
+    ).rejects.toEqual(
+      new L4WorkerClientError(
+        'TRANSPORT_ERROR',
+      ),
+    );
+
+    expect(fetchIdToken)
+      .not.toHaveBeenCalled();
+
+    expect(fetchImpl)
+      .not.toHaveBeenCalled();
+  });
 });

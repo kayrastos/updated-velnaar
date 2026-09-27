@@ -3,6 +3,10 @@ import {
 } from 'google-auth-library';
 
 import {
+  FULGOR_L4_MAX_TIMEOUT_MS,
+} from './gcpConfig';
+
+import {
   L4WorkerClientError,
 } from './l4WorkerClient';
 
@@ -258,7 +262,7 @@ implements L4WorkerTransport {
         request.timeoutMs,
       ) ||
       request.timeoutMs < 1 ||
-      request.timeoutMs > 120000
+      request.timeoutMs > FULGOR_L4_MAX_TIMEOUT_MS
     ) {
       throw new L4WorkerClientError(
         'TRANSPORT_ERROR',

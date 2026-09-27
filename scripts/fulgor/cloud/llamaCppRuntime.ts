@@ -7,6 +7,7 @@ import {
 } from 'node:fs';
 
 import {
+  dirname,
   isAbsolute,
 } from 'node:path';
 
@@ -209,6 +210,27 @@ export function buildLlamaCppLaunchPlan(
   ]) {
     copyEnv(env, key, runtimeEnv);
   }
+
+  const binaryDirectory =
+    dirname(config.binaryPath);
+
+  const inheritedLibraryPath =
+    runtimeEnv.LD_LIBRARY_PATH;
+
+  runtimeEnv.LD_LIBRARY_PATH =
+    typeof inheritedLibraryPath === 'string' &&
+    inheritedLibraryPath.length !== 0
+      ? [
+          binaryDirectory,
+          ...inheritedLibraryPath
+            .split(':')
+            .filter(
+              segment =>
+                segment.length !== 0 &&
+                segment !== binaryDirectory,
+            ),
+        ].join(':')
+      : binaryDirectory;
 
   return {
     command: config.binaryPath,

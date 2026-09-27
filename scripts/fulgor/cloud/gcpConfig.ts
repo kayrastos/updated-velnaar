@@ -2,6 +2,8 @@ import {
   URL,
 } from 'node:url';
 
+export const FULGOR_L4_MAX_TIMEOUT_MS = 360000;
+
 export type GcpConfigFailureCode =
   | 'MISSING_VALUE'
   | 'INVALID_VALUE'
@@ -235,7 +237,7 @@ export function loadFulgorGcpConfig(
       ),
       'FULGOR_L4_TIMEOUT_MS',
       1000,
-      120000,
+      FULGOR_L4_MAX_TIMEOUT_MS,
     );
 
   const maxJobsPerRun =
