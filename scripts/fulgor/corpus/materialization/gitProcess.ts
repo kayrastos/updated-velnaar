@@ -4,8 +4,11 @@ import {
 
 export interface GitProcessResult {
   exitCode: number;
+
   stdout: string;
   stderr: string;
+
+  stdoutBytes?: Uint8Array;
 }
 
 export interface GitProcessRequest {
@@ -91,6 +94,18 @@ implements GitProcessRunner {
         let outputBytes = 0;
         let settled = false;
 
+        let timer:
+          ReturnType<
+            typeof setTimeout
+          > | null = null;
+
+        const clearTimer = () => {
+          if (timer !== null) {
+            clearTimeout(timer);
+            timer = null;
+          }
+        };
+
         const finishError = (
           error: Error,
         ) => {
@@ -100,7 +115,7 @@ implements GitProcessRunner {
 
           settled = true;
 
-          clearTimeout(timer);
+          clearTimer();
 
           child.kill();
 
@@ -159,7 +174,7 @@ implements GitProcessRunner {
             finishError(error),
         );
 
-        const timer =
+        timer =
           setTimeout(
             () => {
               finishError(
@@ -180,16 +195,19 @@ implements GitProcessRunner {
 
             settled = true;
 
-            clearTimeout(timer);
+            clearTimer();
+
+            const stdoutBuffer =
+              Buffer.concat(
+                stdout,
+              );
 
             resolve({
               exitCode:
                 code ?? -1,
 
               stdout:
-                Buffer.concat(
-                  stdout,
-                ).toString(
+                stdoutBuffer.toString(
                   'utf8',
                 ),
 
@@ -199,6 +217,9 @@ implements GitProcessRunner {
                 ).toString(
                   'utf8',
                 ),
+
+              stdoutBytes:
+                stdoutBuffer,
             });
           },
         );
