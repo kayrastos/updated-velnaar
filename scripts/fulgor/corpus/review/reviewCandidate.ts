@@ -165,7 +165,6 @@ function digestCandidate(
     licenseSpdxId: string;
     licensePath: string;
     licenseContentSha256: string;
-    createdAtUtc: string;
   },
 ): string {
   const canonical =
@@ -214,9 +213,6 @@ function digestCandidate(
 
       licenseContentSha256:
         input.licenseContentSha256,
-
-      createdAtUtc:
-        input.createdAtUtc,
     });
 
   return createHash('sha256')

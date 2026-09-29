@@ -281,6 +281,51 @@ describe(
     );
 
     it(
+      'keeps candidate content identity stable across creation timestamps',
+      () => {
+        const firstInput =
+          baseInput();
+
+        const secondInput =
+          baseInput();
+
+        secondInput.createdAtUtc =
+          '2026-09-29T10:00:00Z';
+
+        const first =
+          buildCorpusReviewCandidate(
+            firstInput,
+          );
+
+        const second =
+          buildCorpusReviewCandidate(
+            secondInput,
+          );
+
+        expect(first.accepted)
+          .toBe(true);
+
+        expect(second.accepted)
+          .toBe(true);
+
+        expect(
+          first.candidate
+            ?.createdAtUtc,
+        ).not.toBe(
+          second.candidate
+            ?.createdAtUtc,
+        );
+
+        expect(
+          first.candidate
+            ?.candidateSha256,
+        ).toBe(
+          second.candidate
+            ?.candidateSha256,
+        );
+      },
+    );
+    it(
       'rejects withdrawn advisories',
       () => {
         const input =
