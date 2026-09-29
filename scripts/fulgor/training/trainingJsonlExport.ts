@@ -956,7 +956,11 @@ export function verifyTrainingJsonlExport(
     value
       .sourceFinalHoldoutCommitmentSha256 !==
       manifest
-        .sourceFinalHoldoutCommitmentSha256
+        .sourceFinalHoldoutCommitmentSha256 ||
+    value
+      .finalHoldoutRecordCount !==
+      manifest
+        .finalHoldoutRecordCount
   ) {
     failures.push(
       'INVALID_SOURCE_MANIFEST',
@@ -1040,15 +1044,50 @@ export function verifyTrainingJsonlExport(
       'DEV',
     );
 
+  const expectedTrainIds =
+    manifest
+      .trainRequests
+      .map(
+        (request) =>
+          request.recordId,
+      )
+      .slice()
+      .sort();
+
+  const expectedDevIds =
+    manifest
+      .devRequests
+      .map(
+        (request) =>
+          request.recordId,
+      )
+      .slice()
+      .sort();
+
+  const expectedTrainIdsSha256 =
+    sha256Object(
+      expectedTrainIds,
+    );
+
+  const expectedDevIdsSha256 =
+    sha256Object(
+      expectedDevIds,
+    );
+
   if (
     trainIds === null ||
     trainIds.length !==
       value.train.exampleCount ||
+    value.train.exampleCount !==
+      expectedTrainIds.length ||
     sha256Object(
       trainIds ?? [],
     ) !==
       value.train
-        .recordIdsSha256
+        .recordIdsSha256 ||
+    value.train
+      .recordIdsSha256 !==
+      expectedTrainIdsSha256
   ) {
     failures.push(
       'TRAIN_JSONL_RECORD_SET_MISMATCH',
@@ -1059,11 +1098,16 @@ export function verifyTrainingJsonlExport(
     devIds === null ||
     devIds.length !==
       value.dev.exampleCount ||
+    value.dev.exampleCount !==
+      expectedDevIds.length ||
     sha256Object(
       devIds ?? [],
     ) !==
       value.dev
-        .recordIdsSha256
+        .recordIdsSha256 ||
+    value.dev
+      .recordIdsSha256 !==
+      expectedDevIdsSha256
   ) {
     failures.push(
       'DEV_JSONL_RECORD_SET_MISMATCH',

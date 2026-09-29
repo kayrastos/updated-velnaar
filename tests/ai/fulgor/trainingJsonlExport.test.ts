@@ -695,6 +695,119 @@ describe(
     );
 
     it(
+      'rejects a self-consistent JSONL record set not derived from the manifest',
+      () => {
+        const {
+          sourceManifest,
+          trainArtifacts,
+          devArtifacts,
+        } = fixture();
+
+        const output =
+          createTrainingJsonlExport(
+            sourceManifest,
+            trainArtifacts,
+            devArtifacts,
+          );
+
+        const tampered =
+          structuredClone(
+            output,
+          );
+
+        const lines =
+          tampered.trainJsonl
+            .trimEnd()
+            .split('\n');
+
+        const first =
+          JSON.parse(
+            lines[0],
+          ) as {
+            recordId:
+              string;
+          };
+
+        first.recordId =
+          'FCV1-VULNERABLE-FFFFFFFFFFFFFFFFFFFFFFFF';
+
+        lines[0] =
+          JSON.stringify(
+            first,
+          );
+
+        tampered.trainJsonl =
+          `${lines.join('\n')}\n`;
+
+        const fabricatedIds =
+          lines.map(
+            (line) =>
+              (
+                JSON.parse(
+                  line,
+                ) as {
+                  recordId:
+                    string;
+                }
+              ).recordId,
+          );
+
+        tampered.train.exampleCount =
+          fabricatedIds.length;
+
+        tampered.train.jsonlByteLength =
+          new TextEncoder()
+            .encode(
+              tampered.trainJsonl,
+            )
+            .byteLength;
+
+        tampered.train.jsonlSha256 =
+          textHash(
+            tampered.trainJsonl,
+          );
+
+        tampered.train.recordIdsSha256 =
+          objectHash(
+            fabricatedIds,
+          );
+
+        const {
+          trainJsonl:
+            _trainJsonl,
+
+          devJsonl:
+            _devJsonl,
+
+          exportSha256:
+            _exportSha256,
+
+          ...core
+        } = tampered;
+
+        tampered.exportSha256 =
+          objectHash(
+            core,
+          );
+
+        const verification =
+          verifyTrainingJsonlExport(
+            tampered,
+            sourceManifest,
+          );
+
+        expect(
+          verification.accepted,
+        ).toBe(false);
+
+        expect(
+          verification.failureCodes,
+        ).toContain(
+          'TRAIN_JSONL_RECORD_SET_MISMATCH',
+        );
+      },
+    );
+    it(
       'verifies an untouched deterministic export',
       () => {
         const {

@@ -20,6 +20,7 @@ import type {
 
 import type {
   FulgorTrainingMaterializationManifest,
+  FulgorTrainingMaterializationRequest,
 } from '../../../scripts/fulgor/training/trainingMaterializationManifest';
 
 import {
@@ -104,6 +105,95 @@ const TRAIN_ID =
 const DEV_ID =
   'FCV1-FIXED-000000000000000000000002';
 
+function materializationRequest(
+  split:
+    'TRAIN' | 'DEV',
+
+  recordId:
+    string,
+
+  seed:
+    number,
+): FulgorTrainingMaterializationRequest {
+  const vulnerableCommitSha =
+    seed
+      .toString(16)
+      .padStart(
+        40,
+        '1',
+      )
+      .slice(-40);
+
+  const fixedCommitSha =
+    (seed + 1)
+      .toString(16)
+      .padStart(
+        40,
+        '2',
+      )
+      .slice(-40);
+
+  return {
+    schemaVersion:
+      'FULGOR_TRAINING_MATERIALIZATION_REQUEST_V1',
+
+    split,
+
+    recordId,
+
+    recordSha256:
+      objectHash({
+        recordId,
+      }),
+
+    pairGroupKey:
+      objectHash({
+        seed,
+      }),
+
+    family:
+      'PATH_TRAVERSAL',
+
+    role:
+      'VULNERABLE',
+
+    verdict:
+      'CONFIRMED_RISK',
+
+    repository:
+      `example/qwen-${seed}`,
+
+    advisoryId:
+      null,
+
+    sourceImmutableRevision:
+      vulnerableCommitSha,
+
+    sourceCommitSha:
+      vulnerableCommitSha,
+
+    vulnerableCommitSha,
+
+    fixedCommitSha,
+
+    sourceContentSha256:
+      textHash(
+        `source-${seed}\n`,
+      ),
+
+    prompt:
+      `Assess source ${seed}.`,
+
+    expectedEvidence: [
+      `Evidence ${seed}.`,
+    ],
+
+    expectedRemediation: [
+      `Remediation ${seed}.`,
+    ],
+  };
+}
+
 function manifest():
   FulgorTrainingMaterializationManifest {
   const core = {
@@ -122,9 +212,21 @@ function manifest():
     sourceFinalHoldoutCommitmentSha256:
       'c'.repeat(64),
 
-    trainRequests: [],
+    trainRequests: [
+      materializationRequest(
+        'TRAIN',
+        TRAIN_ID,
+        1,
+      ),
+    ],
 
-    devRequests: [],
+    devRequests: [
+      materializationRequest(
+        'DEV',
+        DEV_ID,
+        2,
+      ),
+    ],
 
     finalHoldoutRecordCount:
       2,
