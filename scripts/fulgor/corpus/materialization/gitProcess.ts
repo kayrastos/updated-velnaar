@@ -2,6 +2,140 @@ import {
   spawn,
 } from 'node:child_process';
 
+const GIT_ENVIRONMENT_KEYS_TO_REMOVE =
+  new Set([
+    'GIT_CONFIG',
+    'GIT_CONFIG_PARAMETERS',
+    'GIT_CONFIG_COUNT',
+    'GIT_CONFIG_GLOBAL',
+    'GIT_CONFIG_SYSTEM',
+    'GIT_CONFIG_NOSYSTEM',
+
+    /*
+     * Repository/object identity must come from explicit command
+     * arguments and the materializer-created bare repository only.
+     */
+    'GIT_DIR',
+    'GIT_WORK_TREE',
+    'GIT_COMMON_DIR',
+    'GIT_OBJECT_DIRECTORY',
+    'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_INDEX_FILE',
+    'GIT_NAMESPACE',
+
+    /*
+     * Do not allow host-controlled templates or Git subprogram paths
+     * to alter `git init` / command execution semantics.
+     */
+    'GIT_TEMPLATE_DIR',
+    'GIT_EXEC_PATH',
+
+    /*
+     * HOME/XDG are replaced below with the null config root.
+     */
+    'HOME',
+    'XDG_CONFIG_HOME',
+  ]);
+
+const GIT_CONFIG_VECTOR =
+  /^GIT_CONFIG_(?:KEY|VALUE)_\d+$/;
+
+function gitNullDevice(): string {
+  return process.platform ===
+    'win32'
+    ? 'NUL'
+    : '/dev/null';
+}
+
+/*
+ * Build an isolated Git process environment.
+ *
+ * The ordinary host environment is retained for OS-level necessities
+ * such as PATH/SystemRoot, but Git trust/config authority is stripped
+ * and replaced with explicit fail-closed values.
+ */
+export function buildIsolatedGitEnvironment(
+  parentEnvironment:
+    NodeJS.ProcessEnv =
+      process.env,
+): NodeJS.ProcessEnv {
+  const environment:
+    NodeJS.ProcessEnv = {
+      ...parentEnvironment,
+    };
+
+  /*
+   * Windows environment-variable names are case-insensitive.
+   * Delete hostile vectors case-insensitively before inserting our
+   * canonical uppercase values.
+   */
+  for (
+    const key of
+    Object.keys(
+      environment,
+    )
+  ) {
+    const normalized =
+      key.toUpperCase();
+
+    if (
+      GIT_ENVIRONMENT_KEYS_TO_REMOVE.has(
+        normalized,
+      ) ||
+      GIT_CONFIG_VECTOR.test(
+        normalized,
+      )
+    ) {
+      delete environment[key];
+    }
+  }
+
+  const nullDevice =
+    gitNullDevice();
+
+  /*
+   * No system Git configuration.
+   */
+  environment.GIT_CONFIG_NOSYSTEM =
+    '1';
+
+  /*
+   * Explicit global/system config paths prevent $HOME/.gitconfig,
+   * $XDG_CONFIG_HOME/git/config and host-config inheritance.
+   */
+  environment.GIT_CONFIG_GLOBAL =
+    nullDevice;
+
+  environment.GIT_CONFIG_SYSTEM =
+    nullDevice;
+
+  /*
+   * Disable environment-based key/value config injection.
+   */
+  environment.GIT_CONFIG_COUNT =
+    '0';
+
+  /*
+   * HOME/XDG are controlled even though GIT_CONFIG_GLOBAL is already
+   * pinned. This gives defense in depth against implicit config lookup.
+   */
+  environment.HOME =
+    nullDevice;
+
+  environment.XDG_CONFIG_HOME =
+    nullDevice;
+
+  environment.GIT_TERMINAL_PROMPT =
+    '0';
+
+  environment.GCM_INTERACTIVE =
+    'Never';
+
+  environment.GIT_OPTIONAL_LOCKS =
+    '0';
+
+  return environment;
+}
 export interface GitProcessResult {
   exitCode: number;
 
@@ -64,18 +198,8 @@ implements GitProcessRunner {
 
               windowsHide: true,
 
-              env: {
-                ...process.env,
-
-                GIT_TERMINAL_PROMPT:
-                  '0',
-
-                GCM_INTERACTIVE:
-                  'Never',
-
-                GIT_OPTIONAL_LOCKS:
-                  '0',
-              },
+              env:
+                buildIsolatedGitEnvironment(),
 
               stdio: [
                 'ignore',
