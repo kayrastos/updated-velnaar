@@ -23,6 +23,11 @@ import {
 } from './productionTrainingAuthorizationTrust';
 
 import {
+  PRODUCTION_FULGOR_CORPUS_REGISTRY_TRUST_ANCHOR_PROVISIONED,
+  resolveProductionFulgorCorpusRegistryPublicKey,
+} from './productionCorpusRegistryTrust';
+
+import {
   verifySignedCorpusRegistry,
 } from '../registry/signedCorpusRegistry';
 
@@ -166,6 +171,7 @@ export type TrainingAuthorizationFailureCode =
   | 'MANIFEST_BINDING_MISMATCH'
   | 'HOLDOUT_BINDING_MISMATCH'
   | 'SIGNER_TRUST_ANCHOR_NOT_PROVISIONED'
+  | 'CORPUS_REGISTRY_TRUST_ANCHOR_NOT_PROVISIONED'
   | 'SIGNER_TRUST_POLICY_INVALID'
   | 'UNKNOWN_SIGNER'
   | 'SIGNER_REVOKED'
@@ -991,9 +997,6 @@ export async function consumeTrainingExecutionAuthorization(
   splitBundle:
     CorpusSplitBundle,
 
-  registryPublicKey:
-    KeyObject,
-
   replayStore:
     TrainingAuthorizationReplayStore,
 ): Promise<TrainingAuthorizationConsumeResult> {
@@ -1009,6 +1012,27 @@ export async function consumeTrainingExecutionAuthorization(
 
       failureCodes: [
         'SIGNER_TRUST_ANCHOR_NOT_PROVISIONED',
+      ],
+    };
+  }
+
+  const registryPublicKey =
+    resolveProductionFulgorCorpusRegistryPublicKey();
+
+  if (
+    !PRODUCTION_FULGOR_CORPUS_REGISTRY_TRUST_ANCHOR_PROVISIONED ||
+    registryPublicKey ===
+      null
+  ) {
+    return {
+      authorized:
+        false,
+
+      nonceConsumed:
+        false,
+
+      failureCodes: [
+        'CORPUS_REGISTRY_TRUST_ANCHOR_NOT_PROVISIONED',
       ],
     };
   }

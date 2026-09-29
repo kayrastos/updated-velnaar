@@ -768,7 +768,6 @@ describe(
             data.authorization,
             data.registry,
             data.splitBundle,
-            data.registryKeys.publicKey,
             replayStore,
           );
 
