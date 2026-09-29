@@ -1,0 +1,70 @@
+FULGOR CORPUS FACTORY V1 CHECKPOINT
+Generated: 2026-09-27 17:26:01 +03:00
+
+Branch: feature/fulgor-corpus-factory-v1
+Certified code HEAD: e942b8ee7a950c88f4810f97d4091c1043c908bc
+
+CERTIFICATION
+Test files: 13 passed
+Tests: 73 passed
+TypeScript: PASS
+Live public dry-run: PASS
+
+REAL WORLD FIXTURE
+Advisory: GHSA-hqjg-pww4-pcgq
+Repository: google/clasp
+Family: PATH_TRAVERSAL
+CWE: CWE-22
+Vulnerable SHA: 56f0e6274c2daa2c0928d44fe50c517b188c11f5
+Fixed SHA: ba6bd666fe74de54950122b5d92ecf1dcc02a9d3
+Relationship: DIRECT_SINGLE_PARENT
+Changed file: src/core/files.ts
+Diff SHA256: 032737ee5eec6cad0e8882ea48ebf5d97177b0a8a234e6c6057b973bcaa8cf13
+
+IMPLEMENTED
+GHSA and OSV untrusted ingestion
+Exact commit hypotheses
+Bounded bare Git materialization
+Post-materialization exact identity
+License gate
+Repository pair evidence
+Review candidate gate
+First public live dry-run
+Corpus vulnerable/fixed draft factory
+Hard-negative request-only boundary
+Independent verification receipt
+Verified canonical corpus admission
+Ed25519 signed immutable corpus registry
+Pair-level deterministic TRAIN DEV FINAL_HOLDOUT split
+Final holdout commitment
+
+SECURITY STATE
+Training started: FALSE
+Training execution authorized: FALSE
+Promotion authorized: FALSE
+Deployment authorized: FALSE
+Auto dataset write: FALSE
+Private signing key in repository: FALSE
+Final holdout visible to training: FALSE
+Remote push during Corpus Factory session: FALSE
+
+NEXT
+Training execution authorization gate
+Require explicit human authorization
+Bind authorization to exact registry and manifest identity
+Add nonce expiry and replay protection
+Do not start training yet
+
+RECENT COMMITS
+e942b8e feat(fulgor): add sealed deterministic corpus split manifest
+29ea12b feat(fulgor): add signed immutable corpus registry
+8eb108f feat(fulgor): add verified corpus record admission
+005c7c6 feat(fulgor): add verification-gated corpus draft factory
+8703aec feat(fulgor): seal first public corpus dry run
+a8129c6 feat(fulgor): add corpus review candidate gate
+084bf97 feat(fulgor): add exact repository pair evidence
+d9f4e28 feat(fulgor): add bounded bare corpus materializer
+e85eb63 feat(fulgor): enforce corpus exact identity and license gates
+7152f15 feat(fulgor): add untrusted GHSA and OSV ingestion
+06f44a3 feat(fulgor): add corpus provenance and isolation core
+90c41ca feat(fulgor): seal signed evidence and continuous controller chain
