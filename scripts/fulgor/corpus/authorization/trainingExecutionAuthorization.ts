@@ -10,6 +10,19 @@ import type {
 } from 'node:crypto';
 
 import {
+  resolveTrainingAuthorizationTrustedSigner,
+} from './trainingAuthorizationTrustPolicy';
+
+import type {
+  TrainingAuthorizationTrustPolicy,
+} from './trainingAuthorizationTrustPolicy';
+
+import {
+  PRODUCTION_FULGOR_TRAINING_AUTHORIZATION_TRUST_ANCHOR_PROVISIONED,
+  PRODUCTION_FULGOR_TRAINING_AUTHORIZATION_TRUST_POLICY,
+} from './productionTrainingAuthorizationTrust';
+
+import {
   verifySignedCorpusRegistry,
 } from '../registry/signedCorpusRegistry';
 
@@ -152,6 +165,12 @@ export type TrainingAuthorizationFailureCode =
   | 'REGISTRY_BINDING_MISMATCH'
   | 'MANIFEST_BINDING_MISMATCH'
   | 'HOLDOUT_BINDING_MISMATCH'
+  | 'SIGNER_TRUST_ANCHOR_NOT_PROVISIONED'
+  | 'SIGNER_TRUST_POLICY_INVALID'
+  | 'UNKNOWN_SIGNER'
+  | 'SIGNER_REVOKED'
+  | 'SIGNER_ALGORITHM_MISMATCH'
+  | 'SIGNER_FINGERPRINT_MISMATCH'
   | 'PUBLIC_KEY_MISMATCH'
   | 'PAYLOAD_DIGEST_MISMATCH'
   | 'INVALID_SIGNATURE'
@@ -564,7 +583,7 @@ export function createTrainingExecutionAuthorization(
   };
 }
 
-export async function consumeTrainingExecutionAuthorization(
+export async function consumeTrainingExecutionAuthorizationWithPolicyForTesting(
   authorization:
     TrainingExecutionAuthorization,
 
@@ -577,8 +596,8 @@ export async function consumeTrainingExecutionAuthorization(
   registryPublicKey:
     KeyObject,
 
-  authorizationPublicKey:
-    KeyObject,
+  authorizationTrustPolicy:
+    TrainingAuthorizationTrustPolicy,
 
   replayStore:
     TrainingAuthorizationReplayStore,
@@ -716,16 +735,36 @@ export async function consumeTrainingExecutionAuthorization(
     );
   }
 
+  const signerResolution =
+    resolveTrainingAuthorizationTrustedSigner(
+      authorizationTrustPolicy,
+      {
+        signerKeyId:
+          authorization.signerKeyId,
+
+        signerPublicKeySha256:
+          authorization.signerPublicKeySha256,
+
+        algorithm:
+          authorization.signatureAlgorithm,
+      },
+    );
+
+  let trustedAuthorizationPublicKey:
+    KeyObject | null =
+      null;
+
   if (
-    authorization
-      .signerPublicKeySha256 !==
-      publicKeySha256(
-        authorizationPublicKey,
-      )
+    signerResolution.resolved ===
+      false
   ) {
     failures.push(
-      'PUBLIC_KEY_MISMATCH',
+      signerResolution.failureCode,
     );
+  }
+  else {
+    trustedAuthorizationPublicKey =
+      signerResolution.publicKey;
   }
 
   const {
@@ -761,31 +800,36 @@ export async function consumeTrainingExecutionAuthorization(
     );
   }
 
-  let signatureValid =
-    false;
-
-  try {
-    signatureValid =
-      cryptoVerify(
-        null,
-        payloadBytes,
-        authorizationPublicKey,
-        Buffer.from(
-          authorization
-            .signatureBase64,
-          'base64',
-        ),
-      );
-  }
-  catch {
-    signatureValid =
+  if (
+    trustedAuthorizationPublicKey !==
+      null
+  ) {
+    let signatureValid =
       false;
-  }
 
-  if (!signatureValid) {
-    failures.push(
-      'INVALID_SIGNATURE',
-    );
+    try {
+      signatureValid =
+        cryptoVerify(
+          null,
+          payloadBytes,
+          trustedAuthorizationPublicKey,
+          Buffer.from(
+            authorization
+              .signatureBase64,
+            'base64',
+          ),
+        );
+    }
+    catch {
+      signatureValid =
+        false;
+    }
+
+    if (!signatureValid) {
+      failures.push(
+        'INVALID_SIGNATURE',
+      );
+    }
   }
 
   const issued =
@@ -927,4 +971,55 @@ export async function consumeTrainingExecutionAuthorization(
 
     failureCodes: [],
   };
+}
+/**
+ * Canonical production entrypoint.
+ *
+ * Security boundary:
+ * - caller cannot provide signer public key
+ * - caller cannot provide trust policy
+ * - caller cannot override verification time
+ * - production trust anchor must be provisioned server-side
+ */
+export async function consumeTrainingExecutionAuthorization(
+  authorization:
+    TrainingExecutionAuthorization,
+
+  registry:
+    SignedCorpusRegistry,
+
+  splitBundle:
+    CorpusSplitBundle,
+
+  registryPublicKey:
+    KeyObject,
+
+  replayStore:
+    TrainingAuthorizationReplayStore,
+): Promise<TrainingAuthorizationConsumeResult> {
+  if (
+    !PRODUCTION_FULGOR_TRAINING_AUTHORIZATION_TRUST_ANCHOR_PROVISIONED
+  ) {
+    return {
+      authorized:
+        false,
+
+      nonceConsumed:
+        false,
+
+      failureCodes: [
+        'SIGNER_TRUST_ANCHOR_NOT_PROVISIONED',
+      ],
+    };
+  }
+
+  return consumeTrainingExecutionAuthorizationWithPolicyForTesting(
+    authorization,
+    registry,
+    splitBundle,
+    registryPublicKey,
+    PRODUCTION_FULGOR_TRAINING_AUTHORIZATION_TRUST_POLICY,
+    replayStore,
+    new Date().toISOString(),
+  );
 }

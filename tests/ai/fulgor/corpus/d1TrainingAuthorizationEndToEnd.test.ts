@@ -25,7 +25,7 @@ import {
 } from '../../../../scripts/fulgor/corpus/registry/sealedSplitManifest';
 
 import {
-  consumeTrainingExecutionAuthorization,
+  consumeTrainingExecutionAuthorizationWithPolicyForTesting,
   createTrainingExecutionAuthorization,
 } from '../../../../scripts/fulgor/corpus/authorization/trainingExecutionAuthorization';
 
@@ -36,6 +36,10 @@ import type {
 import {
   D1TrainingAuthorizationReplayStore,
 } from '../../../../scripts/fulgor/corpus/authorization/d1TrainingAuthorizationReplayStore';
+
+import {
+  createTrainingAuthorizationTrustPolicy,
+} from '../../../../scripts/fulgor/corpus/authorization/trainingAuthorizationTrustPolicy';
 
 function record(
   role:
@@ -249,12 +253,45 @@ function createAuthorizationFixture() {
         ).toISOString(),
     });
 
+  const authorizationPublicKeyPem =
+    authorizationKeys.publicKey
+      .export({
+        type:
+          'spki',
+
+        format:
+          'pem',
+      })
+      .toString();
+
+  const authorizationTrustPolicy =
+    createTrainingAuthorizationTrustPolicy([
+      {
+        signerKeyId:
+          authorization.signerKeyId,
+
+        status:
+          'ACTIVE',
+
+        algorithm:
+          'Ed25519',
+
+        signerPublicKeySha256:
+          authorization
+            .signerPublicKeySha256,
+
+        publicKeyPem:
+          authorizationPublicKeyPem,
+      },
+    ]);
+
   return {
     registryKeys,
     authorizationKeys,
     registry,
     splitBundle,
     authorization,
+    authorizationTrustPolicy,
     nowUtc,
   };
 }
@@ -379,12 +416,12 @@ describe(
           );
 
         const first =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             data.authorization,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             store,
             data.nowUtc,
           );
@@ -405,12 +442,12 @@ describe(
         ).toBe(1);
 
         const second =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             data.authorization,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             store,
             data.nowUtc,
           );
@@ -451,12 +488,12 @@ describe(
           );
 
         const result =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             data.authorization,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             store,
             data.nowUtc,
           );
@@ -476,6 +513,59 @@ describe(
       },
     );
 
+    it(
+      'never reaches D1 when the signer is not trusted',
+      async () => {
+        const data =
+          createAuthorizationFixture();
+
+        const storage =
+          createAtomicMockD1();
+
+        const store =
+          new D1TrainingAuthorizationReplayStore(
+            storage.db,
+          );
+
+        const emptyTrustPolicy =
+          createTrainingAuthorizationTrustPolicy(
+            [],
+          );
+
+        const result =
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
+            data.authorization,
+            data.registry,
+            data.splitBundle,
+            data.registryKeys.publicKey,
+            emptyTrustPolicy,
+            store,
+            data.nowUtc,
+          );
+
+        expect(
+          result.authorized,
+        ).toBe(false);
+
+        expect(
+          result.nonceConsumed,
+        ).toBe(false);
+
+        expect(
+          result.failureCodes,
+        ).toContain(
+          'UNKNOWN_SIGNER',
+        );
+
+        expect(
+          storage.getPrepareCalls(),
+        ).toBe(0);
+
+        expect(
+          storage.ledger.size,
+        ).toBe(0);
+      },
+    );
     it(
       'never reaches D1 when the signed authorization is invalid',
       async () => {
@@ -498,12 +588,12 @@ describe(
         } as TrainingExecutionAuthorization;
 
         const result =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             tampered,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             store,
             data.nowUtc,
           );

@@ -18,9 +18,15 @@ import {
 
 import {
   consumeTrainingExecutionAuthorization,
+  consumeTrainingExecutionAuthorizationWithPolicyForTesting,
   createInMemoryTrainingAuthorizationReplayStore,
   createTrainingExecutionAuthorization,
 } from '../../../../scripts/fulgor/corpus/authorization/trainingExecutionAuthorization';
+
+import {
+  computeTrainingAuthorizationPublicKeySha256FromPem,
+  createTrainingAuthorizationTrustPolicy,
+} from '../../../../scripts/fulgor/corpus/authorization/trainingAuthorizationTrustPolicy';
 
 import type {
   FulgorCorpusRecord,
@@ -230,12 +236,46 @@ function fixture(
         '2026-09-29T07:15:00Z',
     });
 
+  const authorizationPublicKeyPem =
+    authorizationKeys
+      .publicKey
+      .export({
+        type:
+          'spki',
+
+        format:
+          'pem',
+      })
+      .toString();
+
+  const authorizationTrustPolicy =
+    createTrainingAuthorizationTrustPolicy([
+      {
+        signerKeyId:
+          authorization.signerKeyId,
+
+        status:
+          'ACTIVE',
+
+        algorithm:
+          'Ed25519',
+
+        signerPublicKeySha256:
+          authorization
+            .signerPublicKeySha256,
+
+        publicKeyPem:
+          authorizationPublicKeyPem,
+      },
+    ]);
+
   return {
     registryKeys,
     authorizationKeys,
     registry,
     splitBundle,
     authorization,
+    authorizationTrustPolicy,
   };
 }
 
@@ -252,12 +292,12 @@ describe(
           createInMemoryTrainingAuthorizationReplayStore();
 
         const result =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             data.authorization,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             replay,
             '2026-09-29T07:05:00Z',
           );
@@ -371,12 +411,12 @@ describe(
           'f'.repeat(64);
 
         const rejected =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             tampered,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             replay,
             '2026-09-29T07:05:00Z',
           );
@@ -390,12 +430,12 @@ describe(
         ).toBe(false);
 
         const valid =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             data.authorization,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             replay,
             '2026-09-29T07:06:00Z',
           );
@@ -425,12 +465,12 @@ describe(
         };
 
         const result =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             data.authorization,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             unavailableStore,
             '2026-09-29T07:05:00Z',
           );
@@ -460,23 +500,23 @@ describe(
           createInMemoryTrainingAuthorizationReplayStore();
 
         const first =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             data.authorization,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             replay,
             '2026-09-29T07:05:00Z',
           );
 
         const second =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             data.authorization,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             replay,
             '2026-09-29T07:06:00Z',
           );
@@ -504,12 +544,12 @@ describe(
           fixture();
 
         const result =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             data.authorization,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             createInMemoryTrainingAuthorizationReplayStore(),
             '2026-09-29T07:30:00Z',
           );
@@ -546,12 +586,12 @@ describe(
           'f'.repeat(64);
 
         const result =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             tampered,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            data.authorizationKeys.publicKey,
+            data.authorizationTrustPolicy,
             createInMemoryTrainingAuthorizationReplayStore(),
             '2026-09-29T07:05:00Z',
           );
@@ -609,7 +649,7 @@ describe(
           );
 
         const result =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             first.authorization,
             otherRegistry,
             otherSplit,
@@ -617,8 +657,7 @@ describe(
               .registryKeys
               .publicKey,
             first
-              .authorizationKeys
-              .publicKey,
+              .authorizationTrustPolicy,
             createInMemoryTrainingAuthorizationReplayStore(),
             '2026-09-29T07:05:00Z',
           );
@@ -636,7 +675,7 @@ describe(
     );
 
     it(
-      'rejects authorization signed by another key',
+      'rejects a trust policy pinned to another signer key',
       async () => {
         const data =
           fixture();
@@ -646,13 +685,47 @@ describe(
             'ed25519',
           );
 
+        const otherPublicKeyPem =
+          otherKey.publicKey
+            .export({
+              type:
+                'spki',
+
+              format:
+                'pem',
+            })
+            .toString();
+
+        const wrongTrustPolicy =
+          createTrainingAuthorizationTrustPolicy([
+            {
+              signerKeyId:
+                data.authorization
+                  .signerKeyId,
+
+              status:
+                'ACTIVE',
+
+              algorithm:
+                'Ed25519',
+
+              signerPublicKeySha256:
+                computeTrainingAuthorizationPublicKeySha256FromPem(
+                  otherPublicKeyPem,
+                ),
+
+              publicKeyPem:
+                otherPublicKeyPem,
+            },
+          ]);
+
         const result =
-          await consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorizationWithPolicyForTesting(
             data.authorization,
             data.registry,
             data.splitBundle,
             data.registryKeys.publicKey,
-            otherKey.publicKey,
+            wrongTrustPolicy,
             createInMemoryTrainingAuthorizationReplayStore(),
             '2026-09-29T07:05:00Z',
           );
@@ -662,19 +735,61 @@ describe(
         ).toBe(false);
 
         expect(
-          result.failureCodes,
-        ).toContain(
-          'PUBLIC_KEY_MISMATCH',
-        );
+          result.nonceConsumed,
+        ).toBe(false);
 
         expect(
           result.failureCodes,
         ).toContain(
-          'INVALID_SIGNATURE',
+          'SIGNER_FINGERPRINT_MISMATCH',
         );
       },
     );
+    it(
+      'fails closed at the production entrypoint while the trust anchor is unprovisioned',
+      async () => {
+        const data =
+          fixture();
 
+        let replayCalls =
+          0;
+
+        const replayStore = {
+          async consumeOnce() {
+            replayCalls +=
+              1;
+
+            return 'CONSUMED' as const;
+          },
+        };
+
+        const result =
+          await consumeTrainingExecutionAuthorization(
+            data.authorization,
+            data.registry,
+            data.splitBundle,
+            data.registryKeys.publicKey,
+            replayStore,
+          );
+
+        expect(result)
+          .toEqual({
+            authorized:
+              false,
+
+            nonceConsumed:
+              false,
+
+            failureCodes: [
+              'SIGNER_TRUST_ANCHOR_NOT_PROVISIONED',
+            ],
+          });
+
+        expect(
+          replayCalls,
+        ).toBe(0);
+      },
+    );
     it(
       'authorizes training only and never promotion or deployment',
       async () => {
