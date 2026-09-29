@@ -244,7 +244,7 @@ describe(
   () => {
     it(
       'authorizes one exact signed training execution',
-      () => {
+      async () => {
         const data =
           fixture();
 
@@ -252,7 +252,7 @@ describe(
           createInMemoryTrainingAuthorizationReplayStore();
 
         const result =
-          consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorization(
             data.authorization,
             data.registry,
             data.splitBundle,
@@ -277,7 +277,7 @@ describe(
 
     it(
       'requires explicit human approval at issuance',
-      () => {
+      async () => {
         const registryKeys =
           generateKeyPairSync(
             'ed25519',
@@ -350,7 +350,7 @@ describe(
 
     it(
       'does not consume a nonce when authorization validation fails',
-      () => {
+      async () => {
         const data =
           fixture();
 
@@ -371,7 +371,7 @@ describe(
           'f'.repeat(64);
 
         const rejected =
-          consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorization(
             tampered,
             data.registry,
             data.splitBundle,
@@ -390,7 +390,7 @@ describe(
         ).toBe(false);
 
         const valid =
-          consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorization(
             data.authorization,
             data.registry,
             data.splitBundle,
@@ -413,8 +413,46 @@ describe(
       },
     );
     it(
+      'fails closed when durable replay backend is unavailable',
+      async () => {
+        const data =
+          fixture();
+
+        const unavailableStore = {
+          async consumeOnce() {
+            return 'BACKEND_UNAVAILABLE' as const;
+          },
+        };
+
+        const result =
+          await consumeTrainingExecutionAuthorization(
+            data.authorization,
+            data.registry,
+            data.splitBundle,
+            data.registryKeys.publicKey,
+            data.authorizationKeys.publicKey,
+            unavailableStore,
+            '2026-09-29T07:05:00Z',
+          );
+
+        expect(
+          result.authorized,
+        ).toBe(false);
+
+        expect(
+          result.nonceConsumed,
+        ).toBe(false);
+
+        expect(
+          result.failureCodes,
+        ).toContain(
+          'REPLAY_BACKEND_UNAVAILABLE',
+        );
+      },
+    );
+    it(
       'rejects replay of a consumed authorization',
-      () => {
+      async () => {
         const data =
           fixture();
 
@@ -422,7 +460,7 @@ describe(
           createInMemoryTrainingAuthorizationReplayStore();
 
         const first =
-          consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorization(
             data.authorization,
             data.registry,
             data.splitBundle,
@@ -433,7 +471,7 @@ describe(
           );
 
         const second =
-          consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorization(
             data.authorization,
             data.registry,
             data.splitBundle,
@@ -461,12 +499,12 @@ describe(
 
     it(
       'rejects expired authorization',
-      () => {
+      async () => {
         const data =
           fixture();
 
         const result =
-          consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorization(
             data.authorization,
             data.registry,
             data.splitBundle,
@@ -490,7 +528,7 @@ describe(
 
     it(
       'rejects training manifest tampering',
-      () => {
+      async () => {
         const data =
           fixture();
 
@@ -508,7 +546,7 @@ describe(
           'f'.repeat(64);
 
         const result =
-          consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorization(
             tampered,
             data.registry,
             data.splitBundle,
@@ -538,7 +576,7 @@ describe(
 
     it(
       'rejects use against another valid registry',
-      () => {
+      async () => {
         const first =
           fixture(1);
 
@@ -571,7 +609,7 @@ describe(
           );
 
         const result =
-          consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorization(
             first.authorization,
             otherRegistry,
             otherSplit,
@@ -599,7 +637,7 @@ describe(
 
     it(
       'rejects authorization signed by another key',
-      () => {
+      async () => {
         const data =
           fixture();
 
@@ -609,7 +647,7 @@ describe(
           );
 
         const result =
-          consumeTrainingExecutionAuthorization(
+          await consumeTrainingExecutionAuthorization(
             data.authorization,
             data.registry,
             data.splitBundle,
@@ -639,7 +677,7 @@ describe(
 
     it(
       'authorizes training only and never promotion or deployment',
-      () => {
+      async () => {
         const data =
           fixture();
 

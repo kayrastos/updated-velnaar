@@ -38,7 +38,7 @@ const TOKEN_VALUE =
   /^[A-Za-z0-9._:-]{8,128}$/;
 
 const NONCE_VALUE =
-  /^[A-Za-z0-9._:-]{16,128}$/;
+  /^[A-Za-z0-9_-]{16,128}$/;
 
 export interface TrainingExecutionAuthorizationRequest {
   registry:
@@ -156,6 +156,7 @@ export type TrainingAuthorizationFailureCode =
   | 'PAYLOAD_DIGEST_MISMATCH'
   | 'INVALID_SIGNATURE'
   | 'REPLAY_DETECTED'
+  | 'REPLAY_BACKEND_UNAVAILABLE'
   | 'AUTHORITY_ESCAPE';
 
 export interface TrainingAuthorizationConsumeResult {
@@ -169,7 +170,8 @@ export interface TrainingAuthorizationConsumeResult {
 
 export type TrainingAuthorizationReplayConsumeResult =
   | 'CONSUMED'
-  | 'ALREADY_CONSUMED';
+  | 'ALREADY_CONSUMED'
+  | 'BACKEND_UNAVAILABLE';
 
 export interface TrainingAuthorizationReplayStore {
   /*
@@ -177,10 +179,16 @@ export interface TrainingAuthorizationReplayStore {
    * operation atomically in one authoritative durable transaction.
    *
    * A separate preflight read is not an authorization primitive.
+   *
+   * Implementations may be synchronous test stores or asynchronous
+   * durable production stores.
    */
   consumeOnce(
-    nonce: string,
-  ): TrainingAuthorizationReplayConsumeResult;
+    authorization:
+      Readonly<TrainingExecutionAuthorization>,
+  ):
+    | TrainingAuthorizationReplayConsumeResult
+    | Promise<TrainingAuthorizationReplayConsumeResult>;
 }
 
 function normalize(
@@ -318,19 +326,23 @@ export function createInMemoryTrainingAuthorizationReplayStore():
 
   return {
     consumeOnce(
-      nonce: string,
+      authorization:
+        Readonly<TrainingExecutionAuthorization>,
     ):
       TrainingAuthorizationReplayConsumeResult {
+      const replayIdentity =
+        authorization.payloadSha256;
+
       if (
         consumed.has(
-          nonce,
+          replayIdentity,
         )
       ) {
         return 'ALREADY_CONSUMED';
       }
 
       consumed.add(
-        nonce,
+        replayIdentity,
       );
 
       return 'CONSUMED';
@@ -552,7 +564,7 @@ export function createTrainingExecutionAuthorization(
   };
 }
 
-export function consumeTrainingExecutionAuthorization(
+export async function consumeTrainingExecutionAuthorization(
   authorization:
     TrainingExecutionAuthorization,
 
@@ -573,7 +585,7 @@ export function consumeTrainingExecutionAuthorization(
 
   nowUtc:
     string,
-): TrainingAuthorizationConsumeResult {
+): Promise<TrainingAuthorizationConsumeResult> {
   const failures:
     TrainingAuthorizationFailureCode[] = [];
 
@@ -849,10 +861,45 @@ export function consumeTrainingExecutionAuthorization(
     };
   }
 
-  const consumeResult =
-    replayStore.consumeOnce(
-      authorization.nonce,
-    );
+  let consumeResult:
+    TrainingAuthorizationReplayConsumeResult;
+
+  try {
+    consumeResult =
+      await replayStore.consumeOnce(
+        authorization,
+      );
+  }
+  catch {
+    return {
+      authorized:
+        false,
+
+      nonceConsumed:
+        false,
+
+      failureCodes: [
+        'REPLAY_BACKEND_UNAVAILABLE',
+      ],
+    };
+  }
+
+  if (
+    consumeResult ===
+      'ALREADY_CONSUMED'
+  ) {
+    return {
+      authorized:
+        false,
+
+      nonceConsumed:
+        false,
+
+      failureCodes: [
+        'REPLAY_DETECTED',
+      ],
+    };
+  }
 
   if (
     consumeResult !==
@@ -866,7 +913,7 @@ export function consumeTrainingExecutionAuthorization(
         false,
 
       failureCodes: [
-        'REPLAY_DETECTED',
+        'REPLAY_BACKEND_UNAVAILABLE',
       ],
     };
   }
