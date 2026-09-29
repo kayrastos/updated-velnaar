@@ -1,5 +1,8 @@
 import {
+  createHash,
   generateKeyPairSync,
+  sign as cryptoSign,
+  type KeyObject,
 } from 'node:crypto';
 
 import {
@@ -133,6 +136,157 @@ function keys() {
     'ed25519',
   );
 }
+function canonicalizeForRegistryTest(
+  value:
+    unknown,
+): unknown {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+
+  if (
+    typeof value ===
+      'number'
+  ) {
+    if (
+      !Number.isFinite(
+        value,
+      )
+    ) {
+      throw new Error(
+        'TEST_NON_CANONICAL_NUMBER',
+      );
+    }
+
+    return value;
+  }
+
+  if (
+    Array.isArray(
+      value,
+    )
+  ) {
+    return value.map(
+      canonicalizeForRegistryTest,
+    );
+  }
+
+  if (
+    typeof value ===
+      'object'
+  ) {
+    const source =
+      value as Record<
+        string,
+        unknown
+      >;
+
+    const target:
+      Record<
+        string,
+        unknown
+      > = {};
+
+    for (
+      const key of
+      Object.keys(
+        source,
+      ).sort()
+    ) {
+      const item =
+        source[key];
+
+      if (
+        item ===
+          undefined
+      ) {
+        throw new Error(
+          'TEST_NON_CANONICAL_UNDEFINED',
+        );
+      }
+
+      target[key] =
+        canonicalizeForRegistryTest(
+          item,
+        );
+    }
+
+    return target;
+  }
+
+  throw new Error(
+    'TEST_NON_CANONICAL_VALUE',
+  );
+}
+
+function resignInconsistentRegistryForTesting(
+  registry:
+    ReturnType<
+      typeof createSignedCorpusRegistry
+    >,
+
+  privateKey:
+    KeyObject,
+): void {
+  const {
+    registryPayloadSha256:
+      _registryPayloadSha256,
+
+    signatureAlgorithm:
+      _signatureAlgorithm,
+
+    signatureBase64:
+      _signatureBase64,
+
+    ...payload
+  } = registry;
+
+  const payloadBytes =
+    Buffer.from(
+      JSON.stringify(
+        canonicalizeForRegistryTest(
+          payload,
+        ),
+      ),
+      'utf8',
+    );
+
+  (
+    registry as {
+      registryPayloadSha256:
+        string;
+    }
+  ).registryPayloadSha256 =
+    createHash(
+      'sha256',
+    )
+      .update(
+        payloadBytes,
+      )
+      .digest(
+        'hex',
+      );
+
+  (
+    registry as {
+      signatureBase64:
+        string;
+    }
+  ).signatureBase64 =
+    Buffer.from(
+      cryptoSign(
+        null,
+        payloadBytes,
+        privateKey,
+      ),
+    ).toString(
+      'base64',
+    );
+}
 
 describe(
   'FULGOR signed corpus registry',
@@ -249,6 +403,147 @@ describe(
       },
     );
 
+    it(
+      'rejects a declared recordSha256 that does not match the canonical record',
+      () => {
+        const {
+          privateKey,
+          publicKey,
+        } = keys();
+
+        const registry =
+          createSignedCorpusRegistry(
+            [
+              record(
+                'VULNERABLE',
+              ),
+              record(
+                'FIXED',
+              ),
+            ],
+            privateKey,
+            'test-key-1',
+            '2026-09-27T12:00:00Z',
+          );
+
+        const inconsistent =
+          structuredClone(
+            registry,
+          ) as typeof registry;
+
+        (
+          inconsistent.entries[0] as {
+            recordSha256:
+              string;
+          }
+        ).recordSha256 =
+          '0'.repeat(64);
+
+        resignInconsistentRegistryForTesting(
+          inconsistent,
+          privateKey,
+        );
+
+        const verified =
+          verifySignedCorpusRegistry(
+            inconsistent,
+            publicKey,
+          );
+
+        expect(
+          verified.accepted,
+        ).toBe(false);
+
+        expect(
+          verified.failureCodes,
+        ).toContain(
+          'ENTRY_RECORD_SHA256_MISMATCH',
+        );
+
+        expect(
+          verified.failureCodes,
+        ).not.toContain(
+          'PAYLOAD_DIGEST_MISMATCH',
+        );
+
+        expect(
+          verified.failureCodes,
+        ).not.toContain(
+          'INVALID_SIGNATURE',
+        );
+      },
+    );
+
+    it(
+      'rejects a declared pairGroupKey that does not match the canonical record lineage',
+      () => {
+        const {
+          privateKey,
+          publicKey,
+        } = keys();
+
+        const registry =
+          createSignedCorpusRegistry(
+            [
+              record(
+                'VULNERABLE',
+              ),
+              record(
+                'FIXED',
+              ),
+            ],
+            privateKey,
+            'test-key-1',
+            '2026-09-27T12:00:00Z',
+          );
+
+        const inconsistent =
+          structuredClone(
+            registry,
+          ) as typeof registry;
+
+        (
+          inconsistent.entries[0] as {
+            pairGroupKey:
+              string;
+          }
+        ).pairGroupKey =
+          'f'.repeat(64);
+
+        resignInconsistentRegistryForTesting(
+          inconsistent,
+          privateKey,
+        );
+
+        const verified =
+          verifySignedCorpusRegistry(
+            inconsistent,
+            publicKey,
+          );
+
+        expect(
+          verified.accepted,
+        ).toBe(false);
+
+        expect(
+          verified.failureCodes,
+        ).toContain(
+          'ENTRY_PAIR_GROUP_KEY_MISMATCH',
+        );
+
+        expect(
+          verified.failureCodes,
+        ).not.toContain(
+          'PAYLOAD_DIGEST_MISMATCH',
+        );
+
+        expect(
+          verified.failureCodes,
+        ).not.toContain(
+          'INVALID_SIGNATURE',
+        );
+      },
+    );
     it(
       'detects payload tampering after signing',
       () => {

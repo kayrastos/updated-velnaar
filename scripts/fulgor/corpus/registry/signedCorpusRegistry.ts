@@ -74,6 +74,8 @@ export type CorpusRegistryFailureCode =
   | 'INVALID_RECORD'
   | 'DUPLICATE_RECORD_ID'
   | 'DUPLICATE_RECORD_CONTENT'
+  | 'ENTRY_RECORD_SHA256_MISMATCH'
+  | 'ENTRY_PAIR_GROUP_KEY_MISMATCH'
   | 'INVALID_PAIR_IDENTITY'
   | 'INCOMPLETE_PAIR'
   | 'INVALID_PAIR_VERDICT'
@@ -652,6 +654,58 @@ export function verifySignedCorpusRegistry(
   failures.push(
     ...entryValidation.failures,
   );
+
+  /*
+   * recordSha256 and pairGroupKey are derived integrity data.
+   * Their presence inside a signed envelope is not sufficient:
+   * verification must independently derive them from the canonical
+   * record and require exact equality.
+   *
+   * validateEntries preserves input order for accepted records and
+   * recomputes both derived values from each record.
+   */
+  if (
+    entryValidation.entries.length ===
+      registry.entries.length
+  ) {
+    for (
+      let index = 0;
+      index <
+        registry.entries.length;
+      index += 1
+    ) {
+      const declaredEntry =
+        registry.entries[index];
+
+      const derivedEntry =
+        entryValidation.entries[index];
+
+      if (
+        !declaredEntry ||
+        !derivedEntry
+      ) {
+        continue;
+      }
+
+      if (
+        declaredEntry.recordSha256 !==
+          derivedEntry.recordSha256
+      ) {
+        failures.push(
+          'ENTRY_RECORD_SHA256_MISMATCH',
+        );
+      }
+
+      if (
+        declaredEntry.pairGroupKey !==
+          derivedEntry.pairGroupKey
+      ) {
+        failures.push(
+          'ENTRY_PAIR_GROUP_KEY_MISMATCH',
+        );
+      }
+    }
+  }
 
   const payload =
     payloadOf({
