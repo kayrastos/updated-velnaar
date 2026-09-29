@@ -167,14 +167,20 @@ export interface TrainingAuthorizationConsumeResult {
     readonly TrainingAuthorizationFailureCode[];
 }
 
-export interface TrainingAuthorizationReplayStore {
-  has(
-    nonce: string,
-  ): boolean;
+export type TrainingAuthorizationReplayConsumeResult =
+  | 'CONSUMED'
+  | 'ALREADY_CONSUMED';
 
-  consume(
+export interface TrainingAuthorizationReplayStore {
+  /*
+   * Production implementations MUST perform the check-and-consume
+   * operation atomically in one authoritative durable transaction.
+   *
+   * A separate preflight read is not an authorization primitive.
+   */
+  consumeOnce(
     nonce: string,
-  ): boolean;
+  ): TrainingAuthorizationReplayConsumeResult;
 }
 
 function normalize(
@@ -311,30 +317,23 @@ export function createInMemoryTrainingAuthorizationReplayStore():
     new Set<string>();
 
   return {
-    has(
+    consumeOnce(
       nonce: string,
-    ): boolean {
-      return consumed.has(
-        nonce,
-      );
-    },
-
-    consume(
-      nonce: string,
-    ): boolean {
+    ):
+      TrainingAuthorizationReplayConsumeResult {
       if (
         consumed.has(
           nonce,
         )
       ) {
-        return false;
+        return 'ALREADY_CONSUMED';
       }
 
       consumed.add(
         nonce,
       );
 
-      return true;
+      return 'CONSUMED';
     },
   };
 }
@@ -828,15 +827,6 @@ export function consumeTrainingExecutionAuthorization(
     }
   }
 
-  if (
-    replayStore.has(
-      authorization.nonce,
-    )
-  ) {
-    failures.push(
-      'REPLAY_DETECTED',
-    );
-  }
 
   const uniqueFailures =
     [...new Set(
@@ -859,12 +849,15 @@ export function consumeTrainingExecutionAuthorization(
     };
   }
 
-  const consumed =
-    replayStore.consume(
+  const consumeResult =
+    replayStore.consumeOnce(
       authorization.nonce,
     );
 
-  if (!consumed) {
+  if (
+    consumeResult !==
+      'CONSUMED'
+  ) {
     return {
       authorized:
         false,

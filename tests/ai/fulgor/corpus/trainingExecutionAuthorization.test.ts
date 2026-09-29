@@ -349,6 +349,70 @@ describe(
     );
 
     it(
+      'does not consume a nonce when authorization validation fails',
+      () => {
+        const data =
+          fixture();
+
+        const replay =
+          createInMemoryTrainingAuthorizationReplayStore();
+
+        const tampered =
+          structuredClone(
+            data.authorization,
+          ) as typeof data.authorization;
+
+        (
+          tampered as {
+            sourceTrainingManifestSha256:
+              string;
+          }
+        ).sourceTrainingManifestSha256 =
+          'f'.repeat(64);
+
+        const rejected =
+          consumeTrainingExecutionAuthorization(
+            tampered,
+            data.registry,
+            data.splitBundle,
+            data.registryKeys.publicKey,
+            data.authorizationKeys.publicKey,
+            replay,
+            '2026-09-29T07:05:00Z',
+          );
+
+        expect(
+          rejected.authorized,
+        ).toBe(false);
+
+        expect(
+          rejected.nonceConsumed,
+        ).toBe(false);
+
+        const valid =
+          consumeTrainingExecutionAuthorization(
+            data.authorization,
+            data.registry,
+            data.splitBundle,
+            data.registryKeys.publicKey,
+            data.authorizationKeys.publicKey,
+            replay,
+            '2026-09-29T07:06:00Z',
+          );
+
+        expect(valid)
+          .toEqual({
+            authorized:
+              true,
+
+            nonceConsumed:
+              true,
+
+            failureCodes: [],
+          });
+      },
+    );
+    it(
       'rejects replay of a consumed authorization',
       () => {
         const data =
