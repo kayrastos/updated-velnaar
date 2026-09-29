@@ -78,6 +78,9 @@ export interface RepositoryPairEvidence {
 }
 
 export interface RepositoryPairEvidenceRequest {
+  repository:
+    string;
+
   bareRepositoryPath:
     string;
 
@@ -98,6 +101,12 @@ export interface RepositoryPairEvidenceRequest {
 
 const SHA =
   /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+
+const REPOSITORY =
+  /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
+const ZERO_OBJECT_ID =
+  /^(?:0{40}|0{64})$/;
 
 const LICENSE_NAMES =
   new Set([
@@ -280,6 +289,274 @@ function strictUtf8(
   }
 }
 
+interface ChangedBlobRecord {
+  path: string;
+  oldObjectId: string | null;
+  newObjectId: string | null;
+}
+
+function canonicalRemote(
+  repository: string,
+): string {
+  return (
+    `https://github.com/${repository}.git`
+  );
+}
+
+function parseRawChangedBlobRecords(
+  bytes: Uint8Array,
+): readonly ChangedBlobRecord[] {
+  if (bytes.byteLength === 0) {
+    return [];
+  }
+
+  const fields =
+    strictUtf8(bytes)
+      .split('\0');
+
+  if (
+    fields.length > 0 &&
+    fields[
+      fields.length - 1
+    ] === ''
+  ) {
+    fields.pop();
+  }
+
+  if (
+    fields.length % 2 !== 0
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_INVALID_RAW_DIFF_RECORD',
+    );
+  }
+
+  const records:
+    ChangedBlobRecord[] = [];
+
+  for (
+    let index = 0;
+    index < fields.length;
+    index += 2
+  ) {
+    const header =
+      fields[index];
+
+    const path =
+      fields[index + 1];
+
+    const match =
+      /^:([0-7]{6}) ([0-7]{6}) ([a-f0-9]{40}|[a-f0-9]{64}) ([a-f0-9]{40}|[a-f0-9]{64}) ([A-Z][0-9]*)$/
+        .exec(header);
+
+    if (
+      !match ||
+      path.length === 0
+    ) {
+      throw new Error(
+        'PAIR_EVIDENCE_INVALID_RAW_DIFF_RECORD',
+      );
+    }
+
+    const oldObjectId =
+      ZERO_OBJECT_ID.test(
+        match[3],
+      )
+        ? null
+        : match[3];
+
+    const newObjectId =
+      ZERO_OBJECT_ID.test(
+        match[4],
+      )
+        ? null
+        : match[4];
+
+    records.push({
+      path,
+      oldObjectId,
+      newObjectId,
+    });
+  }
+
+  return records;
+}
+
+function sameChangedPaths(
+  changedFiles: readonly string[],
+  rawRecords:
+    readonly ChangedBlobRecord[],
+): boolean {
+  if (
+    changedFiles.length !==
+    rawRecords.length
+  ) {
+    return false;
+  }
+
+  const left =
+    [...changedFiles]
+      .sort();
+
+  const right =
+    rawRecords
+      .map(
+        (record) =>
+          record.path,
+      )
+      .sort();
+
+  return left.every(
+    (path, index) =>
+      path === right[index],
+  );
+}
+
+async function assertLocalNetworkConfigSafe(
+  runner: GitProcessRunner,
+  prefix: readonly string[],
+  bareRepositoryPath: string,
+  timeoutMs: number,
+  maxOutputBytes: number,
+): Promise<void> {
+  const result =
+    await runner.run({
+      args:
+        command(
+          prefix,
+          bareRepositoryPath,
+          [
+            'config',
+            '--local',
+            '--name-only',
+            '--get-regexp',
+            '^(url\.|http\.|credential\.|remote\..*\.proxy$|core\.gitproxy$)',
+          ],
+        ),
+
+      timeoutMs,
+      maxOutputBytes,
+    });
+
+  /*
+   * git config --get-regexp returns 1 when no matching
+   * configuration exists.
+   */
+  if (result.exitCode === 1) {
+    return;
+  }
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      [
+        'PAIR_EVIDENCE_GIT_FAILED',
+        'config',
+        String(result.exitCode),
+      ].join(':'),
+    );
+  }
+
+  if (
+    result.stdout
+      .trim()
+      .length > 0
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_UNSAFE_LOCAL_NETWORK_CONFIG',
+    );
+  }
+}
+
+async function exactBlobIsLocal(
+  runner: GitProcessRunner,
+  prefix: readonly string[],
+  bareRepositoryPath: string,
+  objectId: string,
+  timeoutMs: number,
+  maxOutputBytes: number,
+): Promise<boolean> {
+  if (!SHA.test(objectId)) {
+    throw new Error(
+      'PAIR_EVIDENCE_INVALID_BLOB_OBJECT_ID',
+    );
+  }
+
+  const result =
+    await runner.run({
+      args:
+        command(
+          prefix,
+          bareRepositoryPath,
+          [
+            'cat-file',
+            '-e',
+            `${objectId}^{blob}`,
+          ],
+        ),
+
+      timeoutMs,
+      maxOutputBytes,
+    });
+
+  return result.exitCode === 0;
+}
+
+async function hydrateExactBlob(
+  runner: GitProcessRunner,
+  prefix: readonly string[],
+  bareRepositoryPath: string,
+  objectId: string,
+  timeoutMs: number,
+  maxOutputBytes: number,
+): Promise<void> {
+  if (
+    await exactBlobIsLocal(
+      runner,
+      prefix,
+      bareRepositoryPath,
+      objectId,
+      timeoutMs,
+      maxOutputBytes,
+    )
+  ) {
+    return;
+  }
+
+  /*
+   * This is the only post-materialization network phase.
+   * The object identity is derived from authenticated Git
+   * tree metadata rather than caller-provided arbitrary input.
+   */
+  await runResult(
+    runner,
+    prefix,
+    bareRepositoryPath,
+    [
+      'fetch',
+      '--no-tags',
+      '--no-recurse-submodules',
+      'origin',
+      objectId,
+    ],
+    timeoutMs,
+    maxOutputBytes,
+  );
+
+  if (
+    !await exactBlobIsLocal(
+      runner,
+      prefix,
+      bareRepositoryPath,
+      objectId,
+      timeoutMs,
+      maxOutputBytes,
+    )
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_EXPLICIT_BLOB_FETCH_FAILED',
+    );
+  }
+}
 function fixRelationship(
   fixedCommitSha: string,
   revListLine: string,
@@ -476,6 +753,15 @@ async function licenseEvidence(
     );
   }
 
+  await hydrateExactBlob(
+    runner,
+    prefix,
+    bareRepositoryPath,
+    match[2],
+    timeoutMs,
+    maxMetadataBytes,
+  );
+
   const blob =
     await runBytes(
       runner,
@@ -546,6 +832,16 @@ export async function extractRepositoryPairEvidence(
       new DefaultGitProcessRunner(),
 ): Promise<RepositoryPairEvidence> {
   if (
+    !REPOSITORY.test(
+      request.repository,
+    )
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_INVALID_REPOSITORY',
+    );
+  }
+
+  if (
     request.bareRepositoryPath
       .trim().length === 0
   ) {
@@ -604,6 +900,39 @@ export async function extractRepositoryPairEvidence(
       hooksPath,
     );
 
+  const resolvedOrigin =
+    await runText(
+      runner,
+      prefix,
+      request.bareRepositoryPath,
+      [
+        'remote',
+        'get-url',
+        'origin',
+      ],
+      timeoutMs,
+      maxMetadataBytes,
+    );
+
+  if (
+    resolvedOrigin !==
+    canonicalRemote(
+      request.repository,
+    )
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_ORIGIN_MISMATCH',
+    );
+  }
+
+  await assertLocalNetworkConfigSafe(
+    runner,
+    prefix,
+    request.bareRepositoryPath,
+    timeoutMs,
+    maxMetadataBytes,
+  );
+
   const parentLine =
     await runText(
       runner,
@@ -658,6 +987,98 @@ export async function extractRepositoryPairEvidence(
     parseChangedFiles(
       changedFileBytes,
     );
+
+  /*
+   * Bound the network phase before requesting any missing blob.
+   */
+  if (
+    changedFiles.length >
+    maxChangedFiles
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_CHANGED_FILE_LIMIT_EXCEEDED',
+    );
+  }
+
+  const rawChangedBytes =
+    await runBytes(
+      runner,
+      prefix,
+      request.bareRepositoryPath,
+      [
+        'diff-tree',
+        '-r',
+        '--raw',
+        '-z',
+        '--no-abbrev',
+        '--no-renames',
+
+        request.vulnerableCommitSha,
+        request.fixedCommitSha,
+
+        '--',
+      ],
+      timeoutMs,
+      maxMetadataBytes,
+    );
+
+  const rawChangedRecords =
+    parseRawChangedBlobRecords(
+      rawChangedBytes,
+    );
+
+  if (
+    !sameChangedPaths(
+      changedFiles,
+      rawChangedRecords,
+    )
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_RAW_DIFF_PATH_MISMATCH',
+    );
+  }
+
+  const changedBlobObjectIds =
+    [
+      ...new Set(
+        rawChangedRecords
+          .flatMap(
+            (record) => [
+              record.oldObjectId,
+              record.newObjectId,
+            ],
+          )
+          .filter(
+            (
+              objectId,
+            ): objectId is string =>
+              objectId !== null,
+          ),
+      ),
+    ];
+
+  if (
+    changedBlobObjectIds.length >
+    maxChangedFiles * 2
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_BLOB_OBJECT_LIMIT_EXCEEDED',
+    );
+  }
+
+  for (
+    const objectId of
+    changedBlobObjectIds
+  ) {
+    await hydrateExactBlob(
+      runner,
+      prefix,
+      request.bareRepositoryPath,
+      objectId,
+      timeoutMs,
+      maxMetadataBytes,
+    );
+  }
 
   const diffBytes =
     await runBytes(

@@ -174,6 +174,9 @@ export async function runFirstPublicDryRun(): Promise<void> {
 
     const pairEvidence =
       await extractRepositoryPairEvidence({
+        repository:
+          REPOSITORY,
+
         bareRepositoryPath:
           barePath,
 
@@ -353,6 +356,8 @@ export async function runFirstPublicDryRun(): Promise<void> {
       {
         recursive: true,
         force: true,
+        maxRetries: 20,
+        retryDelay: 250,
       },
     );
   }

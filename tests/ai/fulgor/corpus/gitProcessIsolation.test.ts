@@ -77,6 +77,12 @@ describe(
         ).toBe(
           nullDevice(),
         );
+
+        expect(
+          environment.GIT_NO_LAZY_FETCH,
+        ).toBe(
+          '1',
+        );
       },
     );
 

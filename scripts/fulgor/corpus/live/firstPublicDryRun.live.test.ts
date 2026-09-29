@@ -24,7 +24,7 @@ describe(
 
         expect(true).toBe(true);
       },
-      180_000,
+      300_000,
     );
   },
 );

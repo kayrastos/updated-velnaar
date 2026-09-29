@@ -10,6 +10,7 @@ const GIT_ENVIRONMENT_KEYS_TO_REMOVE =
     'GIT_CONFIG_GLOBAL',
     'GIT_CONFIG_SYSTEM',
     'GIT_CONFIG_NOSYSTEM',
+    'GIT_NO_LAZY_FETCH',
 
     /*
      * Repository/object identity must come from explicit command
@@ -125,6 +126,14 @@ export function buildIsolatedGitEnvironment(
   environment.XDG_CONFIG_HOME =
     nullDevice;
 
+  /*
+   * A promisor/partial repository must never perform hidden
+   * demand-fetch during evidence extraction. Network access is
+   * explicit and exact-object only.
+   */
+  environment.GIT_NO_LAZY_FETCH =
+    '1';
+
   environment.GIT_TERMINAL_PROMPT =
     '0';
 
@@ -223,6 +232,14 @@ implements GitProcessRunner {
             typeof setTimeout
           > | null = null;
 
+        let terminationTimer:
+          ReturnType<
+            typeof setTimeout
+          > | null = null;
+
+        let pendingError:
+          Error | null = null;
+
         const clearTimer = () => {
           if (timer !== null) {
             clearTimeout(timer);
@@ -230,20 +247,58 @@ implements GitProcessRunner {
           }
         };
 
+        const clearTerminationTimer =
+          () => {
+            if (
+              terminationTimer !== null
+            ) {
+              clearTimeout(
+                terminationTimer,
+              );
+
+              terminationTimer =
+                null;
+            }
+          };
+
         const finishError = (
           error: Error,
         ) => {
-          if (settled) {
+          if (
+            settled ||
+            pendingError !== null
+          ) {
             return;
           }
 
-          settled = true;
+          pendingError = error;
 
           clearTimer();
 
+          /*
+           * Do not reject until Git has emitted close.
+           * Otherwise callers may attempt to delete a repository
+           * while Git still owns object/pack file handles.
+           */
           child.kill();
 
-          reject(error);
+          terminationTimer =
+            setTimeout(
+              () => {
+                if (settled) {
+                  return;
+                }
+
+                settled = true;
+
+                reject(
+                  new Error(
+                    `${error.message}:GIT_PROCESS_TERMINATION_TIMEOUT`,
+                  ),
+                );
+              },
+              5_000,
+            );
         };
 
         const capture = (
@@ -320,6 +375,17 @@ implements GitProcessRunner {
             settled = true;
 
             clearTimer();
+            clearTerminationTimer();
+
+            if (
+              pendingError !== null
+            ) {
+              reject(
+                pendingError,
+              );
+
+              return;
+            }
 
             const stdoutBuffer =
               Buffer.concat(

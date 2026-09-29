@@ -490,6 +490,15 @@ export async function materializeBareRepositoryPair(
         {
           recursive: true,
           force: true,
+
+          /*
+           * Windows can retain Git object/pack file handles
+           * briefly after process termination.
+           *
+           * Retry for a strictly bounded interval only.
+           */
+          maxRetries: 20,
+          retryDelay: 250,
         },
       );
     }

@@ -24,6 +24,15 @@ const VULN =
 const FIX =
   '2222222222222222222222222222222222222222';
 
+const REPOSITORY =
+  'example/project';
+
+const OLD_BLOB =
+  'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+const NEW_BLOB =
+  'cccccccccccccccccccccccccccccccccccccccc';
+
 const BLOB =
   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
@@ -76,6 +85,18 @@ function result(
   };
 }
 
+function failure(
+  exitCode = 1,
+): GitProcessResult {
+  return {
+    exitCode,
+    stdout: '',
+    stderr: 'expected test failure',
+    stdoutBytes:
+      Buffer.alloc(0),
+  };
+}
+
 class FakeRunner
 implements GitProcessRunner {
   readonly calls:
@@ -107,6 +128,53 @@ function defaultHandler(
 ): GitProcessResult {
   const command =
     request.args.join(' ');
+
+  if (
+    command.includes(
+      'remote get-url origin',
+    )
+  ) {
+    return result(
+      `https://github.com/${REPOSITORY}.git\n`,
+    );
+  }
+
+  if (
+    command.includes(
+      'config --local --name-only --get-regexp',
+    )
+  ) {
+    return result('');
+  }
+
+  if (
+    command.includes(
+      'diff-tree -r --raw -z --no-abbrev --no-renames',
+    )
+  ) {
+    return result(
+      Buffer.from(
+        `:100644 100644 ${OLD_BLOB} ${NEW_BLOB} M\0a.ts\0`,
+        'utf8',
+      ),
+    );
+  }
+
+  if (
+    command.includes(
+      'cat-file -e',
+    )
+  ) {
+    return result('');
+  }
+
+  if (
+    command.includes(
+      'fetch --no-tags --no-recurse-submodules origin',
+    )
+  ) {
+    return result('');
+  }
 
   if (
     command.includes(
@@ -192,6 +260,9 @@ describe(
         const evidence =
           await extractRepositoryPairEvidence(
             {
+              repository:
+                REPOSITORY,
+
               bareRepositoryPath:
                 'C:/tmp/repo.git',
 
@@ -268,6 +339,9 @@ describe(
         const evidence =
           await extractRepositoryPairEvidence(
             {
+              repository:
+                REPOSITORY,
+
               bareRepositoryPath:
                 'C:/tmp/repo.git',
 
@@ -326,6 +400,9 @@ describe(
         const evidence =
           await extractRepositoryPairEvidence(
             {
+              repository:
+                REPOSITORY,
+
               bareRepositoryPath:
                 'C:/tmp/repo.git',
 
@@ -381,6 +458,9 @@ describe(
         const evidence =
           await extractRepositoryPairEvidence(
             {
+              repository:
+                REPOSITORY,
+
               bareRepositoryPath:
                 'C:/tmp/repo.git',
 
@@ -420,6 +500,9 @@ describe(
 
         await extractRepositoryPairEvidence(
           {
+            repository:
+              REPOSITORY,
+
             bareRepositoryPath:
               'C:/tmp/repo.git',
 
@@ -474,6 +557,225 @@ describe(
     );
 
     it(
+      'explicitly hydrates exact missing changed blobs before reading the full diff',
+      async () => {
+        const hydrated =
+          new Set<string>();
+
+        const runner =
+          new FakeRunner(
+            (request) => {
+              const command =
+                request.args.join(
+                  ' ',
+                );
+
+              for (
+                const objectId of [
+                  OLD_BLOB,
+                  NEW_BLOB,
+                ]
+              ) {
+                if (
+                  command.includes(
+                    `cat-file -e ${objectId}^{blob}`,
+                  )
+                ) {
+                  return hydrated.has(
+                    objectId,
+                  )
+                    ? result('')
+                    : failure();
+                }
+
+                if (
+                  command.includes(
+                    `fetch --no-tags --no-recurse-submodules origin ${objectId}`,
+                  )
+                ) {
+                  hydrated.add(
+                    objectId,
+                  );
+
+                  return result('');
+                }
+              }
+
+              return defaultHandler(
+                request,
+              );
+            },
+          );
+
+        await extractRepositoryPairEvidence(
+          {
+            repository:
+              REPOSITORY,
+
+            bareRepositoryPath:
+              'C:/tmp/repo.git',
+
+            vulnerableCommitSha:
+              VULN,
+
+            fixedCommitSha:
+              FIX,
+          },
+
+          runner,
+        );
+
+        expect(
+          hydrated,
+        ).toEqual(
+          new Set([
+            OLD_BLOB,
+            NEW_BLOB,
+          ]),
+        );
+
+        const fetches =
+          runner.calls
+            .map(
+              (call) =>
+                call.args.join(' '),
+            )
+            .filter(
+              (command) =>
+                command.includes(
+                  'fetch --no-tags --no-recurse-submodules origin',
+                ),
+            );
+
+        expect(fetches)
+          .toHaveLength(2);
+      },
+    );
+
+    it(
+      'fails closed when origin identity changes before explicit hydration',
+      async () => {
+        const runner =
+          new FakeRunner(
+            (request) => {
+              const command =
+                request.args.join(
+                  ' ',
+                );
+
+              if (
+                command.includes(
+                  'remote get-url origin',
+                )
+              ) {
+                return result(
+                  'https://github.com/attacker/project.git\n',
+                );
+              }
+
+              return defaultHandler(
+                request,
+              );
+            },
+          );
+
+        await expect(
+          extractRepositoryPairEvidence(
+            {
+              repository:
+                REPOSITORY,
+
+              bareRepositoryPath:
+                'C:/tmp/repo.git',
+
+              vulnerableCommitSha:
+                VULN,
+
+              fixedCommitSha:
+                FIX,
+            },
+
+            runner,
+          ),
+        ).rejects.toThrow(
+          'PAIR_EVIDENCE_ORIGIN_MISMATCH',
+        );
+
+        expect(
+          runner.calls.some(
+            (call) =>
+              call.args
+                .join(' ')
+                .includes(
+                  ' fetch ',
+                ),
+          ),
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'fails closed on local Git network rewrite configuration',
+      async () => {
+        const runner =
+          new FakeRunner(
+            (request) => {
+              const command =
+                request.args.join(
+                  ' ',
+                );
+
+              if (
+                command.includes(
+                  'config --local --name-only --get-regexp',
+                )
+              ) {
+                return result(
+                  'url.https://evil.example/.insteadof\n',
+                );
+              }
+
+              return defaultHandler(
+                request,
+              );
+            },
+          );
+
+        await expect(
+          extractRepositoryPairEvidence(
+            {
+              repository:
+                REPOSITORY,
+
+              bareRepositoryPath:
+                'C:/tmp/repo.git',
+
+              vulnerableCommitSha:
+                VULN,
+
+              fixedCommitSha:
+                FIX,
+            },
+
+            runner,
+          ),
+        ).rejects.toThrow(
+          'PAIR_EVIDENCE_UNSAFE_LOCAL_NETWORK_CONFIG',
+        );
+
+        expect(
+          runner.calls.some(
+            (call) =>
+              call.args
+                .join(' ')
+                .includes(
+                  ' fetch ',
+                ),
+          ),
+        ).toBe(false);
+      },
+    );
+    it(
       'uses separate bounded output budgets for metadata and exact diff',
       async () => {
         const runner =
@@ -481,6 +783,9 @@ describe(
 
         await extractRepositoryPairEvidence(
           {
+            repository:
+              REPOSITORY,
+
             bareRepositoryPath:
               'C:/tmp/repo.git',
 
