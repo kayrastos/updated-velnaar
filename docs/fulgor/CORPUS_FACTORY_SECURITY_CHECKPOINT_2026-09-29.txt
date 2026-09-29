@@ -1,0 +1,55 @@
+FULGOR CORPUS FACTORY V1 — SECURITY CHECKPOINT
+Date: 2026-09-29
+
+Branch: feature/fulgor-corpus-factory-v1
+HEAD: cc83900363b61b6583320897a54c8885584307b5
+
+CERTIFICATION
+- Corpus test files: 16 PASS
+- Corpus tests: 92 PASS
+- TypeScript: PASS
+
+TRAINING AUTHORIZATION
+- Explicit human approval required: TRUE
+- Exact signed registry binding: TRUE
+- Exact training manifest binding: TRUE
+- Final holdout commitment binding: TRUE
+- Ed25519 signature verification: TRUE
+- Authorization expiry enforced: TRUE
+- Single-use nonce semantics: TRUE
+- Promotion authorization: FALSE
+- Deployment authorization: FALSE
+
+DURABLE REPLAY
+- Async durable replay contract: TRUE
+- Cloudflare D1 adapter: TRUE
+- Atomic reserve-if-absent: TRUE
+- First valid use authorized: TRUE
+- Repeated exact authorization rejected: TRUE
+- Backend unavailable fails closed: TRUE
+- Invalid authorization reaches D1: FALSE
+
+IDENTITY
+- Review candidate content identity deterministic: TRUE
+- createdAtUtc retained as audit metadata: TRUE
+- createdAtUtc included in candidateSha256: FALSE
+
+EXECUTION STATE
+- Training started: FALSE
+- Production training worker connected: FALSE
+- Promotion performed: FALSE
+- Deployment performed: FALSE
+- Remote push performed in this session: FALSE
+
+KNOWN REMAINING HARDENING
+- Live/real D1 integration gate not yet executed
+- Authorization signer trust-anchor policy still requires explicit production policy
+- Autonomous SPDX/license detector remains outstanding
+- Semantic fix resolver remains outstanding
+- Git system/global config isolation remains outstanding
+- Partial-clone lazy-fetch bounds remain outstanding
+- Hard negatives still require independent verification
+- Registry internal recordSha256/pairGroupKey recomputation hardening remains outstanding
+
+INVARIANT
+TRAIN != PROMOTE != DEPLOY
