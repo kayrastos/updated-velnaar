@@ -1,4 +1,8 @@
 import {
+  isStrictUtcTimestamp,
+} from '../validation/strictUtcTimestamp';
+
+import {
   createHash,
   createPublicKey,
   sign as cryptoSign,
@@ -494,10 +498,8 @@ export function createSignedCorpusRegistry(
   }
 
   if (
-    Number.isNaN(
-      Date.parse(
-        createdAtUtc,
-      ),
+    !isStrictUtcTimestamp(
+      createdAtUtc,
     )
   ) {
     throw new Error(
@@ -620,10 +622,8 @@ export function verifySignedCorpusRegistry(
   }
 
   if (
-    Number.isNaN(
-      Date.parse(
-        registry.createdAtUtc,
-      ),
+    !isStrictUtcTimestamp(
+      registry.createdAtUtc,
     )
   ) {
     failures.push(

@@ -3,6 +3,10 @@ import {
   FULGOR_CORPUS_SCHEMA_VERSION,
 } from '../corpusRecord';
 
+import {
+  isStrictUtcTimestamp,
+} from './strictUtcTimestamp';
+
 import type {
   FulgorCorpusProofType,
   FulgorCorpusRecord,
@@ -292,11 +296,8 @@ export function validateCorpusRecord(
 
   add(
     failures,
-    (
-      !nonEmpty(record.createdAtUtc) ||
-      Number.isNaN(
-        Date.parse(record.createdAtUtc),
-      )
+    !isStrictUtcTimestamp(
+      record.createdAtUtc,
     ),
     'INVALID_CREATED_AT',
   );

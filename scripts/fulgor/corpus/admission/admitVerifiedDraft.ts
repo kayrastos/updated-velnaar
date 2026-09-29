@@ -1,4 +1,8 @@
 import {
+  isStrictUtcTimestamp,
+} from '../validation/strictUtcTimestamp';
+
+import {
   FULGOR_CORPUS_SCHEMA_VERSION,
 } from '../corpusRecord';
 
@@ -392,13 +396,8 @@ export function admitVerifiedDraft(
   }
 
   if (
-    !nonEmpty(
+    !isStrictUtcTimestamp(
       receipt.verifiedAtUtc,
-    ) ||
-    Number.isNaN(
-      Date.parse(
-        receipt.verifiedAtUtc,
-      ),
     )
   ) {
     failures.push(

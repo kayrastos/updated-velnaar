@@ -1,4 +1,8 @@
 import {
+  isStrictUtcTimestamp,
+} from '../validation/strictUtcTimestamp';
+
+import {
   createHash,
 } from 'node:crypto';
 
@@ -37,7 +41,8 @@ export type ReviewCandidateFailureCode =
   | 'PAIR_EVIDENCE_REJECTED'
   | 'LICENSE_REJECTED'
   | 'COMMIT_PAIR_MISMATCH'
-  | 'INVALID_LICENSE_EVIDENCE';
+  | 'INVALID_LICENSE_EVIDENCE'
+  | 'INVALID_CREATED_AT_UTC';
 
 export interface CorpusReviewCandidate {
   schemaVersion:
@@ -282,6 +287,15 @@ export function buildCorpusReviewCandidate(
 ): BuildReviewCandidateResult {
   const failures:
     ReviewCandidateFailureCode[] = [];
+  if (
+    !isStrictUtcTimestamp(
+      input.createdAtUtc,
+    )
+  ) {
+    failures.push(
+      'INVALID_CREATED_AT_UTC',
+    );
+  }
 
   if (
     input.advisory.withdrawnAtUtc !==

@@ -1,4 +1,8 @@
 import {
+  isStrictUtcTimestamp,
+} from '../validation/strictUtcTimestamp';
+
+import {
   createHash,
 } from 'node:crypto';
 
@@ -1013,13 +1017,8 @@ export function admitVerifiedHardNegative(
   }
 
   if (
-    !nonEmpty(
+    !isStrictUtcTimestamp(
       receipt.verifiedAtUtc,
-    ) ||
-    Number.isNaN(
-      Date.parse(
-        receipt.verifiedAtUtc,
-      ),
     )
   ) {
     failures.push(
