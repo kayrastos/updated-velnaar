@@ -9,6 +9,8 @@ import {
 import type {
   FulgorAdvisoryCandidate,
   FulgorAffectedPackage,
+  FulgorGitRange,
+  FulgorGitRangeEvent,
 } from './advisoryCandidate';
 
 import type {
@@ -106,6 +108,187 @@ function serializeRange(
   return `${type}:${JSON.stringify(events)}`;
 }
 
+const EXACT_GIT_SHA =
+  /^[0-9a-fA-F]{40}$/;
+
+function normalizeExactGitCommit(
+  value: unknown,
+  allowRepositoryRoot: boolean,
+): string | null {
+  const commit =
+    stringValue(
+      value,
+    );
+
+  if (!commit) {
+    return null;
+  }
+
+  if (
+    allowRepositoryRoot &&
+    commit === '0'
+  ) {
+    return '0';
+  }
+
+  if (
+    !EXACT_GIT_SHA.test(
+      commit,
+    )
+  ) {
+    return null;
+  }
+
+  return commit.toLowerCase();
+}
+
+function parseGitRangeEvent(
+  raw: unknown,
+): FulgorGitRangeEvent | null {
+  const event =
+    record(raw);
+
+  if (!event) {
+    return null;
+  }
+
+  const recognized =
+    [
+      'introduced',
+      'fixed',
+      'last_affected',
+      'limit',
+    ].filter(
+      (key) =>
+        Object.prototype.hasOwnProperty.call(
+          event,
+          key,
+        ),
+    );
+
+  /*
+   * More than one semantic event in the same object is ambiguous.
+   */
+  if (recognized.length !== 1) {
+    return null;
+  }
+
+  const key =
+    recognized[0];
+
+  const commit =
+    normalizeExactGitCommit(
+      event[key],
+      key === 'introduced',
+    );
+
+  if (!commit) {
+    return null;
+  }
+
+  switch (key) {
+    case 'introduced':
+      return {
+        kind:
+          'INTRODUCED',
+
+        commit,
+      };
+
+    case 'fixed':
+      return {
+        kind:
+          'FIXED',
+
+        commit,
+      };
+
+    case 'last_affected':
+      return {
+        kind:
+          'LAST_AFFECTED',
+
+        commit,
+      };
+
+    case 'limit':
+      return {
+        kind:
+          'LIMIT',
+
+        commit,
+      };
+
+    default:
+      return null;
+  }
+}
+
+function parseGitRange(
+  raw: unknown,
+): FulgorGitRange | null {
+  const range =
+    record(raw);
+
+  if (!range) {
+    return null;
+  }
+
+  if (
+    stringValue(
+      range.type,
+    ) !== 'GIT'
+  ) {
+    return null;
+  }
+
+  const repositoryUrl =
+    stringValue(
+      range.repo,
+    );
+
+  /*
+   * Preserve only HTTPS repository identifiers. They remain
+   * untrusted source metadata until independently canonicalized.
+   */
+  const safeRepositoryUrl =
+    repositoryUrl &&
+    repositoryUrl.startsWith(
+      'https://',
+    )
+      ? repositoryUrl
+      : null;
+
+  const rawEvents =
+    Array.isArray(
+      range.events,
+    )
+      ? range.events
+      : [];
+
+  const events =
+    rawEvents
+      .map(
+        parseGitRangeEvent,
+      )
+      .filter(
+        (
+          event,
+        ): event is FulgorGitRangeEvent =>
+          event !== null,
+      );
+
+  if (events.length === 0) {
+    return null;
+  }
+
+  return {
+    repositoryUrl:
+      safeRepositoryUrl,
+
+    events,
+  };
+}
 function parsePackages(
   value: unknown,
 ): FulgorAffectedPackage[] {
@@ -145,24 +328,43 @@ function parsePackages(
           )
         : null;
 
-    const ranges =
+    const rawRanges =
       Array.isArray(
         affected.ranges,
       )
         ? affected.ranges
-            .map(serializeRange)
-            .filter(
-              (
-                entry,
-              ): entry is string =>
-                entry !== null,
-            )
         : [];
+
+    const ranges =
+      rawRanges
+        .map(
+          serializeRange,
+        )
+        .filter(
+          (
+            entry,
+          ): entry is string =>
+            entry !== null,
+        );
+
+    const gitRanges =
+      rawRanges
+        .map(
+          parseGitRange,
+        )
+        .filter(
+          (
+            range,
+          ): range is FulgorGitRange =>
+            range !== null,
+        );
 
     result.push({
       ecosystem,
       name,
       ranges,
+
+      gitRanges,
     });
   }
 
