@@ -131,6 +131,26 @@ function defaultHandler(
 
   if (
     command.includes(
+      'count-objects -v',
+    )
+  ) {
+    return result(
+      [
+        'count: 0',
+        'size: 0',
+        'in-pack: 0',
+        'packs: 0',
+        'size-pack: 0',
+        'prune-packable: 0',
+        'garbage: 0',
+        'size-garbage: 0',
+        '',
+      ].join('\n'),
+    );
+  }
+
+  if (
+    command.includes(
       'remote get-url origin',
     )
   ) {
@@ -652,6 +672,325 @@ describe(
       },
     );
 
+    it(
+      'fails closed on alternate object-store configuration',
+      async () => {
+        const runner =
+          new FakeRunner(
+            (request) => {
+              const command =
+                request.args.join(
+                  ' ',
+                );
+
+              if (
+                command.includes(
+                  'count-objects -v',
+                )
+              ) {
+                return result(
+                  [
+                    'count: 0',
+                    'size: 0',
+                    'in-pack: 0',
+                    'packs: 0',
+                    'size-pack: 0',
+                    'prune-packable: 0',
+                    'garbage: 0',
+                    'size-garbage: 0',
+                    'alternate: C:/attacker/objects',
+                    '',
+                  ].join('\n'),
+                );
+              }
+
+              return defaultHandler(
+                request,
+              );
+            },
+          );
+
+        await expect(
+          extractRepositoryPairEvidence(
+            {
+              repository:
+                REPOSITORY,
+
+              bareRepositoryPath:
+                'C:/tmp/repo.git',
+
+              vulnerableCommitSha:
+                VULN,
+
+              fixedCommitSha:
+                FIX,
+            },
+
+            runner,
+          ),
+        ).rejects.toThrow(
+          'PAIR_EVIDENCE_OBJECT_STORE_ALTERNATE_REJECTED',
+        );
+
+        expect(
+          runner.calls.some(
+            (call) =>
+              call.args
+                .join(' ')
+                .includes(
+                  'fetch --no-tags --no-recurse-submodules origin',
+                ),
+          ),
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'fails closed when object-store garbage is present',
+      async () => {
+        const runner =
+          new FakeRunner(
+            (request) => {
+              const command =
+                request.args.join(
+                  ' ',
+                );
+
+              if (
+                command.includes(
+                  'count-objects -v',
+                )
+              ) {
+                return result(
+                  [
+                    'count: 0',
+                    'size: 0',
+                    'in-pack: 0',
+                    'packs: 0',
+                    'size-pack: 0',
+                    'prune-packable: 0',
+                    'garbage: 1',
+                    'size-garbage: 4',
+                    '',
+                  ].join('\n'),
+                );
+              }
+
+              return defaultHandler(
+                request,
+              );
+            },
+          );
+
+        await expect(
+          extractRepositoryPairEvidence(
+            {
+              repository:
+                REPOSITORY,
+
+              bareRepositoryPath:
+                'C:/tmp/repo.git',
+
+              vulnerableCommitSha:
+                VULN,
+
+              fixedCommitSha:
+                FIX,
+            },
+
+            runner,
+          ),
+        ).rejects.toThrow(
+          'PAIR_EVIDENCE_OBJECT_STORE_GARBAGE_REJECTED',
+        );
+
+        expect(
+          runner.calls.some(
+            (call) =>
+              call.args
+                .join(' ')
+                .includes(
+                  'fetch --no-tags --no-recurse-submodules origin',
+                ),
+          ),
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'fails closed on an incomplete object-store report',
+      async () => {
+        const runner =
+          new FakeRunner(
+            (request) => {
+              const command =
+                request.args.join(
+                  ' ',
+                );
+
+              if (
+                command.includes(
+                  'count-objects -v',
+                )
+              ) {
+                return result(
+                  [
+                    'count: 0',
+                    'size: 0',
+                    'garbage: 0',
+                    'size-garbage: 0',
+                    '',
+                  ].join('\n'),
+                );
+              }
+
+              return defaultHandler(
+                request,
+              );
+            },
+          );
+
+        await expect(
+          extractRepositoryPairEvidence(
+            {
+              repository:
+                REPOSITORY,
+
+              bareRepositoryPath:
+                'C:/tmp/repo.git',
+
+              vulnerableCommitSha:
+                VULN,
+
+              fixedCommitSha:
+                FIX,
+            },
+
+            runner,
+          ),
+        ).rejects.toThrow(
+          'PAIR_EVIDENCE_INCOMPLETE_OBJECT_STORE_REPORT',
+        );
+
+        expect(
+          runner.calls.some(
+            (call) =>
+              call.args
+                .join(' ')
+                .includes(
+                  'fetch --no-tags --no-recurse-submodules origin',
+                ),
+          ),
+        ).toBe(false);
+      },
+    );
+    it(
+      'fails closed when explicit hydration exceeds the object-store growth budget',
+      async () => {
+        const hydrated =
+          new Set<string>();
+
+        let objectStoreKiB =
+          0;
+
+        const runner =
+          new FakeRunner(
+            (request) => {
+              const command =
+                request.args.join(
+                  ' ',
+                );
+
+              if (
+                command.includes(
+                  'count-objects -v',
+                )
+              ) {
+                return result(
+                  [
+                    'count: 0',
+                    'size: 0',
+                    'in-pack: 1',
+                    'packs: 1',
+                    `size-pack: ${objectStoreKiB}`,
+                    'prune-packable: 0',
+                    'garbage: 0',
+                    'size-garbage: 0',
+                    '',
+                  ].join('\n'),
+                );
+              }
+
+              for (
+                const objectId of [
+                  OLD_BLOB,
+                  NEW_BLOB,
+                ]
+              ) {
+                if (
+                  command.includes(
+                    `cat-file -e ${objectId}^{blob}`,
+                  )
+                ) {
+                  return hydrated.has(
+                    objectId,
+                  )
+                    ? result('')
+                    : failure();
+                }
+
+                if (
+                  command.includes(
+                    `fetch --no-tags --no-recurse-submodules origin ${objectId}`,
+                  )
+                ) {
+                  hydrated.add(
+                    objectId,
+                  );
+
+                  objectStoreKiB =
+                    2;
+
+                  return result('');
+                }
+              }
+
+              return defaultHandler(
+                request,
+              );
+            },
+          );
+
+        await expect(
+          extractRepositoryPairEvidence(
+            {
+              repository:
+                REPOSITORY,
+
+              bareRepositoryPath:
+                'C:/tmp/repo.git',
+
+              vulnerableCommitSha:
+                VULN,
+
+              fixedCommitSha:
+                FIX,
+
+              maxHydrationObjectStoreGrowthKiB:
+                1,
+            },
+
+            runner,
+          ),
+        ).rejects.toThrow(
+          'PAIR_EVIDENCE_OBJECT_STORE_GROWTH_LIMIT_EXCEEDED',
+        );
+
+        expect(
+          hydrated.size,
+        ).toBe(1);
+      },
+    );
     it(
       'fails closed when origin identity changes before explicit hydration',
       async () => {

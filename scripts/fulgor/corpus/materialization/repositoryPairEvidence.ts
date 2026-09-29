@@ -97,6 +97,16 @@ export interface RepositoryPairEvidenceRequest {
   maxDiffBytes?: number;
 
   maxChangedFiles?: number;
+
+  /*
+   * Maximum cumulative growth of the Git object database caused
+   * by explicit post-materialization blob hydration.
+   *
+   * Unit is KiB because `git count-objects -v` reports object
+   * database disk consumption in KiB.
+   */
+  maxHydrationObjectStoreGrowthKiB?:
+    number;
 }
 
 const SHA =
@@ -557,6 +567,178 @@ async function hydrateExactBlob(
     );
   }
 }
+interface ObjectStoreUsage {
+  objectKiB: number;
+  garbageKiB: number;
+}
+
+function parseObjectStoreUsage(
+  text: string,
+): ObjectStoreUsage {
+  const values =
+    new Map<string, number>();
+
+  for (
+    const rawLine of
+    text.split('\n')
+  ) {
+    const line =
+      rawLine.trim();
+
+    if (line.length === 0) {
+      continue;
+    }
+
+    if (
+      line.startsWith(
+        'alternate: ',
+      )
+    ) {
+      throw new Error(
+        'PAIR_EVIDENCE_OBJECT_STORE_ALTERNATE_REJECTED',
+      );
+    }
+
+    const match =
+      /^([a-z-]+): ([0-9]+)$/
+        .exec(line);
+
+    if (!match) {
+      throw new Error(
+        'PAIR_EVIDENCE_INVALID_OBJECT_STORE_REPORT',
+      );
+    }
+
+    values.set(
+      match[1],
+      Number(match[2]),
+    );
+  }
+
+  for (
+    const required of [
+      'size',
+      'size-pack',
+      'garbage',
+      'size-garbage',
+    ]
+  ) {
+    if (
+      !values.has(required)
+    ) {
+      throw new Error(
+        'PAIR_EVIDENCE_INCOMPLETE_OBJECT_STORE_REPORT',
+      );
+    }
+  }
+
+  const size =
+    values.get('size')!;
+
+  const sizePack =
+    values.get('size-pack')!;
+
+  const garbage =
+    values.get('garbage')!;
+
+  const sizeGarbage =
+    values.get('size-garbage')!;
+
+  if (
+    !Number.isSafeInteger(size) ||
+    !Number.isSafeInteger(sizePack) ||
+    !Number.isSafeInteger(garbage) ||
+    !Number.isSafeInteger(sizeGarbage)
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_INVALID_OBJECT_STORE_REPORT',
+    );
+  }
+
+  if (
+    garbage !== 0 ||
+    sizeGarbage !== 0
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_OBJECT_STORE_GARBAGE_REJECTED',
+    );
+  }
+
+  return {
+    objectKiB:
+      size + sizePack,
+
+    garbageKiB:
+      sizeGarbage,
+  };
+}
+
+async function objectStoreUsage(
+  runner: GitProcessRunner,
+  prefix: readonly string[],
+  bareRepositoryPath: string,
+  timeoutMs: number,
+  maxOutputBytes: number,
+): Promise<ObjectStoreUsage> {
+  const report =
+    await runText(
+      runner,
+      prefix,
+      bareRepositoryPath,
+      [
+        'count-objects',
+        '-v',
+      ],
+      timeoutMs,
+      maxOutputBytes,
+    );
+
+  return parseObjectStoreUsage(
+    report,
+  );
+}
+
+async function assertHydrationGrowthWithinBound(
+  runner: GitProcessRunner,
+  prefix: readonly string[],
+  bareRepositoryPath: string,
+  timeoutMs: number,
+  maxOutputBytes: number,
+  baselineObjectKiB: number,
+  maxGrowthKiB: number,
+): Promise<void> {
+  const current =
+    await objectStoreUsage(
+      runner,
+      prefix,
+      bareRepositoryPath,
+      timeoutMs,
+      maxOutputBytes,
+    );
+
+  const growthKiB =
+    current.objectKiB -
+    baselineObjectKiB;
+
+  if (growthKiB < 0) {
+    throw new Error(
+      'PAIR_EVIDENCE_OBJECT_STORE_SHRANK_UNEXPECTEDLY',
+    );
+  }
+
+  if (
+    growthKiB >
+    maxGrowthKiB
+  ) {
+    throw new Error(
+      [
+        'PAIR_EVIDENCE_OBJECT_STORE_GROWTH_LIMIT_EXCEEDED',
+        String(growthKiB),
+        String(maxGrowthKiB),
+      ].join(':'),
+    );
+  }
+}
 function fixRelationship(
   fixedCommitSha: string,
   revListLine: string,
@@ -881,6 +1063,24 @@ export async function extractRepositoryPairEvidence(
     request.maxChangedFiles ??
     DEFAULT_MAX_CHANGED_FILES;
 
+  const maxHydrationObjectStoreGrowthKiB =
+    request
+      .maxHydrationObjectStoreGrowthKiB ??
+    Math.ceil(
+      maxDiffBytes / 1024,
+    );
+
+  if (
+    !Number.isSafeInteger(
+      maxHydrationObjectStoreGrowthKiB,
+    ) ||
+    maxHydrationObjectStoreGrowthKiB <= 0
+  ) {
+    throw new Error(
+      'PAIR_EVIDENCE_INVALID_OBJECT_STORE_GROWTH_LIMIT',
+    );
+  }
+
   if (
     !Number.isInteger(
       maxChangedFiles,
@@ -1066,6 +1266,18 @@ export async function extractRepositoryPairEvidence(
     );
   }
 
+  const hydrationBaseline =
+    await objectStoreUsage(
+      runner,
+      prefix,
+      request.bareRepositoryPath,
+      timeoutMs,
+      maxMetadataBytes,
+    );
+
+  const hydrationBaselineObjectKiB =
+    hydrationBaseline.objectKiB;
+
   for (
     const objectId of
     changedBlobObjectIds
@@ -1077,6 +1289,16 @@ export async function extractRepositoryPairEvidence(
       objectId,
       timeoutMs,
       maxMetadataBytes,
+    );
+
+    await assertHydrationGrowthWithinBound(
+      runner,
+      prefix,
+      request.bareRepositoryPath,
+      timeoutMs,
+      maxMetadataBytes,
+      hydrationBaselineObjectKiB,
+      maxHydrationObjectStoreGrowthKiB,
     );
   }
 
@@ -1112,6 +1334,16 @@ export async function extractRepositoryPairEvidence(
       maxMetadataBytes,
     );
 
+  await assertHydrationGrowthWithinBound(
+    runner,
+    prefix,
+    request.bareRepositoryPath,
+    timeoutMs,
+    maxMetadataBytes,
+    hydrationBaselineObjectKiB,
+    maxHydrationObjectStoreGrowthKiB,
+  );
+
   const fixedLicense =
     await licenseEvidence(
       runner,
@@ -1121,6 +1353,16 @@ export async function extractRepositoryPairEvidence(
       timeoutMs,
       maxMetadataBytes,
     );
+
+  await assertHydrationGrowthWithinBound(
+    runner,
+    prefix,
+    request.bareRepositoryPath,
+    timeoutMs,
+    maxMetadataBytes,
+    hydrationBaselineObjectKiB,
+    maxHydrationObjectStoreGrowthKiB,
+  );
 
   const continuity =
     licenseContinuity(
