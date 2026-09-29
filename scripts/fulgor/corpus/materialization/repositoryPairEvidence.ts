@@ -6,6 +6,14 @@ import {
   DefaultGitProcessRunner,
 } from './gitProcess';
 
+import {
+  detectReviewEligibleSpdxLicense,
+} from '../validation/spdxLicenseDetector';
+
+import type {
+  ReviewEligibleSpdxId,
+} from '../validation/spdxLicenseDetector';
+
 import type {
   GitProcessResult,
   GitProcessRunner,
@@ -40,6 +48,13 @@ export interface RevisionLicenseEvidence {
 
   byteLength:
     number | null;
+
+  /*
+   * Derived only from the exact materialized license blob.
+   * Caller/advisory metadata is never SPDX authority.
+   */
+  detectedSpdxId?:
+    ReviewEligibleSpdxId | null;
 }
 
 export interface RepositoryPairEvidence {
@@ -886,6 +901,7 @@ async function licenseEvidence(
       blobObjectId: null,
       contentSha256: null,
       byteLength: null,
+      detectedSpdxId: null,
     };
   }
 
@@ -898,6 +914,7 @@ async function licenseEvidence(
       blobObjectId: null,
       contentSha256: null,
       byteLength: null,
+      detectedSpdxId: null,
     };
   }
 
@@ -958,6 +975,13 @@ async function licenseEvidence(
       maxMetadataBytes,
     );
 
+  const detectedLicense =
+    detectReviewEligibleSpdxLicense(
+      strictUtf8(
+        blob,
+      ),
+    );
+
   return {
     state:
       'SINGLE_ROOT_LICENSE',
@@ -972,6 +996,10 @@ async function licenseEvidence(
 
     byteLength:
       blob.byteLength,
+
+    detectedSpdxId:
+      detectedLicense
+        .spdxId,
   };
 }
 

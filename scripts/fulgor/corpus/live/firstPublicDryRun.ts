@@ -44,9 +44,6 @@ const VULNERABLE_SHA =
 const FIXED_SHA =
   'ba6bd666fe74de54950122b5d92ecf1dcc02a9d3';
 
-const EXPECTED_LICENSE =
-  'Apache-2.0';
-
 export async function runFirstPublicDryRun(): Promise<void> {
   const workspaceRoot =
     process.env
@@ -238,7 +235,9 @@ export async function runFirstPublicDryRun(): Promise<void> {
     const licenseGate =
       evaluateLicenseEvidence({
         spdxId:
-          EXPECTED_LICENSE,
+          fixedLicense
+            .detectedSpdxId ??
+          null,
 
         licenseFilePath:
           fixedLicense.path,
@@ -251,6 +250,10 @@ export async function runFirstPublicDryRun(): Promise<void> {
           fixedLicense.state ===
             'SINGLE_ROOT_LICENSE',
       });
+
+    console.log(
+      `DETECTED_LICENSE_SPDX=${fixedLicense.detectedSpdxId ?? 'UNDETECTED'}`,
+    );
 
     console.log(
       `LICENSE_GATE=${licenseGate.decision}`,
@@ -286,7 +289,9 @@ export async function runFirstPublicDryRun(): Promise<void> {
         licenseGate,
 
         licenseSpdxId:
-          EXPECTED_LICENSE,
+          fixedLicense
+            .detectedSpdxId ??
+          null,
 
         createdAtUtc:
           new Date()

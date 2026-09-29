@@ -127,6 +127,9 @@ function pairEvidence():
 
       byteLength:
         1024,
+
+      detectedSpdxId:
+        'MIT',
     },
 
     fixedLicense: {
@@ -144,6 +147,9 @@ function pairEvidence():
 
       byteLength:
         1024,
+
+      detectedSpdxId:
+        'MIT',
     },
 
     licenseContinuity:
@@ -442,6 +448,30 @@ describe(
       },
     );
 
+    it(
+      'rejects caller SPDX that disagrees with materialized detection',
+      () => {
+        const input =
+          baseInput();
+
+        input.licenseSpdxId =
+          'Apache-2.0';
+
+        const result =
+          buildCorpusReviewCandidate(
+            input,
+          );
+
+        expect(result.accepted)
+          .toBe(false);
+
+        expect(
+          result.failureCodes,
+        ).toContain(
+          'INVALID_LICENSE_EVIDENCE',
+        );
+      },
+    );
     it(
       'rejects mismatched pair identities',
       () => {

@@ -310,6 +310,15 @@ export function buildCorpusReviewCandidate(
   const validLicense =
     input.licenseSpdxId !==
       null &&
+    fixedLicense
+      .detectedSpdxId !==
+      undefined &&
+    fixedLicense
+      .detectedSpdxId !==
+      null &&
+    input.licenseSpdxId ===
+      fixedLicense
+        .detectedSpdxId &&
     fixedLicense.state ===
       'SINGLE_ROOT_LICENSE' &&
     fixedLicense.path !==

@@ -207,6 +207,14 @@ implements GitProcessRunner {
 
               windowsHide: true,
 
+              /*
+               * POSIX Git runs in its own process group so timeout
+               * termination cannot leave transport descendants alive.
+               * Windows uses taskkill /T /F below.
+               */
+              detached:
+                process.platform !== 'win32',
+
               env:
                 buildIsolatedGitEnvironment(),
 
@@ -261,6 +269,76 @@ implements GitProcessRunner {
             }
           };
 
+        const terminateProcessTree =
+          () => {
+            const pid =
+              child.pid;
+
+            if (
+              pid === undefined
+            ) {
+              child.kill(
+                'SIGKILL',
+              );
+
+              return;
+            }
+
+            if (
+              process.platform ===
+              'win32'
+            ) {
+              /*
+               * Git for Windows may leave sh.exe,
+               * git-remote-https.exe or transport descendants alive
+               * when only the root git.exe is killed.
+               */
+              const killer =
+                spawn(
+                  'taskkill.exe',
+                  [
+                    '/PID',
+                    String(pid),
+                    '/T',
+                    '/F',
+                  ],
+                  {
+                    shell: false,
+                    windowsHide: true,
+                    stdio: 'ignore',
+                  },
+                );
+
+              killer.once(
+                'error',
+                () => {
+                  child.kill(
+                    'SIGKILL',
+                  );
+                },
+              );
+
+              killer.unref();
+
+              return;
+            }
+
+            /*
+             * On POSIX the Git child is detached, therefore -pid
+             * targets only the dedicated Git process group.
+             */
+            try {
+              process.kill(
+                -pid,
+                'SIGKILL',
+              );
+            }
+            catch {
+              child.kill(
+                'SIGKILL',
+              );
+            }
+          };
         const finishError = (
           error: Error,
         ) => {
@@ -280,7 +358,7 @@ implements GitProcessRunner {
            * Otherwise callers may attempt to delete a repository
            * while Git still owns object/pack file handles.
            */
-          child.kill();
+          terminateProcessTree();
 
           terminationTimer =
             setTimeout(

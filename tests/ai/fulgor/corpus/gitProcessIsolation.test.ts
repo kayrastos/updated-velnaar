@@ -5,6 +5,7 @@ import {
 } from 'vitest';
 
 import {
+  DefaultGitProcessRunner,
   buildIsolatedGitEnvironment,
 } from '../../../../scripts/fulgor/corpus/materialization/gitProcess';
 
@@ -294,5 +295,58 @@ describe(
         );
       },
     );
-  },
+
+    it(
+      'terminates a timed-out Git process tree before rejecting',
+      async () => {
+        const runner =
+          new DefaultGitProcessRunner();
+
+        const hangingAlias =
+          process.platform ===
+            'win32'
+            ? 'alias.fulgorhang=!ping.exe -n 30 127.0.0.1 >/dev/null 2>&1'
+            : 'alias.fulgorhang=!sleep 30';
+
+        let message:
+          string | null = null;
+
+        const started =
+          Date.now();
+
+        try {
+          await runner.run({
+            args: [
+              '-c',
+              hangingAlias,
+              'fulgorhang',
+            ],
+
+            timeoutMs:
+              100,
+
+            maxOutputBytes:
+              4_096,
+          });
+        }
+        catch (error) {
+          message =
+            error instanceof Error
+              ? error.message
+              : String(error);
+        }
+
+        expect(message)
+          .toBe(
+            'GIT_PROCESS_TIMEOUT',
+          );
+
+        expect(
+          Date.now() -
+          started,
+        ).toBeLessThan(
+          5_000,
+        );
+      },
+    );  },
 );
