@@ -12,6 +12,10 @@ import {
   admitVerifiedDraft,
 } from '../../../../scripts/fulgor/corpus/admission/admitVerifiedDraft';
 
+import {
+  recomputeCorpusDraftSha256,
+} from '../../../../scripts/fulgor/corpus/factory/reviewCandidateToDrafts';
+
 import type {
   FulgorCorpusDraft,
 } from '../../../../scripts/fulgor/corpus/factory/corpusDraft';
@@ -31,7 +35,7 @@ const SOURCE =
 const VERIFY =
   'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
 
-function draft(
+function rawDraft(
   role:
     'VULNERABLE' | 'FIXED' =
       'VULNERABLE',
@@ -116,6 +120,23 @@ function draft(
   };
 }
 
+function draft(
+  role:
+    'VULNERABLE' | 'FIXED' =
+      'VULNERABLE',
+): FulgorCorpusDraft {
+  const value =
+    rawDraft(
+      role,
+    );
+
+  value.draftSha256 =
+    recomputeCorpusDraftSha256(
+      value,
+    );
+
+  return value;
+}
 function receipt(
   input:
     FulgorCorpusDraft,
@@ -502,7 +523,47 @@ describe(
         ).not.toBeNull();
       },
     );
-  },
+
+    it(
+      'rejects semantic draft tampering even when receipt still matches stored draftSha256',
+      () => {
+        const input =
+          draft();
+
+        const verify =
+          receipt(
+            input,
+          );
+
+        (
+          input.verificationRequirements as string[]
+        ).push(
+          'UNBOUND_SEMANTIC_CHANGE',
+        );
+
+        const result =
+          admitVerifiedDraft(
+            input,
+            verify,
+            authored,
+          );
+
+        expect(result.accepted)
+          .toBe(false);
+
+        expect(
+          result.failureCodes,
+        ).toContain(
+          'DRAFT_DIGEST_MISMATCH',
+        );
+
+        expect(
+          verify.draftSha256,
+        ).toBe(
+          input.draftSha256,
+        );
+      },
+    );  },
 );
 
 function receiptPayload(

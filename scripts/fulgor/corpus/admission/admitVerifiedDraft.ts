@@ -7,6 +7,10 @@ import {
 } from './verificationReceipt';
 
 import {
+  recomputeCorpusDraftSha256,
+} from '../factory/reviewCandidateToDrafts';
+
+import {
   validateCorpusRecord,
 } from '../validation/provenanceValidator';
 
@@ -26,6 +30,7 @@ import type {
 
 export type DraftAdmissionFailureCode =
   | 'INVALID_DRAFT_STATE'
+  | 'DRAFT_DIGEST_MISMATCH'
   | 'RECEIPT_DRAFT_MISMATCH'
   | 'RECEIPT_PAIR_MISMATCH'
   | 'RECEIPT_DIFF_MISMATCH'
@@ -194,6 +199,16 @@ export function admitVerifiedDraft(
     );
   }
 
+  if (
+    draft.draftSha256 !==
+      recomputeCorpusDraftSha256(
+        draft,
+      )
+  ) {
+    failures.push(
+      'DRAFT_DIGEST_MISMATCH',
+    );
+  }
   if (
     receipt.draftSha256 !==
       draft.draftSha256

@@ -9,6 +9,7 @@ import {
 
 import {
   FULGOR_REVIEW_CANDIDATE_VERSION,
+  recomputeCorpusReviewCandidateSha256,
 } from '../review/reviewCandidate';
 
 import type {
@@ -141,6 +142,16 @@ function assertCandidate(
     );
   }
 
+  if (
+    candidate.candidateSha256 !==
+      recomputeCorpusReviewCandidateSha256(
+        candidate,
+      )
+  ) {
+    throw new Error(
+      'DRAFT_CANDIDATE_DIGEST_MISMATCH',
+    );
+  }
   if (
     candidate.changedFiles
       .length === 0
@@ -285,6 +296,78 @@ function buildDraft(
   };
 }
 
+export function recomputeCorpusDraftSha256(
+  draft:
+    FulgorCorpusDraft,
+): string {
+  /*
+   * Explicit canonical field projection prevents property insertion
+   * order of caller-owned objects from becoming digest authority.
+   */
+  return digest({
+    schemaVersion:
+      draft.schemaVersion,
+
+    trustState:
+      draft.trustState,
+
+    trainingAdmission:
+      draft.trainingAdmission,
+
+    vulnerabilityTruthAuthority:
+      draft.vulnerabilityTruthAuthority,
+
+    sourceCandidateSha256:
+      draft.sourceCandidateSha256,
+
+    corpusGroupKey:
+      draft.corpusGroupKey,
+
+    provider:
+      draft.provider,
+
+    advisoryId:
+      draft.advisoryId,
+
+    family:
+      draft.family,
+
+    repository:
+      draft.repository,
+
+    role:
+      draft.role,
+
+    expectedVerdict:
+      draft.expectedVerdict,
+
+    materializedCommitSha:
+      draft.materializedCommitSha,
+
+    counterpartCommitSha:
+      draft.counterpartCommitSha,
+
+    diffSha256:
+      draft.diffSha256,
+
+    changedFiles:
+      [...draft.changedFiles],
+
+    license: {
+      spdxId:
+        draft.license.spdxId,
+
+      path:
+        draft.license.path,
+
+      contentSha256:
+        draft.license.contentSha256,
+    },
+
+    verificationRequirements:
+      [...draft.verificationRequirements],
+  });
+}
 function buildHardNegativeRequest(
   candidate:
     CorpusReviewCandidate,

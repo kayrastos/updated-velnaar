@@ -223,6 +223,59 @@ function digestCandidate(
     .digest('hex');
 }
 
+export function recomputeCorpusReviewCandidateSha256(
+  candidate:
+    CorpusReviewCandidate,
+): string {
+  /*
+   * createdAtUtc is intentionally excluded:
+   * candidate identity represents semantic/evidence identity,
+   * not observation time.
+   */
+  return digestCandidate({
+    provider:
+      candidate.provider,
+
+    advisoryId:
+      candidate.advisoryId,
+
+    sourceUrl:
+      candidate.sourceUrl,
+
+    family:
+      candidate.family,
+
+    matchedCwes:
+      candidate.matchedCwes,
+
+    repository:
+      candidate.repository,
+
+    vulnerableCommitSha:
+      candidate.vulnerableCommitSha,
+
+    fixedCommitSha:
+      candidate.fixedCommitSha,
+
+    diffSha256:
+      candidate.diffSha256,
+
+    diffByteLength:
+      candidate.diffByteLength,
+
+    changedFiles:
+      candidate.changedFiles,
+
+    licenseSpdxId:
+      candidate.license.spdxId,
+
+    licensePath:
+      candidate.license.path,
+
+    licenseContentSha256:
+      candidate.license.contentSha256,
+  });
+}
 export function buildCorpusReviewCandidate(
   input:
     BuildReviewCandidateInput,

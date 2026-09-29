@@ -6,7 +6,12 @@ import {
 
 import {
   buildCorpusDraftBundle,
+  recomputeCorpusDraftSha256,
 } from '../../../../scripts/fulgor/corpus/factory/reviewCandidateToDrafts';
+
+import {
+  recomputeCorpusReviewCandidateSha256,
+} from '../../../../scripts/fulgor/corpus/review/reviewCandidate';
 
 import type {
   CorpusReviewCandidate,
@@ -18,7 +23,7 @@ const VULN =
 const FIX =
   '2222222222222222222222222222222222222222';
 
-function candidate():
+function rawCandidate():
   CorpusReviewCandidate {
   return {
     schemaVersion:
@@ -104,6 +109,18 @@ function candidate():
   };
 }
 
+function candidate():
+  CorpusReviewCandidate {
+  const value =
+    rawCandidate();
+
+  value.candidateSha256 =
+    recomputeCorpusReviewCandidateSha256(
+      value,
+    );
+
+  return value;
+}
 describe(
   'FULGOR corpus draft factory',
   () => {
@@ -317,5 +334,111 @@ describe(
         );
       },
     );
-  },
+
+    it(
+      'recomputes generated draft digest from its semantic fields',
+      () => {
+        const bundle =
+          buildCorpusDraftBundle(
+            candidate(),
+          );
+
+        expect(
+          recomputeCorpusDraftSha256(
+            bundle.vulnerableDraft,
+          ),
+        ).toBe(
+          bundle.vulnerableDraft
+            .draftSha256,
+        );
+
+        expect(
+          recomputeCorpusDraftSha256(
+            bundle.fixedDraft,
+          ),
+        ).toBe(
+          bundle.fixedDraft
+            .draftSha256,
+        );
+      },
+    );
+
+    it(
+      'rejects a stale candidate digest after semantic mutation',
+      () => {
+        const input =
+          candidate();
+
+        input.diffByteLength +=
+          1;
+
+        expect(
+          () =>
+            buildCorpusDraftBundle(
+              input,
+            ),
+        ).toThrow(
+          'DRAFT_CANDIDATE_DIGEST_MISMATCH',
+        );
+      },
+    );
+
+    it(
+      'changes downstream draft identity when upstream semantic evidence changes',
+      () => {
+        const firstCandidate =
+          candidate();
+
+        const first =
+          buildCorpusDraftBundle(
+            firstCandidate,
+          );
+
+        const secondCandidate =
+          candidate();
+
+        secondCandidate.diffByteLength +=
+          1;
+
+        secondCandidate.candidateSha256 =
+          recomputeCorpusReviewCandidateSha256(
+            secondCandidate,
+          );
+
+        const second =
+          buildCorpusDraftBundle(
+            secondCandidate,
+          );
+
+        expect(
+          secondCandidate.candidateSha256,
+        ).not.toBe(
+          firstCandidate.candidateSha256,
+        );
+
+        expect(
+          second.vulnerableDraft
+            .sourceCandidateSha256,
+        ).not.toBe(
+          first.vulnerableDraft
+            .sourceCandidateSha256,
+        );
+
+        expect(
+          second.vulnerableDraft
+            .draftSha256,
+        ).not.toBe(
+          first.vulnerableDraft
+            .draftSha256,
+        );
+
+        expect(
+          second.fixedDraft
+            .draftSha256,
+        ).not.toBe(
+          first.fixedDraft
+            .draftSha256,
+        );
+      },
+    );  },
 );
