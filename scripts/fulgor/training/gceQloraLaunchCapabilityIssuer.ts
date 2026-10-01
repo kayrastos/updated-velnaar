@@ -795,7 +795,7 @@ export function createGceQloraLaunchCapabilityIssuer(
   };
 }
 
-export async function verifyGceQloraLaunchCapabilityForTesting(
+export async function verifyGceQloraLaunchCapability(
   capability:
     GceQloraLaunchCapability,
 
@@ -913,4 +913,20 @@ export async function verifyGceQloraLaunchCapabilityForTesting(
   catch {
     return false;
   }
+}
+export async function verifyGceQloraLaunchCapabilityForTesting(
+  capability:
+    GceQloraLaunchCapability,
+
+  verifier:
+    GceQloraLaunchCapabilityVerifier,
+
+  nowUtc:
+    string,
+): Promise<boolean> {
+  return verifyGceQloraLaunchCapability(
+    capability,
+    verifier,
+    nowUtc,
+  );
 }
