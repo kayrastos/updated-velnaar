@@ -3,6 +3,10 @@ import {
 } from 'node:crypto';
 
 import {
+  FULGOR_QWEN_QLORA_MODEL_ID,
+  FULGOR_QWEN_QLORA_MODEL_REVISION_SHA,
+} from './qwenQloraModelPin';
+import {
   verifyTrainingJsonlExport,
 } from './trainingJsonlExport';
 
@@ -17,8 +21,10 @@ import type {
 export const FULGOR_QWEN_QLORA_RUNNER_CONTRACT_VERSION =
   'FULGOR_QWEN_QLORA_RUNNER_CONTRACT_V1' as const;
 
-export const FULGOR_QWEN_QLORA_MODEL_ID =
-  'Qwen/Qwen3.8-27B' as const;
+export {
+  FULGOR_QWEN_QLORA_MODEL_ID,
+  FULGOR_QWEN_QLORA_MODEL_REVISION_SHA,
+};
 
 export interface QwenQloraRunnerContractInput {
   trainingExport:
@@ -434,7 +440,9 @@ function assertModelRevision(
     ) ||
     /^0{40}$/.test(
       revision,
-    )
+    ) ||
+    revision !==
+      FULGOR_QWEN_QLORA_MODEL_REVISION_SHA
   ) {
     throw new Error(
       'INVALID_BASE_MODEL_REVISION_SHA',

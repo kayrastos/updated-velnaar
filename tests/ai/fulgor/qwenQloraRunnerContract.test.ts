@@ -435,7 +435,7 @@ function fixture() {
       sourceManifest,
 
       baseModelRevisionSha:
-        '1234567890abcdef1234567890abcdef12345678',
+        '1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0',
     },
   };
 }
@@ -698,6 +698,18 @@ describe(
 
               baseModelRevisionSha:
                 '0'.repeat(40),
+            }),
+        ).toThrow(
+          'INVALID_BASE_MODEL_REVISION_SHA',
+        );
+
+        expect(
+          () =>
+            createQwenQloraRunnerContract({
+              ...input,
+
+              baseModelRevisionSha:
+                'f'.repeat(40),
             }),
         ).toThrow(
           'INVALID_BASE_MODEL_REVISION_SHA',
