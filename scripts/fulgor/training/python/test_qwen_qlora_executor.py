@@ -83,7 +83,39 @@ class FakeCuda:
 
 
 class FakeTorch:
+    __version__ = (
+        "2.12.0a0+5aff3928d8.nv26.05"
+    )
+
+    class version:
+        cuda = "13.2"
+
     cuda = FakeCuda()
+
+
+class FakeModule:
+    def __init__(
+        self,
+        version: str,
+    ) -> None:
+        self.__version__ = version
+
+
+def fake_training_stack():
+    return {
+        "torch":
+            FakeTorch(),
+        "transformers":
+            FakeModule("5.18.0"),
+        "peft":
+            FakeModule("0.21.0"),
+        "bitsandbytes":
+            FakeModule("0.50.2"),
+        "accelerate":
+            FakeModule("1.15.0"),
+        "safetensors":
+            FakeModule("0.8.0"),
+    }
 
 
 class ExecutorTests(
@@ -406,6 +438,59 @@ class ExecutorTests(
                 request,
                 data_root,
                 output_root,
+            )
+
+    def test_runtime_stack_accepts_exact_pins(
+        self,
+    ):
+        result = (
+            executor
+            .verify_training_stack_versions(
+                fake_training_stack()
+            )
+        )
+
+        self.assertEqual(
+            result["packages"][
+                "transformers"
+            ],
+            "5.18.0",
+        )
+
+        self.assertEqual(
+            result["packages"][
+                "bitsandbytes"
+            ],
+            "0.50.2",
+        )
+
+        self.assertEqual(
+            result[
+                "torchCudaVersion"
+            ],
+            "13.2",
+        )
+
+    def test_runtime_stack_rejects_package_drift(
+        self,
+    ):
+        stack = fake_training_stack()
+
+        stack["peft"] = (
+            FakeModule(
+                "0.22.0"
+            )
+        )
+
+        with self.assertRaisesRegex(
+            executor.ExecutorError,
+            "TRAINING_STACK_VERSION_MISMATCH:peft",
+        ):
+            (
+                executor
+                .verify_training_stack_versions(
+                    stack
+                )
             )
 
     def test_cuda_probe_accepts_l4(

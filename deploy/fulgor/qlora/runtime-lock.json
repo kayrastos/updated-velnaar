@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "FULGOR_QWEN_QLORA_TRAINING_IMAGE_RUNTIME_LOCK_V1",
+  "state": "OFFLINE_CONTRACT_ONLY_BUILD_NOT_AUTHORIZED",
+  "platform": "linux/amd64",
+  "baseImage": {
+    "reference": "nvcr.io/nvidia/pytorch@sha256:ca73b4795f0d3ae27e9cd81b1b1f1b7fc6c0a129f7d51a359d2326e95af48a3d",
+    "tagProvenance": "26.05-py3",
+    "manifestDigest": "sha256:ca73b4795f0d3ae27e9cd81b1b1f1b7fc6c0a129f7d51a359d2326e95af48a3d",
+    "cudaToolkitVersion": "13.2.1",
+    "torchSourceVersionPrefix": "2.12.0a0+5aff3928d8",
+    "pythonMajorMinor": "3.12"
+  },
+  "directPythonPins": {
+    "transformers": "5.18.0",
+    "peft": "0.21.0",
+    "bitsandbytes": "0.50.2",
+    "accelerate": "1.15.0",
+    "safetensors": "0.8.0"
+  },
+  "modelContract": {
+    "modelId": "Qwen/Qwen3.8-27B",
+    "modelRevisionSha": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+    "trustRemoteCode": false,
+    "requireSafeTensors": true,
+    "ggufInputAllowed": false
+  },
+  "gpuContract": {
+    "expectedGpu": "NVIDIA_L4_24GB",
+    "expectedGpuCount": 1,
+    "minimumCudaComputeCapability": "8.9",
+    "computeDtype": "BFLOAT16",
+    "quantization": "NF4_4BIT"
+  },
+  "policies": {
+    "floatingBaseImageAllowed": false,
+    "networkPackageInstallAtRuntimeAllowed": false,
+    "networkModelDownloadAtRuntimeAllowed": false,
+    "completeTransitiveWheelhouseHashLockRequired": true,
+    "buildAuthorized": false,
+    "containerPullAuthorized": false,
+    "containerStartAuthorized": false,
+    "cloudProvisioningAuthorized": false,
+    "trainingExecutionAuthorized": false,
+    "promotionAuthorized": false,
+    "deploymentAuthorized": false
+  }
+}

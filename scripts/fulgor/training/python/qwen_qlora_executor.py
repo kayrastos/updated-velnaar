@@ -28,6 +28,20 @@ MODEL_ARCHITECTURE = (
 
 MODEL_TYPE = "qwen3_5"
 
+EXPECTED_TRAINING_STACK_VERSIONS = {
+    "transformers": "5.18.0",
+    "peft": "0.21.0",
+    "bitsandbytes": "0.50.2",
+    "accelerate": "1.15.0",
+    "safetensors": "0.8.0",
+}
+
+EXPECTED_TORCH_VERSION_PREFIX = (
+    "2.12.0a0+5aff3928d8"
+)
+
+EXPECTED_TORCH_CUDA_PREFIX = "13.2"
+
 SHA256 = re.compile(r"^[a-f0-9]{64}$")
 SHA40 = re.compile(r"^[a-f0-9]{40}$")
 
@@ -762,6 +776,7 @@ def import_training_stack() -> dict[str, Any]:
         "peft",
         "bitsandbytes",
         "accelerate",
+        "safetensors",
     ):
         try:
             modules[name] = (
@@ -811,6 +826,98 @@ def import_training_stack() -> dict[str, Any]:
             )
 
     return modules
+
+
+def verify_training_stack_versions(
+    modules: dict[str, Any],
+) -> dict[str, Any]:
+    expected_module_names = (
+        set(
+            EXPECTED_TRAINING_STACK_VERSIONS.keys()
+        )
+        | {"torch"}
+    )
+
+    if set(modules.keys()) != expected_module_names:
+        fail(
+            "TRAINING_STACK_MODULE_SET_MISMATCH"
+        )
+
+    torch_module = modules["torch"]
+
+    torch_version = str(
+        getattr(
+            torch_module,
+            "__version__",
+            "UNKNOWN",
+        )
+    )
+
+    if not torch_version.startswith(
+        EXPECTED_TORCH_VERSION_PREFIX
+    ):
+        fail(
+            "TRAINING_STACK_VERSION_MISMATCH:torch"
+        )
+
+    torch_version_module = getattr(
+        torch_module,
+        "version",
+        None,
+    )
+
+    torch_cuda_version = getattr(
+        torch_version_module,
+        "cuda",
+        None,
+    )
+
+    if (
+        not isinstance(
+            torch_cuda_version,
+            str,
+        )
+        or not torch_cuda_version.startswith(
+            EXPECTED_TORCH_CUDA_PREFIX
+        )
+    ):
+        fail(
+            "TRAINING_STACK_CUDA_MISMATCH"
+        )
+
+    package_versions: dict[str, str] = {
+        "torch":
+            torch_version,
+    }
+
+    for (
+        name,
+        expected_version,
+    ) in EXPECTED_TRAINING_STACK_VERSIONS.items():
+        actual_version = str(
+            getattr(
+                modules[name],
+                "__version__",
+                "UNKNOWN",
+            )
+        )
+
+        if actual_version != expected_version:
+            fail(
+                "TRAINING_STACK_VERSION_MISMATCH:"
+                + name
+            )
+
+        package_versions[name] = (
+            actual_version
+        )
+
+    return {
+        "packages":
+            package_versions,
+        "torchCudaVersion":
+            torch_cuda_version,
+    }
 
 
 def probe_cuda_runtime(
@@ -889,6 +996,12 @@ def container_preflight(
 
     modules = import_training_stack()
 
+    stack_versions = (
+        verify_training_stack_versions(
+            modules
+        )
+    )
+
     cuda_result = probe_cuda_runtime(
         modules["torch"]
     )
@@ -901,17 +1014,10 @@ def container_preflight(
             True,
         "cuda":
             cuda_result,
-        "packageVersions": {
-            name: str(
-                getattr(
-                    module,
-                    "__version__",
-                    "UNKNOWN",
-                )
-            )
-            for name, module
-            in modules.items()
-        },
+        "packageVersions":
+            stack_versions["packages"],
+        "torchCudaVersion":
+            stack_versions["torchCudaVersion"],
     }
 
 

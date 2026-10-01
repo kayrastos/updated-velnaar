@@ -1,0 +1,11 @@
+# FULGOR QLoRA direct Python dependency contract.
+#
+# NOT a complete transitive installation lock.
+# NOT authorized for online runtime installation.
+# A complete offline wheelhouse with SHA-256 bindings is required
+# before image-build authorization.
+transformers==5.18.0
+peft==0.21.0
+bitsandbytes==0.50.2
+accelerate==1.15.0
+safetensors==0.8.0
