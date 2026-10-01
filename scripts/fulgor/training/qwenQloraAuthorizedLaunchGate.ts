@@ -84,6 +84,12 @@ export interface QwenQloraLaunchCapabilityIssueRequest {
   runnerContractSha256:
     string;
 
+  sourceRegistryPayloadSha256:
+    string;
+
+  sourceTrainingManifestSha256:
+    string;
+
   modelId:
     string;
 
@@ -100,6 +106,9 @@ export interface QwenQloraLaunchCapabilityIssueRequest {
     string;
 
   sourceFinalHoldoutCommitmentSha256:
+    string;
+
+  authorizationExpiresAtUtc:
     string;
 
   targetRuntime:
@@ -316,6 +325,16 @@ function buildIssueRequest(
       request.runnerContract
         .contractSha256,
 
+    sourceRegistryPayloadSha256:
+      request.runnerContract
+        .dataBinding
+        .sourceRegistryPayloadSha256,
+
+    sourceTrainingManifestSha256:
+      request.runnerContract
+        .dataBinding
+        .sourceTrainingManifestSha256,
+
     modelId:
       request.runnerContract
         .model
@@ -345,6 +364,10 @@ function buildIssueRequest(
       request.runnerContract
         .dataBinding
         .sourceFinalHoldoutCommitmentSha256,
+
+    authorizationExpiresAtUtc:
+      request.authorization
+        .expiresAtUtc,
 
     targetRuntime:
       request.runnerContract

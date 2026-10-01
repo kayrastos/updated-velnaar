@@ -33,6 +33,9 @@ function requestFixture():
       payloadSha256:
         'a'.repeat(64),
 
+      expiresAtUtc:
+        '2026-09-29T21:00:00Z',
+
       nonce:
         'secret-nonce-not-for-issuer',
 
@@ -53,6 +56,12 @@ function requestFixture():
       },
 
       dataBinding: {
+        sourceRegistryPayloadSha256:
+          '2'.repeat(64),
+
+        sourceTrainingManifestSha256:
+          '3'.repeat(64),
+
         sourceJsonlExportSha256:
           'd'.repeat(64),
 
