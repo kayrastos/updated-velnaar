@@ -481,13 +481,27 @@ export function parseCodexJsonl(
 }
 
 /**
- * Parse Antigravity's structured JSON envelope.
+ * Extract the sole authority-bearing payload from an
+ * Antigravity JSON envelope.
  *
- * Envelope metadata is non-authoritative and may evolve.
- * Only status=SUCCESS plus the schema-constrained
- * structured_output may become candidate protocol.
+ * AGY versions may expose schema-constrained output as:
+ *
+ * 1. structured_output object, or
+ * 2. response containing a JSON object while json_schema
+ *    remains present in the envelope.
+ *
+ * Envelope metadata itself has no authority.
+ *
+ * Security rules:
+ * - status must be SUCCESS
+ * - denied_actions must exist and be empty
+ * - json_schema must exist as an object
+ * - if structured_output exists, it MUST be valid;
+ *   never downgrade to response if it is malformed
+ * - response fallback must itself be exactly one JSON
+ *   object, never prose/markdown
  */
-export function parseAntigravityJsonEnvelope(
+export function extractAntigravityAuthorityPayload(
   stdout: Buffer,
 ): Buffer {
   try {
@@ -532,53 +546,162 @@ export function parseAntigravityJsonEnvelope(
       return Buffer.alloc(0);
     }
 
-    const structured =
-      record.structured_output;
-
+    /*
+     * Any denied action means the model did not execute
+     * the exact bounded task as requested. Do not silently
+     * count a partial result as useful output.
+     */
     if (
-      structured === null ||
-      typeof structured !==
-        'object' ||
-      Array.isArray(structured)
+      !Array.isArray(
+        record.denied_actions,
+      ) ||
+      record.denied_actions
+        .length !== 0
     ) {
       return Buffer.alloc(0);
     }
 
-    /*
-     * Serialize only the schema-bound payload.
-     * response, usage, duration, conversation_id,
-     * json_schema and future metadata have no authority.
-     */
-    const raw =
-      Buffer.from(
+    if (
+      record.json_schema ===
+        null ||
+      typeof record.json_schema !==
+        'object' ||
+      Array.isArray(
+        record.json_schema,
+      )
+    ) {
+      return Buffer.alloc(0);
+    }
+
+    const ownsStructuredOutput =
+      Object.prototype
+        .hasOwnProperty.call(
+          record,
+          'structured_output',
+        );
+
+    if (
+      ownsStructuredOutput
+    ) {
+      const structured =
+        record.structured_output;
+
+      /*
+       * Do NOT downgrade to response if the runtime
+       * explicitly supplied a malformed/null
+       * structured_output field.
+       */
+      if (
+        structured === null ||
+        typeof structured !==
+          'object' ||
+        Array.isArray(
+          structured,
+        )
+      ) {
+        return Buffer.alloc(0);
+      }
+
+      return Buffer.from(
         JSON.stringify(
           structured,
         ),
       );
+    }
 
-    const value =
-      parseExact(
-        raw,
-        [
-          'status',
-          'path',
-          'content',
-        ],
-      ) ??
-      parseExact(
-        raw,
-        [
-          'status',
-          'failure',
-        ],
-      );
+    /*
+     * Current AGY 1.4.2 live envelope can omit
+     * structured_output even when --json-schema is used.
+     *
+     * In that compatibility path response gains no
+     * authority merely by being text: it must decode as
+     * exactly one JSON object first.
+     */
+    if (
+      typeof record.response !==
+        'string'
+    ) {
+      return Buffer.alloc(0);
+    }
 
-    return value
-      ? raw
-      : Buffer.alloc(0);
+    if (
+      Buffer.byteLength(
+        record.response,
+        'utf8',
+      ) >
+      MAX_AGENT_TRANSCRIPT_BYTES
+    ) {
+      return Buffer.alloc(0);
+    }
+
+    const responseValue:
+      unknown =
+        JSON.parse(
+          record.response,
+        );
+
+    if (
+      responseValue === null ||
+      typeof responseValue !==
+        'object' ||
+      Array.isArray(
+        responseValue,
+      )
+    ) {
+      return Buffer.alloc(0);
+    }
+
+    return Buffer.from(
+      JSON.stringify(
+        responseValue,
+      ),
+    );
   } catch {
     return Buffer.alloc(0);
   }
+}
+
+/**
+ * Production one-shot Antigravity builder protocol.
+ *
+ * Envelope extraction is generic, but candidate authority
+ * remains constrained to the existing exact builder
+ * contract.
+ */
+export function parseAntigravityJsonEnvelope(
+  stdout: Buffer,
+): Buffer {
+  const raw =
+    extractAntigravityAuthorityPayload(
+      stdout,
+    );
+
+  if (
+    raw.length === 0
+  ) {
+    return raw;
+  }
+
+  const value =
+    parseExact(
+      raw,
+      [
+        'status',
+        'path',
+        'content',
+      ],
+    ) ??
+    parseExact(
+      raw,
+      [
+        'status',
+        'failure',
+      ],
+    );
+
+  return value
+    ? raw
+    : Buffer.alloc(0);
 }
 
 export async function runAntigravityFallback(config: LiveAgentConfig, repoRoot: string, session: Session, task: string, findings: string): Promise<LiveOutput> {

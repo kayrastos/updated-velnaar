@@ -12,6 +12,7 @@ import { runLiveOrchestration } from '../../../scripts/fulgor/orchestration/live
 import {
   ANTIGRAVITY_BUILDER_SCHEMA,
   MAX_AGENT_TRANSCRIPT_BYTES,
+  extractAntigravityAuthorityPayload,
   parseAntigravityJsonEnvelope,
   parseExact,
   runCopilotScout,
@@ -52,6 +53,9 @@ function antigravityEnvelope(
 
     status:
       'SUCCESS',
+
+    denied_actions:
+      [],
 
     response:
       JSON.stringify(
@@ -214,6 +218,249 @@ it(
         branch.additionalProperties,
       ).toBe(false);
     }
+  },
+);
+
+it(
+  'accepts the current AGY response JSON compatibility shape when structured_output is absent',
+  () => {
+    const envelope =
+      JSON.parse(
+        antigravityEnvelope(
+          candidate,
+        ),
+      );
+
+    delete envelope
+      .structured_output;
+
+    envelope.response =
+      JSON.stringify(
+        candidate,
+      );
+
+    const raw =
+      extractAntigravityAuthorityPayload(
+        Buffer.from(
+          JSON.stringify(
+            envelope,
+          ),
+        ),
+      );
+
+    expect(
+      JSON.parse(
+        new TextDecoder(
+          'utf-8',
+          {
+            fatal: true,
+          },
+        ).decode(
+          raw,
+        ),
+      ),
+    ).toEqual(
+      candidate,
+    );
+
+    /*
+     * Production builder parser still applies its exact
+     * contract after generic envelope extraction.
+     */
+    expect(
+      parseAntigravityJsonEnvelope(
+        Buffer.from(
+          JSON.stringify(
+            envelope,
+          ),
+        ),
+      ),
+    ).toEqual(
+      raw,
+    );
+  },
+);
+
+it(
+  'keeps generic AGY payload extraction separate from the production builder contract',
+  () => {
+    const providerWorkProduct = {
+      schemaVersion:
+        'VELNAR_PROVIDER_WORK_PRODUCT_V1',
+
+      provider:
+        'antigravity',
+
+      taskId:
+        'canary-task',
+
+      baseline:
+        '0123456789abcdef0123456789abcdef01234567',
+
+      status:
+        'PROPOSE_CHANGE',
+
+      summary:
+        'Bounded fixture.',
+
+      evidenceIds:
+        ['E1', 'E2'],
+
+      candidate: {
+        path:
+          'tests/canary.test.ts',
+
+        content:
+          'export const x = true;\n',
+      },
+
+      tests: [
+        'npx vitest run tests/canary.test.ts',
+      ],
+
+      blocker:
+        null,
+    };
+
+    const envelope =
+      JSON.parse(
+        antigravityEnvelope(
+          candidate,
+        ),
+      );
+
+    delete envelope
+      .structured_output;
+
+    envelope.response =
+      JSON.stringify(
+        providerWorkProduct,
+      );
+
+    const bytes =
+      Buffer.from(
+        JSON.stringify(
+          envelope,
+        ),
+      );
+
+    const generic =
+      extractAntigravityAuthorityPayload(
+        bytes,
+      );
+
+    expect(
+      JSON.parse(
+        new TextDecoder(
+          'utf-8',
+          {
+            fatal: true,
+          },
+        ).decode(
+          generic,
+        ),
+      ),
+    ).toEqual(
+      providerWorkProduct,
+    );
+
+    /*
+     * Generic extraction can feed the provider work
+     * product gate, but MUST NOT broaden the production
+     * builder contract.
+     */
+    expect(
+      parseAntigravityJsonEnvelope(
+        bytes,
+      ).length,
+    ).toBe(0);
+  },
+);
+
+it(
+  'rejects AGY success envelopes with denied actions',
+  () => {
+    const raw =
+      Buffer.from(
+        antigravityEnvelope(
+          candidate,
+          {
+            denied_actions: [
+              {
+                action:
+                  'synthetic',
+              },
+            ],
+          },
+        ),
+      );
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        raw,
+      ).length,
+    ).toBe(0);
+
+    expect(
+      parseAntigravityJsonEnvelope(
+        raw,
+      ).length,
+    ).toBe(0);
+  },
+);
+
+it(
+  'does not downgrade from malformed structured_output to response',
+  () => {
+    const raw =
+      Buffer.from(
+        antigravityEnvelope(
+          null,
+          {
+            response:
+              JSON.stringify(
+                candidate,
+              ),
+
+            structured_output:
+              null,
+          },
+        ),
+      );
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        raw,
+      ).length,
+    ).toBe(0);
+  },
+);
+
+it(
+  'rejects prose response fallback even when AGY reports SUCCESS',
+  () => {
+    const envelope =
+      JSON.parse(
+        antigravityEnvelope(
+          candidate,
+        ),
+      );
+
+    delete envelope
+      .structured_output;
+
+    envelope.response =
+      'not-json';
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        Buffer.from(
+          JSON.stringify(
+            envelope,
+          ),
+        ),
+      ).length,
+    ).toBe(0);
   },
 );
 
