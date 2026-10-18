@@ -41,6 +41,74 @@ export const ACCEPTED_WORK_GIT_MATERIALIZER_SCHEMA =
 const MAX_GIT_OUTPUT_BYTES =
   1024 * 1024;
 
+function isolatedGitEnvironment():
+NodeJS.ProcessEnv {
+  const environment:
+    NodeJS.ProcessEnv =
+      {};
+
+  for (
+    const [
+      key,
+      value,
+    ] of Object.entries(
+      process.env,
+    )
+  ) {
+    if (
+      !key.startsWith(
+        'GIT_',
+      ) &&
+      value !==
+        undefined
+    ) {
+      environment[key] =
+        value;
+    }
+  }
+
+  environment.GIT_CONFIG_NOSYSTEM =
+    '1';
+
+  environment.GIT_CONFIG_GLOBAL =
+    process.platform ===
+      'win32'
+      ? 'NUL'
+      : '/dev/null';
+
+  environment.GIT_NO_REPLACE_OBJECTS =
+    '1';
+
+  environment.GIT_OPTIONAL_LOCKS =
+    '0';
+
+  environment.GIT_TERMINAL_PROMPT =
+    '0';
+
+  environment.LC_ALL =
+    'C';
+
+  environment.LANG =
+    'C';
+
+  return environment;
+}
+
+function isolatedGitArgs(
+  args:
+    readonly string[],
+): string[] {
+  return [
+    '-c',
+    'core.hooksPath=/dev/null',
+    '-c',
+    'core.autocrlf=false',
+    '-c',
+    'core.safecrlf=false',
+    ...args,
+  ];
+}
+
 const HEX40 =
   /^[0-9a-f]{40}$/;
 
@@ -135,7 +203,9 @@ function execGitBuffer(
     ) => {
       execFile(
         'git',
-        [...args],
+        isolatedGitArgs(
+          args,
+        ),
         {
           cwd:
             repoRoot,
@@ -145,6 +215,9 @@ function execGitBuffer(
 
           maxBuffer:
             MAX_GIT_OUTPUT_BYTES,
+
+          env:
+            isolatedGitEnvironment(),
 
           windowsHide:
             true,
@@ -189,7 +262,9 @@ function execGitSuccess(
     ) => {
       execFile(
         'git',
-        [...args],
+        isolatedGitArgs(
+          args,
+        ),
         {
           cwd:
             repoRoot,
@@ -199,6 +274,9 @@ function execGitSuccess(
 
           maxBuffer:
             MAX_GIT_OUTPUT_BYTES,
+
+          env:
+            isolatedGitEnvironment(),
 
           windowsHide:
             true,
@@ -872,12 +950,12 @@ async function dryRunApplyProduction(
         const child =
           execFile(
             'git',
-            [
+            isolatedGitArgs([
               'apply',
               '--check',
               '--whitespace=nowarn',
               '-',
-            ],
+            ]),
             {
               cwd:
                 root,
@@ -887,6 +965,9 @@ async function dryRunApplyProduction(
 
               maxBuffer:
                 MAX_GIT_OUTPUT_BYTES,
+
+              env:
+                isolatedGitEnvironment(),
 
               windowsHide:
                 true,

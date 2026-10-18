@@ -42,6 +42,10 @@ import {
   type AcceptedWorkSourceBinding,
 } from '../orchestration/acceptedWorkSourceBinding';
 
+import {
+  readAcceptedWorkFulgorAdmissionReceiptForEvidence,
+} from '../orchestration/acceptedWorkFulgorPermit';
+
 export const ACCEPTED_WORK_AUTHORIZATION_GATE_SCHEMA =
   'VELNAR_ACCEPTED_WORK_AUTHORIZATION_GATE_V1' as const;
 
@@ -67,6 +71,8 @@ export type AcceptedWorkAuthorizationGateCode =
   | 'PROVENANCE_INVALID'
   | 'PROVENANCE_BINDING_MISMATCH'
   | 'SOURCE_BINDING_ARTIFACT_INVALID'
+  | 'ADMISSION_RECEIPT_INVALID'
+  | 'ADMISSION_RECEIPT_ARTIFACT_INVALID'
   | 'AUTOMATION_EVIDENCE_ARTIFACT_INVALID'
   | 'STATIC_SCOPE_SOURCE_MISMATCH'
   | 'HUMAN_PROMOTION_GATE_DENIED';
@@ -633,6 +639,47 @@ evaluateAcceptedWorkAuthorizationGate(
     );
   }
 
+  let admission;
+
+  try {
+    admission =
+      await readAcceptedWorkFulgorAdmissionReceiptForEvidence(
+        evidenceRoot,
+        envelope.evidence,
+      );
+  } catch {
+    return deny(
+      'ADMISSION_RECEIPT_INVALID',
+      {
+        verifiedEnvelope:
+          envelope,
+
+        sourceBinding:
+          source.binding,
+      },
+    );
+  }
+
+  if (
+    admission
+      .receipt
+      .sourceBindingSha256 !==
+        source
+          .binding
+          .bindingSha256
+  ) {
+    return deny(
+      'ADMISSION_RECEIPT_INVALID',
+      {
+        verifiedEnvelope:
+          envelope,
+
+        sourceBinding:
+          source.binding,
+      },
+    );
+  }
+
   let provenance:
     FulgorProvenanceManifestV1;
 
@@ -690,6 +737,36 @@ evaluateAcceptedWorkAuthorizationGate(
   ) {
     return deny(
       'SOURCE_BINDING_ARTIFACT_INVALID',
+      {
+        verifiedEnvelope:
+          envelope,
+
+        verifiedProvenance:
+          provenance,
+
+        sourceBinding:
+          source.binding,
+      },
+    );
+  }
+
+  if (
+    !exactVerifiedArtifact(
+      provenance,
+      {
+        path:
+          admission.relativePath,
+
+        sha256:
+          admission.fileSha256,
+
+        role:
+          'accepted_work_fulgor_admission_receipt',
+      },
+    )
+  ) {
+    return deny(
+      'ADMISSION_RECEIPT_ARTIFACT_INVALID',
       {
         verifiedEnvelope:
           envelope,

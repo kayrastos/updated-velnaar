@@ -32,6 +32,11 @@ import {
   type AcceptedWorkSourceBinding,
 } from './acceptedWorkSourceBinding';
 
+import {
+  authorizeAcceptedWorkCandidateWithPermit,
+  type AcceptedWorkFulgorPermitAdmission,
+} from './acceptedWorkFulgorPermit';
+
 export const ACCEPTED_WORK_CONTROLLER_FEEDER_SCHEMA =
   'VELNAR_ACCEPTED_WORK_CONTROLLER_FEEDER_V1' as const;
 
@@ -60,6 +65,9 @@ export interface AcceptedWorkControllerFeederOptions {
     string;
 
   readonly sourceBindingRoot:
+    string;
+
+  readonly permitRoot:
     string;
 
   readonly policy:
@@ -111,6 +119,22 @@ export interface AcceptedWorkControllerFeederDependencies {
 
   readonly materialize?:
     typeof materializeNextAcceptedWorkForFulgor;
+
+  readonly authorizeCandidate?:
+    (
+      permitRoot:
+        string,
+
+      pointer:
+        AcceptedWorkLatestPointer,
+
+      materialized:
+        MaterializedFulgorCandidate,
+
+      sourceBinding:
+        AcceptedWorkSourceBinding,
+    ) =>
+      Promise<AcceptedWorkFulgorPermitAdmission>;
 }
 
 async function loadAcceptedProduction(
@@ -198,29 +222,6 @@ async function readExistingSourceBinding(
   }
 }
 
-function removeSelectionMembers(
-  input:
-    readonly PersistedAcceptedWorkProduct[],
-
-  materialized:
-    MaterializedFulgorCandidate,
-): readonly PersistedAcceptedWorkProduct[] {
-  const ids =
-    new Set(
-      materialized
-        .plan
-        .selection
-        .memberJobIds,
-    );
-
-  return input.filter(
-    item =>
-      !ids.has(
-        item.jobId,
-      ),
-  );
-}
-
 export async function
 scanAcceptedWorkForFulgorOnce(
   options:
@@ -238,14 +239,11 @@ scanAcceptedWorkForFulgorOnce(
     1;
 
   if (
-    !Number.isInteger(
-      maxEnqueue,
-    ) ||
-    maxEnqueue < 1 ||
-    maxEnqueue > 16
+    maxEnqueue !==
+      1
   ) {
     throw new Error(
-      'ACCEPTED_WORK_FEEDER_MAX_ENQUEUE_INVALID',
+      'ACCEPTED_WORK_FEEDER_MAX_ENQUEUE_MUST_BE_ONE',
     );
   }
 
@@ -343,146 +341,166 @@ scanAcceptedWorkForFulgorOnce(
     dependencies.materialize ??
     materializeNextAcceptedWorkForFulgor;
 
-  let remaining:
-    readonly PersistedAcceptedWorkProduct[] =
-      accepted;
-
-  let duplicateSkipped =
-    0;
-
-  let enqueued =
-    0;
-
-  while (
-    remaining.length >
-      0 &&
-    enqueued <
-      maxEnqueue
-  ) {
-    const materialized =
-      await materialize(
-        options.repoRoot,
-        remaining,
-        options.policy,
-      );
-
-    if (
-      materialized ===
-        null
-    ) {
-      break;
-    }
-
-    const jobId =
-      materialized
-        .plan
-        .job
-        .jobId;
-
-    /*
-     * Deterministic VF-* identity is candidate-bound,
-     * not provider-run-bound.
-     *
-     * A later provider run may legitimately rediscover
-     * the exact same baseline/candidate/patch. In that
-     * case its request ID, source job ID, fingerprint,
-     * provider support count and accepted SHA can differ
-     * while the FULGOR job remains identical.
-     *
-     * Reuse is therefore permitted only when the
-     * existing immutable binding proves the exact same
-     * stable bridge identity.
-     */
-    const sourceBinding =
-      createAcceptedWorkSourceBinding(
-        pointer,
-        materialized,
-      );
-
-    const existingBinding =
-      await readExistingSourceBinding(
-        options.sourceBindingRoot,
-        jobId,
-      );
-
-    if (
-      existingBinding !==
-        null &&
-      !sameStableBridgeBinding(
-        existingBinding,
-        sourceBinding,
-      )
-    ) {
-      throw new Error(
-        'ACCEPTED_WORK_FEEDER_SOURCE_BINDING_MISMATCH',
-      );
-    }
-
-    if (
-      knownJobIds.has(
-        jobId,
-      )
-    ) {
-      /*
-       * A controller-known VF-* job must already have
-       * its immutable source binding. Never backfill a
-       * known job from a later provider run.
-       */
-      if (
-        existingBinding ===
-          null
-      ) {
-        throw new Error(
-          'ACCEPTED_WORK_FEEDER_KNOWN_JOB_BINDING_MISSING',
-        );
-      }
-
-      duplicateSkipped +=
-        1;
-
-      remaining =
-        removeSelectionMembers(
-          remaining,
-          materialized,
-        );
-
-      continue;
-    }
-
-    if (
-      existingBinding ===
-        null
-    ) {
-      /*
-       * New jobs persist source authority BEFORE queue
-       * admission. If enqueue then fails, this binding
-       * remains harmless and may be reused on retry.
-       */
-      await persistAcceptedWorkSourceBinding(
-        options.sourceBindingRoot,
-        sourceBinding,
-      );
-    }
-
-    await store.enqueue(
-      materialized
-        .plan
-        .job,
+  /*
+   * Exactly one deterministic top candidate is examined
+   * per explicit authorization. No duplicate, rejection
+   * or materialization failure may widen the authority
+   * to a fallback candidate.
+   */
+  const materialized =
+    await materialize(
+      options.repoRoot,
+      accepted,
+      options.policy,
     );
 
-    knownJobIds.add(
+  if (
+    materialized ===
+      null
+  ) {
+    return Object.freeze({
+      schemaVersion:
+        ACCEPTED_WORK_CONTROLLER_FEEDER_SCHEMA,
+
+      pointerFound:
+        true,
+
+      acceptedRows:
+        accepted.length,
+
+      duplicateSkipped:
+        0,
+
+      enqueued:
+        0,
+
+      noCandidate:
+        true,
+    });
+  }
+
+  const jobId =
+    materialized
+      .plan
+      .job
+      .jobId;
+
+  const sourceBinding =
+    createAcceptedWorkSourceBinding(
+      pointer,
+      materialized,
+    );
+
+  const existingBinding =
+    await readExistingSourceBinding(
+      options.sourceBindingRoot,
       jobId,
     );
 
-    enqueued +=
-      1;
-
-    remaining =
-      removeSelectionMembers(
-        remaining,
-        materialized,
-      );
+  if (
+    existingBinding !==
+      null &&
+    !sameStableBridgeBinding(
+      existingBinding,
+      sourceBinding,
+    )
+  ) {
+    throw new Error(
+      'ACCEPTED_WORK_FEEDER_SOURCE_BINDING_MISMATCH',
+    );
   }
+
+  const bindingForAdmission =
+    existingBinding ??
+    sourceBinding;
+
+  const authorizeCandidate =
+    dependencies.authorizeCandidate ??
+    authorizeAcceptedWorkCandidateWithPermit;
+
+  const admission =
+    await authorizeCandidate(
+      options.permitRoot,
+      pointer,
+      materialized,
+      bindingForAdmission,
+    );
+
+  if (
+    admission ===
+      'NO_PERMIT' ||
+    admission ===
+      'ALREADY_CONSUMED'
+  ) {
+    return Object.freeze({
+      schemaVersion:
+        ACCEPTED_WORK_CONTROLLER_FEEDER_SCHEMA,
+
+      pointerFound:
+        true,
+
+      acceptedRows:
+        accepted.length,
+
+      duplicateSkipped:
+        knownJobIds.has(jobId)
+          ? 1
+          : 0,
+
+      enqueued:
+        0,
+
+      noCandidate:
+        true,
+    });
+  }
+
+  /*
+   * No source-binding filesystem mutation occurs before
+   * an exact explicit FULGOR admission permit has been
+   * validated and durably consumed.
+   */
+  if (
+    existingBinding ===
+      null
+  ) {
+    await persistAcceptedWorkSourceBinding(
+      options.sourceBindingRoot,
+      sourceBinding,
+    );
+  }
+
+  if (
+    knownJobIds.has(
+      jobId,
+    )
+  ) {
+    return Object.freeze({
+      schemaVersion:
+        ACCEPTED_WORK_CONTROLLER_FEEDER_SCHEMA,
+
+      pointerFound:
+        true,
+
+      acceptedRows:
+        accepted.length,
+
+      duplicateSkipped:
+        1,
+
+      enqueued:
+        0,
+
+      noCandidate:
+        true,
+    });
+  }
+
+  await store.enqueue(
+    materialized
+      .plan
+      .job,
+  );
 
   return Object.freeze({
     schemaVersion:
@@ -494,11 +512,13 @@ scanAcceptedWorkForFulgorOnce(
     acceptedRows:
       accepted.length,
 
-    duplicateSkipped,
-    enqueued,
+    duplicateSkipped:
+      0,
+
+    enqueued:
+      1,
 
     noCandidate:
-      enqueued ===
-        0,
+      false,
   });
 }

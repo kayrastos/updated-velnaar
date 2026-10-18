@@ -38,6 +38,12 @@ import {
   persistAcceptedWorkSourceBinding,
 } from '../../../scripts/fulgor/orchestration/acceptedWorkSourceBinding';
 
+import {
+  authorizeAcceptedWorkCandidateWithPermit,
+  createAcceptedWorkFulgorPermit,
+  persistActiveAcceptedWorkFulgorPermit,
+} from '../../../scripts/fulgor/orchestration/acceptedWorkFulgorPermit';
+
 function sha(
   value:
     string,
@@ -255,6 +261,29 @@ describe(
               'source-binding',
             ),
             binding,
+          );
+
+          const permit =
+            createAcceptedWorkFulgorPermit(
+              pointer,
+              m,
+              2000,
+            );
+
+          await persistActiveAcceptedWorkFulgorPermit(
+            root,
+            permit,
+          );
+
+          await expect(
+            authorizeAcceptedWorkCandidateWithPermit(
+              root,
+              pointer,
+              m,
+              binding,
+            ),
+          ).resolves.toBe(
+            'AUTHORIZED',
           );
 
           const withoutHash = {

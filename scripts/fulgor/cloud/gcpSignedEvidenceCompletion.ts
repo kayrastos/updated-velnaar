@@ -33,6 +33,10 @@ import {
 } from '../orchestration/acceptedWorkSourceBinding';
 
 import {
+  readAcceptedWorkFulgorAdmissionReceiptForEvidence,
+} from '../orchestration/acceptedWorkFulgorPermit';
+
+import {
   GcpKmsEvidenceSigner,
 } from './gcpKmsEvidenceSigner';
 
@@ -58,6 +62,7 @@ export type GcpSignedCompletionFailureCode =
   | 'RAW_EVIDENCE_PERSISTENCE_FAILURE'
   | 'PROVENANCE_PERSISTENCE_FAILURE'
   | 'ACCEPTED_WORK_SOURCE_BINDING_FAILURE'
+  | 'ACCEPTED_WORK_FULGOR_ADMISSION_RECEIPT_FAILURE'
   | 'ACCEPTED_WORK_AUTHORIZATION_FAILURE'
   | 'AUTHORIZATION_READINESS_PERSISTENCE_FAILURE';
 
@@ -284,6 +289,33 @@ export function createGcpSignedEvidenceCompletionHook(
         );
       }
 
+      let admission;
+
+      try {
+        admission =
+          await readAcceptedWorkFulgorAdmissionReceiptForEvidence(
+            root,
+            result.evidence,
+          );
+      } catch {
+        return fail(
+          'ACCEPTED_WORK_FULGOR_ADMISSION_RECEIPT_FAILURE',
+        );
+      }
+
+      if (
+        admission
+          .receipt
+          .sourceBindingSha256 !==
+            source
+              .binding
+              .bindingSha256
+      ) {
+        return fail(
+          'ACCEPTED_WORK_FULGOR_ADMISSION_RECEIPT_FAILURE',
+        );
+      }
+
       artifacts.push({
         path:
           source.relativePath,
@@ -293,6 +325,20 @@ export function createGcpSignedEvidenceCompletionHook(
 
         role:
           'accepted_work_source_binding',
+
+        opaqueSemantic:
+          true,
+      });
+
+      artifacts.push({
+        path:
+          admission.relativePath,
+
+        expectedSha256:
+          admission.fileSha256,
+
+        role:
+          'accepted_work_fulgor_admission_receipt',
 
         opaqueSemantic:
           true,

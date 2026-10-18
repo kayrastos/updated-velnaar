@@ -389,19 +389,19 @@ export async function runLocalControllerFeedersOnce(
               'source-binding',
             ),
 
+          permitRoot:
+            settings.signedEvidenceRoot,
+
           policy:
             ACCEPTED_WORK_POLICY,
 
           /*
-           * Enqueue the full bounded output set now;
-           * actual FULGOR execution remains limited
-           * independently by FULGOR_MAX_JOBS_PER_RUN.
-           *
-           * This avoids losing candidates if a later
-           * provider run replaces the latest pointer.
+           * Explicit FULGOR authorization is exactly
+           * one candidate / one possible verifier call.
+           * Never widen a consumed permit to a fallback.
            */
           maxEnqueuePerScan:
-            16,
+            1,
         },
         store,
       );

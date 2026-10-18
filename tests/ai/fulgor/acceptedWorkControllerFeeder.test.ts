@@ -419,6 +419,12 @@ describe(
                     'source-binding',
                   ),
 
+                permitRoot:
+                  join(
+                    stateRoot,
+                    'permit-root',
+                  ),
+
                 policy: {
                   forbiddenPaths: [
                     '.git',
@@ -437,6 +443,10 @@ describe(
               },
               store,
               {
+                authorizeCandidate:
+                  async () =>
+                    'AUTHORIZED' as const,
+
                 loadAccepted:
                   async () =>
                     rows,
@@ -493,7 +503,7 @@ describe(
     );
 
     it(
-      'skips a known bridge job and advances to the next deterministic candidate',
+      'stops on a known top bridge job without falling back to another candidate',
       async () => {
         const repo =
           createRepo();
@@ -599,6 +609,12 @@ describe(
                     'source-binding',
                   ),
 
+                permitRoot:
+                  join(
+                    stateRoot,
+                    'permit-root',
+                  ),
+
                 policy: {
                   forbiddenPaths:
                     ['.git'],
@@ -612,6 +628,10 @@ describe(
               },
               store,
               {
+                authorizeCandidate:
+                  async () =>
+                    'AUTHORIZED' as const,
+
                 loadAccepted:
                   async () =>
                     rows,
@@ -702,6 +722,12 @@ describe(
                     'source-binding',
                   ),
 
+                permitRoot:
+                  join(
+                    stateRoot,
+                    'permit-root',
+                  ),
+
                 policy: {
                   forbiddenPaths:
                     ['.git'],
@@ -715,6 +741,10 @@ describe(
               },
               store,
               {
+                authorizeCandidate:
+                  async () =>
+                    'AUTHORIZED' as const,
+
                 loadAccepted:
                   async () =>
                     rows,
@@ -727,15 +757,15 @@ describe(
 
           expect(
             second.enqueued,
-          ).toBe(1);
+          ).toBe(0);
 
           expect(
             store.jobs,
-          ).toHaveLength(2);
+          ).toHaveLength(1);
 
           expect(
-            store.jobs[1].jobId,
-          ).not.toBe(
+            store.jobs[0].jobId,
+          ).toBe(
             firstId,
           );
         } finally {
@@ -860,6 +890,12 @@ describe(
                     'source-binding',
                   ),
 
+                permitRoot:
+                  join(
+                    stateRoot,
+                    'permit-root',
+                  ),
+
                 policy: {
                   forbiddenPaths:
                     ['.git'],
@@ -873,6 +909,10 @@ describe(
               },
               new FakeStore(),
               {
+                authorizeCandidate:
+                  async () =>
+                    'AUTHORIZED' as const,
+
                 loadAccepted:
                   async () =>
                     [row],

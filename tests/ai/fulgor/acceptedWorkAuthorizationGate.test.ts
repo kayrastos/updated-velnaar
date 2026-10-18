@@ -44,6 +44,12 @@ import {
 } from '../../../scripts/fulgor/orchestration/acceptedWorkSourceBinding';
 
 import {
+  authorizeAcceptedWorkCandidateWithPermit,
+  createAcceptedWorkFulgorPermit,
+  persistActiveAcceptedWorkFulgorPermit,
+} from '../../../scripts/fulgor/orchestration/acceptedWorkFulgorPermit';
+
+import {
   createAcceptedWorkAuthorizationReadiness,
   evaluateAcceptedWorkAuthorizationGate,
   persistAcceptedWorkAuthorizationReadiness,
@@ -225,6 +231,9 @@ function fixtureMaterialized() {
 async function signedFixture(
   includeSourceArtifact =
     true,
+
+  includeAdmissionReceiptArtifact =
+    true,
 ) {
   const evidenceRoot =
     mkdtempSync(
@@ -275,6 +284,42 @@ async function signedFixture(
     await persistAcceptedWorkSourceBinding(
       sourceRoot,
       binding,
+    );
+
+  const permit =
+    createAcceptedWorkFulgorPermit(
+      pointer,
+      materialized,
+      2000,
+    );
+
+  await persistActiveAcceptedWorkFulgorPermit(
+    evidenceRoot,
+    permit,
+  );
+
+  const admission =
+    await authorizeAcceptedWorkCandidateWithPermit(
+      evidenceRoot,
+      pointer,
+      materialized,
+      binding,
+    );
+
+  if (
+    admission !==
+      'AUTHORIZED'
+  ) {
+    throw new Error(
+      'TEST_ADMISSION_FAILED',
+    );
+  }
+
+  const receiptPath =
+    join(
+      evidenceRoot,
+      'admission-receipt',
+      `${binding.jobId}.json`,
     );
 
   const withoutHash = {
@@ -398,6 +443,26 @@ async function signedFixture(
 
       role:
         'accepted_work_source_binding',
+
+      opaqueSemantic:
+        true,
+    });
+  }
+
+  if (
+    includeAdmissionReceiptArtifact
+  ) {
+    artifacts.push({
+      path:
+        `admission-receipt/${binding.jobId}.json`,
+
+      expectedSha256:
+        await sha256File(
+          receiptPath,
+        ),
+
+      role:
+        'accepted_work_fulgor_admission_receipt',
 
       opaqueSemantic:
         true,
@@ -561,6 +626,48 @@ describe(
     );
 
     it(
+      'fails closed when signed provenance omits the explicit FULGOR admission receipt',
+      async () => {
+        const fixture =
+          await signedFixture(
+            true,
+            false,
+          );
+
+        try {
+          const result =
+            await evaluateAcceptedWorkAuthorizationGate(
+              fixture.envelope,
+              fixture.provenance,
+              fixture.verifier,
+              fixture.evidenceRoot,
+            );
+
+          expect(
+            result.eligibleForHumanGatedPromotion,
+          ).toBe(false);
+
+          expect(
+            result.code,
+          ).toBe(
+            'ADMISSION_RECEIPT_ARTIFACT_INVALID',
+          );
+        } finally {
+          rmSync(
+            fixture.evidenceRoot,
+            {
+              recursive:
+                true,
+
+              force:
+                true,
+            },
+          );
+        }
+      },
+    );
+
+    it(
       'fails closed when static touched path does not match source candidate',
       async () => {
         const fixture =
@@ -667,6 +774,25 @@ describe(
 
                   role:
                     'accepted_work_source_binding',
+
+                  opaqueSemantic:
+                    true,
+                },
+                {
+                  path:
+                    `admission-receipt/${fixture.binding.jobId}.json`,
+
+                  expectedSha256:
+                    await sha256File(
+                      join(
+                        fixture.evidenceRoot,
+                        'admission-receipt',
+                        `${fixture.binding.jobId}.json`,
+                      ),
+                    ),
+
+                  role:
+                    'accepted_work_fulgor_admission_receipt',
 
                   opaqueSemantic:
                     true,

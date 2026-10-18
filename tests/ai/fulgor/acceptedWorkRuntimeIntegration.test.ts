@@ -191,7 +191,14 @@ describe(
         expect(
           capturedOptions!
             .maxEnqueuePerScan,
-        ).toBe(16);
+        ).toBe(1);
+
+        expect(
+          capturedOptions!
+            .permitRoot,
+        ).toBe(
+          '/tmp/fulgor-evidence',
+        );
 
         expect(
           capturedOptions!
