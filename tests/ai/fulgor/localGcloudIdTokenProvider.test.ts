@@ -7,6 +7,7 @@ import {
 
 import {
   GcloudIamIdTokenProvider,
+  resolveGcloudAccessTokenInvocation,
 } from '../../../scripts/fulgor/cloud/localGcloudIdTokenProvider';
 
 import {
@@ -49,6 +50,52 @@ function token(
 describe(
   'local gcloud IAM ID-token provider',
   () => {
+    it(
+      'uses direct gcloud invocation on Linux',
+      () => {
+        expect(
+          resolveGcloudAccessTokenInvocation(
+            'linux',
+            undefined,
+          ),
+        ).toEqual({
+          command: 'gcloud',
+
+          args: [
+            'auth',
+            'print-access-token',
+            '--quiet',
+          ],
+
+          windowsHide: false,
+        });
+      },
+    );
+
+    it(
+      'preserves cmd.exe wrapper on Windows',
+      () => {
+        expect(
+          resolveGcloudAccessTokenInvocation(
+            'win32',
+            'C:\\Windows\\System32\\cmd.exe',
+          ),
+        ).toEqual({
+          command:
+            'C:\\Windows\\System32\\cmd.exe',
+
+          args: [
+            '/d',
+            '/s',
+            '/c',
+            'gcloud.cmd auth print-access-token --quiet',
+          ],
+
+          windowsHide: true,
+        });
+      },
+    );
+
     it(
       'generates an audience-bound controller token',
       async () => {
