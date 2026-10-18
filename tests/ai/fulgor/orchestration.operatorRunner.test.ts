@@ -96,6 +96,7 @@ it('service is manually invoked oneshot with no restart or deployment and README
   const unit = await readFile('deploy/systemd/user/velnar-live-orchestrator.service', 'utf8');
   expect(unit).toContain('Type=oneshot'); expect(unit).not.toMatch(/Restart=|\[Install\]|WantedBy=|deploy\s|git\s|systemctl/);
   expect(unit).toContain('UMask=0077'); expect(unit).not.toContain('MemoryDenyWriteExecute');
+  expect(unit).not.toContain('ProtectKernelModules=true');
   const readme = await readFile('scripts/fulgor/orchestration/README.md', 'utf8');
   expect(readme).not.toMatch(/No live adapters are supplied|No live agent adapter exists/);
   expect(readme).toContain('not auto-enabled');
