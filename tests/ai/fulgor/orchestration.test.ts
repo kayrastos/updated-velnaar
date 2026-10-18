@@ -36,7 +36,7 @@ describe('bounded orchestration foundation', () => {
     expect(result.policy.humanApprovalRequired).toBe(true);
     expect(result.policy.automaticPromotionAllowed).toBe(false);
   });
-  it.each(['TIMEOUT', 'PROCESS_FAILURE', 'MALFORMED_RESPONSE'])('permits a single bounded fallback for %s', failure => {
+  it.each(['TIMEOUT', 'OUTPUT_LIMIT', 'MALFORMED_RESPONSE'])('permits a single bounded fallback for %s', failure => {
     let s = builder();
     s = advance(s, output(s, 'FAILED', { failure }));
     expect(s.state).toBe('FALLBACK_ELIGIBLE');
@@ -53,10 +53,17 @@ describe('bounded orchestration foundation', () => {
     expect(result.state).toBe('FULGOR_HANDOFF_ELIGIBLE');
     expect(result.evidence.map(e => e.stage)).toEqual(['SCOUT', 'CODEX', 'ANTIGRAVITY', 'REVIEWER']);
   });
-  it.each(['AUTHORIZATION_FAILURE', 'SECURITY_POLICY_FAILURE', 'FORBIDDEN_SCOPE', 'REFUSAL', 'PRODUCTION_BOUNDARY', 'unknown'])('denies fallback for %s', failure => {
+  it.each(['AUTHORIZATION_FAILURE', 'SECURITY_POLICY_FAILURE', 'FORBIDDEN_SCOPE', 'REFUSAL', 'PRODUCTION_BOUNDARY', 'NON_ZERO_EXIT', 'SPAWN_FAILURE', 'INVALID_CONFIG', 'PROCESS_FAILURE', 'unknown'])('denies fallback for %s', failure => {
     const s = builder();
     expect(fallbackEligible(failure)).toBe(false);
     expect(advance(s, output(s, 'FAILED', { failure })).state).toBe('NEEDS_REVIEW');
+  });
+  it.each(['PASS', 'FINDINGS'])('valid advisory %s permits handoff without granting authority', verdict => {
+    const s = reviewer(); const response = output(s, verdict);
+    const result = advance(s, response);
+    expect(result.state).toBe('FULGOR_HANDOFF_ELIGIBLE');
+    expect(result.evidence.at(-1)).toEqual({ stage: 'REVIEWER', responseSha256: sha256(response) });
+    expect(result.policy).toBe(NO_AUTO_ACTION);
   });
   it.each(['{', '{}', 'null', '[]'])('fails closed on malformed reviewer output %s', response => {
     expect(advance(reviewer(), response).state).toBe('NEEDS_REVIEW');
@@ -77,7 +84,7 @@ describe('bounded orchestration foundation', () => {
     const s = builder();
     expect(advance(s, output(s, 'CANDIDATE', { candidate: { ...candidate, ...change } })).state).toBe('UNSUPPORTED_HANDOFF');
   });
-  it('blocks reviewer disagreement without fallback and preserves policy', () => {
+  it('blocks explicit blocker without fallback and preserves policy', () => {
     const s = reviewer();
     const blocked = advance(s, output(s, 'BLOCKED'));
     expect(blocked.state).toBe('NEEDS_REVIEW');

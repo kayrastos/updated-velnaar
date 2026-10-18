@@ -8,12 +8,12 @@ export const NO_AUTO_ACTION = Object.freeze({
 } as const);
 export const BOUNDS = Object.freeze({ maxResponseBytes: 131072, maxContentBytes: 32768, maxStages: 4 });
 export const BUILDER_FAILURES = [
-  'TIMEOUT', 'PROCESS_FAILURE', 'MALFORMED_RESPONSE', 'AUTHORIZATION_FAILURE',
+  'TIMEOUT', 'OUTPUT_LIMIT', 'NON_ZERO_EXIT', 'SPAWN_FAILURE', 'INVALID_CONFIG', 'MALFORMED_RESPONSE', 'AUTHORIZATION_FAILURE',
   'SECURITY_POLICY_FAILURE', 'FORBIDDEN_SCOPE', 'REFUSAL', 'PRODUCTION_BOUNDARY',
 ] as const;
 export type BuilderFailure = typeof BUILDER_FAILURES[number];
 export function fallbackEligible(failure: unknown): boolean {
-  return failure === 'TIMEOUT' || failure === 'PROCESS_FAILURE' || failure === 'MALFORMED_RESPONSE';
+  return failure === 'TIMEOUT' || failure === 'OUTPUT_LIMIT' || failure === 'MALFORMED_RESPONSE';
 }
 export type Stage = 'SCOUT' | 'CODEX' | 'ANTIGRAVITY' | 'REVIEWER';
 export type State = 'AWAITING_SCOUT' | 'AWAITING_CODEX' | 'FALLBACK_ELIGIBLE' |
@@ -109,9 +109,11 @@ export function advanceOrchestration(input: unknown, response: unknown): Session
   }
   if (value.failure !== null || value.candidate !== null) return end('NEEDS_REVIEW', 'MALFORMED_OUTPUT');
   if (stage === 'SCOUT') return value.disposition === 'FINDINGS' ? end('AWAITING_CODEX') : end('NEEDS_REVIEW', 'SCOUT_BLOCKED');
-  // PASS is advisory only. This state cannot enqueue, verify, sign, or promote.
-  return value.disposition === 'PASS' || value.disposition === 'NO_BLOCKERS'
-    ? end('FULGOR_HANDOFF_ELIGIBLE') : end('NEEDS_REVIEW', 'REVIEWER_FINDINGS');
+  // Valid reviewer verdicts are advisory evidence only, including FINDINGS.
+  // Eligibility only permits a bounded bundle for independent FULGOR verification;
+  // it cannot verify, sign, or promote, and human approval remains required.
+  return value.disposition === 'PASS' || value.disposition === 'FINDINGS' || value.disposition === 'NO_BLOCKERS'
+    ? end('FULGOR_HANDOFF_ELIGIBLE') : end('NEEDS_REVIEW', 'MALFORMED_OUTPUT');
 }
 
 /** DI boundary accepts evidence only. No live CLI or FULGOR implementation is provided. */
