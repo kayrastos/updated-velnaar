@@ -109,35 +109,314 @@ function validCodexUsage(value: unknown): boolean {
   });
 }
 
-/** Accept one complete, text-only turn. Tool/action events never grant authority. */
-export function parseCodexJsonl(stdout: Buffer): Buffer {
+const CODEX_NONAUTHORITATIVE_ITEM_TYPES =
+  new Set([
+    'reasoning',
+    'command_execution',
+    'file_change',
+    'mcp_tool_call',
+    'collab_tool_call',
+    'web_search',
+    'todo_list',
+    'error',
+  ]);
+
+/**
+ * Extract exactly one completed Codex agent message.
+ *
+ * item.started / item.updated / non-agent item.completed events are
+ * execution telemetry only. They can never grant authority and their
+ * contents are never interpreted as candidate protocol.
+ *
+ * turn.failed, top-level error, unknown event types, malformed item
+ * identity, multiple completed agent messages, or malformed usage all
+ * fail closed.
+ */
+export function extractCodexFinalMessage(
+  stdout: Buffer,
+): Buffer {
   try {
-    if (stdout.length > BOUNDS.maxResponseBytes) return Buffer.alloc(0);
-    const text = new TextDecoder('utf-8', { fatal: true }).decode(stdout);
-    const lines = text.replace(/\n$/, '').split('\n');
-    let phase = 0;
-    let final: string | undefined;
-    const ids = new Set<string>();
-    for (const line of lines) {
-      const event = JSON.parse(line);
-      const exact = (v: unknown, keys: string[]) => v !== null && typeof v === 'object' && !Array.isArray(v) &&
-        Object.keys(v).sort().join(',') === keys.sort().join(',');
-      if (phase === 0 && exact(event, ['type', 'thread_id']) && event.type === 'thread.started' && boundedText(event.thread_id)) phase = 1;
-      else if (phase === 1 && exact(event, ['type']) && event.type === 'turn.started') phase = 2;
-      else if (phase === 2 && exact(event, ['type', 'item']) && event.type === 'item.completed' &&
-        exact(event.item, ['id', 'type', 'text']) && boundedText(event.item.id) && !ids.has(event.item.id) &&
-        typeof event.item.text === 'string' && ['reasoning', 'agent_message'].includes(event.item.type) && final === undefined) {
-        ids.add(event.item.id);
-        if (event.item.type === 'agent_message') final = event.item.text;
-      } else if (phase === 2 && final !== undefined && exact(event, ['type', 'usage']) && event.type === 'turn.completed' &&
-        validCodexUsage(event.usage)) phase = 3;
-      else return Buffer.alloc(0);
+    if (
+      stdout.length === 0 ||
+      stdout.length >
+        BOUNDS.maxResponseBytes
+    ) {
+      return Buffer.alloc(0);
     }
-    if (phase !== 3 || final === undefined) return Buffer.alloc(0);
-    const raw = Buffer.from(final);
-    const value = parseExact(raw, ['status', 'path', 'content']) ?? parseExact(raw, ['status', 'failure']);
-    return value ? raw : Buffer.alloc(0);
-  } catch { return Buffer.alloc(0); }
+
+    const text =
+      new TextDecoder(
+        'utf-8',
+        { fatal: true },
+      ).decode(stdout);
+
+    const lines =
+      text
+        .replace(/\n$/, '')
+        .split('\n');
+
+    if (
+      lines.length === 0 ||
+      lines.some(
+        line =>
+          line.trim().length === 0,
+      )
+    ) {
+      return Buffer.alloc(0);
+    }
+
+    const exact =
+      (
+        value: unknown,
+        keys: string[],
+      ): value is
+        Record<string, unknown> =>
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        Object.keys(value)
+          .sort()
+          .join(',') ===
+        [...keys]
+          .sort()
+          .join(',');
+
+    let phase:
+      0 | 1 | 2 | 3 =
+        0;
+
+    let final:
+      string | undefined;
+
+    let completedAgentMessages =
+      0;
+
+    for (
+      const line
+      of lines
+    ) {
+      const event:
+        unknown =
+          JSON.parse(line);
+
+      if (
+        phase === 0 &&
+        exact(
+          event,
+          [
+            'type',
+            'thread_id',
+          ],
+        ) &&
+        event.type ===
+          'thread.started' &&
+        boundedText(
+          event.thread_id,
+        )
+      ) {
+        phase = 1;
+        continue;
+      }
+
+      if (
+        phase === 1 &&
+        exact(
+          event,
+          ['type'],
+        ) &&
+        event.type ===
+          'turn.started'
+      ) {
+        phase = 2;
+        continue;
+      }
+
+      if (
+        phase === 2 &&
+        exact(
+          event,
+          [
+            'type',
+            'item',
+          ],
+        ) &&
+        (
+          event.type ===
+            'item.started' ||
+          event.type ===
+            'item.updated' ||
+          event.type ===
+            'item.completed'
+        )
+      ) {
+        const item =
+          event.item;
+
+        if (
+          item === null ||
+          typeof item !== 'object' ||
+          Array.isArray(item)
+        ) {
+          return Buffer.alloc(0);
+        }
+
+        const record =
+          item as
+            Record<
+              string,
+              unknown
+            >;
+
+        if (
+          !boundedText(
+            record.id,
+          ) ||
+          typeof record.type !==
+            'string'
+        ) {
+          return Buffer.alloc(0);
+        }
+
+        if (
+          record.type ===
+            'agent_message'
+        ) {
+          /*
+           * Started/updated agent-message events have no
+           * authority. Only one COMPLETED agent message
+           * may become the final protocol payload.
+           */
+          if (
+            event.type !==
+              'item.completed'
+          ) {
+            continue;
+          }
+
+          if (
+            typeof record.text !==
+              'string'
+          ) {
+            return Buffer.alloc(0);
+          }
+
+          completedAgentMessages +=
+            1;
+
+          if (
+            completedAgentMessages !==
+              1
+          ) {
+            return Buffer.alloc(0);
+          }
+
+          final =
+            record.text;
+
+          continue;
+        }
+
+        if (
+          !CODEX_NONAUTHORITATIVE_ITEM_TYPES
+            .has(
+              record.type,
+            )
+        ) {
+          return Buffer.alloc(0);
+        }
+
+        /*
+         * Known non-authoritative execution telemetry:
+         * accepted structurally, never interpreted.
+         */
+        continue;
+      }
+
+      if (
+        phase === 2 &&
+        exact(
+          event,
+          [
+            'type',
+            'usage',
+          ],
+        ) &&
+        event.type ===
+          'turn.completed' &&
+        completedAgentMessages ===
+          1 &&
+        final !== undefined &&
+        validCodexUsage(
+          event.usage,
+        )
+      ) {
+        phase = 3;
+        continue;
+      }
+
+      /*
+       * Includes turn.failed, top-level error,
+       * unknown schema expansion and events after
+       * turn.completed.
+       */
+      return Buffer.alloc(0);
+    }
+
+    if (
+      phase !== 3 ||
+      completedAgentMessages !==
+        1 ||
+      final === undefined
+    ) {
+      return Buffer.alloc(0);
+    }
+
+    return Buffer.from(
+      final,
+    );
+  } catch {
+    return Buffer.alloc(0);
+  }
+}
+
+/**
+ * Existing one-shot builder protocol remains strict.
+ * The Codex event stream is separated from candidate authority:
+ * execution telemetry is ignored; only the final agent message
+ * is parsed against the exact builder contract.
+ */
+export function parseCodexJsonl(
+  stdout: Buffer,
+): Buffer {
+  const raw =
+    extractCodexFinalMessage(
+      stdout,
+    );
+
+  if (raw.length === 0) {
+    return raw;
+  }
+
+  const value =
+    parseExact(
+      raw,
+      [
+        'status',
+        'path',
+        'content',
+      ],
+    ) ??
+    parseExact(
+      raw,
+      [
+        'status',
+        'failure',
+      ],
+    );
+
+  return value
+    ? raw
+    : Buffer.alloc(0);
 }
 
 export async function runAntigravityFallback(config: LiveAgentConfig, repoRoot: string, session: Session, task: string, findings: string): Promise<LiveOutput> {

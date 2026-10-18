@@ -143,6 +143,220 @@ it('COPILOT_STDIN=EOF CODEX_STDIN=EOF ANTIGRAVITY_STDIN=EOF', async () => {
   expect(r.session.state).toBe('FULGOR_HANDOFF_ELIGIBLE');
   expect(await readFile(s.calls, 'utf8')).toBe('copilot\ncodex\nagy\ncopilot\n');
 });
+it('accepts documented Codex execution telemetry but grants authority only to one completed agent message', () => {
+  const stream = [
+    {
+      type: 'thread.started',
+      thread_id: 'telemetry-fixture',
+    },
+    {
+      type: 'turn.started',
+    },
+    {
+      type: 'item.started',
+      item: {
+        id: 'reasoning-1',
+        type: 'reasoning',
+        text: 'non-authoritative',
+      },
+    },
+    {
+      type: 'item.updated',
+      item: {
+        id: 'reasoning-1',
+        type: 'reasoning',
+        text: 'still non-authoritative',
+      },
+    },
+    {
+      type: 'item.completed',
+      item: {
+        id: 'reasoning-1',
+        type: 'reasoning',
+        text: 'done',
+      },
+    },
+    {
+      type: 'item.started',
+      item: {
+        id: 'command-1',
+        type: 'command_execution',
+        command: 'cat file',
+        status: 'in_progress',
+      },
+    },
+    {
+      type: 'item.completed',
+      item: {
+        id: 'command-1',
+        type: 'command_execution',
+        command: 'cat file',
+        status: 'completed',
+        exit_code: 0,
+      },
+    },
+    {
+      type: 'item.started',
+      item: {
+        id: 'answer-1',
+        type: 'agent_message',
+        text: '',
+      },
+    },
+    {
+      type: 'item.completed',
+      item: {
+        id: 'answer-1',
+        type: 'agent_message',
+        text:
+          JSON.stringify(
+            candidate,
+          ),
+      },
+    },
+    {
+      type: 'item.completed',
+      item: {
+        id: 'todo-1',
+        type: 'todo_list',
+        items: [],
+      },
+    },
+    {
+      type: 'turn.completed',
+      usage: {
+        input_tokens: 10,
+        cached_input_tokens: 2,
+        cache_write_input_tokens: 0,
+        output_tokens: 4,
+        reasoning_output_tokens: 2,
+      },
+    },
+  ]
+    .map(
+      value =>
+        JSON.stringify(value),
+    )
+    .join('\n') + '\n';
+
+  expect(
+    parseCodexJsonl(
+      Buffer.from(stream),
+    ),
+  ).toEqual(
+    Buffer.from(
+      JSON.stringify(
+        candidate,
+      ),
+    ),
+  );
+});
+
+it.each([
+  'turn.failed',
+  'error',
+])('fails closed on Codex terminal error event %s', type => {
+  const terminal =
+    type === 'turn.failed'
+      ? {
+          type,
+          error: {
+            message: 'synthetic',
+          },
+        }
+      : {
+          type,
+          message:
+            'synthetic',
+        };
+
+  const stream = [
+    {
+      type:
+        'thread.started',
+      thread_id:
+        'error-fixture',
+    },
+    {
+      type:
+        'turn.started',
+    },
+    terminal,
+  ]
+    .map(
+      value =>
+        JSON.stringify(value),
+    )
+    .join('\n') + '\n';
+
+  expect(
+    parseCodexJsonl(
+      Buffer.from(stream),
+    ).length,
+  ).toBe(0);
+});
+
+it('rejects two completed Codex agent messages even if one is a valid candidate', () => {
+  const stream = [
+    {
+      type:
+        'thread.started',
+      thread_id:
+        'double-answer',
+    },
+    {
+      type:
+        'turn.started',
+    },
+    {
+      type:
+        'item.completed',
+      item: {
+        id: 'a1',
+        type:
+          'agent_message',
+        text:
+          JSON.stringify(
+            candidate,
+          ),
+      },
+    },
+    {
+      type:
+        'item.completed',
+      item: {
+        id: 'a2',
+        type:
+          'agent_message',
+        text:
+          JSON.stringify(
+            candidate,
+          ),
+      },
+    },
+    {
+      type:
+        'turn.completed',
+      usage: {
+        input_tokens: 1,
+        cached_input_tokens: 0,
+        output_tokens: 1,
+      },
+    },
+  ]
+    .map(
+      value =>
+        JSON.stringify(value),
+    )
+    .join('\n') + '\n';
+
+  expect(
+    parseCodexJsonl(
+      Buffer.from(stream),
+    ).length,
+  ).toBe(0);
+});
+
 it.each(['not json', '{"type":"item.completed"}', jsonl(JSON.stringify(candidate)) + jsonl(JSON.stringify(candidate)),
   jsonl(JSON.stringify(candidate)).replace('agent_message', 'command_execution')])('rejects unexpected Codex JSONL %s', text => {
   expect(parseCodexJsonl(Buffer.from(text)).length).toBe(0);
