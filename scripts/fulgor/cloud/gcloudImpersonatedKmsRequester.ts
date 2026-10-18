@@ -2,6 +2,10 @@ import {
   spawnSync,
 } from 'node:child_process';
 
+import {
+  resolveGcloudAccessTokenInvocation,
+} from './localGcloudIdTokenProvider';
+
 import type {
   GcpKmsRequester,
   GcpKmsSignRequest,
@@ -55,22 +59,17 @@ function isRecord(
 
 function defaultAccessTokenCommand():
 GcloudAccessTokenCommandResult {
-  const shell =
-    process.env.ComSpec ??
-    'C:\\Windows\\System32\\cmd.exe';
+  const invocation =
+    resolveGcloudAccessTokenInvocation();
 
   const result =
     spawnSync(
-      shell,
-      [
-        '/d',
-        '/s',
-        '/c',
-        'gcloud.cmd auth print-access-token --quiet',
-      ],
+      invocation.command,
+      invocation.args,
       {
         encoding: 'utf8',
-        windowsHide: true,
+        windowsHide:
+          invocation.windowsHide,
       },
     );
 

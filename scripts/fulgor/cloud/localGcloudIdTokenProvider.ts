@@ -76,24 +76,59 @@ function assertServiceAccount(
   }
 }
 
-function defaultAccessTokenCommand():
-GcloudAccessTokenCommandResult {
-  const shell =
-    process.env.ComSpec ??
-    'C:\\Windows\\System32\\cmd.exe';
+export interface GcloudAccessTokenInvocation {
+  command: string;
+  args: string[];
+  windowsHide: boolean;
+}
 
-  const result =
-    spawnSync(
-      shell,
-      [
+export function resolveGcloudAccessTokenInvocation(
+  platform = process.platform,
+  comSpec = process.env.ComSpec,
+): GcloudAccessTokenInvocation {
+  if (platform === 'win32') {
+    return {
+      command:
+        comSpec ??
+        'C:\\Windows\\System32\\cmd.exe',
+
+      args: [
         '/d',
         '/s',
         '/c',
         'gcloud.cmd auth print-access-token --quiet',
       ],
+
+      windowsHide: true,
+    };
+  }
+
+  return {
+    command: 'gcloud',
+
+    args: [
+      'auth',
+      'print-access-token',
+      '--quiet',
+    ],
+
+    windowsHide: false,
+  };
+}
+
+function defaultAccessTokenCommand():
+GcloudAccessTokenCommandResult {
+  const invocation =
+    resolveGcloudAccessTokenInvocation();
+
+  const result =
+    spawnSync(
+      invocation.command,
+      invocation.args,
       {
         encoding: 'utf8',
-        windowsHide: true,
+        windowsHide:
+          invocation.windowsHide,
       },
     );
 
