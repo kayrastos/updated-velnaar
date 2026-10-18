@@ -54,6 +54,11 @@ import type {
   BoundHostEvidenceText,
 } from './liveProviderProtocolBindings';
 
+import {
+  ACCEPTED_WORK_LATEST_POINTER_SCHEMA,
+  publishAcceptedWorkLatestPointer,
+} from './acceptedWorkLatestPointer';
+
 export const LIVE_8X8_OPERATOR_REQUEST_SCHEMA =
   'VELNAR_LIVE_8X8_OPERATOR_REQUEST_V1' as const;
 
@@ -133,6 +138,9 @@ export interface Live8x8OperatorResult {
     string;
 
   readonly processTelemetryPath:
+    string;
+
+  readonly acceptedWorkPointerPath:
     string;
 
   readonly elapsedMs:
@@ -1325,6 +1333,31 @@ runLive8x8Operator(
     fail();
   }
 
+  const acceptedWorkPointerPath =
+    await publishAcceptedWorkLatestPointer(
+      stateRoot,
+      {
+        schemaVersion:
+          ACCEPTED_WORK_LATEST_POINTER_SCHEMA,
+
+        requestId:
+          request.requestId,
+
+        baseline:
+          request.baseline,
+
+        runDirectory,
+        queuePath,
+
+        usefulUnique:
+          result.pool
+            .totalUsefulUnique,
+
+        completedAtMs:
+          result.completedAtMs,
+      },
+    );
+
   return Object.freeze({
     requestId:
       request.requestId,
@@ -1337,6 +1370,8 @@ runLive8x8Operator(
     queuePath,
 
     processTelemetryPath,
+
+    acceptedWorkPointerPath,
 
     elapsedMs:
       result.elapsedMs,
@@ -1408,6 +1443,7 @@ export function live8x8OperatorSummary(
     `RUN_DIRECTORY=${safe(result.runDirectory)}`,
     `QUEUE_PATH=${safe(result.queuePath)}`,
     `PROCESS_TELEMETRY_PATH=${safe(result.processTelemetryPath)}`,
+    `ACCEPTED_WORK_POINTER_PATH=${safe(result.acceptedWorkPointerPath)}`,
     `ELAPSED_MS=${result.elapsedMs}`,
     `EXPECTED_PROVIDER_CALLS=${result.expectedProviderCalls}`,
     `ACTUAL_PROVIDER_CALLS=${result.actualProviderCalls}`,

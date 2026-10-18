@@ -16,10 +16,6 @@ import {
   type HostEvidenceCapsule,
 } from './providerWorkProductGate';
 
-import {
-  workProductFingerprint,
-} from './providerWorkAccounting';
-
 import type {
   ProviderWorkRecord,
 } from './providerWorkOrder';
@@ -707,19 +703,16 @@ async function runSlot(
         continue;
       }
 
-      const fingerprint =
-        workProductFingerprint(
-          accepted,
-        );
-
       /*
-       * Only SQLite decides unique vs duplicate.
+       * Only SQLite decides unique vs duplicate and
+       * durably persists the exact accepted work
+       * product in the same transaction.
        */
       const settled =
         queue.settleUseful(
           provider,
           record.lease.leaseId,
-          fingerprint,
+          accepted,
           now(options),
         );
 

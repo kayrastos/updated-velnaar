@@ -1,10 +1,21 @@
 import {
+  join,
+} from 'node:path';
+
+import {
   createControllerStateStore,
 } from './controllerRuntime';
 
 import {
   scanReviewBundlesOnce,
+  type ReviewBundleFeederStore,
 } from './reviewBundleFeeder';
+
+import {
+  scanAcceptedWorkForFulgorOnce,
+  type AcceptedWorkControllerFeederOptions,
+  type AcceptedWorkControllerStore,
+} from '../orchestration/acceptedWorkControllerFeeder';
 
 import {
   CloudRunIdTokenTransport,
@@ -32,12 +43,14 @@ import {
 
 import {
   createGcloudImpersonatedKmsRequester,
+  createGcloudImpersonatedKmsPublicKeyRequester,
 } from './gcloudImpersonatedKmsRequester';
 
 export type LocalControllerFailureCode =
   | 'LOCAL_RUNNER_MISSING_VALUE'
   | 'LOCAL_RUNNER_INVALID_POLL_INTERVAL'
-  | 'LOCAL_RUNNER_INVALID_FEEDER_CONFIG';
+  | 'LOCAL_RUNNER_INVALID_FEEDER_CONFIG'
+  | 'LOCAL_RUNNER_INVALID_ACCEPTED_WORK_FEEDER_CONFIG';
 
 export class LocalControllerError
 extends Error {
@@ -69,6 +82,11 @@ export interface LocalControllerSettings {
     bundleRoot: string;
     repoRoot: string;
     notBeforeMs: number;
+  };
+
+  acceptedWorkFeeder?: {
+    stateRoot: string;
+    repoRoot: string;
   };
 }
 
@@ -206,6 +224,48 @@ export function loadLocalControllerSettings(
     };
   }
 
+  const acceptedWorkStateRoot =
+    env.FULGOR_ACCEPTED_WORK_STATE_ROOT;
+
+  const acceptedWorkRepoRoot =
+    env.FULGOR_ACCEPTED_WORK_REPO_ROOT;
+
+  const acceptedWorkPresence =
+    [
+      acceptedWorkStateRoot,
+      acceptedWorkRepoRoot,
+    ].filter(
+      value =>
+        typeof value === 'string' &&
+        value.trim().length > 0,
+    ).length;
+
+  if (
+    acceptedWorkPresence !== 0 &&
+    acceptedWorkPresence !== 2
+  ) {
+    throw new LocalControllerError(
+      'LOCAL_RUNNER_INVALID_ACCEPTED_WORK_FEEDER_CONFIG',
+    );
+  }
+
+  let acceptedWorkFeeder:
+    LocalControllerSettings[
+      'acceptedWorkFeeder'
+    ];
+
+  if (
+    acceptedWorkPresence === 2
+  ) {
+    acceptedWorkFeeder = {
+      stateRoot:
+        acceptedWorkStateRoot!.trim(),
+
+      repoRoot:
+        acceptedWorkRepoRoot!.trim(),
+    };
+  }
+
   return {
     controllerServiceAccount,
     signedEvidenceRoot,
@@ -218,7 +278,141 @@ export function loadLocalControllerSettings(
         ? { feeder }
         : {}
     ),
+
+    ...(
+      acceptedWorkFeeder
+        ? {
+            acceptedWorkFeeder,
+          }
+        : {}
+    ),
   };
+}
+
+export interface LocalControllerFeederDependencies {
+  readonly scanReviewBundles?:
+    typeof scanReviewBundlesOnce;
+
+  readonly scanAcceptedWork?:
+    typeof scanAcceptedWorkForFulgorOnce;
+}
+
+export type LocalControllerFeederStore =
+  ReviewBundleFeederStore &
+  AcceptedWorkControllerStore;
+
+const ACCEPTED_WORK_POLICY:
+AcceptedWorkControllerFeederOptions['policy'] =
+  Object.freeze({
+    forbiddenPaths:
+      Object.freeze([
+        '.git',
+        '.github/workflows',
+        '.env',
+        'secrets',
+        'scripts/fulgor/corpus/holdout',
+      ]),
+
+    maxHunks:
+      64,
+
+    maxChangedLines:
+      10_000,
+  });
+
+export async function runLocalControllerFeedersOnce(
+  settings:
+    LocalControllerSettings,
+
+  store:
+    LocalControllerFeederStore,
+
+  dependencies:
+    LocalControllerFeederDependencies =
+      {},
+): Promise<void> {
+  if (
+    settings.feeder
+  ) {
+    try {
+      await (
+        dependencies
+          .scanReviewBundles ??
+        scanReviewBundlesOnce
+      )(
+        {
+          bundleRoot:
+            settings.feeder.bundleRoot,
+
+          repoRoot:
+            settings.feeder.repoRoot,
+
+          notBeforeMs:
+            settings.feeder.notBeforeMs,
+
+          maxEnqueuePerScan:
+            1,
+        },
+        store,
+      );
+    } catch {
+      /*
+       * Existing review-bundle ingestion remains
+       * independently fail-closed.
+       */
+    }
+  }
+
+  if (
+    settings.acceptedWorkFeeder
+  ) {
+    try {
+      await (
+        dependencies
+          .scanAcceptedWork ??
+        scanAcceptedWorkForFulgorOnce
+      )(
+        {
+          stateRoot:
+            settings
+              .acceptedWorkFeeder
+              .stateRoot,
+
+          repoRoot:
+            settings
+              .acceptedWorkFeeder
+              .repoRoot,
+
+          sourceBindingRoot:
+            join(
+              settings.signedEvidenceRoot,
+              'source-binding',
+            ),
+
+          policy:
+            ACCEPTED_WORK_POLICY,
+
+          /*
+           * Enqueue the full bounded output set now;
+           * actual FULGOR execution remains limited
+           * independently by FULGOR_MAX_JOBS_PER_RUN.
+           *
+           * This avoids losing candidates if a later
+           * provider run replaces the latest pointer.
+           */
+          maxEnqueuePerScan:
+            16,
+        },
+        store,
+      );
+    } catch {
+      /*
+       * No accepted-work ingestion failure may
+       * widen authority or break the verification
+       * controller's existing availability.
+       */
+    }
+  }
 }
 
 export async function runLocalContinuousController(
@@ -253,6 +447,12 @@ export async function runLocalContinuousController(
         .controllerServiceAccount,
     );
 
+  const kmsPublicKeyRequester =
+    createGcloudImpersonatedKmsPublicKeyRequester(
+      settings
+        .controllerServiceAccount,
+    );
+
   const completionHook =
     createGcpSignedEvidenceCompletionHook({
       evidenceRoot:
@@ -267,46 +467,28 @@ export async function runLocalContinuousController(
 
       requester:
         kmsRequester,
+
+      publicKeyRequester:
+        kmsPublicKeyRequester,
     });
 
   const feederStore =
-    settings.feeder
+    (
+      settings.feeder ||
+      settings.acceptedWorkFeeder
+    )
       ? createControllerStateStore(
           config,
         )
       : null;
 
   const beforeCycle =
-    settings.feeder &&
     feederStore
       ? async () => {
-          try {
-            await scanReviewBundlesOnce(
-              {
-                bundleRoot:
-                  settings.feeder!
-                    .bundleRoot,
-
-                repoRoot:
-                  settings.feeder!
-                    .repoRoot,
-
-                notBeforeMs:
-                  settings.feeder!
-                    .notBeforeMs,
-
-                maxEnqueuePerScan:
-                  1,
-              },
-              feederStore,
-            );
-          } catch {
-            /*
-             * Fail closed for ingestion.
-             * Existing controller availability is
-             * preserved; nothing is admitted.
-             */
-          }
+          await runLocalControllerFeedersOnce(
+            settings,
+            feederStore,
+          );
         }
       : undefined;
 

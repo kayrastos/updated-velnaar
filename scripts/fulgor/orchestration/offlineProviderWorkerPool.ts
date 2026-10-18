@@ -7,9 +7,8 @@ import {
   type HostEvidenceCapsule,
 } from './providerWorkProductGate';
 
-import {
-  workProductFingerprint,
-  type WorkOutcome,
+import type {
+  WorkOutcome,
 } from './providerWorkAccounting';
 
 import type {
@@ -588,16 +587,20 @@ async function runSlot(
         continue;
       }
 
-      const fingerprint =
-        workProductFingerprint(
-          accepted,
-        );
-
+      /*
+       * The offline harness obeys the same authority
+       * boundary as the live pool:
+       *
+       * worker code may supply only the exact accepted
+       * work product. SQLite re-validates it, computes
+       * the fingerprint and decides uniqueness inside
+       * the settlement transaction.
+       */
       const settled =
         queue.settleUseful(
           provider,
           record.lease.leaseId,
-          fingerprint,
+          accepted,
           Date.now(),
         );
 

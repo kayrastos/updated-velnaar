@@ -439,6 +439,15 @@ describe(
                 captured =
                   input;
 
+                writeFileSync(
+                  input.queuePath,
+                  'test-queue',
+                  {
+                    mode:
+                      0o600,
+                  },
+                );
+
                 return fakeResult();
               },
           });
@@ -480,6 +489,15 @@ describe(
         expect(
           result.usefulUnique,
         ).toBe(16);
+
+        expect(
+          result.acceptedWorkPointerPath,
+        ).toBe(
+          join(
+            stateRoot,
+            'accepted-work-latest.json',
+          ),
+        );
 
         expect(
           result.fulgorCalled,

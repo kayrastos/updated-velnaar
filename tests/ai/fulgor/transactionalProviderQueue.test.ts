@@ -35,6 +35,10 @@ import {
 } from '../../../scripts/fulgor/orchestration/providerWorkAccounting';
 
 import {
+  parseProviderWorkProduct,
+} from '../../../scripts/fulgor/orchestration/providerWorkProductGate';
+
+import {
   TransactionalProviderQueue,
 } from '../../../scripts/fulgor/orchestration/transactionalProviderQueue';
 
@@ -78,6 +82,90 @@ function order(
 
     affinity,
   });
+}
+
+
+function accepted(
+  taskId: string,
+  provider:
+    'codex' |
+    'antigravity',
+  identity = taskId,
+) {
+  const candidatePath =
+    `tests/${identity}.test.ts`;
+
+  return parseProviderWorkProduct(
+    JSON.stringify({
+      schemaVersion:
+        'VELNAR_PROVIDER_WORK_PRODUCT_V1',
+
+      provider,
+      taskId,
+      baseline,
+
+      status:
+        'PROPOSE_CHANGE',
+
+      summary:
+        'Bounded regression candidate.',
+
+      evidenceIds:
+        ['E1', 'E2'],
+
+      candidate: {
+        path:
+          candidatePath,
+
+        content:
+          [
+            "import { describe, expect, it } from 'vitest';",
+            '',
+            `describe('${identity}', () => {`,
+            "  it('holds', () => {",
+            '    expect(true).toBe(true);',
+            '  });',
+            '});',
+            '',
+          ].join('\n'),
+      },
+
+      tests: [
+        `npx vitest run ${candidatePath}`,
+      ],
+
+      blocker:
+        null,
+    }),
+    {
+      taskId,
+      baseline,
+
+      evidence: [
+        {
+          id:
+            'E1',
+
+          path:
+            'scripts/evidence-one.ts',
+
+          sha256:
+            '1'.repeat(64),
+        },
+        {
+          id:
+            'E2',
+
+          path:
+            'scripts/evidence-two.ts',
+
+          sha256:
+            '2'.repeat(64),
+        },
+      ],
+    },
+    provider,
+  );
 }
 
 afterEach(
@@ -460,7 +548,10 @@ describe(
           queue.settleUseful(
             'codex',
             leased.lease!.leaseId,
-            'a'.repeat(64),
+            accepted(
+              'job-complete',
+              'codex',
+            ),
             3000,
           );
 
@@ -475,6 +566,285 @@ describe(
           USEFUL_COMPLETE: 1,
         });
 
+        queue.close();
+      },
+    );
+
+    it(
+      'persists canonical accepted work across restart',
+      () => {
+        const root =
+          makeRoot();
+
+        const dbPath =
+          join(
+            root,
+            'queue.sqlite',
+          );
+
+        let queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        queue.enqueue(
+          order(
+            'job-durable',
+            'codex',
+          ),
+          1000,
+        );
+
+        const leased =
+          queue.claimNext(
+            'codex',
+            'codex-01',
+            2000,
+            60_000,
+          )!;
+
+        queue.settleUseful(
+          'codex',
+          leased.lease!.leaseId,
+          accepted(
+            'job-durable',
+            'codex',
+          ),
+          3000,
+        );
+
+        const before =
+          queue.getAcceptedWorkProduct(
+            'job-durable',
+          );
+
+        expect(before)
+          .not.toBeNull();
+
+        expect(
+          before?.accepted
+            .workProduct
+            .candidate
+            ?.path,
+        ).toBe(
+          'tests/job-durable.test.ts',
+        );
+
+        expect(
+          before?.evidenceCount,
+        ).toBe(2);
+
+        expect(
+          before?.accepted
+            .verified,
+        ).toBe(false);
+
+        expect(
+          before?.accepted
+            .authorityGranted,
+        ).toBe(false);
+
+        queue.close();
+
+        queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        const after =
+          queue.getAcceptedWorkProduct(
+            'job-durable',
+          );
+
+        expect(after)
+          .toEqual(before);
+
+        expect(
+          queue.listAcceptedWorkProducts(),
+        ).toHaveLength(1);
+
+        queue.close();
+      },
+    );
+
+    it(
+      'rolls back fingerprint and accepted persistence when binding is invalid',
+      () => {
+        const root =
+          makeRoot();
+
+        const dbPath =
+          join(
+            root,
+            'queue.sqlite',
+          );
+
+        const queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        queue.enqueue(
+          order(
+            'job-rollback',
+            'codex',
+          ),
+          1000,
+        );
+
+        const leased =
+          queue.claimNext(
+            'codex',
+            'codex-01',
+            2000,
+            60_000,
+          )!;
+
+        expect(() =>
+          queue.settleUseful(
+            'codex',
+            leased.lease!.leaseId,
+            accepted(
+              'different-task',
+              'codex',
+            ),
+            3000,
+          ),
+        ).toThrow();
+
+        expect(
+          queue.get(
+            'job-rollback',
+          )?.state,
+        ).toBe(
+          'LEASED',
+        );
+
+        expect(
+          queue.listAcceptedWorkProducts(),
+        ).toHaveLength(0);
+
+        const db =
+          new DatabaseSync(
+            dbPath,
+          );
+
+        const count =
+          db.prepare(`
+            SELECT COUNT(*) AS count
+            FROM work_fingerprints
+          `)
+            .get() as {
+              count: number;
+            };
+
+        expect(
+          Number(
+            count.count,
+          ),
+        ).toBe(0);
+
+        db.close();
+        queue.close();
+      },
+    );
+
+    it(
+      'migrates V3 queues additively to V4',
+      () => {
+        const root =
+          makeRoot();
+
+        const dbPath =
+          join(
+            root,
+            'queue.sqlite',
+          );
+
+        let queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        queue.enqueue(
+          order(
+            'job-v3-preserved',
+            'codex',
+          ),
+          1000,
+        );
+
+        queue.close();
+
+        const db =
+          new DatabaseSync(
+            dbPath,
+          );
+
+        db.exec(`
+          DROP TABLE accepted_work_products;
+
+          UPDATE queue_meta
+          SET value =
+            'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V3'
+          WHERE key = 'schema';
+        `);
+
+        db.close();
+
+        queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        expect(
+          queue.get(
+            'job-v3-preserved',
+          )?.state,
+        ).toBe(
+          'PENDING',
+        );
+
+        expect(
+          queue.listAcceptedWorkProducts(),
+        ).toHaveLength(0);
+
+        const migrated =
+          new DatabaseSync(
+            dbPath,
+          );
+
+        const schema =
+          migrated.prepare(`
+            SELECT value
+            FROM queue_meta
+            WHERE key = 'schema'
+          `)
+            .get() as {
+              value: string;
+            };
+
+        expect(
+          schema.value,
+        ).toBe(
+          'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V4',
+        );
+
+        const table =
+          migrated.prepare(`
+            SELECT name
+            FROM sqlite_master
+            WHERE
+              type = 'table'
+              AND
+              name = 'accepted_work_products'
+          `)
+            .get();
+
+        expect(table)
+          .toBeTruthy();
+
+        migrated.close();
         queue.close();
       },
     );
@@ -526,7 +896,7 @@ describe(
     );
 
     it(
-      'classifies the first persistent fingerprint as unique and cross-provider repeat as duplicate',
+      'classifies the first persistent fingerprint as unique and same-provider repeat as duplicate',
       () => {
         const root =
           makeRoot();
@@ -550,7 +920,7 @@ describe(
         queue.enqueue(
           order(
             'job-second-fingerprint',
-            'antigravity',
+            'codex',
           ),
           1001,
         );
@@ -567,7 +937,11 @@ describe(
           queue.settleUseful(
             'codex',
             first.lease!.leaseId,
-            'b'.repeat(64),
+            accepted(
+              'job-first-fingerprint',
+              'codex',
+              'shared-fingerprint',
+            ),
             3000,
           );
 
@@ -585,17 +959,21 @@ describe(
 
         const second =
           queue.claimNext(
-            'antigravity',
-            'agy-01',
+            'codex',
+            'codex-02',
             4000,
             60_000,
           )!;
 
         const secondResult =
           queue.settleUseful(
-            'antigravity',
+            'codex',
             second.lease!.leaseId,
-            'b'.repeat(64),
+            accepted(
+              'job-second-fingerprint',
+              'codex',
+              'shared-fingerprint',
+            ),
             5000,
           );
 
@@ -658,7 +1036,11 @@ describe(
         queue.settleUseful(
           'codex',
           first.lease!.leaseId,
-          'c'.repeat(64),
+          accepted(
+            'job-before-restart',
+            'codex',
+            'restart-shared',
+          ),
           3000,
         );
 
@@ -672,24 +1054,28 @@ describe(
         queue.enqueue(
           order(
             'job-after-restart',
-            'antigravity',
+            'codex',
           ),
           4000,
         );
 
         const second =
           queue.claimNext(
-            'antigravity',
-            'agy-01',
+            'codex',
+            'codex-02',
             5000,
             60_000,
           )!;
 
         const result =
           queue.settleUseful(
-            'antigravity',
+            'codex',
             second.lease!.leaseId,
-            'c'.repeat(64),
+            accepted(
+              'job-after-restart',
+              'codex',
+              'restart-shared',
+            ),
             6000,
           );
 
@@ -742,7 +1128,7 @@ describe(
         queueB.enqueue(
           order(
             'job-connection-b',
-            'antigravity',
+            'codex',
           ),
           1001,
         );
@@ -755,10 +1141,10 @@ describe(
             60_000,
           )!;
 
-        const antigravity =
+        const codexSecond =
           queueB.claimNext(
-            'antigravity',
-            'agy-01',
+            'codex',
+            'codex-02',
             2001,
             60_000,
           )!;
@@ -767,15 +1153,23 @@ describe(
           queueA.settleUseful(
             'codex',
             codex.lease!.leaseId,
-            'd'.repeat(64),
+            accepted(
+              'job-connection-a',
+              'codex',
+              'connection-shared',
+            ),
             3000,
           );
 
         const second =
           queueB.settleUseful(
-            'antigravity',
-            antigravity.lease!.leaseId,
-            'd'.repeat(64),
+            'codex',
+            codexSecond.lease!.leaseId,
+            accepted(
+              'job-connection-b',
+              'codex',
+              'connection-shared',
+            ),
             3001,
           );
 

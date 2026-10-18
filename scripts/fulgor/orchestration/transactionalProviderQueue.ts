@@ -1,4 +1,8 @@
 import {
+  createHash,
+} from 'node:crypto';
+
+import {
   chmodSync,
   existsSync,
   lstatSync,
@@ -19,10 +23,17 @@ import type {
   Provider,
 } from '../scheduler/verified8x8Scheduler';
 
-import type {
-  QualityCertification,
-  WorkOutcome,
+import {
+  workProductFingerprint,
+  type QualityCertification,
+  type WorkOutcome,
 } from './providerWorkAccounting';
+
+import {
+  parseProviderWorkProduct,
+  type AcceptedWorkProduct,
+  type HostEvidence,
+} from './providerWorkProductGate';
 
 import {
   claimProviderWork,
@@ -36,11 +47,50 @@ import {
 } from './providerWorkOrder';
 
 export const TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
+  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V4' as const;
+
+const PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
   'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V3' as const;
 
 export type PersistedQualityCircuitState =
   | 'CLOSED'
   | 'OPEN';
+
+export interface PersistedAcceptedWorkProduct {
+  readonly jobId:
+    string;
+
+  readonly fingerprint:
+    string;
+
+  readonly provider:
+    Provider;
+
+  readonly baseline:
+    string;
+
+  readonly status:
+    'PROPOSE_CHANGE'
+    | 'NO_CHANGE_NEEDED';
+
+  readonly candidatePath:
+    string | null;
+
+  readonly candidateSha256:
+    string | null;
+
+  readonly evidenceCount:
+    number;
+
+  readonly acceptedSha256:
+    string;
+
+  readonly accepted:
+    AcceptedWorkProduct;
+
+  readonly createdAtMs:
+    number;
+}
 
 export interface PersistedProviderQualityState {
   readonly provider: Provider;
@@ -60,6 +110,7 @@ const REQUIRED_OBJECTS =
   Object.freeze([
     'jobs',
     'work_fingerprints',
+    'accepted_work_products',
     'provider_quality_state',
     'idx_jobs_pending',
     'idx_jobs_lease_expiry',
@@ -128,6 +179,103 @@ function asNumber(
   }
 
   return value;
+}
+
+function sha256Text(
+  value: string,
+): string {
+  return createHash('sha256')
+    .update(
+      value,
+      'utf8',
+    )
+    .digest('hex');
+}
+
+function exactObjectKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+): boolean {
+  return (
+    Object.keys(value)
+      .sort()
+      .join('\0') ===
+    [...expected]
+      .sort()
+      .join('\0')
+  );
+}
+
+function hostEvidenceFromUnknown(
+  value: unknown,
+): readonly HostEvidence[] {
+  if (!Array.isArray(value)) {
+    throw new Error(
+      'QUEUE_ACCEPTED_EVIDENCE_INVALID',
+    );
+  }
+
+  return Object.freeze(
+    value.map(
+      item => {
+        const row =
+          requireRow(
+            item,
+            'ACCEPTED_EVIDENCE',
+          );
+
+        if (
+          !exactObjectKeys(
+            row,
+            [
+              'id',
+              'path',
+              'sha256',
+            ],
+          )
+        ) {
+          throw new Error(
+            'QUEUE_ACCEPTED_EVIDENCE_KEYS_INVALID',
+          );
+        }
+
+        const id =
+          asString(
+            row.id,
+            'ACCEPTED_EVIDENCE_ID',
+          );
+
+        const path =
+          asString(
+            row.path,
+            'ACCEPTED_EVIDENCE_PATH',
+          );
+
+        const sha256 =
+          asString(
+            row.sha256,
+            'ACCEPTED_EVIDENCE_SHA256',
+          )
+            .toLowerCase();
+
+        if (
+          !/^[0-9a-f]{64}$/.test(
+            sha256,
+          )
+        ) {
+          throw new Error(
+            'QUEUE_ACCEPTED_EVIDENCE_SHA256_INVALID',
+          );
+        }
+
+        return Object.freeze({
+          id,
+          path,
+          sha256,
+        });
+      },
+    ),
+  );
 }
 
 function asNullableNumber(
@@ -467,6 +615,123 @@ export class TransactionalProviderQueue {
             );
 
             /*
+             * Host-owned durable accepted work product.
+             *
+             * Only USEFUL_UNIQUE work may enter this
+             * table. Fingerprint reservation, accepted
+             * payload persistence and job settlement
+             * occur in the same BEGIN IMMEDIATE
+             * transaction.
+             */
+            CREATE TABLE accepted_work_products (
+              job_id TEXT
+                PRIMARY KEY,
+
+              fingerprint TEXT
+                NOT NULL
+                UNIQUE
+                CHECK(
+                  length(fingerprint) = 64
+                  AND
+                  fingerprint = lower(fingerprint)
+                  AND
+                  fingerprint
+                    NOT GLOB '*[^0-9a-f]*'
+                ),
+
+              provider TEXT
+                NOT NULL
+                CHECK(
+                  provider IN (
+                    'codex',
+                    'antigravity'
+                  )
+                ),
+
+              baseline TEXT
+                NOT NULL
+                CHECK(
+                  length(baseline) = 40
+                  AND
+                  baseline = lower(baseline)
+                  AND
+                  baseline
+                    NOT GLOB '*[^0-9a-f]*'
+                ),
+
+              status TEXT
+                NOT NULL
+                CHECK(
+                  status IN (
+                    'PROPOSE_CHANGE',
+                    'NO_CHANGE_NEEDED'
+                  )
+                ),
+
+              candidate_path TEXT,
+
+              candidate_sha256 TEXT,
+
+              evidence_count INTEGER
+                NOT NULL
+                CHECK(evidence_count >= 2),
+
+              accepted_sha256 TEXT
+                NOT NULL
+                CHECK(
+                  length(accepted_sha256) = 64
+                  AND
+                  accepted_sha256 =
+                    lower(accepted_sha256)
+                  AND
+                  accepted_sha256
+                    NOT GLOB '*[^0-9a-f]*'
+                ),
+
+              accepted_json TEXT
+                NOT NULL,
+
+              created_ms INTEGER
+                NOT NULL,
+
+              CHECK(
+                (
+                  status = 'PROPOSE_CHANGE'
+                  AND
+                  candidate_path IS NOT NULL
+                  AND
+                  candidate_sha256 IS NOT NULL
+                  AND
+                  length(candidate_sha256) = 64
+                  AND
+                  candidate_sha256 =
+                    lower(candidate_sha256)
+                  AND
+                  candidate_sha256
+                    NOT GLOB '*[^0-9a-f]*'
+                )
+                OR
+                (
+                  status = 'NO_CHANGE_NEEDED'
+                  AND
+                  candidate_path IS NULL
+                  AND
+                  candidate_sha256 IS NULL
+                )
+              ),
+
+              FOREIGN KEY(job_id)
+              REFERENCES jobs(job_id)
+              ON DELETE RESTRICT,
+
+              FOREIGN KEY(fingerprint)
+              REFERENCES work_fingerprints(
+                fingerprint
+              )
+              ON DELETE RESTRICT
+            );
+
+            /*
              * Provider-local persistent quality circuit.
              *
              * Restart must never silently reset an OPEN
@@ -599,6 +864,138 @@ export class TransactionalProviderQueue {
         );
 
       if (
+        schema ===
+        PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
+      ) {
+        /*
+         * V3 did not persist the accepted provider
+         * work product. Historical rows remain valid
+         * but cannot retroactively gain candidate
+         * payloads that were never stored.
+         *
+         * Migration is additive and transactional.
+         */
+        this.transaction(
+          () => {
+            this.db.exec(`
+              CREATE TABLE accepted_work_products (
+                job_id TEXT
+                  PRIMARY KEY,
+
+                fingerprint TEXT
+                  NOT NULL
+                  UNIQUE
+                  CHECK(
+                    length(fingerprint) = 64
+                    AND
+                    fingerprint =
+                      lower(fingerprint)
+                    AND
+                    fingerprint
+                      NOT GLOB '*[^0-9a-f]*'
+                  ),
+
+                provider TEXT
+                  NOT NULL
+                  CHECK(
+                    provider IN (
+                      'codex',
+                      'antigravity'
+                    )
+                  ),
+
+                baseline TEXT
+                  NOT NULL
+                  CHECK(
+                    length(baseline) = 40
+                    AND
+                    baseline = lower(baseline)
+                    AND
+                    baseline
+                      NOT GLOB '*[^0-9a-f]*'
+                  ),
+
+                status TEXT
+                  NOT NULL
+                  CHECK(
+                    status IN (
+                      'PROPOSE_CHANGE',
+                      'NO_CHANGE_NEEDED'
+                    )
+                  ),
+
+                candidate_path TEXT,
+                candidate_sha256 TEXT,
+
+                evidence_count INTEGER
+                  NOT NULL
+                  CHECK(evidence_count >= 2),
+
+                accepted_sha256 TEXT
+                  NOT NULL
+                  CHECK(
+                    length(accepted_sha256) = 64
+                    AND
+                    accepted_sha256 =
+                      lower(accepted_sha256)
+                    AND
+                    accepted_sha256
+                      NOT GLOB '*[^0-9a-f]*'
+                  ),
+
+                accepted_json TEXT
+                  NOT NULL,
+
+                created_ms INTEGER
+                  NOT NULL,
+
+                CHECK(
+                  (
+                    status =
+                      'PROPOSE_CHANGE'
+                    AND
+                    candidate_path IS NOT NULL
+                    AND
+                    candidate_sha256 IS NOT NULL
+                    AND
+                    length(candidate_sha256) = 64
+                    AND
+                    candidate_sha256 =
+                      lower(candidate_sha256)
+                    AND
+                    candidate_sha256
+                      NOT GLOB '*[^0-9a-f]*'
+                  )
+                  OR
+                  (
+                    status =
+                      'NO_CHANGE_NEEDED'
+                    AND
+                    candidate_path IS NULL
+                    AND
+                    candidate_sha256 IS NULL
+                  )
+                ),
+
+                FOREIGN KEY(job_id)
+                REFERENCES jobs(job_id)
+                ON DELETE RESTRICT,
+
+                FOREIGN KEY(fingerprint)
+                REFERENCES work_fingerprints(
+                  fingerprint
+                )
+                ON DELETE RESTRICT
+              );
+
+              UPDATE queue_meta
+              SET value =
+                'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V4'
+              WHERE key = 'schema';
+            `);
+          },
+        );
+      } else if (
         schema !==
         TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
       ) {
@@ -615,6 +1012,7 @@ export class TransactionalProviderQueue {
             WHERE name IN (
               'jobs',
               'work_fingerprints',
+              'accepted_work_products',
               'provider_quality_state',
               'idx_jobs_pending',
               'idx_jobs_lease_expiry',
@@ -800,6 +1198,437 @@ export class TransactionalProviderQueue {
     }
 
     return record;
+  }
+
+  private canonicalAccepted(
+    current:
+      ProviderWorkRecord,
+
+    provider:
+      Provider,
+
+    input:
+      unknown,
+  ): Readonly<{
+    accepted: AcceptedWorkProduct;
+    json: string;
+    fingerprint: string;
+    acceptedSha256: string;
+    candidatePath: string | null;
+    candidateSha256: string | null;
+  }> {
+    const raw =
+      requireRow(
+        input,
+        'ACCEPTED_WORK_PRODUCT',
+      );
+
+    if (
+      !exactObjectKeys(
+        raw,
+        [
+          'workProduct',
+          'usable',
+          'evidenceCount',
+          'evidenceBindings',
+          'verified',
+          'authorityGranted',
+        ],
+      )
+    ) {
+      throw new Error(
+        'QUEUE_ACCEPTED_KEYS_INVALID',
+      );
+    }
+
+    const evidence =
+      hostEvidenceFromUnknown(
+        raw.evidenceBindings,
+      );
+
+    const expectedIds =
+      [...current.order.evidenceIds]
+        .sort();
+
+    const actualIds =
+      evidence
+        .map(
+          item =>
+            item.id,
+        )
+        .sort();
+
+    if (
+      expectedIds.length !==
+        actualIds.length ||
+      expectedIds.some(
+        (
+          id,
+          index,
+        ) =>
+          id !== actualIds[index],
+      )
+    ) {
+      throw new Error(
+        'QUEUE_ACCEPTED_EVIDENCE_BINDING_MISMATCH',
+      );
+    }
+
+    const canonical =
+      parseProviderWorkProduct(
+        JSON.stringify(
+          raw.workProduct,
+        ),
+        {
+          taskId:
+            current.order.jobId,
+
+          baseline:
+            current.order.baseline,
+
+          evidence,
+        },
+        provider,
+      );
+
+    if (!canonical.usable) {
+      throw new Error(
+        'QUEUE_ACCEPTED_NOT_USABLE',
+      );
+    }
+
+    const json =
+      JSON.stringify(
+        canonical,
+      );
+
+    if (
+      json !==
+      JSON.stringify(input)
+    ) {
+      throw new Error(
+        'QUEUE_ACCEPTED_NOT_CANONICAL',
+      );
+    }
+
+    const fingerprint =
+      workProductFingerprint(
+        canonical,
+      );
+
+    const candidate =
+      canonical
+        .workProduct
+        .candidate;
+
+    return Object.freeze({
+      accepted:
+        canonical,
+
+      json,
+
+      fingerprint,
+
+      acceptedSha256:
+        sha256Text(
+          json,
+        ),
+
+      candidatePath:
+        candidate?.path ??
+        null,
+
+      candidateSha256:
+        candidate === null
+          ? null
+          : sha256Text(
+              candidate.content,
+            ),
+    });
+  }
+
+  private parseAcceptedPersistedRow(
+    value:
+      unknown,
+
+    current:
+      ProviderWorkRecord,
+  ): PersistedAcceptedWorkProduct {
+    const row =
+      requireRow(
+        value,
+        'ACCEPTED_ROW',
+      );
+
+    const jobId =
+      asString(
+        row.job_id,
+        'ACCEPTED_JOB_ID',
+      );
+
+    const fingerprint =
+      asString(
+        row.fingerprint,
+        'ACCEPTED_FINGERPRINT',
+      );
+
+    const provider =
+      providerOrNull(
+        row.provider,
+      );
+
+    if (provider === null) {
+      throw new Error(
+        'QUEUE_ACCEPTED_PROVIDER_INVALID',
+      );
+    }
+
+    const baseline =
+      asString(
+        row.baseline,
+        'ACCEPTED_BASELINE',
+      );
+
+    const status =
+      asString(
+        row.status,
+        'ACCEPTED_STATUS',
+      );
+
+    const candidatePath =
+      asNullableString(
+        row.candidate_path,
+        'ACCEPTED_CANDIDATE_PATH',
+      );
+
+    const candidateSha256 =
+      asNullableString(
+        row.candidate_sha256,
+        'ACCEPTED_CANDIDATE_SHA256',
+      );
+
+    const evidenceCount =
+      asNumber(
+        row.evidence_count,
+        'ACCEPTED_EVIDENCE_COUNT',
+      );
+
+    const acceptedSha256 =
+      asString(
+        row.accepted_sha256,
+        'ACCEPTED_SHA256',
+      );
+
+    const acceptedJson =
+      asString(
+        row.accepted_json,
+        'ACCEPTED_JSON',
+      );
+
+    const createdAtMs =
+      asNumber(
+        row.created_ms,
+        'ACCEPTED_CREATED_MS',
+      );
+
+    if (
+      jobId !==
+        current.order.jobId ||
+      baseline !==
+        current.order.baseline ||
+      current.state !==
+        'USEFUL_COMPLETE' ||
+      current.lastOutcome !==
+        'USEFUL_UNIQUE' ||
+      current.fingerprint !==
+        fingerprint
+    ) {
+      throw new Error(
+        'QUEUE_ACCEPTED_JOB_BINDING_INVALID',
+      );
+    }
+
+    if (
+      sha256Text(
+        acceptedJson,
+      ) !==
+      acceptedSha256
+    ) {
+      throw new Error(
+        'QUEUE_ACCEPTED_HASH_MISMATCH',
+      );
+    }
+
+    let decoded:
+      unknown;
+
+    try {
+      decoded =
+        JSON.parse(
+          acceptedJson,
+        );
+    } catch {
+      throw new Error(
+        'QUEUE_ACCEPTED_JSON_INVALID',
+      );
+    }
+
+    const canonical =
+      this.canonicalAccepted(
+        current,
+        provider,
+        decoded,
+      );
+
+    if (
+      canonical.fingerprint !==
+        fingerprint ||
+      canonical.acceptedSha256 !==
+        acceptedSha256 ||
+      canonical.candidatePath !==
+        candidatePath ||
+      canonical.candidateSha256 !==
+        candidateSha256 ||
+      canonical.accepted
+        .evidenceCount !==
+        evidenceCount ||
+      canonical.accepted
+        .workProduct
+        .status !==
+        status
+    ) {
+      throw new Error(
+        'QUEUE_ACCEPTED_METADATA_MISMATCH',
+      );
+    }
+
+    if (
+      status !==
+        'PROPOSE_CHANGE' &&
+      status !==
+        'NO_CHANGE_NEEDED'
+    ) {
+      throw new Error(
+        'QUEUE_ACCEPTED_STATUS_INVALID',
+      );
+    }
+
+    return Object.freeze({
+      jobId,
+      fingerprint,
+      provider,
+      baseline,
+
+      status,
+
+      candidatePath,
+      candidateSha256,
+      evidenceCount,
+      acceptedSha256,
+
+      accepted:
+        canonical.accepted,
+
+      createdAtMs,
+    });
+  }
+
+  getAcceptedWorkProduct(
+    jobId:
+      string,
+  ): PersistedAcceptedWorkProduct | null {
+    const current =
+      this.get(
+        jobId,
+      );
+
+    if (current === null) {
+      return null;
+    }
+
+    const row =
+      this.db
+        .prepare(`
+          SELECT *
+          FROM accepted_work_products
+          WHERE job_id = ?
+          LIMIT 1
+        `)
+        .get(
+          jobId,
+        );
+
+    if (!row) {
+      return null;
+    }
+
+    return this.parseAcceptedPersistedRow(
+      row,
+      current,
+    );
+  }
+
+  listAcceptedWorkProducts(
+    limit = 256,
+  ): readonly PersistedAcceptedWorkProduct[] {
+    if (
+      !Number.isSafeInteger(limit) ||
+      limit < 1 ||
+      limit > 1024
+    ) {
+      throw new Error(
+        'QUEUE_ACCEPTED_LIMIT_INVALID',
+      );
+    }
+
+    const rows =
+      this.db
+        .prepare(`
+          SELECT *
+          FROM accepted_work_products
+          ORDER BY
+            created_ms,
+            job_id
+          LIMIT ?
+        `)
+        .all(
+          limit,
+        );
+
+    return Object.freeze(
+      rows.map(
+        row => {
+          const raw =
+            requireRow(
+              row,
+              'ACCEPTED_LIST_ROW',
+            );
+
+          const jobId =
+            asString(
+              raw.job_id,
+              'ACCEPTED_LIST_JOB_ID',
+            );
+
+          const current =
+            this.get(
+              jobId,
+            );
+
+          if (current === null) {
+            throw new Error(
+              'QUEUE_ACCEPTED_JOB_MISSING',
+            );
+          }
+
+          return this
+            .parseAcceptedPersistedRow(
+              row,
+              current,
+            );
+        },
+      ),
+    );
   }
 
   enqueue(
@@ -1212,19 +2041,9 @@ export class TransactionalProviderQueue {
   settleUseful(
     provider: Provider,
     leaseId: string,
-    fingerprint: string,
+    accepted: AcceptedWorkProduct,
     nowMs: number,
   ): ProviderWorkRecord {
-    if (
-      !/^[0-9a-f]{64}$/.test(
-        fingerprint,
-      )
-    ) {
-      throw new Error(
-        'QUEUE_FINGERPRINT_INVALID',
-      );
-    }
-
     return this.transaction(
       () => {
         const row =
@@ -1261,6 +2080,22 @@ export class TransactionalProviderQueue {
             'QUEUE_USEFUL_PROVIDER_MISMATCH',
           );
         }
+
+        /*
+         * Re-run the semantic work-product gate at the
+         * persistence boundary and compute identity
+         * locally. The caller cannot supply a forged
+         * useful-work fingerprint.
+         */
+        const canonical =
+          this.canonicalAccepted(
+            current,
+            provider,
+            accepted,
+          );
+
+        const fingerprint =
+          canonical.fingerprint;
 
         const existing =
           this.db
@@ -1309,6 +2144,66 @@ export class TransactionalProviderQueue {
               provider,
               nowMs,
             );
+
+          const product =
+            canonical
+              .accepted
+              .workProduct;
+
+          const acceptedResult =
+            this.db
+              .prepare(`
+                INSERT INTO accepted_work_products(
+                  job_id,
+                  fingerprint,
+                  provider,
+                  baseline,
+                  status,
+                  candidate_path,
+                  candidate_sha256,
+                  evidence_count,
+                  accepted_sha256,
+                  accepted_json,
+                  created_ms
+                )
+                VALUES(
+                  ?,
+                  ?,
+                  ?,
+                  ?,
+                  ?,
+                  ?,
+                  ?,
+                  ?,
+                  ?,
+                  ?,
+                  ?
+                )
+              `)
+              .run(
+                current.order.jobId,
+                fingerprint,
+                provider,
+                current.order.baseline,
+                product.status,
+                canonical.candidatePath,
+                canonical.candidateSha256,
+                canonical.accepted
+                  .evidenceCount,
+                canonical.acceptedSha256,
+                canonical.json,
+                nowMs,
+              );
+
+          if (
+            Number(
+              acceptedResult.changes,
+            ) !== 1
+          ) {
+            throw new Error(
+              'QUEUE_ATOMIC_ACCEPTED_INSERT_FAILED',
+            );
+          }
         }
 
         const settled =

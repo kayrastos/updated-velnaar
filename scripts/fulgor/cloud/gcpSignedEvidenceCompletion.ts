@@ -29,8 +29,23 @@ import {
 } from '../evidence/signedEvidenceStore';
 
 import {
+  readAcceptedWorkSourceBindingForEvidence,
+} from '../orchestration/acceptedWorkSourceBinding';
+
+import {
   GcpKmsEvidenceSigner,
 } from './gcpKmsEvidenceSigner';
+
+import {
+  GcpKmsEvidenceVerifier,
+  type GcpKmsPublicKeyRequester,
+} from './gcpKmsEvidenceVerifier';
+
+import {
+  createAcceptedWorkAuthorizationReadiness,
+  evaluateAcceptedWorkAuthorizationGate,
+  persistAcceptedWorkAuthorizationReadiness,
+} from '../promotion/acceptedWorkAuthorizationGate';
 
 import type {
   GcpKmsRequester,
@@ -41,7 +56,10 @@ export type GcpSignedCompletionFailureCode =
   | 'INVALID_JOB_BINDING'
   | 'INVALID_JOB_ID'
   | 'RAW_EVIDENCE_PERSISTENCE_FAILURE'
-  | 'PROVENANCE_PERSISTENCE_FAILURE';
+  | 'PROVENANCE_PERSISTENCE_FAILURE'
+  | 'ACCEPTED_WORK_SOURCE_BINDING_FAILURE'
+  | 'ACCEPTED_WORK_AUTHORIZATION_FAILURE'
+  | 'AUTHORIZATION_READINESS_PERSISTENCE_FAILURE';
 
 export class GcpSignedCompletionError extends Error {
   readonly code: GcpSignedCompletionFailureCode;
@@ -60,6 +78,9 @@ export type GcpSignedEvidenceCompletionOptions = {
   keyId: string;
   keyVersionResource: string;
   requester?: GcpKmsRequester;
+
+  publicKeyRequester?:
+    GcpKmsPublicKeyRequester;
 };
 
 const JOB_ID =
@@ -147,6 +168,18 @@ export function createGcpSignedEvidenceCompletionHook(
         options.requester,
     });
 
+  const verifier =
+    new GcpKmsEvidenceVerifier({
+      keyId:
+        options.keyId,
+
+      keyVersionResource:
+        options.keyVersionResource,
+
+      requester:
+        options.publicKeyRequester,
+    });
+
   return async ({
     jobId,
     result,
@@ -208,25 +241,80 @@ export function createGcpSignedEvidenceCompletionHook(
     const rawSha256 =
       await sha256File(rawPath);
 
+    const artifacts = [
+      {
+        path:
+          rawRelative,
+
+        expectedSha256:
+          rawSha256,
+
+        role:
+          'automation_evidence',
+
+        opaqueSemantic:
+          true,
+      },
+    ];
+
+    /*
+     * Jobs created by the VELNAR accepted-work bridge
+     * are identified by their deterministic VF-* ID.
+     *
+     * Signed evidence for those jobs is invalid unless
+     * the provider-origin source binding exists and
+     * matches jobId + blindedId + patchSha256.
+     */
+    if (
+      jobId.startsWith(
+        'VF-',
+      )
+    ) {
+      let source;
+
+      try {
+        source =
+          await readAcceptedWorkSourceBindingForEvidence(
+            root,
+            result.evidence,
+          );
+      } catch {
+        return fail(
+          'ACCEPTED_WORK_SOURCE_BINDING_FAILURE',
+        );
+      }
+
+      artifacts.push({
+        path:
+          source.relativePath,
+
+        expectedSha256:
+          source.fileSha256,
+
+        role:
+          'accepted_work_source_binding',
+
+        opaqueSemantic:
+          true,
+      });
+    }
+
     const provenance =
       await buildProvenanceManifest(
         root,
-        [
-          {
-            path:
-              rawRelative,
-
-            expectedSha256:
-              rawSha256,
-
-            role:
-              'automation_evidence',
-
-            opaqueSemantic:
-              true,
-          },
-        ],
+        artifacts,
       );
+
+    if (
+      provenance.verified !==
+        true ||
+      provenance.failures.length !==
+        0
+    ) {
+      return fail(
+        'PROVENANCE_PERSISTENCE_FAILURE',
+      );
+    }
 
     const provenancePath =
       join(
@@ -255,5 +343,57 @@ export function createGcpSignedEvidenceCompletionHook(
       signedDirectory,
       envelope,
     );
+
+    if (
+      jobId.startsWith(
+        'VF-',
+      )
+    ) {
+      const authorization =
+        await evaluateAcceptedWorkAuthorizationGate(
+          envelope,
+          provenance,
+          verifier,
+          root,
+        );
+
+      if (
+        authorization
+          .eligibleForHumanGatedPromotion !==
+          true ||
+        authorization
+          .automaticPromotionAllowed !==
+          false ||
+        authorization
+          .executionAuthorityGranted !==
+          false ||
+        authorization
+          .deploymentAuthorityGranted !==
+          false
+      ) {
+        return fail(
+          'ACCEPTED_WORK_AUTHORIZATION_FAILURE',
+        );
+      }
+
+      try {
+        const readiness =
+          createAcceptedWorkAuthorizationReadiness(
+            authorization,
+          );
+
+        await persistAcceptedWorkAuthorizationReadiness(
+          join(
+            root,
+            'authorization-readiness',
+          ),
+          readiness,
+        );
+      } catch {
+        return fail(
+          'AUTHORIZATION_READINESS_PERSISTENCE_FAILURE',
+        );
+      }
+    }
   };
 }
