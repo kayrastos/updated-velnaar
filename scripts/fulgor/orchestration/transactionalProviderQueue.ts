@@ -927,6 +927,28 @@ export class TransactionalProviderQueue {
     return this.transaction(
       () => {
         /*
+         * Quality authority lives in the persistent
+         * queue, not in worker memory.
+         *
+         * BEGIN IMMEDIATE also prevents a concurrent
+         * circuit-open transaction from racing through
+         * this claim boundary.
+         */
+        const quality =
+          this.providerQualityState(
+            provider,
+          );
+
+        if (
+          quality.state !==
+          'CLOSED'
+        ) {
+          throw new Error(
+            `QUEUE_PROVIDER_QUALITY_OPEN=${provider}`,
+          );
+        }
+
+        /*
          * An active slot may own exactly one job.
          */
         const occupied =
@@ -1092,6 +1114,46 @@ export class TransactionalProviderQueue {
             fingerprint,
             nowMs,
           );
+
+        /*
+         * Output-contract failure and provider circuit
+         * transition are one atomic transaction.
+         *
+         * A caller cannot forget to open the circuit
+         * after consuming a bad provider result.
+         */
+        if (
+          outcome ===
+            'PROTOCOL_REJECTED' ||
+          outcome ===
+            'CONTRACT_REJECTED'
+        ) {
+          const qualityResult =
+            this.db
+              .prepare(`
+                UPDATE provider_quality_state
+                SET
+                  state = 'OPEN',
+                  reason = ?,
+                  updated_ms = ?
+                WHERE provider = ?
+              `)
+              .run(
+                outcome,
+                nowMs,
+                provider,
+              );
+
+          if (
+            Number(
+              qualityResult.changes,
+            ) !== 1
+          ) {
+            throw new Error(
+              'QUEUE_ATOMIC_QUALITY_OPEN_FAILED',
+            );
+          }
+        }
 
         const indexed =
           this.indexedFields(

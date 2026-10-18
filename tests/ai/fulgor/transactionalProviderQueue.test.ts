@@ -1091,6 +1091,262 @@ describe(
     );
 
     it(
+      'queue claim authority blocks an open provider while the other lane continues',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        queue.enqueue(
+          order(
+            'quality-gate-codex',
+            'codex',
+          ),
+          1000,
+        );
+
+        queue.enqueue(
+          order(
+            'quality-gate-agy',
+            'antigravity',
+          ),
+          1001,
+        );
+
+        queue.openProviderQualityCircuit(
+          'codex',
+          'CONTRACT_REJECTED',
+          1500,
+        );
+
+        expect(() =>
+          queue.claimNext(
+            'codex',
+            'codex-01',
+            2000,
+            60_000,
+          ),
+        ).toThrow(
+          /PROVIDER_QUALITY_OPEN=codex/,
+        );
+
+        const agy =
+          queue.claimNext(
+            'antigravity',
+            'agy-01',
+            2001,
+            60_000,
+          );
+
+        expect(agy)
+          .not.toBeNull();
+
+        expect(
+          agy?.lease?.provider,
+        ).toBe(
+          'antigravity',
+        );
+
+        queue.close();
+      },
+    );
+
+    it(
+      'contract rejection atomically moves the job to quality hold and opens only that provider',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        queue.enqueue(
+          order(
+            'auto-open-contract',
+            'codex',
+          ),
+          1000,
+        );
+
+        const leased =
+          queue.claimNext(
+            'codex',
+            'codex-01',
+            2000,
+            60_000,
+          )!;
+
+        const settled =
+          queue.settle(
+            'codex',
+            leased.lease!.leaseId,
+            'CONTRACT_REJECTED',
+            null,
+            3000,
+          );
+
+        expect(settled.state)
+          .toBe(
+            'QUALITY_HOLD',
+          );
+
+        expect(
+          queue.providerQualityState(
+            'codex',
+          ),
+        ).toMatchObject({
+          state: 'OPEN',
+          reason:
+            'CONTRACT_REJECTED',
+        });
+
+        expect(
+          queue.canLaunchProvider(
+            'codex',
+          ),
+        ).toBe(false);
+
+        expect(
+          queue.canLaunchProvider(
+            'antigravity',
+          ),
+        ).toBe(true);
+
+        queue.close();
+      },
+    );
+
+    it(
+      'protocol rejection also atomically opens its provider circuit',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        queue.enqueue(
+          order(
+            'auto-open-protocol',
+            'antigravity',
+          ),
+          1000,
+        );
+
+        const leased =
+          queue.claimNext(
+            'antigravity',
+            'agy-01',
+            2000,
+            60_000,
+          )!;
+
+        queue.settle(
+          'antigravity',
+          leased.lease!.leaseId,
+          'PROTOCOL_REJECTED',
+          null,
+          3000,
+        );
+
+        expect(
+          queue.providerQualityState(
+            'antigravity',
+          ),
+        ).toMatchObject({
+          state: 'OPEN',
+          reason:
+            'PROTOCOL_REJECTED',
+        });
+
+        expect(
+          queue.canLaunchProvider(
+            'codex',
+          ),
+        ).toBe(true);
+
+        queue.close();
+      },
+    );
+
+    it(
+      'failed settlement cannot accidentally open the provider circuit',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        queue.enqueue(
+          order(
+            'bad-settle-does-not-open',
+            'codex',
+          ),
+          1000,
+        );
+
+        const leased =
+          queue.claimNext(
+            'codex',
+            'codex-01',
+            2000,
+            60_000,
+          )!;
+
+        expect(() =>
+          queue.settle(
+            'codex',
+            'f'.repeat(64),
+            'CONTRACT_REJECTED',
+            null,
+            3000,
+          ),
+        ).toThrow(
+          /ACTIVE_LEASE_NOT_FOUND/,
+        );
+
+        expect(
+          queue.canLaunchProvider(
+            'codex',
+          ),
+        ).toBe(true);
+
+        expect(
+          queue.get(
+            leased.order.jobId,
+          )?.state,
+        ).toBe(
+          'LEASED',
+        );
+
+        queue.close();
+      },
+    );
+
+    it(
       'opens only the failing provider quality circuit',
       () => {
         const root =
