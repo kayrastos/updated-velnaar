@@ -291,77 +291,115 @@ describe(
   'VELNAR exact live provider protocol bindings',
   () => {
     it(
-      'builds a closed dynamic schema bound to provider task baseline and host evidence IDs',
+      'builds a single root object schema bound to provider task baseline and host evidence IDs',
       () => {
-        const schema =
-          buildProviderWorkProductSchema(
-            input(
-              'codex',
-            ),
-          );
-
-        expect(
-          Array.isArray(
-            schema.oneOf,
-          ),
-        ).toBe(true);
-
-        const branches =
-          schema.oneOf as
-            Record<
-              string,
-              any
-            >[];
-
-        expect(
-          branches,
-        ).toHaveLength(3);
-
         for (
-          const branch
-          of branches
-        ) {
-          expect(
-            branch
-              .properties
-              .provider
-              .const,
-          ).toBe(
+          const provider
+          of [
             'codex',
+            'antigravity',
+          ] as const
+        ) {
+          const schema =
+            buildProviderWorkProductSchema(
+              input(
+                provider,
+              ),
+            );
+
+          expect(
+            schema.type,
+          ).toBe(
+            'object',
           );
 
           expect(
-            branch
-              .properties
+            schema,
+          ).not.toHaveProperty(
+            'oneOf',
+          );
+
+          expect(
+            JSON.stringify(
+              schema,
+            ),
+          ).not.toContain(
+            '"oneOf"',
+          );
+
+          const properties =
+            schema.properties as
+              Record<
+                string,
+                any
+              >;
+
+          expect(
+            properties
+              .provider
+              .enum,
+          ).toEqual([
+            provider,
+          ]);
+
+          expect(
+            properties
               .taskId
-              .const,
-          ).toBe(
+              .enum,
+          ).toEqual([
             capsule.taskId,
-          );
+          ]);
 
           expect(
-            branch
-              .properties
+            properties
               .baseline
-              .const,
-          ).toBe(
+              .enum,
+          ).toEqual([
             capsule.baseline,
-          );
+          ]);
 
           expect(
-            branch
-              .additionalProperties,
-          ).toBe(false);
+            properties
+              .status
+              .enum,
+          ).toEqual([
+            'PROPOSE_CHANGE',
+            'NO_CHANGE_NEEDED',
+            'BLOCKED',
+          ]);
 
           expect(
-            branch
-              .properties
+            properties
               .evidenceIds
               .items
               .enum,
-          ).toEqual(
-            ['E1', 'E2'],
-          );
+          ).toEqual([
+            'E1',
+            'E2',
+          ]);
+
+          expect(
+            properties
+              .candidate
+              .type,
+          ).toEqual([
+            'object',
+            'null',
+          ]);
+
+          expect(
+            properties
+              .blocker
+              .type,
+          ).toEqual([
+            'string',
+            'null',
+          ]);
+
+          expect(
+            schema
+              .additionalProperties,
+          ).toBe(false);
         }
       },
     );

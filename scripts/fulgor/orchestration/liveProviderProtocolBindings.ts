@@ -457,31 +457,28 @@ function validateBindingInput(
 
 function candidateSchema():
   Record<string, unknown> {
+  /*
+   * Nullable object keeps one root schema for all
+   * work-product statuses.
+   *
+   * Exact status/candidate relationship remains
+   * enforced by parseProviderWorkProduct.
+   */
   return {
-    type:
+    type: [
       'object',
+      'null',
+    ],
 
     properties: {
       path: {
         type:
           'string',
-
-        minLength:
-          1,
-
-        maxLength:
-          4096,
       },
 
       content: {
         type:
           'string',
-
-        minLength:
-          1,
-
-        maxLength:
-          32768,
       },
     },
 
@@ -498,40 +495,38 @@ function candidateSchema():
 function evidenceIdsSchema(
   ids:
     readonly string[],
-
-  minimum:
-    number,
 ): Record<string, unknown> {
   return {
     type:
       'array',
 
-    items: {
-      type:
-        'string',
+    items:
+      ids.length > 0
+        ? {
+            type:
+              'string',
 
-      enum:
-        ids,
-    },
+            enum:
+              ids,
+          }
+        : {
+            type:
+              'string',
+          },
 
     minItems:
-      minimum,
+      0,
 
     maxItems:
       Math.min(
         8,
         ids.length,
       ),
-
-    uniqueItems:
-      true,
   };
 }
 
-function testsSchema(
-  minimum:
-    number,
-): Record<string, unknown> {
+function testsSchema():
+  Record<string, unknown> {
   return {
     type:
       'array',
@@ -539,140 +534,13 @@ function testsSchema(
     items: {
       type:
         'string',
-
-      minLength:
-        1,
-
-      maxLength:
-        4096,
     },
 
     minItems:
-      minimum,
+      0,
 
     maxItems:
       8,
-  };
-}
-
-function branchSchema(
-  input:
-    ProviderProtocolBindingInput,
-
-  evidenceIds:
-    readonly string[],
-
-  status:
-    'PROPOSE_CHANGE'
-    | 'NO_CHANGE_NEEDED'
-    | 'BLOCKED',
-): Record<string, unknown> {
-  const proposal =
-    status ===
-      'PROPOSE_CHANGE';
-
-  const noChange =
-    status ===
-      'NO_CHANGE_NEEDED';
-
-  return {
-    type:
-      'object',
-
-    properties: {
-      schemaVersion: {
-        const:
-          'VELNAR_PROVIDER_WORK_PRODUCT_V1',
-      },
-
-      provider: {
-        const:
-          input.provider,
-      },
-
-      taskId: {
-        const:
-          input.record.order.jobId,
-      },
-
-      baseline: {
-        const:
-          input.record.order.baseline,
-      },
-
-      status: {
-        const:
-          status,
-      },
-
-      summary: {
-        type:
-          'string',
-
-        minLength:
-          1,
-
-        maxLength:
-          8192,
-      },
-
-      evidenceIds:
-        evidenceIdsSchema(
-          evidenceIds,
-          proposal ||
-          noChange
-            ? 2
-            : 0,
-        ),
-
-      candidate:
-        proposal
-          ? candidateSchema()
-          : {
-              type:
-                'null',
-            },
-
-      tests:
-        testsSchema(
-          proposal
-            ? 1
-            : 0,
-        ),
-
-      blocker:
-        status === 'BLOCKED'
-          ? {
-              type:
-                'string',
-
-              minLength:
-                1,
-
-              maxLength:
-                4096,
-            }
-          : {
-              type:
-                'null',
-            },
-    },
-
-    required: [
-      'schemaVersion',
-      'provider',
-      'taskId',
-      'baseline',
-      'status',
-      'summary',
-      'evidenceIds',
-      'candidate',
-      'tests',
-      'blocker',
-    ],
-
-    additionalProperties:
-      false,
   };
 }
 
@@ -691,26 +559,105 @@ export function buildProviderWorkProductSchema(
         item.id,
     );
 
+  /*
+   * Provider CLI structured-output implementations
+   * do not receive a root oneOf.
+   *
+   * This schema constrains representation.
+   * parseProviderWorkProduct remains the strict
+   * semantic/status gate.
+   */
   return {
-    oneOf: [
-      branchSchema(
-        input,
-        evidenceIds,
-        'PROPOSE_CHANGE',
-      ),
+    type:
+      'object',
 
-      branchSchema(
-        input,
-        evidenceIds,
-        'NO_CHANGE_NEEDED',
-      ),
+    properties: {
+      schemaVersion: {
+        type:
+          'string',
 
-      branchSchema(
-        input,
-        evidenceIds,
-        'BLOCKED',
-      ),
+        enum: [
+          'VELNAR_PROVIDER_WORK_PRODUCT_V1',
+        ],
+      },
+
+      provider: {
+        type:
+          'string',
+
+        enum: [
+          input.provider,
+        ],
+      },
+
+      taskId: {
+        type:
+          'string',
+
+        enum: [
+          input.record.order.jobId,
+        ],
+      },
+
+      baseline: {
+        type:
+          'string',
+
+        enum: [
+          input.record.order.baseline,
+        ],
+      },
+
+      status: {
+        type:
+          'string',
+
+        enum: [
+          'PROPOSE_CHANGE',
+          'NO_CHANGE_NEEDED',
+          'BLOCKED',
+        ],
+      },
+
+      summary: {
+        type:
+          'string',
+      },
+
+      evidenceIds:
+        evidenceIdsSchema(
+          evidenceIds,
+        ),
+
+      candidate:
+        candidateSchema(),
+
+      tests:
+        testsSchema(),
+
+      blocker: {
+        type: [
+          'string',
+          'null',
+        ],
+      },
+    },
+
+    required: [
+      'schemaVersion',
+      'provider',
+      'taskId',
+      'baseline',
+      'status',
+      'summary',
+      'evidenceIds',
+      'candidate',
+      'tests',
+      'blocker',
     ],
+
+    additionalProperties:
+      false,
   };
 }
 
