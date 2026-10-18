@@ -60,6 +60,45 @@ export interface LiveProviderExecutableConfig {
     number;
 }
 
+export type LiveProviderProcessFailureReason =
+  | 'NONE'
+  | 'SPAWN_FAILURE'
+  | 'TIMEOUT'
+  | 'OUTPUT_LIMIT'
+  | 'NON_ZERO_EXIT'
+  | 'SIGNAL';
+
+export interface LiveProviderProcessTelemetry {
+  readonly provider:
+    'codex'
+    | 'antigravity';
+
+  readonly outcome:
+    'OK'
+    | 'FAILURE';
+
+  readonly failureReason:
+    LiveProviderProcessFailureReason;
+
+  readonly exitCode:
+    number | null;
+
+  readonly signal:
+    NodeJS.Signals | null;
+
+  readonly stdoutBytes:
+    number;
+
+  readonly stderrBytes:
+    number;
+
+  readonly timedOut:
+    boolean;
+
+  readonly outputOverflow:
+    boolean;
+}
+
 export interface LiveProviderProcessRunnerOptions {
   readonly repoRoot:
     string;
@@ -84,6 +123,22 @@ export interface LiveProviderProcessRunnerOptions {
     ) =>
       readonly BoundHostEvidenceText[];
 
+  /*
+   * Sanitized observability only.
+   *
+   * No stdout, stderr, prompt, provider response,
+   * credentials or environment values cross this
+   * callback.
+   *
+   * Observer failure must never affect provider
+   * accounting or authority.
+   */
+  readonly observeProcessTelemetry?:
+    (
+      telemetry:
+        LiveProviderProcessTelemetry,
+    ) => void;
+
   readonly tempRoot?:
     string;
 }
@@ -94,6 +149,9 @@ interface BoundedProcessResult {
 
   readonly stdout:
     Buffer;
+
+  readonly stdoutBytes:
+    number;
 
   readonly stderrBytes:
     number;
@@ -271,6 +329,107 @@ function failure():
   });
 }
 
+function processFailureReason(
+  result:
+    BoundedProcessResult,
+): LiveProviderProcessFailureReason {
+  if (result.ok) {
+    return 'NONE';
+  }
+
+  if (result.timedOut) {
+    return 'TIMEOUT';
+  }
+
+  if (
+    result.outputOverflow
+  ) {
+    return 'OUTPUT_LIMIT';
+  }
+
+  if (
+    result.exitCode !== null &&
+    result.exitCode !== 0
+  ) {
+    return 'NON_ZERO_EXIT';
+  }
+
+  if (
+    result.signal !== null
+  ) {
+    return 'SIGNAL';
+  }
+
+  return 'SPAWN_FAILURE';
+}
+
+function emitProcessTelemetry(
+  options:
+    LiveProviderProcessRunnerOptions,
+
+  provider:
+    'codex'
+    | 'antigravity',
+
+  result:
+    BoundedProcessResult,
+): void {
+  const observer =
+    options
+      .observeProcessTelemetry;
+
+  if (
+    observer === undefined
+  ) {
+    return;
+  }
+
+  const telemetry:
+    LiveProviderProcessTelemetry =
+      Object.freeze({
+        provider,
+
+        outcome:
+          result.ok
+            ? 'OK'
+            : 'FAILURE',
+
+        failureReason:
+          processFailureReason(
+            result,
+          ),
+
+        exitCode:
+          result.exitCode,
+
+        signal:
+          result.signal,
+
+        stdoutBytes:
+          result.stdoutBytes,
+
+        stderrBytes:
+          result.stderrBytes,
+
+        timedOut:
+          result.timedOut,
+
+        outputOverflow:
+          result.outputOverflow,
+      });
+
+  try {
+    observer(
+      telemetry,
+    );
+  } catch {
+    /*
+     * Telemetry has no authority over provider
+     * outcome and may not change queue semantics.
+     */
+  }
+}
+
 async function runBoundedProcess(
   config:
     LiveProviderExecutableConfig,
@@ -316,6 +475,9 @@ async function runBoundedProcess(
 
           stdout:
             Buffer.alloc(0),
+
+          stdoutBytes:
+            0,
 
           stderrBytes:
             0,
@@ -482,6 +644,8 @@ async function runBoundedProcess(
                 : Buffer.alloc(
                     0,
                   ),
+
+            stdoutBytes,
 
             stderrBytes,
 
@@ -654,6 +818,12 @@ async function invokeCodex(
         plan.args,
       );
 
+    emitProcessTelemetry(
+      options,
+      'codex',
+      processResult,
+    );
+
     if (
       !processResult.ok
     ) {
@@ -720,6 +890,12 @@ async function invokeAntigravity(
       options.repoRoot,
       plan.args,
     );
+
+  emitProcessTelemetry(
+    options,
+    'antigravity',
+    processResult,
+  );
 
   if (
     !processResult.ok

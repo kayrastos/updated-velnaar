@@ -1127,3 +1127,258 @@ describe(
     );
   },
 );
+
+
+describe(
+  'sanitized process telemetry',
+  () => {
+    it(
+      'classifies non-zero exit without exposing raw streams',
+      async () => {
+        const directory =
+          root();
+
+        const telemetry:
+          any[] = [];
+
+        const invoke =
+          createBoundedLiveProviderInvoker({
+            ...config(
+              directory,
+              'nonzero',
+            ),
+
+            observeProcessTelemetry:
+              value => {
+                telemetry.push(
+                  value,
+                );
+              },
+          });
+
+        expect(
+          await invoke(
+            input(
+              'codex',
+              'job-telemetry-nonzero',
+            ),
+          ),
+        ).toEqual({
+          source:
+            'LIVE_PROVIDER',
+
+          transport:
+            'FAILURE',
+        });
+
+        expect(
+          telemetry,
+        ).toHaveLength(1);
+
+        expect(
+          telemetry[0],
+        ).toMatchObject({
+          provider:
+            'codex',
+
+          outcome:
+            'FAILURE',
+
+          failureReason:
+            'NON_ZERO_EXIT',
+
+          exitCode:
+            7,
+
+          timedOut:
+            false,
+
+          outputOverflow:
+            false,
+        });
+
+        expect(
+          telemetry[0]
+            .stdoutBytes,
+        ).toBe(0);
+
+        expect(
+          telemetry[0]
+            .stderrBytes,
+        ).toBe(0);
+
+        expect(
+          Object.keys(
+            telemetry[0],
+          ),
+        ).not.toContain(
+          'stdout',
+        );
+
+        expect(
+          Object.keys(
+            telemetry[0],
+          ),
+        ).not.toContain(
+          'stderr',
+        );
+      },
+    );
+
+    it(
+      'classifies timeout independently from signal termination',
+      async () => {
+        const directory =
+          root();
+
+        const telemetry:
+          any[] = [];
+
+        const invoke =
+          createBoundedLiveProviderInvoker({
+            ...config(
+              directory,
+              'timeout',
+            ),
+
+            observeProcessTelemetry:
+              value => {
+                telemetry.push(
+                  value,
+                );
+              },
+          });
+
+        await invoke(
+          input(
+            'codex',
+            'job-telemetry-timeout',
+          ),
+        );
+
+        expect(
+          telemetry,
+        ).toHaveLength(1);
+
+        expect(
+          telemetry[0],
+        ).toMatchObject({
+          provider:
+            'codex',
+
+          outcome:
+            'FAILURE',
+
+          failureReason:
+            'TIMEOUT',
+
+          timedOut:
+            true,
+        });
+      },
+    );
+
+    it(
+      'classifies output ceiling independently from process signal',
+      async () => {
+        const directory =
+          root();
+
+        const telemetry:
+          any[] = [];
+
+        const invoke =
+          createBoundedLiveProviderInvoker({
+            ...config(
+              directory,
+              'overflow',
+            ),
+
+            observeProcessTelemetry:
+              value => {
+                telemetry.push(
+                  value,
+                );
+              },
+          });
+
+        await invoke(
+          input(
+            'codex',
+            'job-telemetry-overflow',
+          ),
+        );
+
+        expect(
+          telemetry,
+        ).toHaveLength(1);
+
+        expect(
+          telemetry[0],
+        ).toMatchObject({
+          provider:
+            'codex',
+
+          outcome:
+            'FAILURE',
+
+          failureReason:
+            'OUTPUT_LIMIT',
+
+          timedOut:
+            false,
+
+          outputOverflow:
+            true,
+        });
+
+        expect(
+          telemetry[0]
+            .stdoutBytes,
+        ).toBeGreaterThan(
+          1024,
+        );
+      },
+    );
+
+    it(
+      'keeps telemetry observer non-authoritative',
+      async () => {
+        const directory =
+          root();
+
+        const invoke =
+          createBoundedLiveProviderInvoker({
+            ...config(
+              directory,
+            ),
+
+            observeProcessTelemetry:
+              () => {
+                throw new Error(
+                  'OBSERVER_FAILURE',
+                );
+              },
+          });
+
+        expect(
+          await invoke(
+            input(
+              'antigravity',
+              'job-telemetry-observer',
+            ),
+          ),
+        ).toMatchObject({
+          source:
+            'LIVE_PROVIDER',
+
+          transport:
+            'OK',
+
+          protocol:
+            'PASS',
+        });
+      },
+    );
+  },
+);
