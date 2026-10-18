@@ -9,7 +9,18 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { createAgentRunStore, verifyAgentRunManifest, type StageRecord } from '../../../scripts/fulgor/orchestration/agentRunStore';
 import { runLiveOrchestration } from '../../../scripts/fulgor/orchestration/liveOrchestrationRuntime';
-import { MAX_AGENT_TRANSCRIPT_BYTES, parseExact, runCopilotScout, parseCopilotScoutText, parseCopilotReviewer, parseCodexJsonl, runAntigravityFallback, type LiveAgentConfig } from '../../../scripts/fulgor/orchestration/liveAgentAdapters';
+import {
+  ANTIGRAVITY_BUILDER_SCHEMA,
+  MAX_AGENT_TRANSCRIPT_BYTES,
+  parseAntigravityJsonEnvelope,
+  parseExact,
+  runCopilotScout,
+  parseCopilotScoutText,
+  parseCopilotReviewer,
+  parseCodexJsonl,
+  runAntigravityFallback,
+  type LiveAgentConfig,
+} from '../../../scripts/fulgor/orchestration/liveAgentAdapters';
 import { BOUNDS, startOrchestration } from '../../../scripts/fulgor/orchestration/orchestrator';
 function jsonl(text: string) {
   return [ { type: 'thread.started', thread_id: 'fake' }, { type: 'turn.started' },
@@ -29,6 +40,49 @@ function metadata(): StageRecord {
 const roots: string[] = [];
 afterEach(async () => { vi.restoreAllMocks(); await Promise.all(roots.splice(0).map(p => rm(p, { recursive: true, force: true }))); });
 const candidate = { status: 'CANDIDATE', path: 'tests/new.test.ts', content: 'export const x = true;\n' };
+function antigravityEnvelope(
+  structuredOutput:
+    unknown = candidate,
+  overrides:
+    Record<string, unknown> = {},
+) {
+  return JSON.stringify({
+    conversation_id:
+      'agy-fixture',
+
+    status:
+      'SUCCESS',
+
+    response:
+      JSON.stringify(
+        structuredOutput,
+      ) + '\n',
+
+    duration_seconds:
+      0.01,
+
+    num_turns:
+      1,
+
+    structured_output:
+      structuredOutput,
+
+    json_schema: {
+      fixture: true,
+    },
+
+    usage: {
+      input_tokens: 10,
+      output_tokens: 5,
+      thinking_tokens: 2,
+      cache_read_tokens: 0,
+      total_tokens: 15,
+    },
+
+    ...overrides,
+  });
+}
+
 async function setup(builder: unknown = candidate, options: { timeout?: boolean; overflow?: boolean; exit?: boolean; verdict?: string; scoutRaw?: string; reviewerRaw?: string; reviewerFailure?: 'TIMEOUT' | 'PROCESS_FAILURE' | 'OUTPUT_LIMIT' } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'live-adapters-')); roots.push(root);
   const calls = join(root, 'calls');
@@ -48,7 +102,50 @@ async function setup(builder: unknown = candidate, options: { timeout?: boolean;
   if (options.reviewerFailure === 'TIMEOUT') copilot.timeoutMs = 300;
   const codex = await executable('codex', options.timeout ? 'setInterval(()=>{},1000);' : options.exit ? 'process.exit(7);' : options.overflow ? "fs.writeSync(1,'x'.repeat(150000));" : `const prompt=args.at(-1);if(!prompt.includes('Untrusted context:')||!prompt.includes('untrusted data')||!args.includes('read-only'))process.exit(97);if(!args.includes('--json')||args.includes('-o')||args.includes('--output-last-message'))process.exit(98);fs.writeSync(1,${JSON.stringify(jsonl(typeof builder === 'string' ? builder : JSON.stringify(builder)))});`);
   if (options.timeout) codex.timeoutMs = 100;
-  const antigravity = await executable('agy', `if(!args.includes('--sandbox')||!args.includes('plan'))process.exit(8);fs.writeSync(1,${JSON.stringify(JSON.stringify(candidate))});`);
+  const antigravity = await executable('agy', `
+    if(
+      !args.includes('--sandbox') ||
+      !args.includes('plan')
+    ) process.exit(8);
+
+    const outputIndex =
+      args.indexOf('--output-format');
+
+    if(
+      outputIndex < 0 ||
+      args[outputIndex + 1] !== 'json'
+    ) process.exit(16);
+
+    const schemaIndex =
+      args.indexOf('--json-schema');
+
+    if(
+      schemaIndex < 0 ||
+      typeof args[schemaIndex + 1] !== 'string'
+    ) process.exit(17);
+
+    let schema;
+
+    try {
+      schema =
+        JSON.parse(
+          args[schemaIndex + 1],
+        );
+    } catch {
+      process.exit(18);
+    }
+
+    if(
+      !schema ||
+      !Array.isArray(schema.oneOf) ||
+      schema.oneOf.length !== 2
+    ) process.exit(19);
+
+    fs.writeSync(
+      1,
+      ${JSON.stringify(antigravityEnvelope(candidate))}
+    );
+  `);
   return { root, calls, input: { requestId: 'run', baseline, task: 'Add a test', repoRoot, stateRoot: root, copilot, codex, antigravity } };
 }
 it('normal flow: bounded Scout, final-message candidate, advisory reviewer, exact raw hashes, no publication', async () => {
@@ -97,6 +194,164 @@ it.each(['src/file.ts', 'tests/../escape.ts'])('unsupported path %s halts before
   const s = await setup({ ...candidate, path }); const r = await runLiveOrchestration(s.input);
   expect(['UNSUPPORTED_HANDOFF', 'NEEDS_REVIEW']).toContain(r.session.state); expect(await readFile(s.calls, 'utf8')).toBe('copilot\ncodex\n');
 });
+it(
+  'uses an exact two-branch Antigravity builder schema',
+  () => {
+    const schema =
+      JSON.parse(
+        ANTIGRAVITY_BUILDER_SCHEMA,
+      );
+
+    expect(
+      schema.oneOf,
+    ).toHaveLength(2);
+
+    for (
+      const branch
+      of schema.oneOf
+    ) {
+      expect(
+        branch.additionalProperties,
+      ).toBe(false);
+    }
+  },
+);
+
+it(
+  'extracts only schema-bound Antigravity structured_output',
+  () => {
+    const raw =
+      parseAntigravityJsonEnvelope(
+        Buffer.from(
+          antigravityEnvelope(
+            candidate,
+            {
+              arbitrary_future_metadata: {
+                ignored: true,
+              },
+
+              response:
+                'NON_AUTHORITATIVE_MISMATCH',
+            },
+          ),
+        ),
+      );
+
+    expect(
+      JSON.parse(
+        new TextDecoder(
+          'utf-8',
+          {
+            fatal: true,
+          },
+        ).decode(
+          raw,
+        ),
+      ),
+    ).toEqual(
+      candidate,
+    );
+  },
+);
+
+it.each([
+  [
+    'empty',
+    '',
+  ],
+
+  [
+    'invalid json',
+    'not-json',
+  ],
+
+  [
+    'failed status',
+    antigravityEnvelope(
+      candidate,
+      {
+        status:
+          'FAILED',
+        error:
+          'synthetic',
+      },
+    ),
+  ],
+
+  [
+    'missing structured output',
+    JSON.stringify({
+      status:
+        'SUCCESS',
+    }),
+  ],
+
+  [
+    'array structured output',
+    antigravityEnvelope(
+      [],
+    ),
+  ],
+
+  [
+    'expanded candidate contract',
+    antigravityEnvelope({
+      ...candidate,
+      extra:
+        'not-authorized',
+    }),
+  ],
+])(
+  'rejects Antigravity envelope %s',
+  (
+    _name,
+    raw,
+  ) => {
+    expect(
+      parseAntigravityJsonEnvelope(
+        Buffer.from(raw),
+      ).length,
+    ).toBe(0);
+  },
+);
+
+it(
+  'accepts exact structured Antigravity FAILED contract but no transport claims',
+  () => {
+    const raw =
+      parseAntigravityJsonEnvelope(
+        Buffer.from(
+          antigravityEnvelope({
+            status:
+              'FAILED',
+
+            failure:
+              'REFUSAL',
+          }),
+        ),
+      );
+
+    expect(
+      JSON.parse(
+        new TextDecoder(
+          'utf-8',
+          {
+            fatal: true,
+          },
+        ).decode(
+          raw,
+        ),
+      ),
+    ).toEqual({
+      status:
+        'FAILED',
+
+      failure:
+        'REFUSAL',
+    });
+  },
+);
+
 it('fallback rejects noneligible state without spawning', async () => {
   const s = await setup(); await expect(runAntigravityFallback(s.input.antigravity, s.root, startOrchestration('x', 'a'.repeat(40)), 'task', 'findings')).rejects.toThrow('FALLBACK_NOT_ELIGIBLE');
   await expect(readFile(s.calls)).rejects.toThrow();
