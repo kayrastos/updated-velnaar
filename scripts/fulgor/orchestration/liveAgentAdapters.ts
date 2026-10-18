@@ -494,7 +494,8 @@ export function parseCodexJsonl(
  *
  * Security rules:
  * - status must be SUCCESS
- * - denied_actions must exist and be empty
+ * - denied_actions may be omitted or an empty array
+ * - any present non-array or non-empty denied_actions fails closed
  * - json_schema must exist as an object
  * - if structured_output exists, it MUST be valid;
  *   never downgrade to response if it is malformed
@@ -551,12 +552,27 @@ export function extractAntigravityAuthorityPayload(
      * the exact bounded task as requested. Do not silently
      * count a partial result as useful output.
      */
+    /*
+     * Observed live AGY envelopes encode denied actions
+     * in two valid zero-denial forms:
+     *
+     * - denied_actions: []
+     * - denied_actions omitted entirely
+     *
+     * Any present non-array value or any non-empty array
+     * still fails closed.
+     */
+    const deniedActions =
+      record.denied_actions;
+
     if (
-      !Array.isArray(
-        record.denied_actions,
-      ) ||
-      record.denied_actions
-        .length !== 0
+      deniedActions !== undefined &&
+      (
+        !Array.isArray(
+          deniedActions,
+        ) ||
+        deniedActions.length !== 0
+      )
     ) {
       return Buffer.alloc(0);
     }

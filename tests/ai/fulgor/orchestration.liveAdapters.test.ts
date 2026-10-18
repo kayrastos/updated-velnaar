@@ -378,6 +378,74 @@ it(
 );
 
 it(
+  'accepts an AGY success envelope when denied_actions is omitted',
+  () => {
+    const envelope =
+      JSON.parse(
+        antigravityEnvelope(
+          candidate,
+        ),
+      );
+
+    delete envelope
+      .denied_actions;
+
+    const raw =
+      extractAntigravityAuthorityPayload(
+        Buffer.from(
+          JSON.stringify(
+            envelope,
+          ),
+        ),
+      );
+
+    expect(
+      raw.length,
+    ).toBeGreaterThan(0);
+
+    expect(
+      JSON.parse(
+        new TextDecoder(
+          'utf-8',
+          {
+            fatal: true,
+          },
+        ).decode(
+          raw,
+        ),
+      ),
+    ).toEqual(
+      candidate,
+    );
+  },
+);
+
+it(
+  'rejects a present non-array denied_actions value',
+  () => {
+    const envelope =
+      JSON.parse(
+        antigravityEnvelope(
+          candidate,
+        ),
+      );
+
+    envelope.denied_actions =
+      'none';
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        Buffer.from(
+          JSON.stringify(
+            envelope,
+          ),
+        ),
+      ).length,
+    ).toBe(0);
+  },
+);
+
+it(
   'rejects AGY success envelopes with denied actions',
   () => {
     const raw =
