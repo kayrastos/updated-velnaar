@@ -398,7 +398,7 @@ it('COPILOT_STDIN=EOF CODEX_STDIN=EOF ANTIGRAVITY_STDIN=EOF', async () => {
   expect(r.session.state).toBe('FULGOR_HANDOFF_ELIGIBLE');
   expect(await readFile(s.calls, 'utf8')).toBe('copilot\ncodex\nagy\ncopilot\n');
 });
-it('accepts documented Codex execution telemetry but grants authority only to one completed agent message', () => {
+it('accepts documented Codex execution telemetry and grants authority only to the last completed agent message', () => {
   const stream = [
     {
       type: 'thread.started',
@@ -551,66 +551,151 @@ it.each([
   ).toBe(0);
 });
 
-it('rejects two completed Codex agent messages even if one is a valid candidate', () => {
-  const stream = [
-    {
-      type:
-        'thread.started',
-      thread_id:
-        'double-answer',
-    },
-    {
-      type:
-        'turn.started',
-    },
-    {
-      type:
-        'item.completed',
-      item: {
-        id: 'a1',
+it(
+  'uses only the last completed Codex agent message as candidate authority',
+  () => {
+    const stream = [
+      {
         type:
-          'agent_message',
-        text:
-          JSON.stringify(
-            candidate,
-          ),
+          'thread.started',
+        thread_id:
+          'last-message-wins',
       },
-    },
-    {
-      type:
-        'item.completed',
-      item: {
-        id: 'a2',
+      {
         type:
-          'agent_message',
-        text:
-          JSON.stringify(
-            candidate,
-          ),
+          'turn.started',
       },
-    },
-    {
-      type:
-        'turn.completed',
-      usage: {
-        input_tokens: 1,
-        cached_input_tokens: 0,
-        output_tokens: 1,
+      {
+        type:
+          'item.completed',
+        item: {
+          id: 'progress-1',
+          type:
+            'agent_message',
+          text:
+            'Inspecting bounded evidence.',
+        },
       },
-    },
-  ]
-    .map(
-      value =>
-        JSON.stringify(value),
-    )
-    .join('\n') + '\n';
+      {
+        type:
+          'item.completed',
+        item: {
+          id: 'command-1',
+          type:
+            'command_execution',
+          command:
+            'cat bounded-file',
+          aggregated_output:
+            'fixture',
+          exit_code: 0,
+          status:
+            'completed',
+        },
+      },
+      {
+        type:
+          'item.completed',
+        item: {
+          id: 'final-1',
+          type:
+            'agent_message',
+          text:
+            JSON.stringify(
+              candidate,
+            ),
+        },
+      },
+      {
+        type:
+          'turn.completed',
+        usage: {
+          input_tokens: 1,
+          cached_input_tokens: 0,
+          output_tokens: 1,
+        },
+      },
+    ]
+      .map(
+        value =>
+          JSON.stringify(value),
+      )
+      .join('\n') + '\n';
 
-  expect(
-    parseCodexJsonl(
-      Buffer.from(stream),
-    ).length,
-  ).toBe(0);
-});
+    expect(
+      parseCodexJsonl(
+        Buffer.from(stream),
+      ),
+    ).toEqual(
+      Buffer.from(
+        JSON.stringify(
+          candidate,
+        ),
+      ),
+    );
+  },
+);
+
+it(
+  'rejects the turn when the last completed Codex agent message is not an exact builder contract',
+  () => {
+    const stream = [
+      {
+        type:
+          'thread.started',
+        thread_id:
+          'last-message-invalid',
+      },
+      {
+        type:
+          'turn.started',
+      },
+      {
+        type:
+          'item.completed',
+        item: {
+          id: 'earlier-valid',
+          type:
+            'agent_message',
+          text:
+            JSON.stringify(
+              candidate,
+            ),
+        },
+      },
+      {
+        type:
+          'item.completed',
+        item: {
+          id: 'final-invalid',
+          type:
+            'agent_message',
+          text:
+            'non-authoritative prose',
+        },
+      },
+      {
+        type:
+          'turn.completed',
+        usage: {
+          input_tokens: 1,
+          cached_input_tokens: 0,
+          output_tokens: 1,
+        },
+      },
+    ]
+      .map(
+        value =>
+          JSON.stringify(value),
+      )
+      .join('\n') + '\n';
+
+    expect(
+      parseCodexJsonl(
+        Buffer.from(stream),
+      ).length,
+    ).toBe(0);
+  },
+);
 
 it.each(['not json', '{"type":"item.completed"}', jsonl(JSON.stringify(candidate)) + jsonl(JSON.stringify(candidate)),
   jsonl(JSON.stringify(candidate)).replace('agent_message', 'command_execution')])('rejects unexpected Codex JSONL %s', text => {

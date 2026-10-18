@@ -184,15 +184,15 @@ const CODEX_NONAUTHORITATIVE_ITEM_TYPES =
   ]);
 
 /**
- * Extract exactly one completed Codex agent message.
+ * Extract the last completed Codex agent message.
  *
  * item.started / item.updated / non-agent item.completed events are
- * execution telemetry only. They can never grant authority and their
- * contents are never interpreted as candidate protocol.
+ * execution telemetry only. Earlier completed agent messages are also
+ * non-authoritative. This matches native Codex finalResponse semantics:
+ * the last completed agent_message is the final response.
  *
  * turn.failed, top-level error, unknown event types, malformed item
- * identity, multiple completed agent messages, or malformed usage all
- * fail closed.
+ * identity, or malformed usage all fail closed.
  */
 export function extractCodexFinalMessage(
   stdout: Buffer,
@@ -345,8 +345,9 @@ export function extractCodexFinalMessage(
         ) {
           /*
            * Started/updated agent-message events have no
-           * authority. Only one COMPLETED agent message
-           * may become the final protocol payload.
+           * authority. Each completed agent message
+           * supersedes the previous one; only the last
+           * completed message can become protocol input.
            */
           if (
             event.type !==
@@ -365,13 +366,11 @@ export function extractCodexFinalMessage(
           completedAgentMessages +=
             1;
 
-          if (
-            completedAgentMessages !==
-              1
-          ) {
-            return Buffer.alloc(0);
-          }
-
+          /*
+           * Native Codex SDK semantics are last-message
+           * wins. Earlier completed assistant messages
+           * never become authority.
+           */
           final =
             record.text;
 
@@ -405,7 +404,7 @@ export function extractCodexFinalMessage(
         ) &&
         event.type ===
           'turn.completed' &&
-        completedAgentMessages ===
+        completedAgentMessages >=
           1 &&
         final !== undefined &&
         validCodexUsage(
@@ -426,7 +425,7 @@ export function extractCodexFinalMessage(
 
     if (
       phase !== 3 ||
-      completedAgentMessages !==
+      completedAgentMessages <
         1 ||
       final === undefined
     ) {
