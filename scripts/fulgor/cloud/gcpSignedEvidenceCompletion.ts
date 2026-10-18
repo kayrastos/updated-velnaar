@@ -139,6 +139,118 @@ async function immutableWrite(
   }
 }
 
+const EXPECTED_HUMAN_GATE_DENIALS =
+  new Set([
+    'EVIDENCE_DECISION_NOT_PASS',
+    'EVIDENCE_FAILURE_PRESENT',
+    'STATIC_GATE_NOT_ACCEPTED',
+    'VERIFIER_NOT_SUPPORTED',
+  ] as const);
+
+export function
+acceptedWorkAuthorizationRequiresReadiness(
+  authorization:
+    Awaited<
+      ReturnType<
+        typeof evaluateAcceptedWorkAuthorizationGate
+      >
+    >,
+): boolean {
+  if (
+    authorization
+      .automaticPromotionAllowed !==
+        false ||
+    authorization
+      .humanApprovalRequired !==
+        true ||
+    authorization
+      .executionAuthorityGranted !==
+        false ||
+    authorization
+      .deploymentAuthorityGranted !==
+        false
+  ) {
+    return fail(
+      'ACCEPTED_WORK_AUTHORIZATION_FAILURE',
+    );
+  }
+
+  if (
+    authorization.code ===
+      'HUMAN_PROMOTION_GATE_DENIED'
+  ) {
+    if (
+      authorization
+        .eligibleForHumanGatedPromotion !==
+          false ||
+      authorization
+        .verifiedEnvelope ===
+          null ||
+      authorization
+        .verifiedProvenance ===
+          null ||
+      authorization
+        .sourceBinding ===
+          null ||
+      authorization
+        .humanGateCode ===
+          null ||
+      authorization
+        .humanGateCode ===
+          'ELIGIBLE_FOR_HUMAN_GATED_PROMOTION' ||
+      !EXPECTED_HUMAN_GATE_DENIALS.has(
+        authorization.humanGateCode as
+          | 'EVIDENCE_DECISION_NOT_PASS'
+          | 'EVIDENCE_FAILURE_PRESENT'
+          | 'STATIC_GATE_NOT_ACCEPTED'
+          | 'VERIFIER_NOT_SUPPORTED',
+      )
+    ) {
+      return fail(
+        'ACCEPTED_WORK_AUTHORIZATION_FAILURE',
+      );
+    }
+
+    /*
+     * A valid signed result can legitimately deny
+     * promotion. This is a semantic outcome, not a
+     * completion-infrastructure failure.
+     *
+     * Preserve the signed evidence, write no readiness
+     * artifact, and allow supervisor store.complete()
+     * to retain the real PASS/REJECT/NEEDS_REVIEW
+     * automation result.
+     */
+    return false;
+  }
+
+  if (
+    authorization.code !==
+      'ELIGIBLE_FOR_HUMAN_GATED_PROMOTION' ||
+    authorization
+      .eligibleForHumanGatedPromotion !==
+        true ||
+    authorization
+      .humanGateCode !==
+        'ELIGIBLE_FOR_HUMAN_GATED_PROMOTION' ||
+    authorization
+      .verifiedEnvelope ===
+        null ||
+    authorization
+      .verifiedProvenance ===
+        null ||
+    authorization
+      .sourceBinding ===
+        null
+  ) {
+    return fail(
+      'ACCEPTED_WORK_AUTHORIZATION_FAILURE',
+    );
+  }
+
+  return true;
+}
+
 /**
  * Production signed-evidence completion boundary.
  *
@@ -403,23 +515,15 @@ export function createGcpSignedEvidenceCompletionHook(
           root,
         );
 
-      if (
-        authorization
-          .eligibleForHumanGatedPromotion !==
-          true ||
-        authorization
-          .automaticPromotionAllowed !==
-          false ||
-        authorization
-          .executionAuthorityGranted !==
-          false ||
-        authorization
-          .deploymentAuthorityGranted !==
-          false
-      ) {
-        return fail(
-          'ACCEPTED_WORK_AUTHORIZATION_FAILURE',
+      const requiresReadiness =
+        acceptedWorkAuthorizationRequiresReadiness(
+          authorization,
         );
+
+      if (
+        !requiresReadiness
+      ) {
+        return;
       }
 
       try {
