@@ -610,7 +610,7 @@ export function extractAntigravityAuthorityPayload(
     }
 
     /*
-     * Current AGY 1.4.2 live envelope can omit
+     * Observed live AGY envelopes can omit
      * structured_output even when --json-schema is used.
      *
      * In that compatibility path response gains no
