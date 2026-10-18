@@ -453,10 +453,9 @@ describe(
           )!;
 
         const settled =
-          queue.settle(
+          queue.settleUseful(
             'codex',
             leased.lease!.leaseId,
-            'USEFUL_UNIQUE',
             'a'.repeat(64),
             3000,
           );
@@ -473,6 +472,323 @@ describe(
         });
 
         queue.close();
+      },
+    );
+
+    it(
+      'does not allow a caller to self-declare useful uniqueness',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        queue.enqueue(
+          order(
+            'job-self-declare',
+            'codex',
+          ),
+          1000,
+        );
+
+        const leased =
+          queue.claimNext(
+            'codex',
+            'codex-01',
+            2000,
+            60_000,
+          )!;
+
+        expect(() =>
+          queue.settle(
+            'codex',
+            leased.lease!.leaseId,
+            'USEFUL_UNIQUE',
+            'a'.repeat(64),
+            3000,
+          ),
+        ).toThrow(
+          /USE_SETTLE_USEFUL/,
+        );
+
+        queue.close();
+      },
+    );
+
+    it(
+      'classifies the first persistent fingerprint as unique and cross-provider repeat as duplicate',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        queue.enqueue(
+          order(
+            'job-first-fingerprint',
+            'codex',
+          ),
+          1000,
+        );
+
+        queue.enqueue(
+          order(
+            'job-second-fingerprint',
+            'antigravity',
+          ),
+          1001,
+        );
+
+        const first =
+          queue.claimNext(
+            'codex',
+            'codex-01',
+            2000,
+            60_000,
+          )!;
+
+        const firstResult =
+          queue.settleUseful(
+            'codex',
+            first.lease!.leaseId,
+            'b'.repeat(64),
+            3000,
+          );
+
+        expect(
+          firstResult.lastOutcome,
+        ).toBe(
+          'USEFUL_UNIQUE',
+        );
+
+        expect(
+          firstResult.state,
+        ).toBe(
+          'USEFUL_COMPLETE',
+        );
+
+        const second =
+          queue.claimNext(
+            'antigravity',
+            'agy-01',
+            4000,
+            60_000,
+          )!;
+
+        const secondResult =
+          queue.settleUseful(
+            'antigravity',
+            second.lease!.leaseId,
+            'b'.repeat(64),
+            5000,
+          );
+
+        expect(
+          secondResult.lastOutcome,
+        ).toBe(
+          'USEFUL_DUPLICATE',
+        );
+
+        expect(
+          secondResult.state,
+        ).toBe(
+          'QUALITY_HOLD',
+        );
+
+        expect(
+          queue.stateCounts(),
+        ).toEqual({
+          QUALITY_HOLD: 1,
+          USEFUL_COMPLETE: 1,
+        });
+
+        queue.close();
+      },
+    );
+
+    it(
+      'preserves useful-work identity across queue restart',
+      () => {
+        const root =
+          makeRoot();
+
+        const dbPath =
+          join(
+            root,
+            'queue.sqlite',
+          );
+
+        let queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        queue.enqueue(
+          order(
+            'job-before-restart',
+            'codex',
+          ),
+          1000,
+        );
+
+        const first =
+          queue.claimNext(
+            'codex',
+            'codex-01',
+            2000,
+            60_000,
+          )!;
+
+        queue.settleUseful(
+          'codex',
+          first.lease!.leaseId,
+          'c'.repeat(64),
+          3000,
+        );
+
+        queue.close();
+
+        queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        queue.enqueue(
+          order(
+            'job-after-restart',
+            'antigravity',
+          ),
+          4000,
+        );
+
+        const second =
+          queue.claimNext(
+            'antigravity',
+            'agy-01',
+            5000,
+            60_000,
+          )!;
+
+        const result =
+          queue.settleUseful(
+            'antigravity',
+            second.lease!.leaseId,
+            'c'.repeat(64),
+            6000,
+          );
+
+        expect(
+          result.lastOutcome,
+        ).toBe(
+          'USEFUL_DUPLICATE',
+        );
+
+        expect(
+          result.state,
+        ).toBe(
+          'QUALITY_HOLD',
+        );
+
+        queue.close();
+      },
+    );
+
+    it(
+      'shares fingerprint authority across independent queue connections',
+      () => {
+        const root =
+          makeRoot();
+
+        const dbPath =
+          join(
+            root,
+            'queue.sqlite',
+          );
+
+        const queueA =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        const queueB =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        queueA.enqueue(
+          order(
+            'job-connection-a',
+            'codex',
+          ),
+          1000,
+        );
+
+        queueB.enqueue(
+          order(
+            'job-connection-b',
+            'antigravity',
+          ),
+          1001,
+        );
+
+        const codex =
+          queueA.claimNext(
+            'codex',
+            'codex-01',
+            2000,
+            60_000,
+          )!;
+
+        const antigravity =
+          queueB.claimNext(
+            'antigravity',
+            'agy-01',
+            2001,
+            60_000,
+          )!;
+
+        const first =
+          queueA.settleUseful(
+            'codex',
+            codex.lease!.leaseId,
+            'd'.repeat(64),
+            3000,
+          );
+
+        const second =
+          queueB.settleUseful(
+            'antigravity',
+            antigravity.lease!.leaseId,
+            'd'.repeat(64),
+            3001,
+          );
+
+        expect(
+          first.lastOutcome,
+        ).toBe(
+          'USEFUL_UNIQUE',
+        );
+
+        expect(
+          second.lastOutcome,
+        ).toBe(
+          'USEFUL_DUPLICATE',
+        );
+
+        queueA.close();
+        queueB.close();
       },
     );
 

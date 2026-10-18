@@ -54,13 +54,16 @@ function accepted(
     'Evidence-backed bounded change.',
   content =
     'export const x = 1;\n',
+  provider:
+    'codex' | 'antigravity' =
+      'codex',
 ) {
   return parseProviderWorkProduct(
     JSON.stringify({
       schemaVersion:
         PROVIDER_WORK_PRODUCT_SCHEMA,
 
-      provider: 'codex',
+      provider,
 
       taskId:
         capsule.taskId,
@@ -89,7 +92,7 @@ function accepted(
       blocker: null,
     }),
     capsule,
-    'codex',
+    provider,
   );
 }
 
@@ -140,6 +143,35 @@ describe(
           workProductFingerprint(a),
         ).toBe(
           workProductFingerprint(b),
+        );
+      },
+    );
+
+    it(
+      'treats identical Codex and Antigravity work as one useful-work identity',
+      () => {
+        const codex =
+          accepted(
+            'Codex wording.',
+            'export const x = 1;\n',
+            'codex',
+          );
+
+        const antigravity =
+          accepted(
+            'Antigravity wording.',
+            'export const x = 1;\n',
+            'antigravity',
+          );
+
+        expect(
+          workProductFingerprint(
+            codex,
+          ),
+        ).toBe(
+          workProductFingerprint(
+            antigravity,
+          ),
         );
       },
     );

@@ -98,11 +98,15 @@ export function workProductFingerprint(
   return sha256(
     JSON.stringify({
       schema:
-        'VELNAR_USEFUL_WORK_FINGERPRINT_V1',
+        'VELNAR_USEFUL_WORK_FINGERPRINT_V2',
 
-      provider:
-        product.provider,
-
+      /*
+       * Provider identity is deliberately excluded.
+       *
+       * If Codex and Antigravity independently produce
+       * the same evidence-bound work product, that is
+       * one useful result, not two productive results.
+       */
       baseline:
         product.baseline,
 

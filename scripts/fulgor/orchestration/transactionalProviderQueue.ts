@@ -35,11 +35,12 @@ import {
 } from './providerWorkOrder';
 
 export const TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
-  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V1' as const;
+  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V2' as const;
 
 const REQUIRED_OBJECTS =
   Object.freeze([
     'jobs',
+    'work_fingerprints',
     'idx_jobs_pending',
     'idx_jobs_lease_expiry',
     'ux_jobs_active_slot',
@@ -403,6 +404,48 @@ export class TransactionalProviderQueue {
               )
             );
 
+            /*
+             * Persistent useful-work identity.
+             *
+             * In-memory worker state is not uniqueness
+             * authority because it disappears after
+             * restart and is process-local.
+             */
+            CREATE TABLE work_fingerprints (
+              fingerprint TEXT
+                PRIMARY KEY
+                CHECK(
+                  length(fingerprint) = 64
+                  AND
+                  fingerprint = lower(fingerprint)
+                  AND
+                  fingerprint
+                    NOT GLOB '*[^0-9a-f]*'
+                ),
+
+              first_job_id TEXT
+                NOT NULL
+                UNIQUE,
+
+              provider TEXT
+                NOT NULL
+                CHECK(
+                  provider IN (
+                    'codex',
+                    'antigravity'
+                  )
+                ),
+
+              created_ms INTEGER
+                NOT NULL,
+
+              FOREIGN KEY(
+                first_job_id
+              )
+              REFERENCES jobs(job_id)
+              ON DELETE RESTRICT
+            );
+
             CREATE INDEX
               idx_jobs_pending
             ON jobs(
@@ -478,6 +521,7 @@ export class TransactionalProviderQueue {
             FROM sqlite_master
             WHERE name IN (
               'jobs',
+              'work_fingerprints',
               'idx_jobs_pending',
               'idx_jobs_lease_expiry',
               'ux_jobs_active_slot',
@@ -905,6 +949,19 @@ export class TransactionalProviderQueue {
     fingerprint: string | null,
     nowMs: number,
   ): ProviderWorkRecord {
+    /*
+     * Useful uniqueness is persistent queue authority.
+     * A worker/caller cannot self-declare it.
+     */
+    if (
+      outcome === 'USEFUL_UNIQUE' ||
+      outcome === 'USEFUL_DUPLICATE'
+    ) {
+      throw new Error(
+        'QUEUE_USE_SETTLE_USEFUL',
+      );
+    }
+
     return this.transaction(
       () => {
         const row =
@@ -981,6 +1038,167 @@ export class TransactionalProviderQueue {
         ) {
           throw new Error(
             'QUEUE_ATOMIC_SETTLE_LOST',
+          );
+        }
+
+        return settled;
+      },
+    );
+  }
+
+  /*
+   * Useful work is classified transactionally.
+   *
+   * BEGIN IMMEDIATE ensures two provider processes
+   * cannot both register the same fingerprint as
+   * unique.
+   */
+  settleUseful(
+    provider: Provider,
+    leaseId: string,
+    fingerprint: string,
+    nowMs: number,
+  ): ProviderWorkRecord {
+    if (
+      !/^[0-9a-f]{64}$/.test(
+        fingerprint,
+      )
+    ) {
+      throw new Error(
+        'QUEUE_FINGERPRINT_INVALID',
+      );
+    }
+
+    return this.transaction(
+      () => {
+        const row =
+          this.db
+            .prepare(`
+              SELECT *
+              FROM jobs
+              WHERE
+                state = 'LEASED'
+                AND lease_id = ?
+              LIMIT 1
+            `)
+            .get(
+              leaseId,
+            );
+
+        if (!row) {
+          throw new Error(
+            'QUEUE_ACTIVE_LEASE_NOT_FOUND',
+          );
+        }
+
+        const current =
+          this.parsePersistedRow(
+            row,
+          );
+
+        if (
+          current.lease === null ||
+          current.lease.provider !==
+            provider
+        ) {
+          throw new Error(
+            'QUEUE_USEFUL_PROVIDER_MISMATCH',
+          );
+        }
+
+        const existing =
+          this.db
+            .prepare(`
+              SELECT
+                first_job_id,
+                provider
+              FROM work_fingerprints
+              WHERE fingerprint = ?
+              LIMIT 1
+            `)
+            .get(
+              fingerprint,
+            );
+
+        const outcome:
+          WorkOutcome =
+            existing
+              ? 'USEFUL_DUPLICATE'
+              : 'USEFUL_UNIQUE';
+
+        /*
+         * Reserve identity before settling the job.
+         * Any subsequent exception rolls both changes
+         * back together.
+         */
+        if (!existing) {
+          this.db
+            .prepare(`
+              INSERT INTO work_fingerprints(
+                fingerprint,
+                first_job_id,
+                provider,
+                created_ms
+              )
+              VALUES(
+                ?,
+                ?,
+                ?,
+                ?
+              )
+            `)
+            .run(
+              fingerprint,
+              current.order.jobId,
+              provider,
+              nowMs,
+            );
+        }
+
+        const settled =
+          settleProviderWork(
+            current,
+            provider,
+            leaseId,
+            outcome,
+            fingerprint,
+            nowMs,
+          );
+
+        const result =
+          this.db
+            .prepare(`
+              UPDATE jobs
+              SET
+                state = ?,
+                assigned_provider = NULL,
+                slot_id = NULL,
+                lease_id = NULL,
+                lease_expires_at_ms = NULL,
+                updated_ms = ?,
+                record_json = ?
+              WHERE
+                job_id = ?
+                AND state = 'LEASED'
+                AND lease_id = ?
+            `)
+            .run(
+              settled.state,
+              settled.updatedAtMs,
+              serializeProviderWorkRecord(
+                settled,
+              ),
+              settled.order.jobId,
+              leaseId,
+            );
+
+        if (
+          Number(
+            result.changes,
+          ) !== 1
+        ) {
+          throw new Error(
+            'QUEUE_ATOMIC_USEFUL_SETTLE_LOST',
           );
         }
 
