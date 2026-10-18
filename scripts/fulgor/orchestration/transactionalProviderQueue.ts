@@ -20,6 +20,7 @@ import type {
 } from '../scheduler/verified8x8Scheduler';
 
 import type {
+  QualityCertification,
   WorkOutcome,
 } from './providerWorkAccounting';
 
@@ -35,12 +36,31 @@ import {
 } from './providerWorkOrder';
 
 export const TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
-  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V2' as const;
+  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V3' as const;
+
+export type PersistedQualityCircuitState =
+  | 'CLOSED'
+  | 'OPEN';
+
+export interface PersistedProviderQualityState {
+  readonly provider: Provider;
+
+  readonly state:
+    PersistedQualityCircuitState;
+
+  readonly reason:
+    | 'PROTOCOL_REJECTED'
+    | 'CONTRACT_REJECTED'
+    | null;
+
+  readonly updatedAtMs: number;
+}
 
 const REQUIRED_OBJECTS =
   Object.freeze([
     'jobs',
     'work_fingerprints',
+    'provider_quality_state',
     'idx_jobs_pending',
     'idx_jobs_lease_expiry',
     'ux_jobs_active_slot',
@@ -446,6 +466,79 @@ export class TransactionalProviderQueue {
               ON DELETE RESTRICT
             );
 
+            /*
+             * Provider-local persistent quality circuit.
+             *
+             * Restart must never silently reset an OPEN
+             * circuit and resume wasting provider quota.
+             */
+            CREATE TABLE provider_quality_state (
+              provider TEXT
+                PRIMARY KEY
+                CHECK(
+                  provider IN (
+                    'codex',
+                    'antigravity'
+                  )
+                ),
+
+              state TEXT
+                NOT NULL
+                CHECK(
+                  state IN (
+                    'CLOSED',
+                    'OPEN'
+                  )
+                ),
+
+              reason TEXT
+                CHECK(
+                  reason IS NULL
+                  OR
+                  reason IN (
+                    'PROTOCOL_REJECTED',
+                    'CONTRACT_REJECTED'
+                  )
+                ),
+
+              updated_ms INTEGER
+                NOT NULL,
+
+              CHECK(
+                (
+                  state = 'CLOSED'
+                  AND
+                  reason IS NULL
+                )
+                OR
+                (
+                  state = 'OPEN'
+                  AND
+                  reason IS NOT NULL
+                )
+              )
+            );
+
+            INSERT INTO provider_quality_state(
+              provider,
+              state,
+              reason,
+              updated_ms
+            )
+            VALUES
+              (
+                'codex',
+                'CLOSED',
+                NULL,
+                0
+              ),
+              (
+                'antigravity',
+                'CLOSED',
+                NULL,
+                0
+              );
+
             CREATE INDEX
               idx_jobs_pending
             ON jobs(
@@ -522,6 +615,7 @@ export class TransactionalProviderQueue {
             WHERE name IN (
               'jobs',
               'work_fingerprints',
+              'provider_quality_state',
               'idx_jobs_pending',
               'idx_jobs_lease_expiry',
               'ux_jobs_active_slot',
@@ -1303,6 +1397,284 @@ export class TransactionalProviderQueue {
         }
 
         return expired;
+      },
+    );
+  }
+
+  providerQualityState(
+    provider: Provider,
+  ): PersistedProviderQualityState {
+    const row =
+      requireRow(
+        this.db
+          .prepare(`
+            SELECT
+              provider,
+              state,
+              reason,
+              updated_ms
+            FROM provider_quality_state
+            WHERE provider = ?
+            LIMIT 1
+          `)
+          .get(provider),
+        'PROVIDER_QUALITY_ROW',
+      );
+
+    const rowProvider =
+      asString(
+        row.provider,
+        'PROVIDER_QUALITY_PROVIDER',
+      );
+
+    if (
+      rowProvider !== provider
+    ) {
+      throw new Error(
+        'QUEUE_PROVIDER_QUALITY_PROVIDER_MISMATCH',
+      );
+    }
+
+    const state =
+      asString(
+        row.state,
+        'PROVIDER_QUALITY_STATE',
+      );
+
+    if (
+      state !== 'CLOSED' &&
+      state !== 'OPEN'
+    ) {
+      throw new Error(
+        'QUEUE_PROVIDER_QUALITY_STATE_INVALID',
+      );
+    }
+
+    const reason =
+      asNullableString(
+        row.reason,
+        'PROVIDER_QUALITY_REASON',
+      );
+
+    if (
+      reason !== null &&
+      reason !==
+        'PROTOCOL_REJECTED' &&
+      reason !==
+        'CONTRACT_REJECTED'
+    ) {
+      throw new Error(
+        'QUEUE_PROVIDER_QUALITY_REASON_INVALID',
+      );
+    }
+
+    if (
+      (
+        state === 'CLOSED' &&
+        reason !== null
+      ) ||
+      (
+        state === 'OPEN' &&
+        reason === null
+      )
+    ) {
+      throw new Error(
+        'QUEUE_PROVIDER_QUALITY_INVARIANT_INVALID',
+      );
+    }
+
+    return Object.freeze({
+      provider,
+
+      state:
+        state as
+          PersistedQualityCircuitState,
+
+      reason:
+        reason as
+          | 'PROTOCOL_REJECTED'
+          | 'CONTRACT_REJECTED'
+          | null,
+
+      updatedAtMs:
+        asNumber(
+          row.updated_ms,
+          'PROVIDER_QUALITY_UPDATED',
+        ),
+    });
+  }
+
+  canLaunchProvider(
+    provider: Provider,
+  ): boolean {
+    return (
+      this.providerQualityState(
+        provider,
+      ).state ===
+      'CLOSED'
+    );
+  }
+
+  openProviderQualityCircuit(
+    provider: Provider,
+
+    reason:
+      | 'PROTOCOL_REJECTED'
+      | 'CONTRACT_REJECTED',
+
+    nowMs: number,
+  ): PersistedProviderQualityState {
+    if (
+      reason !==
+        'PROTOCOL_REJECTED' &&
+      reason !==
+        'CONTRACT_REJECTED'
+    ) {
+      throw new Error(
+        'QUEUE_PROVIDER_QUALITY_OPEN_REASON_INVALID',
+      );
+    }
+
+    if (
+      !Number.isSafeInteger(
+        nowMs,
+      ) ||
+      nowMs < 0
+    ) {
+      throw new Error(
+        'QUEUE_PROVIDER_QUALITY_TIME_INVALID',
+      );
+    }
+
+    return this.transaction(
+      () => {
+        const result =
+          this.db
+            .prepare(`
+              UPDATE provider_quality_state
+              SET
+                state = 'OPEN',
+                reason = ?,
+                updated_ms = ?
+              WHERE provider = ?
+            `)
+            .run(
+              reason,
+              nowMs,
+              provider,
+            );
+
+        if (
+          Number(
+            result.changes,
+          ) !== 1
+        ) {
+          throw new Error(
+            'QUEUE_PROVIDER_QUALITY_OPEN_FAILED',
+          );
+        }
+
+        return this.providerQualityState(
+          provider,
+        );
+      },
+    );
+  }
+
+  closeProviderQualityCircuit(
+    certification:
+      QualityCertification,
+
+    currentBaseline: string,
+    nowMs: number,
+  ): PersistedProviderQualityState {
+    if (
+      !/^[0-9a-f]{40}$/i.test(
+        currentBaseline,
+      )
+    ) {
+      throw new Error(
+        'QUEUE_PROVIDER_QUALITY_BASELINE_INVALID',
+      );
+    }
+
+    if (
+      !certification.certified
+    ) {
+      throw new Error(
+        'QUEUE_PROVIDER_QUALITY_CERT_NOT_PASS',
+      );
+    }
+
+    if (
+      certification.baseline !==
+      currentBaseline
+    ) {
+      throw new Error(
+        'QUEUE_PROVIDER_QUALITY_CERT_BASELINE_MISMATCH',
+      );
+    }
+
+    if (
+      !Number.isSafeInteger(
+        nowMs,
+      ) ||
+      nowMs < 0
+    ) {
+      throw new Error(
+        'QUEUE_PROVIDER_QUALITY_TIME_INVALID',
+      );
+    }
+
+    return this.transaction(
+      () => {
+        const current =
+          this.providerQualityState(
+            certification.provider,
+          );
+
+        /*
+         * Closing a circuit is meaningful only
+         * when it is currently OPEN.
+         */
+        if (
+          current.state !==
+          'OPEN'
+        ) {
+          throw new Error(
+            'QUEUE_PROVIDER_QUALITY_NOT_OPEN',
+          );
+        }
+
+        const result =
+          this.db
+            .prepare(`
+              UPDATE provider_quality_state
+              SET
+                state = 'CLOSED',
+                reason = NULL,
+                updated_ms = ?
+              WHERE provider = ?
+                AND state = 'OPEN'
+            `)
+            .run(
+              nowMs,
+              certification.provider,
+            );
+
+        if (
+          Number(
+            result.changes,
+          ) !== 1
+        ) {
+          throw new Error(
+            'QUEUE_PROVIDER_QUALITY_CLOSE_FAILED',
+          );
+        }
+
+        return this.providerQualityState(
+          certification.provider,
+        );
       },
     );
   }

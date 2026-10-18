@@ -31,6 +31,10 @@ import {
 } from '../../../scripts/fulgor/orchestration/providerWorkOrder';
 
 import {
+  certifyProviderQuality,
+} from '../../../scripts/fulgor/orchestration/providerWorkAccounting';
+
+import {
   TransactionalProviderQueue,
 } from '../../../scripts/fulgor/orchestration/transactionalProviderQueue';
 
@@ -1044,6 +1048,319 @@ describe(
         ).toThrow(
           /DB_PATH_UNSAFE/,
         );
+      },
+    );
+
+    it(
+      'starts both provider quality circuits closed',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        expect(
+          queue.providerQualityState(
+            'codex',
+          ),
+        ).toMatchObject({
+          provider: 'codex',
+          state: 'CLOSED',
+          reason: null,
+        });
+
+        expect(
+          queue.providerQualityState(
+            'antigravity',
+          ),
+        ).toMatchObject({
+          provider:
+            'antigravity',
+          state: 'CLOSED',
+          reason: null,
+        });
+
+        queue.close();
+      },
+    );
+
+    it(
+      'opens only the failing provider quality circuit',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        queue.openProviderQualityCircuit(
+          'codex',
+          'CONTRACT_REJECTED',
+          1000,
+        );
+
+        expect(
+          queue.canLaunchProvider(
+            'codex',
+          ),
+        ).toBe(false);
+
+        expect(
+          queue.canLaunchProvider(
+            'antigravity',
+          ),
+        ).toBe(true);
+
+        expect(
+          queue.providerQualityState(
+            'codex',
+          ).reason,
+        ).toBe(
+          'CONTRACT_REJECTED',
+        );
+
+        queue.close();
+      },
+    );
+
+    it(
+      'persists an open quality circuit across restart',
+      () => {
+        const root =
+          makeRoot();
+
+        const dbPath =
+          join(
+            root,
+            'queue.sqlite',
+          );
+
+        let queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        queue.openProviderQualityCircuit(
+          'antigravity',
+          'PROTOCOL_REJECTED',
+          1000,
+        );
+
+        queue.close();
+
+        queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        expect(
+          queue.canLaunchProvider(
+            'antigravity',
+          ),
+        ).toBe(false);
+
+        expect(
+          queue.canLaunchProvider(
+            'codex',
+          ),
+        ).toBe(true);
+
+        expect(
+          queue.providerQualityState(
+            'antigravity',
+          ).reason,
+        ).toBe(
+          'PROTOCOL_REJECTED',
+        );
+
+        queue.close();
+      },
+    );
+
+    it(
+      'refuses to close an open circuit with failed certification',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        queue.openProviderQualityCircuit(
+          'codex',
+          'CONTRACT_REJECTED',
+          1000,
+        );
+
+        const failed =
+          certifyProviderQuality(
+            'codex',
+            baseline,
+            [
+              'USEFUL_UNIQUE',
+              'BLOCKED',
+            ],
+          );
+
+        expect(
+          failed.certified,
+        ).toBe(false);
+
+        expect(() =>
+          queue.closeProviderQualityCircuit(
+            failed,
+            baseline,
+            2000,
+          ),
+        ).toThrow(
+          /CERT_NOT_PASS/,
+        );
+
+        expect(
+          queue.canLaunchProvider(
+            'codex',
+          ),
+        ).toBe(false);
+
+        queue.close();
+      },
+    );
+
+    it(
+      'refuses certification bound to a stale baseline',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        queue.openProviderQualityCircuit(
+          'codex',
+          'PROTOCOL_REJECTED',
+          1000,
+        );
+
+        const staleBaseline =
+          'f'.repeat(40);
+
+        const cert =
+          certifyProviderQuality(
+            'codex',
+            staleBaseline,
+            [
+              'USEFUL_UNIQUE',
+            ],
+          );
+
+        expect(() =>
+          queue.closeProviderQualityCircuit(
+            cert,
+            baseline,
+            2000,
+          ),
+        ).toThrow(
+          /BASELINE_MISMATCH/,
+        );
+
+        expect(
+          queue.canLaunchProvider(
+            'codex',
+          ),
+        ).toBe(false);
+
+        queue.close();
+      },
+    );
+
+    it(
+      'closes only after successful baseline-bound certification',
+      () => {
+        const root =
+          makeRoot();
+
+        const dbPath =
+          join(
+            root,
+            'queue.sqlite',
+          );
+
+        let queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        queue.openProviderQualityCircuit(
+          'codex',
+          'CONTRACT_REJECTED',
+          1000,
+        );
+
+        const cert =
+          certifyProviderQuality(
+            'codex',
+            baseline,
+            [
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+            ],
+          );
+
+        const closed =
+          queue.closeProviderQualityCircuit(
+            cert,
+            baseline,
+            2000,
+          );
+
+        expect(closed)
+          .toMatchObject({
+            provider: 'codex',
+            state: 'CLOSED',
+            reason: null,
+          });
+
+        expect(
+          queue.canLaunchProvider(
+            'codex',
+          ),
+        ).toBe(true);
+
+        queue.close();
+
+        queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        expect(
+          queue.canLaunchProvider(
+            'codex',
+          ),
+        ).toBe(true);
+
+        queue.close();
       },
     );
 
