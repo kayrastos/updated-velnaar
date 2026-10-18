@@ -1,4 +1,5 @@
 import {
+  appendFileSync,
   constants,
 } from 'node:fs';
 
@@ -129,6 +130,9 @@ export interface Live8x8OperatorResult {
     string;
 
   readonly queuePath:
+    string;
+
+  readonly processTelemetryPath:
     string;
 
   readonly elapsedMs:
@@ -986,6 +990,12 @@ runLive8x8Operator(
       'queue.sqlite',
     );
 
+  const processTelemetryPath =
+    join(
+      runDirectory,
+      'process-telemetry.jsonl',
+    );
+
   const materializedByPath =
     new Map<
       string,
@@ -1194,6 +1204,58 @@ runLive8x8Operator(
             32_768,
         },
 
+        /*
+         * Sanitized process telemetry only.
+         *
+         * No stdout, stderr, prompt, provider response,
+         * credentials or environment values are persisted.
+         * Observer failure cannot change provider accounting.
+         */
+        observeProcessTelemetry:
+          telemetry => {
+            appendFileSync(
+              processTelemetryPath,
+              JSON.stringify({
+                provider:
+                  telemetry.provider,
+
+                outcome:
+                  telemetry.outcome,
+
+                failureReason:
+                  telemetry.failureReason,
+
+                exitCode:
+                  telemetry.exitCode,
+
+                signal:
+                  telemetry.signal,
+
+                stdoutBytes:
+                  telemetry.stdoutBytes,
+
+                stderrBytes:
+                  telemetry.stderrBytes,
+
+                timedOut:
+                  telemetry.timedOut,
+
+                outputOverflow:
+                  telemetry.outputOverflow,
+              }) + '\n',
+              {
+                encoding:
+                  'utf8',
+
+                flag:
+                  'a',
+
+                mode:
+                  0o600,
+              },
+            );
+          },
+
         resolvePreparedEvidence:
           input => {
             const evidence =
@@ -1274,6 +1336,8 @@ runLive8x8Operator(
 
     queuePath,
 
+    processTelemetryPath,
+
     elapsedMs:
       result.elapsedMs,
 
@@ -1343,6 +1407,7 @@ export function live8x8OperatorSummary(
     `BASELINE=${safe(result.baseline)}`,
     `RUN_DIRECTORY=${safe(result.runDirectory)}`,
     `QUEUE_PATH=${safe(result.queuePath)}`,
+    `PROCESS_TELEMETRY_PATH=${safe(result.processTelemetryPath)}`,
     `ELAPSED_MS=${result.elapsedMs}`,
     `EXPECTED_PROVIDER_CALLS=${result.expectedProviderCalls}`,
     `ACTUAL_PROVIDER_CALLS=${result.actualProviderCalls}`,
