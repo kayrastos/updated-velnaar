@@ -177,6 +177,104 @@ describe(
     );
 
     it(
+      'does not collide when different capsules reuse the same local evidence IDs',
+      () => {
+        const raw =
+          JSON.stringify({
+            schemaVersion:
+              PROVIDER_WORK_PRODUCT_SCHEMA,
+
+            provider: 'codex',
+
+            taskId:
+              capsule.taskId,
+
+            baseline,
+
+            status:
+              'PROPOSE_CHANGE',
+
+            summary:
+              'Same candidate, different host evidence.',
+
+            evidenceIds:
+              ['E1', 'E2'],
+
+            candidate: {
+              path:
+                'tests/new-regression.test.ts',
+
+              content:
+                'export const x = 1;\n',
+            },
+
+            tests: [
+              'Run targeted regression.',
+            ],
+
+            blocker: null,
+          });
+
+        const first =
+          parseProviderWorkProduct(
+            raw,
+            capsule,
+            'codex',
+          );
+
+        const changedCapsule:
+          HostEvidenceCapsule = {
+            ...capsule,
+
+            evidence: [
+              {
+                id: 'E1',
+                path:
+                  'worker/a.ts',
+
+                sha256:
+                  'c'.repeat(64),
+              },
+
+              {
+                id: 'E2',
+                path:
+                  'tests/a.test.ts',
+
+                sha256:
+                  'd'.repeat(64),
+              },
+            ],
+          };
+
+        const second =
+          parseProviderWorkProduct(
+            raw,
+            changedCapsule,
+            'codex',
+          );
+
+        expect(
+          first.workProduct
+            .evidenceIds,
+        ).toEqual(
+          second.workProduct
+            .evidenceIds,
+        );
+
+        expect(
+          workProductFingerprint(
+            first,
+          ),
+        ).not.toBe(
+          workProductFingerprint(
+            second,
+          ),
+        );
+      },
+    );
+
+    it(
       'different candidate bytes create different fingerprints',
       () => {
         const a =

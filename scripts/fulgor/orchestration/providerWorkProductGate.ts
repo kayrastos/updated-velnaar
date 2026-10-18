@@ -65,6 +65,15 @@ export interface AcceptedWorkProduct {
   readonly evidenceCount: number;
 
   /*
+   * Immutable host-resolved evidence bindings.
+   *
+   * These values come from HostEvidenceCapsule,
+   * never from provider-authored hashes or paths.
+   */
+  readonly evidenceBindings:
+    readonly HostEvidence[];
+
+  /*
    * Provider output is never verification authority.
    */
   readonly verified: false;
@@ -511,6 +520,39 @@ export function parseProviderWorkProduct(
       blocker,
     };
 
+  const evidenceBindings =
+    Object.freeze(
+      evidenceIds.map(
+        id => {
+          const evidence =
+            evidenceMap.get(id);
+
+          if (!evidence) {
+            /*
+             * Already checked above. Keep this
+             * fail-closed in case the parser is
+             * refactored later.
+             */
+            throw new Error(
+              `WORK_PRODUCT_UNKNOWN_EVIDENCE_ID=${id}`,
+            );
+          }
+
+          return Object.freeze({
+            id:
+              evidence.id,
+
+            path:
+              evidence.path,
+
+            sha256:
+              evidence.sha256
+                .toLowerCase(),
+          });
+        },
+      ),
+    );
+
   return {
     workProduct,
 
@@ -520,6 +562,8 @@ export function parseProviderWorkProduct(
 
     evidenceCount:
       evidenceIds.length,
+
+    evidenceBindings,
 
     verified: false,
     authorityGranted: false,

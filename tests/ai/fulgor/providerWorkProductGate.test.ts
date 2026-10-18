@@ -115,6 +115,51 @@ describe(
     );
 
     it(
+      'returns immutable evidence bindings from the host capsule rather than provider-authored hashes',
+      () => {
+        const result =
+          parseProviderWorkProduct(
+            JSON.stringify(
+              base(),
+            ),
+            capsule,
+            'codex',
+          );
+
+        expect(
+          result.evidenceBindings,
+        ).toEqual([
+          {
+            id: 'E1',
+            path:
+              'worker/intelligence/a.ts',
+            sha256:
+              'a'.repeat(64),
+          },
+          {
+            id: 'E2',
+            path:
+              'tests/intelligence/a.test.ts',
+            sha256:
+              'b'.repeat(64),
+          },
+        ]);
+
+        expect(
+          Object.isFrozen(
+            result.evidenceBindings,
+          ),
+        ).toBe(true);
+
+        expect(
+          Object.isFrozen(
+            result.evidenceBindings[0],
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
       'does not count transport-shaped junk as useful work',
       () => {
         expect(() =>

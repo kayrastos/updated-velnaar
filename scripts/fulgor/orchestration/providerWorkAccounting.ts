@@ -64,10 +64,42 @@ function sha256(
     .digest('hex');
 }
 
-function stableEvidenceIds(
-  ids: readonly string[],
-): readonly string[] {
-  return [...ids].sort();
+function stableEvidenceBindings(
+  accepted: AcceptedWorkProduct,
+): readonly Readonly<{
+  path: string;
+  sha256: string;
+}>[] {
+  return Object.freeze(
+    accepted.evidenceBindings
+      .map(
+        evidence =>
+          Object.freeze({
+            path:
+              evidence.path,
+
+            sha256:
+              evidence.sha256
+                .toLowerCase(),
+          }),
+      )
+      .sort(
+        (a, b) => {
+          const pathOrder =
+            a.path.localeCompare(
+              b.path,
+            );
+
+          if (pathOrder !== 0) {
+            return pathOrder;
+          }
+
+          return a.sha256.localeCompare(
+            b.sha256,
+          );
+        },
+      ),
+  );
 }
 
 /*
@@ -98,14 +130,14 @@ export function workProductFingerprint(
   return sha256(
     JSON.stringify({
       schema:
-        'VELNAR_USEFUL_WORK_FINGERPRINT_V2',
+        'VELNAR_USEFUL_WORK_FINGERPRINT_V3',
 
       /*
        * Provider identity is deliberately excluded.
        *
        * If Codex and Antigravity independently produce
-       * the same evidence-bound work product, that is
-       * one useful result, not two productive results.
+       * the same host-evidence-bound work product, that
+       * is one useful result.
        */
       baseline:
         product.baseline,
@@ -113,9 +145,16 @@ export function workProductFingerprint(
       status:
         product.status,
 
-      evidenceIds:
-        stableEvidenceIds(
-          product.evidenceIds,
+      /*
+       * Local evidence IDs such as E1/E2 are NOT
+       * identity. Different capsules may reuse them.
+       *
+       * Identity is bound to immutable host-resolved
+       * path + sha256 tuples.
+       */
+      evidence:
+        stableEvidenceBindings(
+          accepted,
         ),
 
       candidate,
