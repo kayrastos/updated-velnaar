@@ -23,6 +23,10 @@ import type {
 } from '../../../scripts/fulgor/scheduler/verified8x8Scheduler';
 
 import {
+  issueLiveTierCanaryPermit,
+} from '../../../scripts/fulgor/scheduler/liveProviderTierGate';
+
+import {
   createProviderWorkOrder,
   type ProviderWorkRecord,
 } from '../../../scripts/fulgor/orchestration/providerWorkOrder';
@@ -1068,5 +1072,240 @@ describe(
         ).toBe(0);
       },
     );
+
+    it(
+      'admits exactly one explicit 9+9 canary permit and rejects replay while default 9 remains denied',
+      async () => {
+        const adaptiveDecision =
+          Object.freeze({
+            schemaVersion:
+              'VELNAR_ADAPTIVE_PROVIDER_SCALER_V1',
+
+            codex:
+              Object.freeze({
+                provider:
+                  'codex' as const,
+
+                action:
+                  'SCALE_UP' as const,
+
+                reason:
+                  'HEALTHY_SCALE_UP' as const,
+
+                previousTargetSlots:
+                  8,
+
+                nextTargetSlots:
+                  9,
+
+                usefulYield:
+                  1,
+
+                nextHealthyWindows:
+                  0,
+
+                throughputRatioToPriorTier:
+                  null,
+              }),
+
+            antigravity:
+              Object.freeze({
+                provider:
+                  'antigravity' as const,
+
+                action:
+                  'SCALE_UP' as const,
+
+                reason:
+                  'HEALTHY_SCALE_UP' as const,
+
+                previousTargetSlots:
+                  8,
+
+                nextTargetSlots:
+                  9,
+
+                usefulYield:
+                  1,
+
+                nextHealthyWindows:
+                  0,
+
+                throughputRatioToPriorTier:
+                  null,
+              }),
+
+            nextState:
+              Object.freeze({
+                codex:
+                  Object.freeze({
+                    provider:
+                      'codex' as const,
+
+                    targetSlots:
+                      9,
+
+                    healthyWindows:
+                      0,
+
+                    lastTargetChangeAtMs:
+                      600_000,
+
+                    priorTierUsefulPerMinute:
+                      10,
+                  }),
+
+                antigravity:
+                  Object.freeze({
+                    provider:
+                      'antigravity' as const,
+
+                    targetSlots:
+                      9,
+
+                    healthyWindows:
+                      0,
+
+                    lastTargetChangeAtMs:
+                      600_000,
+
+                    priorTierUsefulPerMinute:
+                      10,
+                  }),
+
+                preferAntigravityFirst:
+                  false,
+              }),
+
+            totalTargetSlots:
+              18,
+
+            liveEnvelopeExpanded:
+              false as const,
+
+            authorityGranted:
+              false as const,
+          });
+
+        const db =
+          join(
+            root(),
+            'tier-gate.sqlite',
+          );
+
+        const base = {
+          queuePath:
+            db,
+
+          mode:
+            'DUAL' as const,
+
+          leaseDurationMs:
+            60_000,
+
+          maxClaimsPerSlot:
+            1,
+
+          nowMs:
+            clock(),
+
+          loadCapsule:
+            capsule,
+
+          invokeProvider:
+            async () =>
+              Object.freeze({
+                source:
+                  'LIVE_PROVIDER' as const,
+
+                transport:
+                  'FAILURE' as const,
+              }),
+        };
+
+        /*
+         * Existing default remains fail closed.
+         */
+        await expect(
+          runLiveTransactionalProviderWorkerPool({
+            ...base,
+
+            codexSlots:
+              9,
+
+            antigravitySlots:
+              9,
+          }),
+        ).rejects.toThrow(
+          /PROVIDER_TARGET_EXCEEDED/,
+        );
+
+        const permit =
+          issueLiveTierCanaryPermit({
+            baseline,
+
+            nowMs:
+              1_000_000,
+
+            ttlMs:
+              60_000,
+
+            previousTierEvidenceSha256:
+              'b'.repeat(64),
+
+            adaptiveDecision,
+          });
+
+        const result =
+          await runLiveTransactionalProviderWorkerPool({
+            ...base,
+
+            codexSlots:
+              9,
+
+            antigravitySlots:
+              9,
+
+            currentBaseline:
+              baseline,
+
+            liveTierCanaryPermit:
+              permit,
+          });
+
+        /*
+         * Empty queue: proving admission does not call
+         * an injected provider.
+         */
+        expect(
+          result.totalSlots,
+        ).toBe(18);
+
+        expect(
+          result.totalLiveProviderCalls,
+        ).toBe(0);
+
+        await expect(
+          runLiveTransactionalProviderWorkerPool({
+            ...base,
+
+            codexSlots:
+              9,
+
+            antigravitySlots:
+              9,
+
+            currentBaseline:
+              baseline,
+
+            liveTierCanaryPermit:
+              permit,
+          }),
+        ).rejects.toThrow(
+          /PERMIT_REPLAYED/,
+        );
+      },
+    );
+
   },
 );

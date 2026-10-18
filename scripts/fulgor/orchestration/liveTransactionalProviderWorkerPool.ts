@@ -6,6 +6,12 @@ import {
 } from '../scheduler/verified8x8Scheduler';
 
 import {
+  consumeLiveTierCanaryPermit,
+  livePlanFitsCurrentCertifiedEnvelope,
+  type LiveTierCanaryPermit,
+} from '../scheduler/liveProviderTierGate';
+
+import {
   parseProviderWorkProduct,
   type HostEvidenceCapsule,
 } from './providerWorkProductGate';
@@ -105,6 +111,20 @@ export interface LiveTransactionalPoolOptions {
 
   readonly antigravitySlots:
     number;
+
+  /*
+   * Optional only because the historical <=8+8 path
+   * requires no permit.
+   *
+   * Any request above the currently certified live
+   * envelope requires both fields and must pass the
+   * one-shot tier gate.
+   */
+  readonly currentBaseline?:
+    string;
+
+  readonly liveTierCanaryPermit?:
+    LiveTierCanaryPermit;
 
   readonly leaseDurationMs:
     number;
@@ -824,36 +844,108 @@ function validatePlan(
     10_000,
   );
 
-  const targets =
-    targetsForMode(
-      options.mode,
-    );
-
-  if (
-    options.codexSlots >
-      targets.codex ||
-    options.antigravitySlots >
-      targets.antigravity
-  ) {
-    throw new Error(
-      'LIVE_POOL_PROVIDER_TARGET_EXCEEDED',
-    );
-  }
-
   const total =
     options.codexSlots +
     options.antigravitySlots;
 
   if (
-    total < 1 ||
-    total >
-      VERIFIED_8X8_POLICY
-        .globalEffectiveMax
+    total < 1
   ) {
     throw new Error(
       'LIVE_POOL_GLOBAL_SLOT_LIMIT_EXCEEDED',
     );
   }
+
+  const withinCurrentEnvelope =
+    livePlanFitsCurrentCertifiedEnvelope(
+      options.mode,
+      options.codexSlots,
+      options.antigravitySlots,
+    );
+
+  if (
+    withinCurrentEnvelope
+  ) {
+    if (
+      options.liveTierCanaryPermit !==
+        undefined
+    ) {
+      throw new Error(
+        'LIVE_POOL_TIER_PERMIT_NOT_REQUIRED',
+      );
+    }
+
+    return;
+  }
+
+  /*
+   * Preserve the historical fail-closed errors when
+   * no explicit expansion permit is supplied.
+   */
+  if (
+    options.liveTierCanaryPermit ===
+      undefined ||
+    options.currentBaseline ===
+      undefined
+  ) {
+    const targets =
+      targetsForMode(
+        options.mode,
+      );
+
+    if (
+      options.codexSlots >
+        targets.codex ||
+      options.antigravitySlots >
+        targets.antigravity
+    ) {
+      throw new Error(
+        'LIVE_POOL_PROVIDER_TARGET_EXCEEDED',
+      );
+    }
+
+    if (
+      total >
+        VERIFIED_8X8_POLICY
+          .globalEffectiveMax
+    ) {
+      throw new Error(
+        'LIVE_POOL_GLOBAL_SLOT_LIMIT_EXCEEDED',
+      );
+    }
+
+    throw new Error(
+      'LIVE_POOL_TIER_GATE_REQUIRED',
+    );
+  }
+
+  /*
+   * This does not certify or promote a new tier.
+   *
+   * It only consumes one process-local permit for the
+   * exact 9+9 certification canary.
+   */
+  consumeLiveTierCanaryPermit({
+    mode:
+      options.mode,
+
+    currentBaseline:
+      options.currentBaseline,
+
+    nowMs:
+      now(
+        options,
+      ),
+
+    codexSlots:
+      options.codexSlots,
+
+    antigravitySlots:
+      options.antigravitySlots,
+
+    permit:
+      options.liveTierCanaryPermit,
+  });
 }
 
 export async function
