@@ -515,3 +515,218 @@ describe(
     );
   },
 );
+
+
+describe(
+  'provider work-order strictness hardening',
+  () => {
+    function mutableSerialized(
+      record = pending(),
+    ): any {
+      return JSON.parse(
+        String(
+          serializeProviderWorkRecord(
+            record,
+          ),
+        ),
+      );
+    }
+
+    it(
+      'rejects coercible non-string serialized work-order fields',
+      () => {
+        const cases: Array<{
+          mutate:
+            (raw: any) => void;
+
+          expected:
+            RegExp;
+        }> = [
+          {
+            mutate:
+              raw => {
+                raw.order.jobId =
+                  123;
+              },
+
+            expected:
+              /JOB_ID_TYPE_INVALID/,
+          },
+
+          {
+            mutate:
+              raw => {
+                raw.order.baseline = {
+                  value:
+                    baseline,
+                };
+              },
+
+            expected:
+              /BASELINE_TYPE_INVALID/,
+          },
+
+          {
+            mutate:
+              raw => {
+                raw.order.task =
+                  456;
+              },
+
+            expected:
+              /TASK_TYPE_INVALID/,
+          },
+
+          {
+            mutate:
+              raw => {
+                raw.order.evidenceIds =
+                  ['E1', 2];
+              },
+
+            expected:
+              /EVIDENCE_ID_TYPE_INVALID/,
+          },
+        ];
+
+        for (
+          const testCase
+          of cases
+        ) {
+          const raw =
+            mutableSerialized();
+
+          testCase.mutate(
+            raw,
+          );
+
+          expect(() =>
+            parseProviderWorkRecord(
+              JSON.stringify(
+                raw,
+              ),
+            ),
+          ).toThrow(
+            testCase.expected,
+          );
+        }
+      },
+    );
+
+    it(
+      'rejects settlement exactly at lease expiry boundary',
+      () => {
+        const leased =
+          claimProviderWork(
+            pending('codex'),
+            'codex',
+            'boundary-settle',
+            2_000,
+            5_000,
+          );
+
+        expect(
+          leased.lease
+            ?.expiresAtMs,
+        ).toBe(
+          7_000,
+        );
+
+        expect(() =>
+          settleProviderWork(
+            leased,
+            'codex',
+            leased.lease!
+              .leaseId,
+            'BLOCKED',
+            null,
+            7_000,
+          ),
+        ).toThrow(
+          /LEASE_EXPIRED/,
+        );
+      },
+    );
+
+    it(
+      'expires a lease exactly at its expiry boundary',
+      () => {
+        const leased =
+          claimProviderWork(
+            pending('codex'),
+            'codex',
+            'boundary-expire',
+            2_000,
+            5_000,
+          );
+
+        const expired =
+          expireProviderLease(
+            leased,
+            7_000,
+          );
+
+        expect(
+          expired.state,
+        ).toBe(
+          'RECOVERY_HOLD',
+        );
+
+        expect(
+          expired
+            .recoveryHoldReason,
+        ).toBe(
+          'LEASE_EXPIRED',
+        );
+      },
+    );
+
+    it(
+      'rejects lease expiry timestamp overflow',
+      () => {
+        expect(() =>
+          claimProviderWork(
+            pending('codex'),
+            'codex',
+            'expiry-overflow',
+            Number.MAX_SAFE_INTEGER -
+              1_000,
+            5_000,
+          ),
+        ).toThrow(
+          /LEASE_EXPIRY_OVERFLOW/,
+        );
+      },
+    );
+
+    it(
+      'rejects attempt counter overflow before increment',
+      () => {
+        const raw =
+          mutableSerialized();
+
+        raw.attempts =
+          Number.MAX_SAFE_INTEGER;
+
+        const record =
+          parseProviderWorkRecord(
+            JSON.stringify(
+              raw,
+            ),
+          );
+
+        expect(() =>
+          claimProviderWork(
+            record,
+            'codex',
+            'attempt-overflow',
+            2_000,
+            5_000,
+          ),
+        ).toThrow(
+          /ATTEMPT_OVERFLOW/,
+        );
+      },
+    );
+  },
+);

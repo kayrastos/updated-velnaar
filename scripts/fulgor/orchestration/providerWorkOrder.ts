@@ -184,6 +184,21 @@ function validCounter(
   return validTimestamp(value);
 }
 
+function strictRecordString(
+  value: unknown,
+  errorCode: string,
+): string {
+  if (
+    typeof value !== 'string'
+  ) {
+    throw new Error(
+      errorCode,
+    );
+  }
+
+  return value;
+}
+
 function boundedText(
   value: unknown,
   maxBytes: number,
@@ -579,18 +594,21 @@ export function parseProviderWorkRecord(
   const order =
     createProviderWorkOrder({
       jobId:
-        String(
+        strictRecordString(
           parsed.order.jobId,
+          'WORK_RECORD_ORDER_JOB_ID_TYPE_INVALID',
         ),
 
       baseline:
-        String(
+        strictRecordString(
           parsed.order.baseline,
+          'WORK_RECORD_ORDER_BASELINE_TYPE_INVALID',
         ),
 
       task:
-        String(
+        strictRecordString(
           parsed.order.task,
+          'WORK_RECORD_ORDER_TASK_TYPE_INVALID',
         ),
 
       evidenceIds:
@@ -599,7 +617,13 @@ export function parseProviderWorkRecord(
         )
           ? parsed.order
               .evidenceIds
-              .map(String)
+              .map(
+              value =>
+                strictRecordString(
+                  value,
+                  'WORK_RECORD_ORDER_EVIDENCE_ID_TYPE_INVALID',
+                ),
+            )
           : [],
 
       affinity:
@@ -930,6 +954,25 @@ export function claimProviderWork(
     );
   }
 
+  if (
+    checked.attempts ===
+      Number.MAX_SAFE_INTEGER
+  ) {
+    throw new Error(
+      'WORK_LEASE_ATTEMPT_OVERFLOW',
+    );
+  }
+
+  if (
+    nowMs >
+      Number.MAX_SAFE_INTEGER -
+        leaseDurationMs
+  ) {
+    throw new Error(
+      'WORK_LEASE_EXPIRY_OVERFLOW',
+    );
+  }
+
   const attempt =
     checked.attempts + 1;
 
@@ -1030,7 +1073,7 @@ export function settleProviderWork(
    * It may correspond to a lease already considered lost.
    */
   if (
-    nowMs >
+    nowMs >=
       checked.lease.expiresAtMs
   ) {
     throw new Error(
