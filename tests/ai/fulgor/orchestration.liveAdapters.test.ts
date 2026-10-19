@@ -13,6 +13,7 @@ import {
   ANTIGRAVITY_BUILDER_SCHEMA,
   MAX_AGENT_TRANSCRIPT_BYTES,
   extractAntigravityAuthorityPayload,
+  diagnoseAntigravityAuthorityPayload,
   parseAntigravityJsonEnvelope,
   parseExact,
   runCopilotScout,
@@ -1383,3 +1384,235 @@ it('proves a valid absent nested candidate against an exact uppercase commit ID 
   expect(r.session.candidate).toMatchObject({ path: 'tests/missing-parent/new.test.ts', status: '??', kind: 'regular', baseline: s.input.baseline.toLowerCase() });
   await expect(lstat(join(s.input.repoRoot, 'tests/missing-parent'))).rejects.toMatchObject({ code: 'ENOENT' });
 });
+
+// VELNAR_ANTIGRAVITY_DIAGNOSTIC_REGRESSION_LOCK
+
+
+it(
+  'reports PASS_STRUCTURED_OUTPUT for the authoritative structured_output path',
+  () => {
+    const raw =
+      Buffer.from(
+        antigravityEnvelope(
+          candidate,
+        ),
+      );
+
+    expect(
+      diagnoseAntigravityAuthorityPayload(
+        raw,
+      ),
+    ).toBe(
+      'PASS_STRUCTURED_OUTPUT',
+    );
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        raw,
+      ).length,
+    ).toBeGreaterThan(0);
+  },
+);
+
+it(
+  'reports PASS_RESPONSE_JSON for the bounded response compatibility path',
+  () => {
+    const envelope =
+      JSON.parse(
+        antigravityEnvelope(
+          candidate,
+        ),
+      );
+
+    delete envelope
+      .structured_output;
+
+    envelope.response =
+      JSON.stringify(
+        candidate,
+      );
+
+    const raw =
+      Buffer.from(
+        JSON.stringify(
+          envelope,
+        ),
+      );
+
+    expect(
+      diagnoseAntigravityAuthorityPayload(
+        raw,
+      ),
+    ).toBe(
+      'PASS_RESPONSE_JSON',
+    );
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        raw,
+      ).length,
+    ).toBeGreaterThan(0);
+  },
+);
+
+it(
+  'diagnoses non-success AGY envelopes fail closed',
+  () => {
+    const raw =
+      Buffer.from(
+        antigravityEnvelope(
+          candidate,
+          {
+            status:
+              'FAILED',
+          },
+        ),
+      );
+
+    expect(
+      diagnoseAntigravityAuthorityPayload(
+        raw,
+      ),
+    ).toBe(
+      'STATUS_NOT_SUCCESS',
+    );
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        raw,
+      ).length,
+    ).toBe(0);
+  },
+);
+
+it(
+  'diagnoses denied actions fail closed',
+  () => {
+    const raw =
+      Buffer.from(
+        antigravityEnvelope(
+          candidate,
+          {
+            denied_actions: [
+              {
+                action:
+                  'synthetic',
+              },
+            ],
+          },
+        ),
+      );
+
+    expect(
+      diagnoseAntigravityAuthorityPayload(
+        raw,
+      ),
+    ).toBe(
+      'DENIED_ACTIONS_INVALID_OR_NONEMPTY',
+    );
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        raw,
+      ).length,
+    ).toBe(0);
+  },
+);
+
+it(
+  'diagnoses malformed structured_output without response downgrade',
+  () => {
+    const raw =
+      Buffer.from(
+        antigravityEnvelope(
+          null,
+          {
+            structured_output:
+              null,
+
+            response:
+              JSON.stringify(
+                candidate,
+              ),
+          },
+        ),
+      );
+
+    expect(
+      diagnoseAntigravityAuthorityPayload(
+        raw,
+      ),
+    ).toBe(
+      'STRUCTURED_OUTPUT_INVALID',
+    );
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        raw,
+      ).length,
+    ).toBe(0);
+  },
+);
+
+it(
+  'diagnoses non-JSON response fallback fail closed',
+  () => {
+    const envelope =
+      JSON.parse(
+        antigravityEnvelope(
+          candidate,
+        ),
+      );
+
+    delete envelope
+      .structured_output;
+
+    envelope.response =
+      'not-json';
+
+    const raw =
+      Buffer.from(
+        JSON.stringify(
+          envelope,
+        ),
+      );
+
+    expect(
+      diagnoseAntigravityAuthorityPayload(
+        raw,
+      ),
+    ).toBe(
+      'RESPONSE_INVALID_JSON',
+    );
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        raw,
+      ).length,
+    ).toBe(0);
+  },
+);
+
+it(
+  'diagnoses malformed top-level AGY JSON fail closed',
+  () => {
+    const raw =
+      Buffer.from(
+        '{"status":',
+      );
+
+    expect(
+      diagnoseAntigravityAuthorityPayload(
+        raw,
+      ),
+    ).toBe(
+      'INVALID_UTF8_OR_ENVELOPE_JSON',
+    );
+
+    expect(
+      extractAntigravityAuthorityPayload(
+        raw,
+      ).length,
+    ).toBe(0);
+  },
+);

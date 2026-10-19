@@ -28,6 +28,11 @@ import {
   type ProviderProtocolBindingInput,
 } from './liveProviderProtocolBindings';
 
+import {
+  diagnoseAntigravityAuthorityPayload,
+  type AntigravityAuthorityDiagnostic,
+} from './liveAgentAdapters';
+
 import type {
   LiveProviderInput,
   LiveProviderInvocation,
@@ -72,6 +77,13 @@ export interface LiveProviderProcessTelemetry {
   readonly provider:
     'codex'
     | 'antigravity';
+
+  readonly jobId:
+    string;
+
+  readonly antigravityAuthorityDiagnostic:
+    AntigravityAuthorityDiagnostic
+    | null;
 
   readonly outcome:
     'OK'
@@ -371,6 +383,13 @@ function emitProcessTelemetry(
     'codex'
     | 'antigravity',
 
+  jobId:
+    string,
+
+  antigravityAuthorityDiagnostic:
+    AntigravityAuthorityDiagnostic
+    | null,
+
   result:
     BoundedProcessResult,
 ): void {
@@ -388,6 +407,10 @@ function emitProcessTelemetry(
     LiveProviderProcessTelemetry =
       Object.freeze({
         provider,
+
+        jobId,
+
+        antigravityAuthorityDiagnostic,
 
         outcome:
           result.ok
@@ -821,6 +844,8 @@ async function invokeCodex(
     emitProcessTelemetry(
       options,
       'codex',
+      input.record.order.jobId,
+      null,
       processResult,
     );
 
@@ -891,9 +916,18 @@ async function invokeAntigravity(
       plan.args,
     );
 
+  const antigravityAuthorityDiagnostic =
+    processResult.ok
+      ? diagnoseAntigravityAuthorityPayload(
+          processResult.stdout,
+        )
+      : null;
+
   emitProcessTelemetry(
     options,
     'antigravity',
+    input.record.order.jobId,
+    antigravityAuthorityDiagnostic,
     processResult,
   );
 

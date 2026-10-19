@@ -27,6 +27,7 @@ import type {
 
 import {
   LIVE_8X8_OPERATOR_REQUEST_SCHEMA,
+  LIVE_ANTIGRAVITY_PROVIDER_TIMEOUT_MS,
   runLive8x8Operator,
 } from '../../../scripts/fulgor/orchestration/live8x8OperatorRunner';
 
@@ -634,6 +635,20 @@ describe(
           oneShotCalled,
         ).toBe(false);
       },
+    );
+  },
+);
+
+// VELNAR_ANTIGRAVITY_RELEASE_LATENCY_BOUND
+
+
+it(
+  'bounds live Antigravity provider latency to ninety seconds',
+  () => {
+    expect(
+      LIVE_ANTIGRAVITY_PROVIDER_TIMEOUT_MS,
+    ).toBe(
+      90_000,
     );
   },
 );

@@ -62,6 +62,9 @@ import {
 export const LIVE_8X8_OPERATOR_REQUEST_SCHEMA =
   'VELNAR_LIVE_8X8_OPERATOR_REQUEST_V1' as const;
 
+export const LIVE_ANTIGRAVITY_PROVIDER_TIMEOUT_MS =
+  90_000 as const;
+
 export interface Live8x8RequestEvidence {
   readonly id:
     string;
@@ -1202,8 +1205,16 @@ runLive8x8Operator(
           executable:
             antigravityExecutable,
 
+          /*
+           * Release latency boundary:
+           * an unhealthy external AGY lane must not
+           * hold the complete 8+8 run for six minutes.
+           *
+           * Transport timeout remains fail-closed and
+           * never grants protocol/useful-work authority.
+           */
           timeoutMs:
-            360_000,
+            LIVE_ANTIGRAVITY_PROVIDER_TIMEOUT_MS,
 
           maxStdoutBytes:
             131_072,
@@ -1226,6 +1237,12 @@ runLive8x8Operator(
               JSON.stringify({
                 provider:
                   telemetry.provider,
+
+                jobId:
+                  telemetry.jobId,
+
+                antigravityAuthorityDiagnostic:
+                  telemetry.antigravityAuthorityDiagnostic,
 
                 outcome:
                   telemetry.outcome,

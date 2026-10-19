@@ -502,6 +502,174 @@ export function parseCodexJsonl(
  * - response fallback must itself be exactly one JSON
  *   object, never prose/markdown
  */
+export type AntigravityAuthorityDiagnostic =
+  | 'PASS_STRUCTURED_OUTPUT'
+  | 'PASS_RESPONSE_JSON'
+  | 'EMPTY_OR_TOO_LARGE'
+  | 'INVALID_UTF8_OR_ENVELOPE_JSON'
+  | 'ENVELOPE_NOT_OBJECT'
+  | 'STATUS_NOT_SUCCESS'
+  | 'DENIED_ACTIONS_INVALID_OR_NONEMPTY'
+  | 'JSON_SCHEMA_INVALID'
+  | 'STRUCTURED_OUTPUT_INVALID'
+  | 'RESPONSE_NOT_STRING'
+  | 'RESPONSE_TOO_LARGE'
+  | 'RESPONSE_INVALID_JSON'
+  | 'RESPONSE_NOT_OBJECT';
+
+export function diagnoseAntigravityAuthorityPayload(
+  stdout: Buffer,
+): AntigravityAuthorityDiagnostic {
+  try {
+    if (
+      stdout.length === 0 ||
+      stdout.length >
+        MAX_AGENT_TRANSCRIPT_BYTES
+    ) {
+      return 'EMPTY_OR_TOO_LARGE';
+    }
+
+    let text: string;
+
+    try {
+      text =
+        new TextDecoder(
+          'utf-8',
+          {
+            fatal: true,
+            ignoreBOM: true,
+          },
+        ).decode(stdout);
+    } catch {
+      return 'INVALID_UTF8_OR_ENVELOPE_JSON';
+    }
+
+    let envelope: unknown;
+
+    try {
+      envelope =
+        JSON.parse(text);
+    } catch {
+      return 'INVALID_UTF8_OR_ENVELOPE_JSON';
+    }
+
+    if (
+      envelope === null ||
+      typeof envelope !== 'object' ||
+      Array.isArray(envelope)
+    ) {
+      return 'ENVELOPE_NOT_OBJECT';
+    }
+
+    const record =
+      envelope as Record<
+        string,
+        unknown
+      >;
+
+    if (
+      record.status !==
+        'SUCCESS'
+    ) {
+      return 'STATUS_NOT_SUCCESS';
+    }
+
+    const deniedActions =
+      record.denied_actions;
+
+    if (
+      deniedActions !== undefined &&
+      (
+        !Array.isArray(
+          deniedActions,
+        ) ||
+        deniedActions.length !== 0
+      )
+    ) {
+      return 'DENIED_ACTIONS_INVALID_OR_NONEMPTY';
+    }
+
+    if (
+      record.json_schema === null ||
+      typeof record.json_schema !==
+        'object' ||
+      Array.isArray(
+        record.json_schema,
+      )
+    ) {
+      return 'JSON_SCHEMA_INVALID';
+    }
+
+    const ownsStructuredOutput =
+      Object.prototype
+        .hasOwnProperty.call(
+          record,
+          'structured_output',
+        );
+
+    if (ownsStructuredOutput) {
+      const structured =
+        record.structured_output;
+
+      if (
+        structured === null ||
+        typeof structured !==
+          'object' ||
+        Array.isArray(
+          structured,
+        )
+      ) {
+        return 'STRUCTURED_OUTPUT_INVALID';
+      }
+
+      return 'PASS_STRUCTURED_OUTPUT';
+    }
+
+    if (
+      typeof record.response !==
+        'string'
+    ) {
+      return 'RESPONSE_NOT_STRING';
+    }
+
+    if (
+      Buffer.byteLength(
+        record.response,
+        'utf8',
+      ) >
+      MAX_AGENT_TRANSCRIPT_BYTES
+    ) {
+      return 'RESPONSE_TOO_LARGE';
+    }
+
+    let responseValue: unknown;
+
+    try {
+      responseValue =
+        JSON.parse(
+          record.response,
+        );
+    } catch {
+      return 'RESPONSE_INVALID_JSON';
+    }
+
+    if (
+      responseValue === null ||
+      typeof responseValue !==
+        'object' ||
+      Array.isArray(
+        responseValue,
+      )
+    ) {
+      return 'RESPONSE_NOT_OBJECT';
+    }
+
+    return 'PASS_RESPONSE_JSON';
+  } catch {
+    return 'INVALID_UTF8_OR_ENVELOPE_JSON';
+  }
+}
+
 export function extractAntigravityAuthorityPayload(
   stdout: Buffer,
 ): Buffer {
