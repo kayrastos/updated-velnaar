@@ -639,16 +639,16 @@ describe(
   },
 );
 
-// VELNAR_ANTIGRAVITY_RELEASE_LATENCY_BOUND
+// VELNAR_ANTIGRAVITY_COMPLETION_ENVELOPE
 
 
 it(
-  'bounds live Antigravity provider latency to ninety seconds',
+  'uses a six-minute hard Antigravity completion envelope',
   () => {
     expect(
       LIVE_ANTIGRAVITY_PROVIDER_TIMEOUT_MS,
     ).toBe(
-      90_000,
+      360_000,
     );
   },
 );

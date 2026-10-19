@@ -63,7 +63,7 @@ export const LIVE_8X8_OPERATOR_REQUEST_SCHEMA =
   'VELNAR_LIVE_8X8_OPERATOR_REQUEST_V1' as const;
 
 export const LIVE_ANTIGRAVITY_PROVIDER_TIMEOUT_MS =
-  90_000 as const;
+  360_000 as const;
 
 export interface Live8x8RequestEvidence {
   readonly id:
@@ -1206,12 +1206,18 @@ runLive8x8Operator(
             antigravityExecutable,
 
           /*
-           * Release latency boundary:
-           * an unhealthy external AGY lane must not
-           * hold the complete 8+8 run for six minutes.
+           * Antigravity completion envelope:
+           * healthy plan-mode work has demonstrated
+           * completion well beyond ninety seconds.
            *
-           * Transport timeout remains fail-closed and
-           * never grants protocol/useful-work authority.
+           * Physical AGY slot execution is serialized
+           * in the live worker pool so the former 8-way
+           * local resource/inotify burst cannot occur.
+           *
+           * 360 seconds remains a hard fail-closed
+           * per-process bound. Timeout never grants
+           * protocol/useful-work authority and is never
+           * retried automatically.
            */
           timeoutMs:
             LIVE_ANTIGRAVITY_PROVIDER_TIMEOUT_MS,

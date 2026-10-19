@@ -692,7 +692,18 @@ export function buildProviderWorkProductPrompt(
       'AI OUTPUT IS NON-AUTHORITATIVE EVIDENCE.',
       '',
       'STRICT EXECUTION BOUNDARY:',
-      '- Do not invoke any tool.',
+      ...(
+        input.provider ===
+          'antigravity'
+          ? [
+              '- Do not invoke any tool except the Antigravity internal `finish` structured-output submission tool.',
+              '- Invoke `finish` exactly once, only after analysis is complete, to submit the final schema-constrained VELNAR_PROVIDER_WORK_PRODUCT_V1 object.',
+              '- `finish` is output transport only and grants no permission for shell, filesystem, repository, network, credential, deployment, promotion or authority actions.',
+            ]
+          : [
+              '- Do not invoke any tool.',
+            ]
+      ),
       '- Do not invoke shell or terminal commands.',
       '- Do not read repository files yourself.',
       '- Do not write or modify files.',

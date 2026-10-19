@@ -47,8 +47,9 @@ import type {
   HostEvidenceCapsule,
 } from '../../../scripts/fulgor/orchestration/providerWorkProductGate';
 
-import type {
-  BoundHostEvidenceText,
+import {
+  buildProviderWorkProductPrompt,
+  type BoundHostEvidenceText,
 } from '../../../scripts/fulgor/orchestration/liveProviderProtocolBindings';
 
 const roots:
@@ -1378,6 +1379,110 @@ describe(
           protocol:
             'PASS',
         });
+      },
+    );
+  },
+);
+
+
+// VELNAR_ANTIGRAVITY_FINISH_SUBMISSION_CONTRACT
+
+describe(
+  'Antigravity structured-output finalization contract',
+  () => {
+    it(
+      'permits only internal finish submission for Antigravity while Codex remains tool-free',
+      () => {
+        const directory =
+          root();
+
+        const agyRecord =
+          record(
+            'antigravity',
+            'job-agy-finish-contract',
+          );
+
+        const agyPrompt =
+          buildProviderWorkProductPrompt({
+            provider:
+              'antigravity',
+
+            repoRoot:
+              directory,
+
+            record:
+              agyRecord,
+
+            capsule:
+              capsule(
+                agyRecord,
+              ),
+
+            evidence:
+              preparedEvidence,
+          });
+
+        expect(
+          agyPrompt,
+        ).toContain(
+          '- Do not invoke any tool except the Antigravity internal `finish` structured-output submission tool.',
+        );
+
+        expect(
+          agyPrompt,
+        ).toContain(
+          '- Invoke `finish` exactly once, only after analysis is complete, to submit the final schema-constrained VELNAR_PROVIDER_WORK_PRODUCT_V1 object.',
+        );
+
+        expect(
+          agyPrompt,
+        ).toContain(
+          '- `finish` is output transport only and grants no permission for shell, filesystem, repository, network, credential, deployment, promotion or authority actions.',
+        );
+
+        expect(
+          agyPrompt,
+        ).not.toContain(
+          '\n- Do not invoke any tool.\n',
+        );
+
+        const codexRecord =
+          record(
+            'codex',
+            'job-codex-no-tool-contract',
+          );
+
+        const codexPrompt =
+          buildProviderWorkProductPrompt({
+            provider:
+              'codex',
+
+            repoRoot:
+              directory,
+
+            record:
+              codexRecord,
+
+            capsule:
+              capsule(
+                codexRecord,
+              ),
+
+            evidence:
+              preparedEvidence,
+          });
+
+        expect(
+          codexPrompt,
+        ).toContain(
+          '- Do not invoke any tool.',
+        );
+
+        expect(
+          codexPrompt,
+        ).not.toContain(
+          'Antigravity internal `finish`',
+        );
       },
     );
   },

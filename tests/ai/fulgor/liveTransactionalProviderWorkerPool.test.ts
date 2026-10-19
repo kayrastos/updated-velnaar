@@ -1309,3 +1309,217 @@ describe(
 
   },
 );
+
+
+// VELNAR_ANTIGRAVITY_SERIAL_SLOT_EXECUTION
+
+describe(
+  'Antigravity serialized physical lane',
+  () => {
+    it(
+      'keeps logical Antigravity slots while never invoking two AGY jobs concurrently',
+      async () => {
+        const db =
+          join(
+            root(),
+            'agy-serial.sqlite',
+          );
+
+        for (
+          let index = 1;
+          index <= 4;
+          index += 1
+        ) {
+          enqueue(
+            db,
+            `job-agy-serial-${index}`,
+            'antigravity',
+            index * 10,
+          );
+        }
+
+        let active =
+          0;
+
+        let maxActive =
+          0;
+
+        let calls =
+          0;
+
+        const result =
+          await runLiveTransactionalProviderWorkerPool({
+            queuePath:
+              db,
+
+            mode:
+              'DUAL',
+
+            codexSlots:
+              0,
+
+            antigravitySlots:
+              4,
+
+            leaseDurationMs:
+              60_000,
+
+            maxClaimsPerSlot:
+              1,
+
+            nowMs:
+              clock(),
+
+            loadCapsule:
+              capsule,
+
+            invokeProvider:
+              async input => {
+                calls += 1;
+                active += 1;
+
+                maxActive =
+                  Math.max(
+                    maxActive,
+                    active,
+                  );
+
+                await new Promise<void>(
+                  resolve => {
+                    setTimeout(
+                      resolve,
+                      20,
+                    );
+                  },
+                );
+
+                active -= 1;
+
+                return Object.freeze({
+                  source:
+                    'LIVE_PROVIDER',
+
+                  transport:
+                    'OK',
+
+                  protocol:
+                    'PASS',
+
+                  raw:
+                    proposal(
+                      input.record,
+                      input.provider,
+                    ),
+                });
+              },
+          });
+
+        expect(
+          calls,
+        ).toBe(4);
+
+        expect(
+          maxActive,
+        ).toBe(1);
+
+        expect(
+          result.antigravity.slots,
+        ).toBe(4);
+
+        expect(
+          result.antigravity.liveProviderCalls,
+        ).toBe(4);
+
+        expect(
+          result.totalLiveProviderCalls,
+        ).toBe(4);
+      },
+    );
+
+    it(
+      're-checks the Antigravity quality circuit before later serialized slots',
+      async () => {
+        const db =
+          join(
+            root(),
+            'agy-circuit-serial.sqlite',
+          );
+
+        for (
+          let index = 1;
+          index <= 4;
+          index += 1
+        ) {
+          enqueue(
+            db,
+            `job-agy-circuit-${index}`,
+            'antigravity',
+            index * 10,
+          );
+        }
+
+        let calls =
+          0;
+
+        const result =
+          await runLiveTransactionalProviderWorkerPool({
+            queuePath:
+              db,
+
+            mode:
+              'DUAL',
+
+            codexSlots:
+              0,
+
+            antigravitySlots:
+              4,
+
+            leaseDurationMs:
+              60_000,
+
+            maxClaimsPerSlot:
+              1,
+
+            nowMs:
+              clock(),
+
+            loadCapsule:
+              capsule,
+
+            invokeProvider:
+              async () => {
+                calls += 1;
+
+                return Object.freeze({
+                  source:
+                    'LIVE_PROVIDER',
+
+                  transport:
+                    'OK',
+
+                  protocol:
+                    'REJECTED',
+                });
+              },
+          });
+
+        expect(
+          calls,
+        ).toBe(1);
+
+        expect(
+          result.totalLiveProviderCalls,
+        ).toBe(1);
+
+        expect(
+          result.antigravity.protocolRejected,
+        ).toBe(1);
+
+        expect(
+          result.antigravity.stoppedByQualityCircuit,
+        ).toBe(3);
+      },
+    );
+  },
+);

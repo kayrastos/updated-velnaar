@@ -436,7 +436,7 @@ describe(
     );
 
     it(
-      'builds deterministic tool-free prompts from host-bound evidence',
+      'builds deterministic bounded prompts from host-bound evidence',
       () => {
         const prompt =
           buildProviderWorkProductPrompt(
@@ -448,7 +448,25 @@ describe(
         expect(
           prompt,
         ).toContain(
-          'Do not invoke any tool.',
+          '- Do not invoke any tool except the Antigravity internal `finish` structured-output submission tool.',
+        );
+
+        expect(
+          prompt,
+        ).toContain(
+          '- Invoke `finish` exactly once, only after analysis is complete, to submit the final schema-constrained VELNAR_PROVIDER_WORK_PRODUCT_V1 object.',
+        );
+
+        expect(
+          prompt,
+        ).toContain(
+          '- `finish` is output transport only and grants no permission for shell, filesystem, repository, network, credential, deployment, promotion or authority actions.',
+        );
+
+        expect(
+          prompt,
+        ).not.toContain(
+          '\n- Do not invoke any tool.\n',
         );
 
         expect(

@@ -953,9 +953,38 @@ runLiveTransactionalProviderWorkerPool(
   const codexPromises:
     Promise<MutableStats>[] = [];
 
-  const antigravityPromises:
-    Promise<MutableStats>[] =
-      [];
+  /*
+   * Antigravity keeps its logical slot count for the
+   * certified 8+8 accounting contract, but AGY slots
+   * execute serially at the runSlot boundary.
+   *
+   * This prevents the local CLI resource/inotify burst
+   * and, critically, re-checks the provider quality
+   * circuit before each later claim.
+   */
+  const runAntigravitySlotsSerially =
+    async (): Promise<MutableStats[]> => {
+      const values:
+        MutableStats[] = [];
+
+      for (
+        let slot = 1;
+        slot <=
+          options.antigravitySlots;
+        slot += 1
+      ) {
+        values.push(
+          await runSlot(
+            options,
+            'antigravity',
+            `live-antigravity-${String(slot)
+              .padStart(2, '0')}`,
+          ),
+        );
+      }
+
+      return values;
+    };
 
   for (
     let slot = 1;
@@ -973,21 +1002,6 @@ runLiveTransactionalProviderWorkerPool(
     );
   }
 
-  for (
-    let slot = 1;
-    slot <=
-      options.antigravitySlots;
-    slot += 1
-  ) {
-    antigravityPromises.push(
-      runSlot(
-        options,
-        'antigravity',
-        `live-antigravity-${String(slot)
-          .padStart(2, '0')}`,
-      ),
-    );
-  }
 
   const [
     codexValues,
@@ -998,9 +1012,7 @@ runLiveTransactionalProviderWorkerPool(
         codexPromises,
       ),
 
-      Promise.all(
-        antigravityPromises,
-      ),
+      runAntigravitySlotsSerially(),
     ]);
 
   const codex =
