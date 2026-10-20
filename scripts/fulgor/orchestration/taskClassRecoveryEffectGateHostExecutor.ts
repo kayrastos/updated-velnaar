@@ -1,3 +1,5 @@
+import { verifyV3RecoveryGateState } from './taskClassRecoveryGateState';
+import { validateRecoveryTransaction } from './taskClassRecoveryTransaction';
 import {
   createHash,
 } from 'node:crypto';
@@ -177,6 +179,15 @@ validateRecoveryEffectGateExecutionRequest(
     );
   }
 
+  if (request.transaction) {
+    validateRecoveryTransaction(request.transaction);
+    if (request.transaction.batchId !== batchId || ordinal > request.transaction.totalProviderCalls ||
+        !request.call || typeof request.call.jobId !== 'string' ||
+        typeof request.call.jobDescriptorSha256 !== 'string' || request.call.jobDescriptorSha256.length !== 64 ||
+        !/^[0-9a-f]{64}$/.test(request.call.jobDescriptorSha256)) {
+      throw new Error('RECOVERY_GATE_EXECUTOR_TRANSACTION_INVALID');
+    }
+  } else if (request.call) throw new Error('RECOVERY_GATE_EXECUTOR_TRANSACTION_MISSING');
   return Object.freeze({
     batchId,
     ordinalText,
@@ -302,6 +313,13 @@ executeSealedRecoveryEffectGate(
   request:
     RecoveryEffectGateExecutionRequest,
 ): Promise<RecoveryEffectGateExecutionResult> {
+  if (!request.transaction || !request.call) {
+    throw new Error('RECOVERY_GATE_EXECUTOR_V3_BINDING_REQUIRED');
+  }
+  request = Object.freeze({ ...request,
+    args: Object.freeze([...request.args]) as RecoveryEffectGateExecutionRequest['args'],
+    ...(request.transaction ? { transaction: Object.freeze({ ...request.transaction }), call: Object.freeze({ ...request.call }) } : {}),
+  });
   const validated =
     validateRecoveryEffectGateExecutionRequest(
       request,
@@ -311,9 +329,10 @@ executeSealedRecoveryEffectGate(
    * Execution-time executable/policy identity recheck
    * occurs immediately before the only process effect.
    */
+  if (request.transaction) await verifyV3RecoveryGateState(request, 'BEFORE');
   await verifySealedEffectGateIdentity();
 
-  return await new Promise(
+  const execution: RecoveryEffectGateExecutionResult = await new Promise(
     (
       resolve,
       reject,
@@ -527,4 +546,9 @@ executeSealedRecoveryEffectGate(
         );
     },
   );
+  if (request.transaction && execution.exitCode === 0 && execution.stderr === '') {
+    await verifyV3RecoveryGateState(request, 'AFTER');
+    return Object.freeze({ ...execution, transaction: request.transaction });
+  }
+  return execution;
 }

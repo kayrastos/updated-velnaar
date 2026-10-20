@@ -75,7 +75,15 @@ class V3Contract(unittest.TestCase):
             shutil.copy2(sandbox / name, lib / name)
         shutil.copy2(sandbox / 'velnar-recovery-foundation-v3.json', self.paths['foundationTrust'])
         self.paths['foundationTrust'].chmod(0o600)
-        self.trusted = json.loads(self.paths['foundationTrust'].read_text())['commit']
+        fixture_trust = json.loads(self.paths['foundationTrust'].read_text())
+        self.trusted = fixture_trust['commit']
+        # Enroll the isolated fixture's complete current file set. Production
+        # trust is never changed by this harness, including during development.
+        fixture_trust['foundationHashes'] = {
+            name: fixture_trust['foundationHashes'].get(name, 'a' * 64)
+            for name in common.FOUNDATION_FILES
+        }
+        self.paths['foundationTrust'].write_text(json.dumps(fixture_trust))
         self.phase = 'PROBATION_BOOTSTRAP'; self.calls = 1; self.progress = 0
         self.raw = {
             'schemaVersion': common.INTENT_SCHEMA, 'batchId': 'fixture-batch',

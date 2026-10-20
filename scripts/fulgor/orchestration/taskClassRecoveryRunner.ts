@@ -1,3 +1,4 @@
+import { validateRecoveryTransaction, sameRecoveryTransaction, type TaskClassRecoveryTransaction } from './taskClassRecoveryTransaction';
 import {
   createHash,
 } from 'node:crypto';
@@ -55,6 +56,7 @@ export interface TaskClassRecoveryJob {
 
 
 export interface TaskClassRecoveryRunInput {
+  readonly transaction?: TaskClassRecoveryTransaction;
   readonly batchId:
     string;
 
@@ -82,6 +84,7 @@ export interface TaskClassRecoveryRunInput {
 
 
 export interface TaskClassRecoverySecurityMetadata {
+  readonly transaction?: TaskClassRecoveryTransaction;
   readonly schemaVersion:
     typeof TASK_CLASS_RECOVERY_SECURITY_SCHEMA;
 
@@ -130,6 +133,7 @@ export interface TaskClassRecoveryGateRequest {
 
 
 export interface TaskClassRecoveryGateDecision {
+  readonly transaction?: TaskClassRecoveryTransaction;
   readonly allowed:
     boolean;
 
@@ -383,7 +387,7 @@ taskClassRecoveryJobDescriptorSha256(
         stableValue(
           job,
         ),
-      ),
+      ).replace(/[\u007f-\uffff]/g, character => '\\u' + character.charCodeAt(0).toString(16).padStart(4, '0')),
       'utf8',
     )
     .digest(
@@ -519,10 +523,19 @@ function evidenceContextKey(
 }
 
 
-function validateInput(
+export function validateTaskClassRecoveryRunInput(
   input:
     TaskClassRecoveryRunInput,
 ): void {
+  if (input.transaction !== undefined) {
+    validateRecoveryTransaction(input.transaction);
+    if (input.transaction.baseline !== input.baseline || input.transaction.batchId !== input.batchId ||
+        input.transaction.provider !== input.provider || input.transaction.taskClass !== input.taskClass ||
+        input.transaction.phase !== input.phase || input.transaction.requestedModel !== input.requestedModel ||
+        input.transaction.totalProviderCalls !== input.jobs.length || input.transaction.maxConcurrency !== input.maxConcurrency) {
+      throw new Error('RECOVERY_RUNNER_TRANSACTION_BINDING_INVALID');
+    }
+  }
   if (
     !SAFE_BATCH.test(
       input.batchId,
@@ -752,6 +765,7 @@ function gateBindingValid(
     TaskClassRecoverySecurityMetadata,
 ): boolean {
   return (
+    (metadata.transaction === undefined || sameRecoveryTransaction(decision.transaction, metadata.transaction)) &&
     decision.allowed ===
       true &&
     decision.authorizationConsumed ===
@@ -778,9 +792,15 @@ runTaskClassRecovery(
   dependencies:
     TaskClassRecoveryRunnerDependencies,
 ): Promise<TaskClassRecoveryRunResult> {
-  validateInput(
-    input,
-  );
+  // Freeze all jobs/evidence before the first gate await. No caller mutation
+  // may change a descriptor after it has consumed an authorization unit.
+  input = Object.freeze({ ...input,
+    ...(input.transaction ? { transaction: Object.freeze({ ...input.transaction }) } : {}),
+    jobs: Object.freeze(input.jobs.map(job => Object.freeze({ ...job,
+      evidence: Object.freeze(job.evidence.map(binding => Object.freeze({ ...binding }))),
+    }))),
+  });
+  validateTaskClassRecoveryRunInput(input);
 
   const completed:
     TaskClassRecoveryCompletedJob[] =
@@ -822,6 +842,7 @@ runTaskClassRecovery(
     const securityMetadata:
       TaskClassRecoverySecurityMetadata =
         Object.freeze({
+          ...(input.transaction ? { transaction: input.transaction } : {}),
           schemaVersion:
             TASK_CLASS_RECOVERY_SECURITY_SCHEMA,
 

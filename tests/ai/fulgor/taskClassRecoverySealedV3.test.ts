@@ -27,10 +27,14 @@ describe('sealed V3 contract in an audit-enforced disposable fixture', () => {
       }
       copyFileSync(join(sources, 'velnar-recovery-foundation-v3.json'), join(root, 'velnar-recovery-foundation-v3.json'));
       copyFileSync(join(import.meta.dirname, 'fixtures/recoveryAuthorityV3.py'), join(root, 'fixture.py'));
-      const output = execFileSync('/usr/bin/python3', ['-B', join(root, 'fixture.py')], {
+      let output: string;
+      try { output = execFileSync('/usr/bin/python3', ['-B', join(root, 'fixture.py')], {
         cwd: root, env: { HOME: root, PATH: '/usr/bin:/bin', PYTHONDONTWRITEBYTECODE: '1' },
         encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024,
       });
+      } catch (error) {
+        throw new Error('SEALED_V3_ISOLATED_FIXTURE_FAILED: ' + String((error as { stdout?: unknown }).stdout ?? error));
+      }
       const result = JSON.parse(output);
       expect(result).toMatchObject({ tests: 38, failures: 0, errors: 0 });
       expect(result.fixtureAuthorizationCreations).toBeGreaterThan(0);

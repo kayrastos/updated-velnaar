@@ -1,3 +1,4 @@
+import { sameRecoveryTransaction, validateRecoveryTransaction, type TaskClassRecoveryTransaction } from './taskClassRecoveryTransaction';
 import {
   SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
 } from './taskClassRecoveryAuthorityCheckBridge';
@@ -42,6 +43,8 @@ type GateStdoutKey =
 
 
 export interface RecoveryEffectGateExecutionRequest {
+  readonly transaction?: TaskClassRecoveryTransaction;
+  readonly call?: Readonly<{ jobId: string; jobDescriptorSha256: string }>;
   readonly expectedGateSha256:
     typeof SEALED_RECOVERY_CALL_GATE_V3_SHA256;
 
@@ -58,6 +61,7 @@ export interface RecoveryEffectGateExecutionRequest {
 
 
 export interface RecoveryEffectGateExecutionResult {
+  readonly transaction?: TaskClassRecoveryTransaction;
   readonly exitCode:
     number;
 
@@ -137,8 +141,16 @@ function validateInput(
   input:
     RecoveryEffectGateBridgeInput,
 ): void {
-  const request =
-    input.request;
+  const request = input.request;
+  if (request.transaction) {
+    validateRecoveryTransaction(request.transaction);
+    const tx = request.transaction;
+    if (tx.baseline !== request.baseline || tx.batchId !== request.batchId || tx.provider !== request.provider ||
+        tx.taskClass !== request.taskClass || tx.phase !== request.phase || tx.requestedModel !== request.requestedModel ||
+        tx.totalProviderCalls !== input.authorizedProviderCalls) {
+      throw new Error('RECOVERY_EFFECT_GATE_TRANSACTION_INVALID');
+    }
+  }
 
   if (
     request.schemaVersion !==
@@ -411,9 +423,10 @@ consumeRecoveryEffectGateThroughBridge(
   dependencies:
     RecoveryEffectGateDependencies,
 ): Promise<RecoveryEffectGateBridgeResult> {
-  validateInput(
-    input,
-  );
+  input = Object.freeze({ ...input, request: Object.freeze({ ...input.request,
+    ...(input.request.transaction ? { transaction: Object.freeze({ ...input.request.transaction }) } : {}),
+  }) });
+  validateInput(input);
 
   let execution:
     RecoveryEffectGateExecutionResult;
@@ -422,6 +435,10 @@ consumeRecoveryEffectGateThroughBridge(
     execution =
       await dependencies
         .executeGate({
+          ...(input.request.transaction ? {
+            transaction: input.request.transaction,
+            call: Object.freeze({ jobId: input.request.jobId, jobDescriptorSha256: input.request.jobDescriptorSha256 }),
+          } : {}),
           expectedGateSha256:
             SEALED_RECOVERY_CALL_GATE_V3_SHA256,
 
@@ -463,6 +480,9 @@ consumeRecoveryEffectGateThroughBridge(
     );
   }
 
+  if (input.request.transaction && !sameRecoveryTransaction(execution.transaction, input.request.transaction)) {
+    throw new Error('RECOVERY_EFFECT_GATE_DURABLE_CONTINUITY_INVALID');
+  }
   parseGateStdout(
     execution.stdout,
     input,
@@ -474,6 +494,7 @@ consumeRecoveryEffectGateThroughBridge(
   const receipt:
     TaskClassRecoveryHostGateReceipt =
       Object.freeze({
+        ...(input.request.transaction ? { transaction: input.request.transaction } : {}),
         schemaVersion:
           TASK_CLASS_RECOVERY_HOST_GATE_SCHEMA,
 

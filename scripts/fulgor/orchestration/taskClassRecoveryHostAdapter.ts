@@ -1,3 +1,4 @@
+import { sameRecoveryTransaction, type TaskClassRecoveryTransaction } from './taskClassRecoveryTransaction';
 import {
   runTaskClassRecovery,
   type TaskClassRecoveryGateDecision,
@@ -18,6 +19,7 @@ export const TASK_CLASS_RECOVERY_HOST_GATE_SCHEMA =
 
 
 export interface TaskClassRecoveryHostGateRequest {
+  readonly transaction?: TaskClassRecoveryTransaction;
   readonly schemaVersion:
     typeof TASK_CLASS_RECOVERY_HOST_GATE_SCHEMA;
 
@@ -52,6 +54,7 @@ export interface TaskClassRecoveryHostGateRequest {
 
 
 export interface TaskClassRecoveryHostGateReceipt {
+  readonly transaction?: TaskClassRecoveryTransaction;
   readonly schemaVersion:
     typeof TASK_CLASS_RECOVERY_HOST_GATE_SCHEMA;
 
@@ -214,13 +217,14 @@ function normalizedReceipt(
     ) ||
     !exactKeys(
       value,
-      RECEIPT_KEYS,
+      expected.transaction ? [...RECEIPT_KEYS, 'transaction'] : RECEIPT_KEYS,
     )
   ) {
     return null;
   }
 
   if (
+    (expected.transaction !== undefined && !sameRecoveryTransaction(value.transaction, expected.transaction)) ||
     value.schemaVersion !==
       TASK_CLASS_RECOVERY_HOST_GATE_SCHEMA ||
     typeof value.allowed !==
@@ -250,6 +254,7 @@ function normalizedReceipt(
   }
 
   return Object.freeze({
+    ...(expected.transaction ? { transaction: expected.transaction } : {}),
     schemaVersion:
       TASK_CLASS_RECOVERY_HOST_GATE_SCHEMA,
 
@@ -323,6 +328,7 @@ function gateRequest(
     TaskClassRecoverySecurityMetadata,
 ): TaskClassRecoveryHostGateRequest {
   return Object.freeze({
+    ...(metadata.transaction ? { transaction: metadata.transaction } : {}),
     schemaVersion:
       TASK_CLASS_RECOVERY_HOST_GATE_SCHEMA,
 
@@ -417,6 +423,7 @@ runTaskClassRecoveryWithHostAdapter(
            * have already been exact-bound above.
            */
           return Object.freeze({
+            ...(receipt.transaction ? { transaction: receipt.transaction } : {}),
             allowed:
               true,
 
