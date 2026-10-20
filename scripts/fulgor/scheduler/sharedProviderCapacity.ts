@@ -1047,6 +1047,68 @@ export class HostProviderCapacityController {
     });
   }
 
+  public reconcileStaleOwnerAndLeases(
+    newOwnerId: string,
+    nowMs?: number,
+  ): readonly string[] {
+    const safeOwnerId = validateSafeId(
+      newOwnerId,
+      'SHARED_CAPACITY_OWNER_ID_INVALID',
+    );
+    const revokedAtMs = validateSafeTimestamp(
+      nowMs ?? this.nowMs(),
+    );
+
+    return this.inImmediateTransaction(() => {
+      const { activeLeaseIds } = this.assertStateHealthyUnlocked();
+      const revoked: string[] = [];
+
+      for (const leaseId of activeLeaseIds) {
+        const row = this.db
+          .prepare(
+            `SELECT acquired_at_ms FROM capacity_leases WHERE lease_id = ?`,
+          )
+          .get(leaseId) as { acquired_at_ms: number } | undefined;
+
+        const effectiveRevokedAtMs = Math.max(
+          revokedAtMs,
+          row?.acquired_at_ms ?? revokedAtMs,
+        );
+
+        this.db
+          .prepare(
+            `UPDATE capacity_leases
+             SET state = 'REVOKED', released_at_ms = ?
+             WHERE lease_id = ?`,
+          )
+          .run(effectiveRevokedAtMs, leaseId);
+
+        revoked.push(leaseId);
+      }
+
+      this.db
+        .prepare(
+          `UPDATE capacity_counters
+           SET normal_codex_held = 0,
+               normal_antigravity_held = 0,
+               recovery_antigravity_held = 0
+           WHERE singleton = 1`,
+        )
+        .run();
+
+      this.db
+        .prepare(
+          `UPDATE capacity_meta
+           SET exclusive_owner_id = ?
+           WHERE singleton = 1`,
+        )
+        .run(safeOwnerId);
+
+      this.assertStateHealthyUnlocked();
+      return Object.freeze(revoked);
+    });
+  }
+
   public close(): void {
     if (!this.closed) {
       this.closed = true;

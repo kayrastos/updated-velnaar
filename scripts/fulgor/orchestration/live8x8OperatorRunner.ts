@@ -17,6 +17,12 @@ import {
 } from '../scheduler/sharedProviderCapacity';
 
 import {
+  HostSchedulerControlStore,
+  buildSchedulerObservabilityReport,
+  writeSchedulerObservabilityReport,
+} from '../scheduler/durableHostControlState';
+
+import {
   recoverProviderTaskClassEvidenceStateRoot,
 } from './providerTaskClassEvidenceReconciler';
 
@@ -230,6 +236,9 @@ export interface Live8x8OperatorDependencies {
 
   readonly sharedCapacity?:
     HostProviderCapacityController;
+
+  readonly controlStore?:
+    HostSchedulerControlStore;
 
   readonly recovery?:
     Live8x8OperatorRecoveryDependencies;
@@ -1202,10 +1211,53 @@ runLive8x8Operator(
         safeOperatorClock,
     });
 
+  const ownedControlStore =
+    dependencies.controlStore ===
+      undefined;
+
+  const controlStorePath =
+    join(
+      stateRoot,
+      'scheduler-control-state.sqlite',
+    );
+
+  const controlStore =
+    dependencies.controlStore ??
+    new HostSchedulerControlStore({
+      dbPath:
+        controlStorePath,
+
+      nowMs:
+        safeOperatorClock,
+    });
+
   let operatorOwnershipHeld =
     false;
 
+  let controlOwnershipHeld =
+    false;
+
   try {
+    if (
+      ownedControlStore
+    ) {
+      try {
+        controlStore.acquireOwnership({
+          controllerId:
+            request.requestId,
+          pid:
+            process.pid,
+          nowMs:
+            safeOperatorClock(),
+        });
+
+        controlOwnershipHeld =
+          true;
+      } catch {
+        fail();
+      }
+    }
+
     if (
       ownedSharedCapacity
     ) {
@@ -1236,6 +1288,153 @@ runLive8x8Operator(
         16
     ) {
       fail();
+    }
+
+    const admissionEvaluateNowMs =
+      safeOperatorClock();
+
+    const codexQuotaState =
+      controlStore.quotaState(
+        'codex',
+      );
+
+    const antigravityQuotaState =
+      controlStore.quotaState(
+        'antigravity',
+      );
+
+    const codexAdaptiveState =
+      controlStore.adaptiveLaneState(
+        'codex',
+      );
+
+    const antigravityAdaptiveState =
+      controlStore.adaptiveLaneState(
+        'antigravity',
+      );
+
+    const codexAvailableCapacity =
+      sharedCapacity.availableProviderCapacity(
+        'codex',
+      );
+
+    const antigravityAvailableCapacity =
+      sharedCapacity.availableProviderCapacity(
+        'antigravity',
+      );
+
+    const codexLaunch =
+      controlStore.evaluateProviderQuotaLaunch(
+        'codex',
+        8,
+        admissionEvaluateNowMs,
+      );
+
+    const antigravityLaunch =
+      controlStore.evaluateProviderQuotaLaunch(
+        'antigravity',
+        8,
+        admissionEvaluateNowMs,
+      );
+
+    let codexProbeReserved =
+      false;
+
+    let antigravityProbeReserved =
+      false;
+
+    let codexAdmittedSlots:
+      number;
+
+    if (
+      codexLaunch.decision ===
+        'BLOCKED'
+    ) {
+      codexAdmittedSlots = 0;
+    } else if (
+      codexLaunch.decision ===
+        'PROBE'
+    ) {
+      if (
+        codexAvailableCapacity >= 1
+      ) {
+        controlStore.reserveQuotaProbe(
+          'codex',
+          8,
+          admissionEvaluateNowMs,
+        );
+
+        codexProbeReserved =
+          true;
+
+        codexAdmittedSlots = 1;
+      } else {
+        codexAdmittedSlots = 0;
+      }
+    } else {
+      const cap =
+        dependencies.runOneShot !==
+          undefined &&
+        codexAvailableCapacity === 0
+          ? codexAdaptiveState.targetSlots
+          : codexAvailableCapacity;
+
+      codexAdmittedSlots =
+        Math.max(
+          0,
+          Math.min(
+            codexAdaptiveState.targetSlots,
+            cap,
+            8,
+          ),
+        );
+    }
+
+    let antigravityAdmittedSlots:
+      number;
+
+    if (
+      antigravityLaunch.decision ===
+        'BLOCKED'
+    ) {
+      antigravityAdmittedSlots = 0;
+    } else if (
+      antigravityLaunch.decision ===
+        'PROBE'
+    ) {
+      if (
+        antigravityAvailableCapacity >= 1
+      ) {
+        controlStore.reserveQuotaProbe(
+          'antigravity',
+          8,
+          admissionEvaluateNowMs,
+        );
+
+        antigravityProbeReserved =
+          true;
+
+        antigravityAdmittedSlots = 1;
+      } else {
+        antigravityAdmittedSlots = 0;
+      }
+    } else {
+      const cap =
+        dependencies.runOneShot !==
+          undefined &&
+        antigravityAvailableCapacity === 0
+          ? antigravityAdaptiveState.targetSlots
+          : antigravityAvailableCapacity;
+
+      antigravityAdmittedSlots =
+        Math.max(
+          0,
+          Math.min(
+            antigravityAdaptiveState.targetSlots,
+            cap,
+            8,
+          ),
+        );
     }
 
     const taskClassEvidenceStore =
@@ -1435,13 +1634,15 @@ runLive8x8Operator(
                   'GENERAL',
                   {
                     qualityCircuit:
-                      'CLOSED',
+                      codexAdaptiveState
+                        .qualityCircuit,
 
                     quotaCircuit:
-                      'CLOSED',
+                      codexQuotaState
+                        .state,
 
                     availableSlots:
-                      8,
+                      codexAdmittedSlots,
                   },
                 ),
 
@@ -1452,13 +1653,15 @@ runLive8x8Operator(
                   'GENERAL',
                   {
                     qualityCircuit:
-                      'CLOSED',
+                      antigravityAdaptiveState
+                        .qualityCircuit,
 
                     quotaCircuit:
-                      'CLOSED',
+                      antigravityQuotaState
+                        .state,
 
                     availableSlots:
-                      8,
+                      antigravityAdmittedSlots,
                   },
                 ),
           });
@@ -1620,6 +1823,17 @@ runLive8x8Operator(
       dependencies.runOneShot ??
       runLive8x8OneShot;
 
+    const nonDefaultEnvelope =
+      codexAdmittedSlots !== 8 ||
+      antigravityAdmittedSlots !== 8 ||
+      codexQuotaState.state !== 'CLOSED' ||
+      antigravityQuotaState.state !== 'CLOSED' ||
+      codexAdaptiveState.qualityCircuit !== 'CLOSED' ||
+      antigravityAdaptiveState.qualityCircuit !== 'CLOSED';
+
+    const quotaExhaustedObserved =
+      new Set<'codex' | 'antigravity'>();
+
     const result =
       await runOneShot({
         queuePath,
@@ -1638,6 +1852,46 @@ runLive8x8Operator(
           600_000,
 
         sharedCapacity,
+
+        ...(
+          nonDefaultEnvelope
+            ? {
+                codexSlots:
+                  codexAdmittedSlots,
+                antigravitySlots:
+                  antigravityAdmittedSlots,
+                allowAdaptiveEnvelope:
+                  true,
+                codexProbeAllowed:
+                  codexProbeReserved,
+                antigravityProbeAllowed:
+                  antigravityProbeReserved,
+              }
+            : {}
+        ),
+
+        onQuotaSignal:
+          event => {
+            if (
+              event.signal ===
+                'QUOTA_EXHAUSTED'
+            ) {
+              quotaExhaustedObserved.add(
+                event.provider,
+              );
+
+              controlStore.recordQuotaExhausted(
+                event.provider,
+                event.observedAtMs,
+              );
+            } else {
+              controlStore.recordUnclassifiedQuotaFailure(
+                event.provider,
+                event.signal,
+                event.observedAtMs,
+              );
+            }
+          },
       });
 
     if (
@@ -1645,12 +1899,19 @@ runLive8x8Operator(
         request.baseline ||
       result.expectedProviderCalls !==
         16 ||
+      result.pool.codex.slots <
+        0 ||
+      result.pool.codex.slots >
+        8 ||
+      result.pool.antigravity.slots <
+        0 ||
+      result.pool.antigravity.slots >
+        8 ||
       result.pool.totalSlots !==
+        result.pool.codex.slots +
+          result.pool.antigravity.slots ||
+      result.pool.totalSlots >
         16 ||
-      result.pool.codex.slots !==
-        8 ||
-      result.pool.antigravity.slots !==
-        8 ||
       result.pool.totalLiveProviderCalls >
         16 ||
       result.fulgorCalled !==
@@ -1661,6 +1922,82 @@ runLive8x8Operator(
         false
     ) {
       fail();
+    }
+
+    for (
+      const provider
+      of [
+        'codex',
+        'antigravity',
+      ] as const
+    ) {
+      const stats =
+        result.pool[provider];
+
+      const quotaExhausted =
+        stats.quotaExhausted ?? 0;
+
+      if (
+        quotaExhausted > 0 &&
+        !quotaExhaustedObserved.has(
+          provider,
+        )
+      ) {
+        controlStore.recordQuotaExhausted(
+          provider,
+          result.completedAtMs,
+        );
+      }
+
+      const probeWasReserved =
+        provider === 'codex'
+          ? codexProbeReserved
+          : antigravityProbeReserved;
+
+      if (probeWasReserved) {
+        const probeSucceeded =
+          stats.usefulUnique > 0 &&
+          quotaExhausted === 0 &&
+          stats.transportFailures === 0 &&
+          stats.protocolRejected === 0 &&
+          stats.contractRejected === 0;
+
+        if (
+          controlStore.quotaState(
+            provider,
+          ).probeInFlight
+        ) {
+          controlStore.settleQuotaProbe(
+            provider,
+            probeSucceeded,
+            result.completedAtMs,
+          );
+        }
+      }
+
+      controlStore.recordObservationOutcomes(
+        provider,
+        {
+          usefulUnique:
+            stats.usefulUnique,
+          usefulDuplicate:
+            stats.usefulDuplicate,
+          blocked:
+            stats.blocked,
+          protocolRejected:
+            stats.protocolRejected,
+          contractRejected:
+            stats.contractRejected,
+          transportFailures:
+            stats.transportFailures,
+          elapsedMs:
+            Math.max(
+              1,
+              result.elapsedMs,
+            ),
+        },
+        result.completedAtMs,
+      );
     }
 
     const acceptedWorkPointerPath =
@@ -1762,6 +2099,16 @@ runLive8x8Operator(
               'antigravity',
             );
 
+          const postRunAntigravityQuota =
+            controlStore.quotaState(
+              'antigravity',
+            );
+
+          const postRunAntigravityAdaptive =
+            controlStore.adaptiveLaneState(
+              'antigravity',
+            );
+
           const lane =
             buildProviderTaskLaneEvidenceFromHostLedger(
               ledger,
@@ -1769,10 +2116,12 @@ runLive8x8Operator(
               'GENERAL',
               {
                 qualityCircuit:
-                  'CLOSED',
+                  postRunAntigravityAdaptive
+                    .qualityCircuit,
 
                 quotaCircuit:
-                  'CLOSED',
+                  postRunAntigravityQuota
+                    .state,
 
                 availableSlots:
                   availableAntigravitySlots,
@@ -2382,6 +2731,28 @@ runLive8x8Operator(
       fail();
     }
 
+    try {
+      const report =
+        buildSchedulerObservabilityReport({
+          controlStore,
+          sharedCapacity,
+          recoveryEnabled,
+          recoveryStatus,
+          nowMs:
+            safeOperatorClock(),
+        });
+
+      writeSchedulerObservabilityReport(
+        join(
+          stateRoot,
+          'scheduler-status.json',
+        ),
+        report,
+      );
+    } catch {
+      fail();
+    }
+
     const normalProviderCalls =
       result.pool
         .totalLiveProviderCalls;
@@ -2465,10 +2836,29 @@ runLive8x8Operator(
         );
       }
     } finally {
-      if (
-        ownedSharedCapacity
-      ) {
-        sharedCapacity.close();
+      try {
+        if (
+          ownedSharedCapacity
+        ) {
+          sharedCapacity.close();
+        }
+      } finally {
+        try {
+          if (
+            controlOwnershipHeld
+          ) {
+            controlStore.releaseOwnership(
+              request.requestId,
+              safeOperatorClock(),
+            );
+          }
+        } finally {
+          if (
+            ownedControlStore
+          ) {
+            controlStore.close();
+          }
+        }
       }
     }
   }

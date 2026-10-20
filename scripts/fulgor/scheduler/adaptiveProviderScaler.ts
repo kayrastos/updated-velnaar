@@ -910,6 +910,41 @@ function evaluateLane(
     );
   }
 
+  if (
+    observation.windowCounters.attempts >=
+      ADAPTIVE_PROVIDER_SCALER_POLICY
+        .minimumWindowAttempts &&
+    ratio !== null &&
+    ratio <
+      ADAPTIVE_PROVIDER_SCALER_POLICY
+        .minimumThroughputRetentionRatio
+  ) {
+    const regressedTarget =
+      Math.max(
+        0,
+        state.targetSlots -
+          ADAPTIVE_PROVIDER_SCALER_POLICY
+            .stepSlots,
+      );
+
+    return transition(
+      state,
+      nowMs,
+      usefulYield,
+      ratio,
+      state.targetSlots === 0
+        ? 'HOLD'
+        : 'SCALE_DOWN',
+      'THROUGHPUT_REGRESSION',
+      regressedTarget,
+      0,
+      regressedTarget === 0
+        ? null
+        : state
+            .priorTierUsefulPerMinute,
+    );
+  }
+
   const machineLaneCap =
     Math.max(
       0,
@@ -1144,6 +1179,25 @@ function evaluateLane(
       ratio,
       'HOLD',
       'USEFUL_YIELD_TOO_LOW',
+      state.targetSlots,
+      0,
+      state.priorTierUsefulPerMinute,
+    );
+  }
+
+  if (
+    ratio !== null &&
+    ratio <
+      ADAPTIVE_PROVIDER_SCALER_POLICY
+        .minimumThroughputGainRatio
+  ) {
+    return transition(
+      state,
+      nowMs,
+      usefulYield,
+      ratio,
+      'HOLD',
+      'THROUGHPUT_GAIN_NOT_PROVEN',
       state.targetSlots,
       0,
       state.priorTierUsefulPerMinute,

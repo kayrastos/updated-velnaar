@@ -2,6 +2,7 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -54,6 +55,10 @@ import {
 import {
   HostProviderCapacityController,
 } from '../../../scripts/fulgor/scheduler/sharedProviderCapacity';
+
+import {
+  HostSchedulerControlStore,
+} from '../../../scripts/fulgor/scheduler/durableHostControlState';
 
 const baseline =
   '0123456789abcdef0123456789abcdef01234567';
@@ -1777,6 +1782,152 @@ describe(
           }
         } finally {
           sharedCapacity.close();
+        }
+      },
+    );
+
+    it(
+      'wires live durable quota and adaptive control state into operator admission and writes scheduler-status.json',
+      async () => {
+        const directory = root();
+        const repoRoot = join(directory, 'repo');
+        const stateRoot = join(directory, 'state');
+        const requestFile = join(directory, 'request.json');
+
+        mkdirSync(repoRoot, { mode: 0o700 });
+        mkdirSync(stateRoot, { mode: 0o700 });
+
+        writeFileSync(
+          requestFile,
+          JSON.stringify(request()),
+          { mode: 0o600 },
+        );
+
+        const codex = executable(directory, 'codex-fake');
+        const antigravity = executable(directory, 'agy-fake');
+
+        const controlStore = new HostSchedulerControlStore({
+          dbPath: join(
+            stateRoot,
+            'scheduler-control-state.sqlite',
+          ),
+          baseline,
+          nowMs: () => 1_000_000,
+        });
+
+        try {
+          controlStore.recordQuotaExhausted(
+            'antigravity',
+            1_000_000,
+            8,
+          );
+
+          let capturedOneShot: Live8x8OneShotInput | null =
+            null;
+
+          const result = await runLive8x8Operator({
+            env: {
+              HOME: directory,
+              VELNAR_REPO_ROOT: repoRoot,
+              VELNAR_8X8_REQUEST_FILE: requestFile,
+              VELNAR_CODEX_EXECUTABLE: codex,
+              VELNAR_ANTIGRAVITY_EXECUTABLE: antigravity,
+            },
+            stateRoot,
+            controlStore,
+            nowMs: () => 1_000_000,
+            gitText: async (_repoRoot, args) => {
+              const key = args.join(' ');
+              if (key === 'rev-parse --show-toplevel') {
+                return `${repoRoot}\n`;
+              }
+              if (
+                key ===
+                'status --porcelain=v1 --untracked-files=all --ignore-submodules=none'
+              ) {
+                return '';
+              }
+              if (
+                key === 'rev-parse HEAD' ||
+                key ===
+                  `rev-parse --verify ${baseline}^{commit}`
+              ) {
+                return `${baseline}\n`;
+              }
+              if (key === `show ${baseline}:src/a.ts`) {
+                return 'export const evidence = 1;\n';
+              }
+              throw new Error(`UNEXPECTED_GIT=${key}`);
+            },
+            runOneShot: async input => {
+              capturedOneShot = input;
+              writeFileSync(
+                input.queuePath,
+                'test-queue',
+                { mode: 0o600 },
+              );
+              const base = fakeResult();
+              return {
+                ...base,
+                pool: {
+                  ...base.pool,
+                  codex: {
+                    ...base.pool.codex,
+                    slots: input.codexSlots ?? 8,
+                    liveProviderCalls:
+                      input.codexSlots ?? 8,
+                    usefulUnique: input.codexSlots ?? 8,
+                  },
+                  antigravity: {
+                    ...base.pool.antigravity,
+                    slots: input.antigravitySlots ?? 0,
+                    liveProviderCalls:
+                      input.antigravitySlots ?? 0,
+                    usefulUnique:
+                      input.antigravitySlots ?? 0,
+                  },
+                  totalSlots:
+                    (input.codexSlots ?? 8) +
+                    (input.antigravitySlots ?? 0),
+                  totalLiveProviderCalls:
+                    (input.codexSlots ?? 8) +
+                    (input.antigravitySlots ?? 0),
+                  totalUsefulUnique:
+                    (input.codexSlots ?? 8) +
+                    (input.antigravitySlots ?? 0),
+                },
+              };
+            },
+          });
+
+          expect(capturedOneShot).not.toBeNull();
+          expect(capturedOneShot?.codexSlots).toBe(8);
+          expect(capturedOneShot?.antigravitySlots).toBe(0);
+          expect(capturedOneShot?.allowAdaptiveEnvelope).toBe(
+            true,
+          );
+          expect(result.normalProviderCalls).toBe(8);
+
+          const statusReport = JSON.parse(
+            readFileSync(
+              join(stateRoot, 'scheduler-status.json'),
+              'utf8',
+            ),
+          );
+          expect(statusReport.codex.quotaState).toBe(
+            'CLOSED',
+          );
+          expect(statusReport.antigravity.quotaState).toBe(
+            'OPEN',
+          );
+          expect(
+            statusReport.antigravity.currentTargetSlots,
+          ).toBe(0);
+          expect(
+            statusReport.antigravity.nextQuotaProbeAtMs,
+          ).toBe(1_600_000);
+        } finally {
+          controlStore.close();
         }
       },
     );

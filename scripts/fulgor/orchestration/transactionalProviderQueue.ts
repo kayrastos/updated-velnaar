@@ -2757,6 +2757,137 @@ export class TransactionalProviderQueue {
   }
 
   /*
+   * Quota exhaustion is a provider rate/quota limit signal,
+   * not uncertain transport failure and not output-quality
+   * failure. Return the leased job to PENDING so it waits
+   * for the quota circuit probe/reopen window without
+   * opening the quality circuit or entering V3 transport
+   * recovery hold.
+   */
+  requeueQuotaWaiting(
+    provider: Provider,
+    leaseId: string,
+    nowMs: number,
+  ): ProviderWorkRecord {
+    return this.transaction(
+      () => {
+        const row =
+          this.db
+            .prepare(`
+              SELECT *
+              FROM jobs
+              WHERE
+                state = 'LEASED'
+                AND lease_id = ?
+              LIMIT 1
+            `)
+            .get(
+              leaseId,
+            );
+
+        if (!row) {
+          throw new Error(
+            'QUEUE_ACTIVE_LEASE_NOT_FOUND',
+          );
+        }
+
+        const current =
+          this.parsePersistedRow(
+            row,
+          );
+
+        if (
+          current.lease === null ||
+          current.lease.provider !==
+            provider
+        ) {
+          throw new Error(
+            'QUEUE_QUOTA_REQUEUE_PROVIDER_MISMATCH',
+          );
+        }
+
+        if (
+          !Number.isSafeInteger(
+            nowMs,
+          ) ||
+          nowMs <
+            current.lease.leasedAtMs
+        ) {
+          throw new Error(
+            'QUEUE_QUOTA_REQUEUE_TIME_INVALID',
+          );
+        }
+
+        if (
+          nowMs >=
+          current.lease.expiresAtMs
+        ) {
+          throw new Error(
+            'WORK_LEASE_EXPIRED',
+          );
+        }
+
+        const requeued =
+          parseProviderWorkRecord(
+            JSON.stringify({
+              ...current,
+              state:
+                'PENDING',
+              lease:
+                null,
+              lastOutcome:
+                null,
+              fingerprint:
+                null,
+              recoveryHoldReason:
+                null,
+              updatedAtMs:
+                nowMs,
+            }),
+          );
+
+        const result =
+          this.db
+            .prepare(`
+              UPDATE jobs
+              SET
+                state = 'PENDING',
+                assigned_provider = NULL,
+                slot_id = NULL,
+                lease_id = NULL,
+                lease_expires_at_ms = NULL,
+                updated_ms = ?,
+                record_json = ?
+              WHERE
+                job_id = ?
+                AND state = 'LEASED'
+                AND lease_id = ?
+            `)
+            .run(
+              requeued.updatedAtMs,
+              serializeProviderWorkRecord(
+                requeued,
+              ),
+              requeued.order.jobId,
+              leaseId,
+            );
+
+        if (
+          Number(
+            result.changes,
+          ) !== 1
+        ) {
+          throw new Error(
+            'QUEUE_ATOMIC_QUOTA_REQUEUE_LOST',
+          );
+        }
+
+        return requeued;
+      },
+    );
+  }
+
+  /*
    * A protocol-valid BLOCKED response is not accepted
    * work. Persist only bounded, sanitized diagnostics
    * in the same transaction as BLOCKED settlement.

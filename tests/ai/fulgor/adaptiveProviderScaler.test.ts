@@ -1130,5 +1130,74 @@ describe(
         ).toBe(false);
       },
     );
+
+    it(
+      'scales down by one slot on throughput regression below 95 percent and holds when throughput gain is below 102 percent',
+      () => {
+        const baseState =
+          state(
+            4,
+            4,
+            {
+              codexHealthy: 2,
+              antigravityHealthy: 2,
+              changedAt: 0,
+            },
+          );
+
+        const stateWithPriorTier: AdaptiveScalerState =
+          Object.freeze({
+            ...baseState,
+            codex: Object.freeze({
+              ...baseState.codex,
+              priorTierUsefulPerMinute: 10,
+            }),
+            antigravity: Object.freeze({
+              ...baseState.antigravity,
+              priorTierUsefulPerMinute: 10,
+            }),
+          });
+
+        const result =
+          evaluateAdaptiveProviderPair({
+            baseline,
+            nowMs: 600_000,
+            machineEffectiveMax: 16,
+            state: stateWithPriorTier,
+            codex: observation('codex', {
+              usefulPerMinute: 9.0, // ratio 0.90 < 0.95 -> THROUGHPUT_REGRESSION
+            }),
+            antigravity: observation(
+              'antigravity',
+              {
+                usefulPerMinute: 10.1, // ratio 1.01 < 1.02 -> THROUGHPUT_GAIN_NOT_PROVEN
+              },
+            ),
+          });
+
+        expect(result.codex.action).toBe(
+          'SCALE_DOWN',
+        );
+        expect(result.codex.reason).toBe(
+          'THROUGHPUT_REGRESSION',
+        );
+        expect(
+          result.codex.nextTargetSlots,
+        ).toBe(3);
+
+        expect(
+          result.antigravity.action,
+        ).toBe('HOLD');
+        expect(
+          result.antigravity.reason,
+        ).toBe(
+          'THROUGHPUT_GAIN_NOT_PROVEN',
+        );
+        expect(
+          result.antigravity
+            .nextTargetSlots,
+        ).toBe(4);
+      },
+    );
   },
 );

@@ -10,6 +10,10 @@ import {
   type SharedProviderCapacityLease,
 } from '../scheduler/sharedProviderCapacity';
 
+import type {
+  ProviderQuotaSignal,
+} from '../scheduler/providerQuotaClassifier';
+
 import {
   livePlanFitsCurrentCertifiedEnvelope,
 } from '../scheduler/liveProviderTierGate';
@@ -43,6 +47,9 @@ export type LiveProviderInvocation =
 
       transport:
         'FAILURE';
+
+      quotaSignal?:
+        ProviderQuotaSignal;
     }>
   | Readonly<{
       source:
@@ -97,6 +104,23 @@ export type LiveCapsuleLoader =
       ProviderWorkRecord,
   ) =>
     HostEvidenceCapsule;
+
+export interface LiveProviderQuotaSignalEvent {
+  readonly provider:
+    Provider;
+
+  readonly jobId:
+    string;
+
+  readonly signal:
+    Exclude<
+      ProviderQuotaSignal,
+      'NONE'
+    >;
+
+  readonly observedAtMs:
+    number;
+}
 
 export interface LiveTransactionalPoolOptions {
   readonly queuePath:
@@ -167,6 +191,15 @@ export interface LiveTransactionalPoolOptions {
    */
   readonly sharedCapacity?:
     HostProviderCapacityController;
+
+  readonly allowZeroSlotPlan?:
+    boolean;
+
+  readonly onQuotaSignal?:
+    (
+      event:
+        LiveProviderQuotaSignalEvent,
+    ) => void;
 }
 
 export interface LiveProviderPoolStats {
@@ -200,6 +233,9 @@ export interface LiveProviderPoolStats {
   readonly transportFailures:
     number;
 
+  readonly quotaExhausted:
+    number;
+
   readonly stoppedByQualityCircuit:
     number;
 
@@ -209,6 +245,9 @@ export interface LiveProviderPoolStats {
    * provider output-quality state.
    */
   readonly stoppedByTransportCircuit:
+    number;
+
+  readonly stoppedByQuotaCircuit:
     number;
 }
 
@@ -278,10 +317,16 @@ interface MutableStats {
   transportFailures:
     number;
 
+  quotaExhausted:
+    number;
+
   stoppedByQualityCircuit:
     number;
 
   stoppedByTransportCircuit:
+    number;
+
+  stoppedByQuotaCircuit:
     number;
 }
 
@@ -408,10 +453,14 @@ function emptyStats(
     protocolRejected: 0,
     contractRejected: 0,
     transportFailures: 0,
+    quotaExhausted: 0,
     stoppedByQualityCircuit:
       0,
 
     stoppedByTransportCircuit:
+      0,
+
+    stoppedByQuotaCircuit:
       0,
   };
 }
@@ -451,6 +500,9 @@ function freezeStats(
     transportFailures:
       value.transportFailures,
 
+    quotaExhausted:
+      value.quotaExhausted,
+
     stoppedByQualityCircuit:
       value
         .stoppedByQualityCircuit,
@@ -458,6 +510,10 @@ function freezeStats(
     stoppedByTransportCircuit:
       value
         .stoppedByTransportCircuit,
+
+    stoppedByQuotaCircuit:
+      value
+        .stoppedByQuotaCircuit,
   });
 }
 
@@ -491,6 +547,9 @@ async function runSlot(
     SharedProviderCapacityLease,
 
   transportStoppedProviders:
+    Set<Provider>,
+
+  quotaStoppedProviders:
     Set<Provider>,
 ): Promise<MutableStats> {
   if (
@@ -531,6 +590,18 @@ async function runSlot(
         throw new Error(
           'LIVE_POOL_CAPACITY_LEASE_LOST',
         );
+      }
+
+      if (
+        quotaStoppedProviders.has(
+          provider,
+        )
+      ) {
+        stats
+          .stoppedByQuotaCircuit +=
+          1;
+
+        break;
       }
 
       /*
@@ -699,12 +770,74 @@ async function runSlot(
         invocation.transport ===
           'FAILURE'
       ) {
+        const observedAtMs =
+          now(options);
+
+        if (
+          invocation.quotaSignal ===
+            'QUOTA_EXHAUSTED'
+        ) {
+          queue.requeueQuotaWaiting(
+            provider,
+            record.lease.leaseId,
+            observedAtMs,
+          );
+
+          quotaStoppedProviders.add(
+            provider,
+          );
+
+          stats.quotaExhausted +=
+            1;
+
+          try {
+            options.onQuotaSignal?.({
+              provider,
+              jobId:
+                record.order.jobId,
+              signal:
+                'QUOTA_EXHAUSTED',
+              observedAtMs,
+            });
+          } catch {
+            /*
+             * Quota signal callback must not corrupt
+             * transactional queue accounting.
+             */
+          }
+
+          break;
+        }
+
+        if (
+          invocation.quotaSignal ===
+            'QUOTA_UNKNOWN' ||
+          invocation.quotaSignal ===
+            'PROVIDER_LIMIT_UNCLASSIFIED'
+        ) {
+          try {
+            options.onQuotaSignal?.({
+              provider,
+              jobId:
+                record.order.jobId,
+              signal:
+                invocation.quotaSignal,
+              observedAtMs,
+            });
+          } catch {
+            /*
+             * Quota signal callback must not corrupt
+             * transactional queue accounting.
+             */
+          }
+        }
+
         queue.settle(
           provider,
           record.lease.leaseId,
           'TRANSPORT_FAILURE',
           null,
-          now(options),
+          observedAtMs,
         );
 
         transportStoppedProviders.add(
@@ -895,6 +1028,9 @@ function aggregateStats(
     total.transportFailures +=
       value.transportFailures;
 
+    total.quotaExhausted +=
+      value.quotaExhausted;
+
     total.stoppedByQualityCircuit +=
       value
         .stoppedByQualityCircuit;
@@ -902,6 +1038,10 @@ function aggregateStats(
     total.stoppedByTransportCircuit +=
       value
         .stoppedByTransportCircuit;
+
+    total.stoppedByQuotaCircuit +=
+      value
+        .stoppedByQuotaCircuit;
   }
 
   return freezeStats(
@@ -1020,6 +1160,14 @@ function validatePlan(
     throw new Error(
       'LIVE_POOL_PROVIDER_TARGET_EXCEEDED',
     );
+  }
+
+  if (
+    options.allowZeroSlotPlan ===
+      true &&
+    total === 0
+  ) {
+    return;
   }
 
   if (
@@ -1151,6 +1299,9 @@ runLiveTransactionalProviderWorkerPool(
     const transportStoppedProviders =
       new Set<Provider>();
 
+    const quotaStoppedProviders =
+      new Set<Provider>();
+
     /*
      * Antigravity logical slot count and physical process
      * concurrency are independent.
@@ -1218,6 +1369,7 @@ runLiveTransactionalProviderWorkerPool(
                     slot - 1
                   ]!,
                   transportStoppedProviders,
+                  quotaStoppedProviders,
                 );
             }
           };
@@ -1252,6 +1404,7 @@ runLiveTransactionalProviderWorkerPool(
             slot - 1
           ]!,
           transportStoppedProviders,
+          quotaStoppedProviders,
         ),
       );
     }

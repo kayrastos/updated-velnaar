@@ -40,6 +40,13 @@ import type {
   LiveProviderInvoker,
 } from './liveTransactionalProviderWorkerPool';
 
+import {
+  classifyProviderProcessQuotaSignal,
+  type ProviderQuotaClassificationResult,
+  type ProviderQuotaReasonCode,
+  type ProviderQuotaSignal,
+} from '../scheduler/providerQuotaClassifier';
+
 export const LIVE_PROVIDER_PROCESS_RUNNER_SCHEMA =
   'VELNAR_LIVE_PROVIDER_PROCESS_RUNNER_V1' as const;
 
@@ -121,6 +128,12 @@ export interface LiveProviderProcessTelemetry {
 
   readonly outputOverflow:
     boolean;
+
+  readonly quotaSignal:
+    ProviderQuotaSignal;
+
+  readonly quotaReasonCode:
+    ProviderQuotaReasonCode;
 }
 
 export interface LiveProviderProcessRunnerOptions {
@@ -191,6 +204,9 @@ interface BoundedProcessResult {
 
   readonly outputOverflow:
     boolean;
+
+  readonly quotaClassification:
+    ProviderQuotaClassificationResult;
 }
 
 function validatePositiveSafeInteger(
@@ -342,14 +358,32 @@ function providerEnvironment():
   return environment;
 }
 
-function failure():
-  LiveProviderInvocation {
+function failure(
+  quotaClassification:
+    ProviderQuotaClassificationResult,
+): LiveProviderInvocation {
+  if (
+    quotaClassification.signal ===
+      'NONE'
+  ) {
+    return Object.freeze({
+      source:
+        'LIVE_PROVIDER',
+
+      transport:
+        'FAILURE',
+    });
+  }
+
   return Object.freeze({
     source:
       'LIVE_PROVIDER',
 
     transport:
       'FAILURE',
+
+    quotaSignal:
+      quotaClassification.signal,
   });
 }
 
@@ -456,6 +490,16 @@ function emitProcessTelemetry(
 
         outputOverflow:
           result.outputOverflow,
+
+        quotaSignal:
+          result
+            .quotaClassification
+            .signal,
+
+        quotaReasonCode:
+          result
+            .quotaClassification
+            .reasonCode,
       });
 
   try {
@@ -471,6 +515,10 @@ function emitProcessTelemetry(
 }
 
 async function runBoundedProcess(
+  provider:
+    'codex'
+    | 'antigravity',
+
   config:
     LiveProviderExecutableConfig,
 
@@ -533,12 +581,27 @@ async function runBoundedProcess(
 
           outputOverflow:
             false,
+
+          quotaClassification:
+            classifyProviderProcessQuotaSignal({
+              provider,
+              ok: false,
+              exitCode: null,
+              signal: null,
+              timedOut: false,
+              outputOverflow: false,
+              stdout: Buffer.alloc(0),
+              stderr: Buffer.alloc(0),
+            }),
         });
 
         return;
       }
 
       const stdout:
+        Buffer[] = [];
+
+      const stderr:
         Buffer[] = [];
 
       let stdoutBytes =
@@ -644,7 +707,13 @@ async function runBoundedProcess(
               true;
 
             kill();
+
+            return;
           }
+
+          stderr.push(
+            chunk,
+          );
         },
       );
 
@@ -673,14 +742,46 @@ async function runBoundedProcess(
             exitCode === 0 &&
             signal === null;
 
+          const stdoutBuffer =
+            !timedOut &&
+            !outputOverflow
+              ? Buffer.concat(
+                  stdout,
+                )
+              : Buffer.alloc(
+                  0,
+                );
+
+          const stderrBuffer =
+            !timedOut &&
+            !outputOverflow
+              ? Buffer.concat(
+                  stderr,
+                )
+              : Buffer.alloc(
+                  0,
+                );
+
+          const quotaClassification =
+            classifyProviderProcessQuotaSignal({
+              provider,
+              ok,
+              exitCode,
+              signal,
+              timedOut,
+              outputOverflow,
+              stdout:
+                stdoutBuffer,
+              stderr:
+                stderrBuffer,
+            });
+
           resolve({
             ok,
 
             stdout:
               ok
-                ? Buffer.concat(
-                    stdout,
-                  )
+                ? stdoutBuffer
                 : Buffer.alloc(
                     0,
                   ),
@@ -696,6 +797,8 @@ async function runBoundedProcess(
             timedOut,
 
             outputOverflow,
+
+            quotaClassification,
           });
         };
 
@@ -853,6 +956,7 @@ async function invokeCodex(
 
     const processResult =
       await runBoundedProcess(
+        'codex',
         options.codex,
         options.repoRoot,
         plan.args,
@@ -870,7 +974,9 @@ async function invokeCodex(
     if (
       !processResult.ok
     ) {
-      return failure();
+      return failure(
+        processResult.quotaClassification,
+      );
     }
 
     const nativeFinal =
@@ -929,6 +1035,7 @@ async function invokeAntigravity(
 
   const processResult =
     await runBoundedProcess(
+      'antigravity',
       options.antigravity,
       options.repoRoot,
       plan.args,
@@ -953,7 +1060,9 @@ async function invokeAntigravity(
   if (
     !processResult.ok
   ) {
-    return failure();
+    return failure(
+      processResult.quotaClassification,
+    );
   }
 
   return parseAntigravityWorkProductProtocol(

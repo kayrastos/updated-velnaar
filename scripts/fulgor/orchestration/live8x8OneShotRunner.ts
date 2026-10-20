@@ -86,6 +86,24 @@ export interface Live8x8OneShotInput {
 
   readonly sharedCapacity?:
     HostProviderCapacityController;
+
+  readonly codexSlots?:
+    number;
+
+  readonly antigravitySlots?:
+    number;
+
+  readonly allowAdaptiveEnvelope?:
+    boolean;
+
+  readonly codexProbeAllowed?:
+    boolean;
+
+  readonly antigravityProbeAllowed?:
+    boolean;
+
+  readonly onQuotaSignal?:
+    LiveTransactionalPoolOptions['onQuotaSignal'];
 }
 
 export interface Live8x8OneShotDependencies {
@@ -344,6 +362,42 @@ runLive8x8OneShot(
       input.jobs,
     );
 
+  const adaptiveEnvelope =
+    input.allowAdaptiveEnvelope ===
+      true ||
+    input.codexSlots !==
+      undefined ||
+    input.antigravitySlots !==
+      undefined;
+
+  const codexSlots =
+    input.codexSlots ??
+    8;
+
+  const antigravitySlots =
+    input.antigravitySlots ??
+    8;
+
+  if (
+    !Number.isSafeInteger(
+      codexSlots,
+    ) ||
+    codexSlots < 0 ||
+    codexSlots > 8 ||
+    !Number.isSafeInteger(
+      antigravitySlots,
+    ) ||
+    antigravitySlots < 0 ||
+    antigravitySlots > 8 ||
+    codexSlots +
+      antigravitySlots >
+      16
+  ) {
+    throw new Error(
+      'LIVE_8X8_POOL_ENVELOPE_MISMATCH',
+    );
+  }
+
   const capsules =
     new Map<
       string,
@@ -354,6 +408,12 @@ runLive8x8OneShot(
     new TransactionalProviderQueue(
       input.queuePath,
     );
+
+  let codexProbeEnqueued =
+    false;
+
+  let antigravityProbeEnqueued =
+    false;
 
   try {
     for (
@@ -433,9 +493,47 @@ runLive8x8OneShot(
           admission.decision.provider !==
             item.order.affinity
         ) {
-          throw new Error(
-            'LIVE_8X8_ROUTING_ADMISSION_HOLD',
-          );
+          if (
+            adaptiveEnvelope
+          ) {
+            if (
+              item.order.affinity ===
+                'codex' &&
+              input.codexProbeAllowed ===
+                true &&
+              !codexProbeEnqueued &&
+              codexSlots === 1
+            ) {
+              queue.enqueue(
+                item.order,
+                admissionNowMs,
+                item.routing.taskClass,
+              );
+
+              codexProbeEnqueued =
+                true;
+            } else if (
+              item.order.affinity ===
+                'antigravity' &&
+              input.antigravityProbeAllowed ===
+                true &&
+              !antigravityProbeEnqueued &&
+              antigravitySlots === 1
+            ) {
+              queue.enqueue(
+                item.order,
+                admissionNowMs,
+                item.routing.taskClass,
+              );
+
+              antigravityProbeEnqueued =
+                true;
+            }
+          } else {
+            throw new Error(
+              'LIVE_8X8_ROUTING_ADMISSION_HOLD',
+            );
+          }
         }
       }
     }
@@ -460,15 +558,9 @@ runLive8x8OneShot(
       mode:
         'DUAL',
 
-      /*
-       * This runner is intentionally pinned to the
-       * currently certified live envelope.
-       */
-      codexSlots:
-        8,
+      codexSlots,
 
-      antigravitySlots:
-        8,
+      antigravitySlots,
 
       leaseDurationMs:
         input.leaseDurationMs ??
@@ -516,6 +608,28 @@ runLive8x8OneShot(
             }
           : {}
       ),
+
+      ...(
+        adaptiveEnvelope &&
+        codexSlots +
+          antigravitySlots ===
+          0
+          ? {
+              allowZeroSlotPlan:
+                true,
+            }
+          : {}
+      ),
+
+      ...(
+        input.onQuotaSignal !==
+          undefined
+          ? {
+              onQuotaSignal:
+                input.onQuotaSignal,
+            }
+          : {}
+      ),
     });
 
   const completedAtMs =
@@ -534,11 +648,12 @@ runLive8x8OneShot(
 
   if (
     pool.totalSlots !==
-      16 ||
+      codexSlots +
+        antigravitySlots ||
     pool.codex.slots !==
-      8 ||
+      codexSlots ||
     pool.antigravity.slots !==
-      8
+      antigravitySlots
   ) {
     throw new Error(
       'LIVE_8X8_POOL_ENVELOPE_MISMATCH',
@@ -547,7 +662,8 @@ runLive8x8OneShot(
 
   if (
     pool.totalLiveProviderCalls >
-      16
+      codexSlots +
+        antigravitySlots
   ) {
     throw new Error(
       'LIVE_8X8_PROVIDER_CALL_BOUND_EXCEEDED',
