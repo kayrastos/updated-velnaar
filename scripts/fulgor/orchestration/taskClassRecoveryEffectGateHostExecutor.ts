@@ -20,11 +20,11 @@ import {
 } from 'node:child_process';
 
 import {
-  SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+  SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
 } from './taskClassRecoveryAuthorityCheckBridge';
 
 import {
-  SEALED_RECOVERY_CALL_GATE_V2_SHA256,
+  SEALED_RECOVERY_CALL_GATE_V3_SHA256,
   type RecoveryEffectGateExecutionRequest,
   type RecoveryEffectGateExecutionResult,
 } from './taskClassRecoveryEffectGateBridge';
@@ -32,7 +32,7 @@ import {
 
 export const
 TASK_CLASS_RECOVERY_EFFECT_GATE_HOST_EXECUTOR_SCHEMA =
-  'VELNAR_TASK_CLASS_RECOVERY_EFFECT_GATE_HOST_EXECUTOR_V1' as const;
+  'VELNAR_TASK_CLASS_RECOVERY_EFFECT_GATE_HOST_EXECUTOR_V3' as const;
 
 
 export const
@@ -100,7 +100,7 @@ validateRecoveryEffectGateExecutionRequest(
 }> {
   if (
     request.expectedGateSha256 !==
-      SEALED_RECOVERY_CALL_GATE_V2_SHA256
+      SEALED_RECOVERY_CALL_GATE_V3_SHA256
   ) {
     throw new Error(
       'RECOVERY_GATE_EXECUTOR_GATE_HASH_BINDING_INVALID',
@@ -109,7 +109,7 @@ validateRecoveryEffectGateExecutionRequest(
 
   if (
     request.expectedCommonSha256 !==
-      SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256
+      SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256
   ) {
     throw new Error(
       'RECOVERY_GATE_EXECUTOR_COMMON_HASH_BINDING_INVALID',
@@ -283,14 +283,14 @@ verifySealedEffectGateIdentity():
 Promise<void> {
   await verifySealedRegularFileIdentity(
     SEALED_RECOVERY_EFFECT_GATE_COMMON_PATH,
-    SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+    SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
     'COMMON',
     false,
   );
 
   await verifySealedRegularFileIdentity(
     SEALED_RECOVERY_EFFECT_GATE_PATH,
-    SEALED_RECOVERY_CALL_GATE_V2_SHA256,
+    SEALED_RECOVERY_CALL_GATE_V3_SHA256,
     'GATE',
     true,
   );
@@ -343,7 +343,7 @@ executeSealedRecoveryEffectGate(
               process.cwd(),
 
             env:
-              process.env,
+              Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('PYTHON'))),
 
             shell:
               false,

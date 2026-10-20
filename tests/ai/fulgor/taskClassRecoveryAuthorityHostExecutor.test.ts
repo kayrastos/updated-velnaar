@@ -5,8 +5,8 @@ import {
 } from 'vitest';
 
 import {
-  SEALED_RECOVERY_AUTHORIZER_V2_SHA256,
-  SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+  SEALED_RECOVERY_AUTHORIZER_V3_SHA256,
+  SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
   type RecoveryAuthorityCheckExecutionRequest,
 } from '../../../scripts/fulgor/orchestration/taskClassRecoveryAuthorityCheckBridge';
 
@@ -25,10 +25,10 @@ function validRequest():
 RecoveryAuthorityCheckExecutionRequest {
   return {
     expectedAuthorizerSha256:
-      SEALED_RECOVERY_AUTHORIZER_V2_SHA256,
+      SEALED_RECOVERY_AUTHORIZER_V3_SHA256,
 
     expectedCommonSha256:
-      SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+      SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
 
     args: [
       '--check-only',

@@ -1,3 +1,4 @@
+import type { RecoveryAuthorizationCreateExecutionRequest } from './taskClassRecoveryAuthorizationBridge';
 import {
   createHash,
 } from 'node:crypto';
@@ -21,8 +22,8 @@ import {
 } from 'node:child_process';
 
 import {
-  SEALED_RECOVERY_AUTHORIZER_V2_SHA256,
-  SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+  SEALED_RECOVERY_AUTHORIZER_V3_SHA256,
+  SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
   type RecoveryAuthorityCheckExecutionRequest,
   type RecoveryAuthorityCheckExecutionResult,
 } from './taskClassRecoveryAuthorityCheckBridge';
@@ -30,7 +31,7 @@ import {
 
 export const
 TASK_CLASS_RECOVERY_AUTHORITY_HOST_EXECUTOR_SCHEMA =
-  'VELNAR_TASK_CLASS_RECOVERY_AUTHORITY_HOST_EXECUTOR_V2' as const;
+  'VELNAR_TASK_CLASS_RECOVERY_AUTHORITY_HOST_EXECUTOR_V3' as const;
 
 
 export const
@@ -83,7 +84,7 @@ validateRecoveryAuthorizerCheckOnlyRequest(
 ): string {
   if (
     request.expectedAuthorizerSha256 !==
-      SEALED_RECOVERY_AUTHORIZER_V2_SHA256
+      SEALED_RECOVERY_AUTHORIZER_V3_SHA256
   ) {
     throw new Error(
       'RECOVERY_HOST_EXECUTOR_AUTHORIZER_HASH_BINDING_INVALID',
@@ -92,7 +93,7 @@ validateRecoveryAuthorizerCheckOnlyRequest(
 
   if (
     request.expectedCommonSha256 !==
-      SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256
+      SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256
   ) {
     throw new Error(
       'RECOVERY_HOST_EXECUTOR_COMMON_HASH_BINDING_INVALID',
@@ -220,13 +221,13 @@ Promise<void> {
    */
   await verifySealedRegularFileIdentity(
     SEALED_RECOVERY_AUTHORITY_COMMON_PATH,
-    SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+    SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
     'COMMON',
   );
 
   await verifySealedRegularFileIdentity(
     SEALED_RECOVERY_AUTHORIZER_PATH,
-    SEALED_RECOVERY_AUTHORIZER_V2_SHA256,
+    SEALED_RECOVERY_AUTHORIZER_V3_SHA256,
     'AUTHORIZER',
   );
 }
@@ -242,10 +243,44 @@ executeSealedRecoveryAuthorizerCheckOnly(
       request,
     );
 
-  /*
-   * Execution-time identity reauthorization immediately
-   * before the only allowed process effect.
-   */
+  return await runSealedAuthorizer({ kind: 'CHECK_ONLY', intentPath });
+}
+
+export function validateRecoveryAuthorizationCreateRequest(
+  request: RecoveryAuthorizationCreateExecutionRequest,
+): Readonly<{ intentPath: string; expectedIntentSha256: string }> {
+  if (request.expectedAuthorizerSha256 !== SEALED_RECOVERY_AUTHORIZER_V3_SHA256 ||
+      request.expectedCommonSha256 !== SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256) {
+    throw new Error('RECOVERY_CREATE_EXECUTOR_SEALED_BINDING_INVALID');
+  }
+  if (!Array.isArray(request.args) || request.args.length !== 3 ||
+      request.args[0] !== '--approve-recovery') {
+    throw new Error('RECOVERY_CREATE_EXECUTOR_ARGS_INVALID');
+  }
+  const [, intentPath, expectedIntentSha256] = request.args;
+  if (typeof intentPath !== 'string' || !isAbsolute(intentPath) || intentPath.includes('\0') ||
+      typeof expectedIntentSha256 !== 'string' || expectedIntentSha256.length !== 64 || !/^[0-9a-f]{64}$/.test(expectedIntentSha256)) {
+    throw new Error('RECOVERY_CREATE_EXECUTOR_PATH_DIGEST_INVALID');
+  }
+  return Object.freeze({ intentPath, expectedIntentSha256 });
+}
+
+export async function executeSealedRecoveryAuthorizationCreate(
+  request: RecoveryAuthorizationCreateExecutionRequest,
+): Promise<RecoveryAuthorityCheckExecutionResult> {
+  const binding = validateRecoveryAuthorizationCreateRequest(request);
+  return await runSealedAuthorizer({ kind: 'CREATE', ...binding });
+}
+
+// Private transport accepts only these two closed operations. Each public
+// entry point has its own strict validator; neither accepts arbitrary argv.
+async function runSealedAuthorizer(
+  operation: Readonly<{ kind: 'CHECK_ONLY'; intentPath: string }> |
+    Readonly<{ kind: 'CREATE'; intentPath: string; expectedIntentSha256: string }>,
+): Promise<RecoveryAuthorityCheckExecutionResult> {
+  const args = operation.kind === 'CHECK_ONLY'
+    ? ['--check-only', operation.intentPath]
+    : ['--approve-recovery', operation.intentPath, operation.expectedIntentSha256];
   await verifySealedAuthorityIdentity();
 
   return await new Promise(
@@ -265,16 +300,13 @@ executeSealedRecoveryAuthorizerCheckOnly(
       const child =
         spawn(
           SEALED_RECOVERY_AUTHORIZER_PATH,
-          [
-            '--check-only',
-            intentPath,
-          ],
+          args,
           {
             cwd:
               process.cwd(),
 
             env:
-              process.env,
+              Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('PYTHON'))),
 
             shell:
               false,

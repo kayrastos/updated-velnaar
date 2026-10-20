@@ -1,5 +1,5 @@
 import {
-  SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+  SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
 } from './taskClassRecoveryAuthorityCheckBridge';
 
 import {
@@ -14,8 +14,8 @@ TASK_CLASS_RECOVERY_EFFECT_GATE_BRIDGE_SCHEMA =
   'VELNAR_TASK_CLASS_RECOVERY_EFFECT_GATE_BRIDGE_V1' as const;
 
 export const
-SEALED_RECOVERY_CALL_GATE_V2_SHA256 =
-  '3c651d770fc7d6d439407ccd9b49d4e496f44d99c5f4196f10e72c5907e1f02a' as const;
+SEALED_RECOVERY_CALL_GATE_V3_SHA256 =
+  '19ccc7e8add3118f288838fe3d126ec36d6934b638e4a00ec2140b06efe1df87' as const;
 
 
 const GATE_STDOUT_KEYS =
@@ -43,10 +43,10 @@ type GateStdoutKey =
 
 export interface RecoveryEffectGateExecutionRequest {
   readonly expectedGateSha256:
-    typeof SEALED_RECOVERY_CALL_GATE_V2_SHA256;
+    typeof SEALED_RECOVERY_CALL_GATE_V3_SHA256;
 
   readonly expectedCommonSha256:
-    typeof SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256;
+    typeof SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256;
 
   readonly args:
     readonly [
@@ -423,10 +423,10 @@ consumeRecoveryEffectGateThroughBridge(
       await dependencies
         .executeGate({
           expectedGateSha256:
-            SEALED_RECOVERY_CALL_GATE_V2_SHA256,
+            SEALED_RECOVERY_CALL_GATE_V3_SHA256,
 
           expectedCommonSha256:
-            SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+            SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
 
           args: [
             '--consume-call',

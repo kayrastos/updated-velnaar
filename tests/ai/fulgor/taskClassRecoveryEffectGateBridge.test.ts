@@ -10,13 +10,13 @@ import {
 } from '../../../scripts/fulgor/orchestration/taskClassRecoveryHostAdapter';
 
 import {
-  SEALED_RECOVERY_CALL_GATE_V2_SHA256,
+  SEALED_RECOVERY_CALL_GATE_V3_SHA256,
   consumeRecoveryEffectGateThroughBridge,
   type RecoveryEffectGateBridgeInput,
 } from '../../../scripts/fulgor/orchestration/taskClassRecoveryEffectGateBridge';
 
 import {
-  SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+  SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
 } from '../../../scripts/fulgor/orchestration/taskClassRecoveryAuthorityCheckBridge';
 
 
@@ -180,10 +180,10 @@ describe(
         ).toEqual([
           {
             expectedGateSha256:
-              SEALED_RECOVERY_CALL_GATE_V2_SHA256,
+              SEALED_RECOVERY_CALL_GATE_V3_SHA256,
 
             expectedCommonSha256:
-              SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+              SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
 
             args: [
               '--consume-call',

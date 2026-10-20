@@ -9,19 +9,19 @@ import {
 
 export const
 TASK_CLASS_RECOVERY_AUTHORITY_CHECK_BRIDGE_SCHEMA =
-  'VELNAR_TASK_CLASS_RECOVERY_AUTHORITY_CHECK_BRIDGE_V1' as const;
+  'VELNAR_TASK_CLASS_RECOVERY_AUTHORITY_CHECK_BRIDGE_V3' as const;
 
 export const
-TASK_CLASS_RECOVERY_INTENT_SCHEMA_V2 =
-  'VELNAR_TASK_CLASS_RECOVERY_INTENT_V2' as const;
+TASK_CLASS_RECOVERY_INTENT_SCHEMA_V3 =
+  'VELNAR_TASK_CLASS_RECOVERY_INTENT_V3' as const;
 
 export const
-SEALED_RECOVERY_AUTHORIZER_V2_SHA256 =
-  'd4658c2ad02e8f8957fdcb44a66993e22980f10a1464e1cd0c9c46f0f4d90b49' as const;
+SEALED_RECOVERY_AUTHORIZER_V3_SHA256 =
+  'd81f8983724e14cd6f0af915db32dd63220a864888ec2d142ea56b9e31bc7220' as const;
 
 export const
-SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256 =
-  '81c70299598a4b5f7b9b213ce9b706ea64390fd032736e23ab88403ed1c08621' as const;
+SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256 =
+  '1f8571921715ad661f7a2db4485466d0a346b57b7c56079cba81fba7b4022474' as const;
 
 
 export type RecoveryCheckPhase =
@@ -61,10 +61,10 @@ export interface RecoveryAuthorityCheckInput {
 
 export interface RecoveryAuthorityCheckExecutionRequest {
   readonly expectedAuthorizerSha256:
-    typeof SEALED_RECOVERY_AUTHORIZER_V2_SHA256;
+    typeof SEALED_RECOVERY_AUTHORIZER_V3_SHA256;
 
   readonly expectedCommonSha256:
-    typeof SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256;
+    typeof SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256;
 
   readonly args:
     readonly [
@@ -111,6 +111,9 @@ export interface RecoveryAuthorityCheckResult {
     'CHECK_ONLY_PASS';
 
   readonly intentSha256:
+    string;
+
+  readonly intentPath:
     string;
 
   readonly batchId:
@@ -185,6 +188,7 @@ const TOP_LEVEL_INTENT_KEYS =
 
 const CHECK_ONLY_STDOUT_KEYS =
   Object.freeze([
+    'RECOVERY_INTENT_SHA256',
     'RECOVERY_POLICY_ELIGIBILITY',
     'RECOVERY_PROVIDER',
     'RECOVERY_TASK_CLASS',
@@ -206,10 +210,10 @@ const SAFE_BATCH =
   /^[A-Za-z0-9_-]{1,64}$/;
 
 const BASELINE =
-  /^[0-9a-f]{40}$/i;
+  /^[0-9a-f]{40}$/;
 
 const MAX_INTENT_BYTES =
-  1_048_576;
+  262_144;
 
 
 function isRecord(
@@ -287,9 +291,11 @@ function validateInput(
     input.intentPath.includes(
       '\0',
     ) ||
+    input.batchId.trim() !== input.batchId ||
     !SAFE_BATCH.test(
       input.batchId,
     ) ||
+    input.baseline.length !== 40 ||
     !BASELINE.test(
       input.baseline,
     ) ||
@@ -397,7 +403,7 @@ function parseIntent(
 
   if (
     parsed.schemaVersion !==
-      TASK_CLASS_RECOVERY_INTENT_SCHEMA_V2 ||
+      TASK_CLASS_RECOVERY_INTENT_SCHEMA_V3 ||
     parsed.batchId !==
       input.batchId ||
     parsed.baseline !==
@@ -450,6 +456,8 @@ function parseCheckOnlyStdout(
 
   input:
     RecoveryAuthorityCheckInput,
+
+  intentSha256: string,
 ): void {
   const values =
     new Map<
@@ -546,6 +554,8 @@ function parseCheckOnlyStdout(
       >
     > =
       Object.freeze({
+        RECOVERY_INTENT_SHA256: intentSha256,
+
         RECOVERY_POLICY_ELIGIBILITY:
           'PASS',
 
@@ -605,6 +615,8 @@ runRecoveryAuthorityCheckOnly(
   dependencies:
     RecoveryAuthorityCheckDependencies,
 ): Promise<RecoveryAuthorityCheckResult> {
+  // Preserve caller identity across every asynchronous boundary.
+  input = Object.freeze({ ...input });
   validateInput(
     input,
   );
@@ -629,10 +641,10 @@ runRecoveryAuthorityCheckOnly(
       await dependencies
         .executeAuthorizer({
           expectedAuthorizerSha256:
-            SEALED_RECOVERY_AUTHORIZER_V2_SHA256,
+            SEALED_RECOVERY_AUTHORIZER_V3_SHA256,
 
           expectedCommonSha256:
-            SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+            SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
 
           args:
             [
@@ -659,7 +671,7 @@ runRecoveryAuthorityCheckOnly(
   }
 
   if (
-    execution.stderr.trim() !==
+    execution.stderr !==
       ''
   ) {
     throw new Error(
@@ -670,6 +682,7 @@ runRecoveryAuthorityCheckOnly(
   parseCheckOnlyStdout(
     execution.stdout,
     input,
+    intent.sha256,
   );
 
   /*
@@ -687,6 +700,9 @@ runRecoveryAuthorityCheckOnly(
 
     intentSha256:
       intent.sha256,
+
+    intentPath:
+      input.intentPath,
 
     batchId:
       input.batchId,

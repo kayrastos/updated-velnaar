@@ -11,7 +11,7 @@ import {
   buildProviderTaskClassRecoveryEvidenceFromHostLedger,
 } from '../../../scripts/fulgor/scheduler/providerTaskClassEvidenceLedger';
 import {
-  TASK_CLASS_RECOVERY_INTENT_SCHEMA_V2,
+  TASK_CLASS_RECOVERY_INTENT_SCHEMA_V3,
   type RecoveryAuthorityCheckInput,
 } from '../../../scripts/fulgor/orchestration/taskClassRecoveryAuthorityCheckBridge';
 
@@ -45,7 +45,7 @@ function fixture(useful = 0, nonUseful = false) {
   const hash = 'a'.repeat(64);
   const { intentPath: _path, ...intentBinding } = binding;
   const raw = JSON.stringify({
-    schemaVersion: TASK_CLASS_RECOVERY_INTENT_SCHEMA_V2, ...intentBinding,
+    schemaVersion: TASK_CLASS_RECOVERY_INTENT_SCHEMA_V3, ...intentBinding,
     latestTransportFailureObservedAtMs: 2000,
     antigravityExecutableSha256: hash, codexExecutableSha256: hash,
     nodeExecutableSha256: hash, tsxCliSha256: hash, liveEnvSha256: hash, liveUnitSha256: hash,
@@ -53,6 +53,7 @@ function fixture(useful = 0, nonUseful = false) {
   });
   const checkOnly = { input: binding, expectedIntentSha256: createHash('sha256').update(raw).digest('hex') };
   const stdout = [
+    `RECOVERY_INTENT_SHA256=${checkOnly.expectedIntentSha256}`,
     'RECOVERY_POLICY_ELIGIBILITY=PASS', 'RECOVERY_PROVIDER=antigravity',
     'RECOVERY_TASK_CLASS=GENERAL', `RECOVERY_PHASE=${binding.phase}`,
     `RECOVERY_CALLS=${binding.requestedProviderCalls}`, 'RECOVERY_CONCURRENCY=1',

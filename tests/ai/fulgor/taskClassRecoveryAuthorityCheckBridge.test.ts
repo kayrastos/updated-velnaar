@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   describe,
   expect,
@@ -6,9 +7,9 @@ import {
 
 import {
   runRecoveryAuthorityCheckOnly,
-  SEALED_RECOVERY_AUTHORIZER_V2_SHA256,
-  SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
-  TASK_CLASS_RECOVERY_INTENT_SCHEMA_V2,
+  SEALED_RECOVERY_AUTHORIZER_V3_SHA256,
+  SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
+  TASK_CLASS_RECOVERY_INTENT_SCHEMA_V3,
   type RecoveryAuthorityCheckInput,
 } from '../../../scripts/fulgor/orchestration/taskClassRecoveryAuthorityCheckBridge';
 
@@ -72,7 +73,7 @@ function intentText(
 ): string {
   return JSON.stringify({
     schemaVersion:
-      TASK_CLASS_RECOVERY_INTENT_SCHEMA_V2,
+      TASK_CLASS_RECOVERY_INTENT_SCHEMA_V3,
 
     batchId:
       current.batchId,
@@ -148,6 +149,7 @@ function validStdout(
     RecoveryAuthorityCheckInput,
 ): string {
   return [
+    `RECOVERY_INTENT_SHA256=${createHash('sha256').update(intentText(current)).digest('hex')}`,
     'RECOVERY_POLICY_ELIGIBILITY=PASS',
     'RECOVERY_PROVIDER=antigravity',
     'RECOVERY_TASK_CLASS=GENERAL',
@@ -218,10 +220,10 @@ describe(
         ).toEqual([
           {
             expectedAuthorizerSha256:
-              SEALED_RECOVERY_AUTHORIZER_V2_SHA256,
+              SEALED_RECOVERY_AUTHORIZER_V3_SHA256,
 
             expectedCommonSha256:
-              SEALED_RECOVERY_AUTHORITY_COMMON_V2_SHA256,
+              SEALED_RECOVERY_AUTHORITY_COMMON_V3_SHA256,
 
             args: [
               '--check-only',
@@ -689,3 +691,42 @@ describe(
     );
   },
 );
+
+describe('V3 check-only digest and path continuity', () => {
+  it.each(['mismatch', 'missing', 'uppercase'])('rejects %s digest evidence from the sealed response', async kind => {
+    const current = input('PROBATION_BOOTSTRAP', 1);
+    const expected = validStdout(current);
+    const stdout = expected.replace(/^RECOVERY_INTENT_SHA256=.*\n/m,
+      kind === 'missing' ? '' : `RECOVERY_INTENT_SHA256=${kind === 'uppercase' ? 'A'.repeat(64) : 'f'.repeat(64)}\n`);
+    await expect(runRecoveryAuthorityCheckOnly(current, {
+      readIntent: async () => intentText(current),
+      executeAuthorizer: async () => ({ exitCode: 0, stdout, stderr: '' }),
+    })).rejects.toThrow();
+  });
+
+  it('retains the original path when the caller mutates during intent reading', async () => {
+    const original = input('PROBATION_BOOTSTRAP', 1);
+    const current = { ...original };
+    const text = intentText(original);
+    const commands: unknown[] = [];
+    const result = await runRecoveryAuthorityCheckOnly(current, {
+      readIntent: async () => { current.intentPath = '/tmp/replaced.json'; return text; },
+      executeAuthorizer: async request => {
+        commands.push(request.args);
+        return { exitCode: 0, stdout: validStdout(original), stderr: '' };
+      },
+    });
+    expect(result.intentPath).toBe(original.intentPath);
+    expect(commands).toEqual([['--check-only', original.intentPath]]);
+  });
+
+  it('rejects a V2 intent before calling the executor', async () => {
+    const current = input('PROBATION_BOOTSTRAP', 1);
+    let executions = 0;
+    await expect(runRecoveryAuthorityCheckOnly(current, {
+      readIntent: async () => intentText(current).replace('RECOVERY_INTENT_V3', 'RECOVERY_INTENT_V2'),
+      executeAuthorizer: async () => { executions++; return { exitCode: 0, stdout: validStdout(current), stderr: '' }; },
+    })).rejects.toThrow('INTENT_BINDING_INVALID');
+    expect(executions).toBe(0);
+  });
+});
