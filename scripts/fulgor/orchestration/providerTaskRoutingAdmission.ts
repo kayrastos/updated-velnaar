@@ -241,6 +241,7 @@ export function routeAndEnqueueProviderWork(
     input.queue.enqueue(
       routedOrder,
       input.nowMs,
+      input.taskClass,
     );
 
   return Object.freeze({

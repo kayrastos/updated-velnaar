@@ -3,6 +3,10 @@ import {
 } from '../scheduler/providerTaskClassEvidenceStore';
 
 import {
+  recoverProviderTaskClassEvidenceStateRoot,
+} from './providerTaskClassEvidenceReconciler';
+
+import {
   appendFileSync,
   constants,
 } from 'node:fs';
@@ -936,6 +940,26 @@ runLive8x8Operator(
     fail();
   }
 
+  const stateRoot =
+    dependencies.stateRoot ??
+    join(
+      home,
+      '.local/state/velnar/provider-canary',
+    );
+
+  await privateDirectory(
+    stateRoot,
+  );
+
+  /*
+   * Recover prior durable V6 queue outcomes before
+   * executable validation, current-run creation,
+   * routing evidence reads or provider execution.
+   */
+  recoverProviderTaskClassEvidenceStateRoot(
+    stateRoot,
+  );
+
   const codexExecutable =
     await executable(
       env,
@@ -947,17 +971,6 @@ runLive8x8Operator(
       env,
       'VELNAR_ANTIGRAVITY_EXECUTABLE',
     );
-
-  const stateRoot =
-    dependencies.stateRoot ??
-    join(
-      home,
-      '.local/state/velnar/provider-canary',
-    );
-
-  await privateDirectory(
-    stateRoot,
-  );
 
   const runDirectory =
     join(

@@ -47,13 +47,21 @@ import {
   type ProviderWorkRecord,
 } from './providerWorkOrder';
 
+import {
+  PROVIDER_TASK_CLASSES,
+  type ProviderTaskClass,
+} from '../scheduler/providerTaskRouter';
+
 export const TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
-  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V5' as const;
+  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V6' as const;
 
 const PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
-  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V4' as const;
+  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V5' as const;
 
 const LEGACY_PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
+  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V4' as const;
+
+const LEGACY_V3_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
   'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V3' as const;
 
 export const BLOCKED_WORK_DIAGNOSTIC_SCHEMA =
@@ -149,6 +157,23 @@ export interface PersistedProviderQualityState {
     | null;
 
   readonly updatedAtMs: number;
+}
+
+export interface DurableProviderTaskClassOutcome {
+  readonly jobId: string;
+  readonly baseline: string;
+
+  readonly provider:
+    'codex' | 'antigravity';
+
+  readonly taskClass:
+    ProviderTaskClass;
+
+  readonly outcome:
+    WorkOutcome;
+
+  readonly observedAtMs:
+    number;
 }
 
 const REQUIRED_OBJECTS =
@@ -387,6 +412,29 @@ function sanitizeBlockedDiagnosticText(
     );
 }
 
+function taskClassOrNull(
+  value: unknown,
+): ProviderTaskClass | null {
+  if (value === null) {
+    return null;
+  }
+
+  if (
+    typeof value !== 'string' ||
+    !(
+      PROVIDER_TASK_CLASSES as
+        readonly string[]
+    ).includes(value)
+  ) {
+    throw new Error(
+      'QUEUE_TASK_CLASS_INVALID',
+    );
+  }
+
+  return value as
+    ProviderTaskClass;
+}
+
 export class TransactionalProviderQueue {
   readonly dbPath: string;
 
@@ -565,6 +613,22 @@ export class TransactionalProviderQueue {
                     'codex',
                     'antigravity',
                     'either'
+                  )
+                ),
+
+              task_class TEXT
+                CHECK(
+                  task_class IS NULL
+                  OR
+                  task_class IN (
+                    'GENERAL',
+                    'AUTHORITY_BOUNDARY',
+                    'SEMANTIC_CONTRACT',
+                    'INVOCATION_BOUND',
+                    'CONCURRENCY_CONTROL',
+                    'TRANSPORT_SAFETY',
+                    'PROTOCOL_VALIDATION',
+                    'EVIDENCE_BINDING'
                   )
                 ),
 
@@ -1005,7 +1069,7 @@ export class TransactionalProviderQueue {
 
       if (
         schema ===
-        LEGACY_PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
+        LEGACY_V3_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
       ) {
         /*
          * V3 did not persist the accepted provider
@@ -1137,12 +1201,12 @@ export class TransactionalProviderQueue {
         );
 
         schema =
-          PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA;
+          LEGACY_PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA;
       }
 
       if (
         schema ===
-        PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
+        LEGACY_PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
       ) {
         /*
          * V4 already has durable accepted work.
@@ -1227,6 +1291,62 @@ export class TransactionalProviderQueue {
                 'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V5'
               WHERE key = 'schema';
             `);
+          },
+        );
+
+        schema =
+          PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA;
+      }
+
+      if (
+        schema ===
+        PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
+      ) {
+        const taskClassColumn =
+          this.db
+            .prepare(`
+              SELECT name
+              FROM pragma_table_info('jobs')
+              WHERE name = 'task_class'
+              LIMIT 1
+            `)
+            .get();
+
+        this.transaction(
+          () => {
+            if (
+              taskClassColumn ===
+                undefined
+            ) {
+              this.db.exec(`
+                ALTER TABLE jobs
+                ADD COLUMN task_class TEXT
+                  CHECK(
+                    task_class IS NULL
+                    OR
+                    task_class IN (
+                      'GENERAL',
+                      'AUTHORITY_BOUNDARY',
+                      'SEMANTIC_CONTRACT',
+                      'INVOCATION_BOUND',
+                      'CONCURRENCY_CONTROL',
+                      'TRANSPORT_SAFETY',
+                      'PROTOCOL_VALIDATION',
+                      'EVIDENCE_BINDING'
+                    )
+                  );
+              `);
+            }
+
+            this.db
+              .prepare(`
+                UPDATE queue_meta
+                SET value = ?
+                WHERE key = 'schema'
+              `)
+              .run(
+                TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA,
+              );
           },
         );
 
@@ -1369,6 +1489,10 @@ export class TransactionalProviderQueue {
         row.affinity,
         'AFFINITY',
       );
+
+    taskClassOrNull(
+      row.task_class,
+    );
 
     const rowState =
       asString(
@@ -2091,7 +2215,17 @@ export class TransactionalProviderQueue {
       ProviderWorkOrder,
 
     nowMs: number,
+
+    taskClass?:
+      ProviderTaskClass,
   ): ProviderWorkRecord {
+    const durableTaskClass =
+      taskClass === undefined
+        ? null
+        : taskClassOrNull(
+            taskClass,
+          );
+
     return this.transaction(
       () => {
         const existing =
@@ -2144,6 +2278,7 @@ export class TransactionalProviderQueue {
             INSERT INTO jobs(
               job_id,
               affinity,
+              task_class,
               state,
               assigned_provider,
               slot_id,
@@ -2154,6 +2289,7 @@ export class TransactionalProviderQueue {
               record_json
             )
             VALUES(
+              ?,
               ?,
               ?,
               'PENDING',
@@ -2169,6 +2305,7 @@ export class TransactionalProviderQueue {
           .run(
             record.order.jobId,
             record.order.affinity,
+            durableTaskClass,
             sequence,
             record.updatedAtMs,
             serializeProviderWorkRecord(
@@ -2199,6 +2336,125 @@ export class TransactionalProviderQueue {
 
     return this.parsePersistedRow(
       row,
+    );
+  }
+
+  taskClass(
+    jobId: string,
+  ): ProviderTaskClass | null {
+    const row =
+      this.db
+        .prepare(`
+          SELECT task_class
+          FROM jobs
+          WHERE job_id = ?
+          LIMIT 1
+        `)
+        .get(jobId);
+
+    if (row === undefined) {
+      return null;
+    }
+
+    return taskClassOrNull(
+      requireRow(
+        row,
+        'TASK_CLASS_ROW',
+      ).task_class,
+    );
+  }
+
+  terminalTaskClassOutcomes(
+    limit = 1024,
+  ): readonly DurableProviderTaskClassOutcome[] {
+    if (
+      !Number.isSafeInteger(limit) ||
+      limit < 1 ||
+      limit > 4096
+    ) {
+      throw new Error(
+        'QUEUE_TASK_CLASS_OUTCOME_LIMIT_INVALID',
+      );
+    }
+
+    const rows =
+      this.db
+        .prepare(`
+          SELECT *
+          FROM jobs
+          WHERE task_class IS NOT NULL
+          ORDER BY created_seq
+          LIMIT ?
+        `)
+        .all(limit);
+
+    const outcomes:
+      DurableProviderTaskClassOutcome[] =
+        [];
+
+    for (const row of rows) {
+      const raw =
+        requireRow(
+          row,
+          'TASK_CLASS_OUTCOME_ROW',
+        );
+
+      const taskClass =
+        taskClassOrNull(
+          raw.task_class,
+        );
+
+      if (taskClass === null) {
+        continue;
+      }
+
+      const record =
+        this.parsePersistedRow(
+          raw,
+        );
+
+      if (
+        record.lastOutcome ===
+          null
+      ) {
+        continue;
+      }
+
+      const provider =
+        record.order.affinity;
+
+      if (
+        provider !== 'codex' &&
+        provider !== 'antigravity'
+      ) {
+        throw new Error(
+          'QUEUE_TASK_CLASS_PROVIDER_UNBOUND',
+        );
+      }
+
+      outcomes.push(
+        Object.freeze({
+          jobId:
+            record.order.jobId,
+
+          baseline:
+            record.order.baseline,
+
+          provider,
+
+          taskClass,
+
+          outcome:
+            record.lastOutcome,
+
+          observedAtMs:
+            record.updatedAtMs,
+        }),
+      );
+    }
+
+    return Object.freeze(
+      outcomes,
     );
   }
 

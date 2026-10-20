@@ -750,7 +750,7 @@ describe(
     );
 
     it(
-      'migrates V3 queues additively through V4 to V5',
+      'migrates V3 queues additively through V4 and V5 to V6',
       () => {
         const root =
           makeRoot();
@@ -828,7 +828,7 @@ describe(
         expect(
           schema.value,
         ).toBe(
-          'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V5',
+          'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V6',
         );
 
         const table =
@@ -2143,7 +2143,7 @@ describe(
       },
     );
     it(
-      'migrates an existing V4 queue additively to V5 without changing jobs or accepted work',
+      'migrates an existing V4 queue additively through V5 to V6 without changing jobs or accepted work',
       () => {
         const root =
           makeRoot();
@@ -2235,7 +2235,7 @@ describe(
         expect(
           schema.value,
         ).toBe(
-          'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V5',
+          'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V6',
         );
 
         expect(
