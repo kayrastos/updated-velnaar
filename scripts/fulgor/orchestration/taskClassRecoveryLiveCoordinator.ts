@@ -14,6 +14,9 @@ export interface TaskClassRecoveryHostSlot {
   readonly maxConcurrency: 1;
   readonly isHeld: () => boolean;
   readonly release: () => Promise<void>;
+  readonly leaseId?: string;
+  readonly capacityControllerId?: string;
+  readonly purpose?: 'RECOVERY';
 }
 export interface TaskClassRecoveryLiveDependencies extends RecoveryAuthorityCheckDependencies,
   RecoveryAuthorizationCreateDependencies, RecoveryEffectGateDependencies {
@@ -54,10 +57,20 @@ export async function runTaskClassRecoveryLive(
   });
   const slot = await dependencies.acquireHostAntigravitySlot();
   if (slot?.provider !== 'antigravity' || slot.maxConcurrency !== 1 ||
+      (slot.purpose !== undefined && slot.purpose !== 'RECOVERY') ||
+      (slot.leaseId !== undefined && (typeof slot.leaseId !== 'string' || slot.leaseId.trim() === '')) ||
+      (slot.capacityControllerId !== undefined && (typeof slot.capacityControllerId !== 'string' || slot.capacityControllerId.trim() === '')) ||
       typeof slot.isHeld !== 'function' || typeof slot.release !== 'function') {
     if (typeof slot?.release === 'function') await slot.release();
     throw new Error('RECOVERY_LIVE_HOST_SLOT_INVALID');
   }
+  const hostSlot = Object.freeze({
+    provider: 'antigravity' as const,
+    maxConcurrency: 1 as const,
+    ...(slot.leaseId !== undefined ? { leaseId: slot.leaseId } : {}),
+    ...(slot.capacityControllerId !== undefined ? { capacityControllerId: slot.capacityControllerId } : {}),
+    ...(slot.purpose !== undefined ? { purpose: slot.purpose } : {}),
+  });
   const requireSlot = () => { if (slot.isHeld() !== true) throw new Error('RECOVERY_LIVE_HOST_SLOT_LOST'); };
   try {
     requireSlot();
@@ -65,7 +78,7 @@ export async function runTaskClassRecoveryLive(
     // authorization. Never invent an intent or call a provider to fill it in.
     if (!input.checkOnly) {
       const coordinator = await coordinateTaskClassRecovery(input);
-      return Object.freeze({ status: coordinator.status, coordinator, authorization: null, run: null,
+      return Object.freeze({ status: coordinator.status, coordinator, authorization: null, run: null, hostSlot,
         automaticRetry: false, codexFallback: false, verificationGranted: false, automaticPromotionAllowed: false });
     }
     const raw = await dependencies.readIntent(input.checkOnly.input.intentPath);
@@ -76,7 +89,7 @@ export async function runTaskClassRecoveryLive(
       readIntent: async () => raw, executeAuthorizer: request => dependencies.executeAuthorizer(request),
     });
     if (coordinator.status !== 'AUTHORIZATION_REQUIRED' || !coordinator.checkOnly) {
-      return Object.freeze({ status: coordinator.status, coordinator, authorization: null, run: null,
+      return Object.freeze({ status: coordinator.status, coordinator, authorization: null, run: null, hostSlot,
         automaticRetry: false, codexFallback: false, verificationGranted: false, automaticPromotionAllowed: false });
     }
     const check = coordinator.checkOnly;
@@ -112,7 +125,7 @@ export async function runTaskClassRecoveryLive(
       appendBoundHostOutcome: outcome => dependencies.appendBoundHostOutcome(outcome),
       nowMs: dependencies.nowMs,
     });
-    return Object.freeze({ status: run.status, coordinator, authorization, run,
+    return Object.freeze({ status: run.status, coordinator, authorization, run, hostSlot,
       automaticRetry: false, codexFallback: false, verificationGranted: false, automaticPromotionAllowed: false });
   } finally { await slot.release(); }
 }

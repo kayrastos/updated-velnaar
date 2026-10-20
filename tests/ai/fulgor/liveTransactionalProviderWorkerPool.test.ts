@@ -40,6 +40,10 @@ import {
   type LiveProviderInvocation,
 } from '../../../scripts/fulgor/orchestration/liveTransactionalProviderWorkerPool';
 
+import {
+  HostProviderCapacityController,
+} from '../../../scripts/fulgor/scheduler/sharedProviderCapacity';
+
 const roots:
   string[] = [];
 
@@ -2002,6 +2006,309 @@ describe(
           expect(
             calls,
           ).toBe(0);
+        }
+      },
+    );
+
+    it(
+      'shares host capacity with recovery, denies a 9th Antigravity slot during an 8+8 run, and releases all leases even on thrown errors',
+      async () => {
+        const db =
+          join(
+            root(),
+            'shared-capacity-pool.sqlite',
+          );
+
+        for (
+          let index = 1;
+          index <= 8;
+          index += 1
+        ) {
+          enqueue(
+            db,
+            `codex-shared-${index}`,
+            'codex',
+            index * 10,
+          );
+
+          enqueue(
+            db,
+            `agy-shared-${index}`,
+            'antigravity',
+            100 + index * 10,
+          );
+        }
+
+        const sharedCapacity =
+          new HostProviderCapacityController({
+            nowMs:
+              clock(),
+          });
+
+        try {
+          let sawFull16InFlight =
+            false;
+
+          let activeAgyInFlight =
+            0;
+
+          let maxAgyInFlight =
+            0;
+
+          const result =
+            await runLiveTransactionalProviderWorkerPool({
+              queuePath:
+                db,
+
+              mode:
+                'DUAL',
+
+              codexSlots:
+                8,
+
+              antigravitySlots:
+                8,
+
+              leaseDurationMs:
+                60_000,
+
+              maxClaimsPerSlot:
+                1,
+
+              nowMs:
+                clock(),
+
+              sharedCapacity,
+
+              loadCapsule:
+                capsule,
+
+              invokeProvider:
+                async input => {
+                  const snap =
+                    sharedCapacity.snapshot();
+
+                  if (
+                    snap.globalHeld ===
+                      16 &&
+                    snap.normalCodexHeld ===
+                      8 &&
+                    snap.normalAntigravityHeld ===
+                      8
+                  ) {
+                    sawFull16InFlight =
+                      true;
+
+                    await expect(
+                      sharedCapacity.acquireRecoveryAntigravitySlot(),
+                    ).rejects.toThrow(
+                      'SHARED_CAPACITY_PROVIDER_EXHAUSTED:antigravity',
+                    );
+                  }
+
+                  if (
+                    input.provider ===
+                      'antigravity'
+                  ) {
+                    activeAgyInFlight +=
+                      1;
+
+                    if (
+                      activeAgyInFlight >
+                        maxAgyInFlight
+                    ) {
+                      maxAgyInFlight =
+                        activeAgyInFlight;
+                    }
+                  }
+
+                  try {
+                    return Object.freeze({
+                      source:
+                        'LIVE_PROVIDER',
+
+                      transport:
+                        'OK',
+
+                      protocol:
+                        'PASS',
+
+                      raw:
+                        proposal(
+                          input.record,
+                          input.provider,
+                        ),
+                    });
+                  } finally {
+                    if (
+                      input.provider ===
+                        'antigravity'
+                    ) {
+                      activeAgyInFlight -=
+                        1;
+                    }
+                  }
+                },
+            });
+
+          expect(
+            sawFull16InFlight,
+          ).toBe(true);
+
+          // Physical Antigravity concurrency remains serialized at 1 while 8 logical AGY slots are reserved
+          expect(
+            maxAgyInFlight,
+          ).toBe(1);
+
+          expect(
+            result.totalLiveProviderCalls,
+          ).toBe(16);
+
+          expect(
+            sharedCapacity.snapshot(),
+          ).toMatchObject({
+            normalCodexHeld:
+              0,
+
+            normalAntigravityHeld:
+              0,
+
+            recoveryAntigravityHeld:
+              0,
+
+            globalHeld:
+              0,
+          });
+
+          // If recovery holds 1 Antigravity unit, an 8-slot AGY normal pool is denied and releases partial leases
+          const recoveryLease =
+            await sharedCapacity.acquireRecoveryAntigravitySlot();
+
+          await expect(
+            runLiveTransactionalProviderWorkerPool({
+              queuePath:
+                db,
+
+              mode:
+                'DUAL',
+
+              codexSlots:
+                8,
+
+              antigravitySlots:
+                8,
+
+              leaseDurationMs:
+                60_000,
+
+              maxClaimsPerSlot:
+                1,
+
+              nowMs:
+                clock(),
+
+              sharedCapacity,
+
+              loadCapsule:
+                capsule,
+
+              invokeProvider:
+                async () =>
+                  Object.freeze({
+                    source:
+                      'LIVE_PROVIDER',
+
+                    transport:
+                      'FAILURE',
+                  }),
+            }),
+          ).rejects.toThrow(
+            'SHARED_CAPACITY_PROVIDER_EXHAUSTED:antigravity',
+          );
+
+          expect(
+            sharedCapacity.snapshot(),
+          ).toMatchObject({
+            normalCodexHeld:
+              0,
+
+            normalAntigravityHeld:
+              0,
+
+            recoveryAntigravityHeld:
+              1,
+
+            globalHeld:
+              1,
+          });
+
+          await recoveryLease.release();
+
+          // Thrown error inside loadCapsule still releases all shared capacity leases
+          const errDb =
+            join(
+              root(),
+              'err-pool.sqlite',
+            );
+
+          enqueue(
+            errDb,
+            'err-job-1',
+            'codex',
+            10,
+          );
+
+          await expect(
+            runLiveTransactionalProviderWorkerPool({
+              queuePath:
+                errDb,
+
+              mode:
+                'CODEX_ONLY',
+
+              codexSlots:
+                2,
+
+              antigravitySlots:
+                0,
+
+              leaseDurationMs:
+                60_000,
+
+              maxClaimsPerSlot:
+                1,
+
+              nowMs:
+                clock(),
+
+              sharedCapacity,
+
+              loadCapsule:
+                () => {
+                  throw new Error(
+                    'HOST_CAPSULE_LOAD_ERROR',
+                  );
+                },
+
+              invokeProvider:
+                async () =>
+                  Object.freeze({
+                    source:
+                      'LIVE_PROVIDER',
+
+                    transport:
+                      'FAILURE',
+                  }),
+            }),
+          ).rejects.toThrow(
+            'HOST_CAPSULE_LOAD_ERROR',
+          );
+
+          expect(
+            sharedCapacity.snapshot().globalHeld,
+          ).toBe(0);
+        } finally {
+          sharedCapacity.close();
         }
       },
     );

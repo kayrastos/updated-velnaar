@@ -3,6 +3,10 @@ import type {
   ProviderTaskLaneEvidence,
 } from '../scheduler/providerTaskRouter';
 
+import type {
+  HostProviderCapacityController,
+} from '../scheduler/sharedProviderCapacity';
+
 import {
   routeAndEnqueueProviderWork,
 } from './providerTaskRoutingAdmission';
@@ -79,6 +83,9 @@ export interface Live8x8OneShotInput {
 
   readonly leaseDurationMs?:
     number;
+
+  readonly sharedCapacity?:
+    HostProviderCapacityController;
 }
 
 export interface Live8x8OneShotDependencies {
@@ -499,6 +506,16 @@ runLive8x8OneShot(
 
       nowMs:
         input.nowMs,
+
+      ...(
+        input.sharedCapacity !==
+          undefined
+          ? {
+              sharedCapacity:
+                input.sharedCapacity,
+            }
+          : {}
+      ),
     });
 
   const completedAtMs =

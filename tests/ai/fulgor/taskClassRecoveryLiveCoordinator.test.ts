@@ -4,6 +4,7 @@ import { runTaskClassRecoveryLive } from '../../../scripts/fulgor/orchestration/
 import { TASK_CLASS_RECOVERY_INTENT_SCHEMA_V3 } from '../../../scripts/fulgor/orchestration/taskClassRecoveryAuthorityCheckBridge';
 import { createProviderTaskClassEvidenceLedger, recordHostTaskClassOutcome,
   buildProviderTaskLaneEvidenceFromHostLedger, buildProviderTaskClassRecoveryEvidenceFromHostLedger } from '../../../scripts/fulgor/scheduler/providerTaskClassEvidenceLedger';
+import { HostProviderCapacityController } from '../../../scripts/fulgor/scheduler/sharedProviderCapacity';
 
 function fixture(useful = 0) {
   const baseline = '0123456789abcdef0123456789abcdef01234567';
@@ -191,5 +192,92 @@ describe('integrated V3 recovery coordinator with exclusively fake effects', () 
     });
     const result = await runTaskClassRecoveryLive(f.input, f.dependencies);
     expect(result.status).toBe('COMPLETE'); expect(result.authorization?.batchId).toBe('integrated');
+  });
+
+  it('acquires from HostProviderCapacityController, denies before any authorization when all 8 AGY slots are held, and handles real lease revocation before/after gate', async () => {
+    const sharedCapacity = new HostProviderCapacityController({ nowMs: () => 200000 });
+    try {
+      // 1. Occupy all 8 normal Antigravity slots
+      const normalLeases = Array.from({ length: 8 }, () =>
+        sharedCapacity.acquireNormalSlot('antigravity'),
+      );
+
+      const deniedFixture = fixture(0);
+      (deniedFixture.dependencies as any).acquireHostAntigravitySlot = vi.fn(async () =>
+        sharedCapacity.acquireRecoveryAntigravitySlot(),
+      );
+
+      await expect(
+        runTaskClassRecoveryLive(deniedFixture.input, deniedFixture.dependencies),
+      ).rejects.toThrow('SHARED_CAPACITY_PROVIDER_EXHAUSTED:antigravity');
+
+      // Zero check-only, zero authorization creation, zero gate, zero provider
+      expect(deniedFixture.dependencies.executeAuthorizer).not.toHaveBeenCalled();
+      expect(deniedFixture.dependencies.executeAuthorization).not.toHaveBeenCalled();
+      expect(deniedFixture.dependencies.executeGate).not.toHaveBeenCalled();
+      expect(deniedFixture.dependencies.invokeBoundAntigravity).not.toHaveBeenCalled();
+
+      // 2. Release 1 normal Antigravity slot (7 normal held) and run a 3-call certification phase on the shared controller
+      await normalLeases[0]!.release();
+      const passFixture = fixture(5); // 8 - 5 = 3 serial calls
+      passFixture.input.lane = { ...passFixture.input.lane, availableSlots: sharedCapacity.availableProviderCapacity('antigravity') };
+      (passFixture.dependencies as any).acquireHostAntigravitySlot = vi.fn(async () =>
+        sharedCapacity.acquireRecoveryAntigravitySlot(),
+      );
+      passFixture.dependencies.invokeBoundAntigravity = vi.fn(async request => {
+        const snap = sharedCapacity.snapshot();
+        expect(snap.normalAntigravityHeld).toBe(7);
+        expect(snap.recoveryAntigravityHeld).toBe(1);
+        expect(snap.antigravityHeld).toBe(8);
+        passFixture.events.push(`provider-${request.securityMetadata.ordinal}`);
+        passFixture.providerMetadata.push(request.securityMetadata);
+        return { outcome: 'USEFUL_UNIQUE' as const };
+      });
+
+      const passResult = await runTaskClassRecoveryLive(passFixture.input, passFixture.dependencies);
+      expect(passResult.status).toBe('COMPLETE');
+      expect(passResult.run?.attemptedProviderCalls).toBe(3);
+      expect(passResult.hostSlot).toMatchObject({
+        provider: 'antigravity',
+        maxConcurrency: 1,
+        purpose: 'RECOVERY',
+        capacityControllerId: sharedCapacity.controllerId,
+      });
+      expect(sharedCapacity.snapshot().recoveryAntigravityHeld).toBe(0);
+      expect(sharedCapacity.snapshot().normalAntigravityHeld).toBe(7);
+
+      // 3. Reject a NORMAL_POOL lease passed as recovery slot and release it immediately
+      const wrongPurposeFixture = fixture(0);
+      (wrongPurposeFixture.dependencies as any).acquireHostAntigravitySlot = vi.fn(async () =>
+        sharedCapacity.acquireNormalSlot('antigravity') as any,
+      );
+      await expect(
+        runTaskClassRecoveryLive(wrongPurposeFixture.input, wrongPurposeFixture.dependencies),
+      ).rejects.toThrow('RECOVERY_LIVE_HOST_SLOT_INVALID');
+      expect(wrongPurposeFixture.dependencies.executeAuthorization).not.toHaveBeenCalled();
+      expect(sharedCapacity.snapshot().normalAntigravityHeld).toBe(7);
+
+      // 4. Real lease revocation before gate and after gate prevents provider effect and cleans up in finally
+      const revokeBeforeGate = fixture(0);
+      let activeLeaseId = '';
+      (revokeBeforeGate.dependencies as any).acquireHostAntigravitySlot = vi.fn(async () => {
+        const lease = await sharedCapacity.acquireRecoveryAntigravitySlot();
+        activeLeaseId = lease.leaseId;
+        return lease;
+      });
+      const origAuth = revokeBeforeGate.dependencies.executeAuthorization.getMockImplementation()!;
+      (revokeBeforeGate.dependencies as any).executeAuthorization = vi.fn(async (req: any) => {
+        const res = await (origAuth as any)(req);
+        sharedCapacity.revokeLease(activeLeaseId, 'antigravity');
+        return res;
+      });
+      const beforeGateRes = await runTaskClassRecoveryLive(revokeBeforeGate.input, revokeBeforeGate.dependencies);
+      expect(beforeGateRes.status).toBe('STOPPED_GATE_DENIED');
+      expect(revokeBeforeGate.dependencies.executeGate).not.toHaveBeenCalled();
+      expect(revokeBeforeGate.dependencies.invokeBoundAntigravity).not.toHaveBeenCalled();
+      expect(sharedCapacity.snapshot().recoveryAntigravityHeld).toBe(0);
+    } finally {
+      sharedCapacity.close();
+    }
   });
 });

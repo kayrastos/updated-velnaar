@@ -39,6 +39,10 @@ import {
   runLive8x8OneShot,
 } from '../../../scripts/fulgor/orchestration/live8x8OneShotRunner';
 
+import {
+  HostProviderCapacityController,
+} from '../../../scripts/fulgor/scheduler/sharedProviderCapacity';
+
 const baseline =
   '0123456789abcdef0123456789abcdef01234567';
 
@@ -590,6 +594,113 @@ describe(
         ).rejects.toThrow(
           /QUEUE_ALREADY_EXISTS/,
         );
+      },
+    );
+
+    it(
+      'forwards the host sharedCapacity controller into the worker pool and denies admission when a recovery slot holds Antigravity capacity',
+      async () => {
+        const directory =
+          root();
+
+        const sharedCapacity =
+          new HostProviderCapacityController({
+            nowMs:
+              clock(),
+          });
+
+        try {
+          let receivedShared:
+            HostProviderCapacityController
+            | undefined;
+
+          await runLive8x8OneShot(
+            {
+              queuePath:
+                join(
+                  directory,
+                  'shared-pass.sqlite',
+                ),
+
+              jobs:
+                exactJobs(),
+
+              invokeProvider:
+                async () => {
+                  throw new Error(
+                    'PROVIDER_MUST_NOT_RUN',
+                  );
+                },
+
+              nowMs:
+                clock(),
+
+              sharedCapacity,
+            },
+            {
+              runPool:
+                async options => {
+                  receivedShared =
+                    options.sharedCapacity;
+
+                  return fakeResult();
+                },
+            },
+          );
+
+          expect(
+            receivedShared,
+          ).toBe(
+            sharedCapacity,
+          );
+
+          // Hold 1 recovery Antigravity unit on the same controller; real pool admission for 8+8 must fail closed
+          const recoverySlot =
+            await sharedCapacity.acquireRecoveryAntigravitySlot();
+
+          await expect(
+            runLive8x8OneShot({
+              queuePath:
+                join(
+                  directory,
+                  'shared-contended.sqlite',
+                ),
+
+              jobs:
+                exactJobs(),
+
+              invokeProvider:
+                async () => {
+                  throw new Error(
+                    'PROVIDER_MUST_NOT_RUN',
+                  );
+                },
+
+              nowMs:
+                clock(),
+
+              sharedCapacity,
+            }),
+          ).rejects.toThrow(
+            'SHARED_CAPACITY_PROVIDER_EXHAUSTED:antigravity',
+          );
+
+          expect(
+            sharedCapacity.snapshot().recoveryAntigravityHeld,
+          ).toBe(1);
+
+          expect(
+            sharedCapacity.snapshot().normalAntigravityHeld,
+          ).toBe(0);
+
+          expect(
+            sharedCapacity.snapshot().normalCodexHeld,
+          ).toBe(0);
+
+          await recoverySlot.release();
+        } finally {
+          sharedCapacity.close();
+        }
       },
     );
   },

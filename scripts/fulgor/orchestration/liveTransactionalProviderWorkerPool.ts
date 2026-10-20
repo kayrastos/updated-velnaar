@@ -6,6 +6,11 @@ import {
 } from '../scheduler/verified8x8Scheduler';
 
 import {
+  HostProviderCapacityController,
+  type SharedProviderCapacityLease,
+} from '../scheduler/sharedProviderCapacity';
+
+import {
   livePlanFitsCurrentCertifiedEnvelope,
 } from '../scheduler/liveProviderTierGate';
 
@@ -154,6 +159,14 @@ export interface LiveTransactionalPoolOptions {
    */
   readonly nowMs:
     () => number;
+
+  /*
+   * Optional host-owned shared capacity authority.
+   * When omitted, a run-local controller with the same
+   * hard 8/8/16 envelope is used.
+   */
+  readonly sharedCapacity?:
+    HostProviderCapacityController;
 }
 
 export interface LiveProviderPoolStats {
@@ -474,9 +487,26 @@ async function runSlot(
   slotId:
     string,
 
+  capacityLease:
+    SharedProviderCapacityLease,
+
   transportStoppedProviders:
     Set<Provider>,
 ): Promise<MutableStats> {
+  if (
+    capacityLease.provider !==
+      provider ||
+    capacityLease.purpose !==
+      'NORMAL_POOL' ||
+    capacityLease.maxConcurrency !==
+      1 ||
+    !capacityLease.isHeld()
+  ) {
+    throw new Error(
+      'LIVE_POOL_CAPACITY_LEASE_INVALID',
+    );
+  }
+
   const stats =
     emptyStats(
       provider,
@@ -495,6 +525,14 @@ async function runSlot(
         options.maxClaimsPerSlot;
       claimIndex += 1
     ) {
+      if (
+        !capacityLease.isHeld()
+      ) {
+        throw new Error(
+          'LIVE_POOL_CAPACITY_LEASE_LOST',
+        );
+      }
+
       /*
        * A transport failure is uncertain execution.
        *
@@ -585,6 +623,14 @@ async function runSlot(
         record,
         capsule,
       );
+
+      if (
+        !capacityLease.isHeld()
+      ) {
+        throw new Error(
+          'LIVE_POOL_CAPACITY_LEASE_LOST',
+        );
+      }
 
       stats.liveProviderCalls +=
         1;
@@ -791,7 +837,17 @@ async function runSlot(
 
     return stats;
   } finally {
-    queue.close();
+    try {
+      queue.close();
+    } finally {
+      if (
+        capacityLease.isHeld()
+      ) {
+        capacityLease.releaseSync(
+          provider,
+        );
+      }
+    }
   }
 }
 
@@ -999,179 +1055,286 @@ runLiveTransactionalProviderWorkerPool(
     options,
   );
 
-  const codexPromises:
-    Promise<MutableStats>[] = [];
+  const ownedCapacityController =
+    options.sharedCapacity ===
+      undefined;
 
-  /*
-   * Shared only within this bounded pool invocation.
-   *
-   * This prevents blind later calls after uncertain
-   * transport without conflating transport health with
-   * provider output quality.
-   */
-  const transportStoppedProviders =
-    new Set<Provider>();
+  const capacityController =
+    options.sharedCapacity ??
+    new HostProviderCapacityController({
+      nowMs:
+        options.nowMs,
+    });
 
-  /*
-   * Antigravity logical slot count and physical process
-   * concurrency are independent.
-   *
-   * No more than antigravityConcurrency runSlot calls
-   * are active simultaneously.
-   *
-   * Each worker re-enters runSlot before claiming the
-   * next logical slot, so the run-local transport stop
-   * and persistent quality circuit are re-checked before
-   * later work is launched.
-   */
-  const runAntigravitySlotsBounded =
-    async (): Promise<MutableStats[]> => {
-      const concurrency =
-        resolvedAntigravityConcurrency(
-          options,
-        );
+  const acquiredLeases:
+    SharedProviderCapacityLease[] =
+      [];
 
-      if (
-        options.antigravitySlots === 0
+  try {
+    const codexLeases:
+      SharedProviderCapacityLease[] =
+        [];
+
+    const antigravityLeases:
+      SharedProviderCapacityLease[] =
+        [];
+
+    try {
+      for (
+        let slot = 1;
+        slot <=
+          options.codexSlots;
+        slot += 1
       ) {
-        return [];
-      }
-
-      const values:
-        MutableStats[] =
-          new Array(
-            options.antigravitySlots,
+        const lease =
+          capacityController.acquireNormalSlot(
+            'codex',
+            undefined,
+            now(options),
           );
 
-      let nextSlot =
-        1;
+        acquiredLeases.push(
+          lease,
+        );
 
-      const worker =
-        async (): Promise<void> => {
-          while (true) {
-            /*
-             * JavaScript executes this allocation
-             * synchronously between awaits, making each
-             * logical slot unique within this invocation.
-             */
-            const slot =
-              nextSlot;
+        codexLeases.push(
+          lease,
+        );
+      }
 
-            if (
-              slot >
-                options.antigravitySlots
-            ) {
-              return;
+      for (
+        let slot = 1;
+        slot <=
+          options.antigravitySlots;
+        slot += 1
+      ) {
+        const lease =
+          capacityController.acquireNormalSlot(
+            'antigravity',
+            undefined,
+            now(options),
+          );
+
+        acquiredLeases.push(
+          lease,
+        );
+
+        antigravityLeases.push(
+          lease,
+        );
+      }
+    } catch (error) {
+      for (
+        const lease
+        of acquiredLeases
+      ) {
+        if (lease.isHeld()) {
+          lease.releaseSync(
+            lease.provider,
+          );
+        }
+      }
+
+      throw error;
+    }
+
+    const codexPromises:
+      Promise<MutableStats>[] = [];
+
+    /*
+     * Shared only within this bounded pool invocation.
+     *
+     * This prevents blind later calls after uncertain
+     * transport without conflating transport health with
+     * provider output quality.
+     */
+    const transportStoppedProviders =
+      new Set<Provider>();
+
+    /*
+     * Antigravity logical slot count and physical process
+     * concurrency are independent.
+     *
+     * No more than antigravityConcurrency runSlot calls
+     * are active simultaneously.
+     *
+     * Each worker re-enters runSlot before claiming the
+     * next logical slot, so the run-local transport stop
+     * and persistent quality circuit are re-checked before
+     * later work is launched.
+     */
+    const runAntigravitySlotsBounded =
+      async (): Promise<MutableStats[]> => {
+        const concurrency =
+          resolvedAntigravityConcurrency(
+            options,
+          );
+
+        if (
+          options.antigravitySlots === 0
+        ) {
+          return [];
+        }
+
+        const values:
+          MutableStats[] =
+            new Array(
+              options.antigravitySlots,
+            );
+
+        let nextSlot =
+          1;
+
+        const worker =
+          async (): Promise<void> => {
+            while (true) {
+              /*
+               * JavaScript executes this allocation
+               * synchronously between awaits, making each
+               * logical slot unique within this invocation.
+               */
+              const slot =
+                nextSlot;
+
+              if (
+                slot >
+                  options.antigravitySlots
+              ) {
+                return;
+              }
+
+              nextSlot +=
+                1;
+
+              values[
+                slot - 1
+              ] =
+                await runSlot(
+                  options,
+                  'antigravity',
+                  `live-antigravity-${String(slot)
+                    .padStart(2, '0')}`,
+                  antigravityLeases[
+                    slot - 1
+                  ]!,
+                  transportStoppedProviders,
+                );
             }
+          };
 
-            nextSlot +=
-              1;
+        await Promise.all(
+          Array.from(
+            {
+              length:
+                concurrency,
+            },
+            () =>
+              worker(),
+          ),
+        );
 
-            values[
-              slot - 1
-            ] =
-              await runSlot(
-                options,
-                'antigravity',
-                `live-antigravity-${String(slot)
-                  .padStart(2, '0')}`,
-                transportStoppedProviders,
-              );
-          }
-        };
+        return values;
+      };
 
-      await Promise.all(
-        Array.from(
-          {
-            length:
-              concurrency,
-          },
-          () =>
-            worker(),
+    for (
+      let slot = 1;
+      slot <=
+        options.codexSlots;
+      slot += 1
+    ) {
+      codexPromises.push(
+        runSlot(
+          options,
+          'codex',
+          `live-codex-${String(slot)
+            .padStart(2, '0')}`,
+          codexLeases[
+            slot - 1
+          ]!,
+          transportStoppedProviders,
         ),
       );
+    }
 
-      return values;
-    };
-
-  for (
-    let slot = 1;
-    slot <=
-      options.codexSlots;
-    slot += 1
-  ) {
-    codexPromises.push(
-      runSlot(
-        options,
-        'codex',
-        `live-codex-${String(slot)
-          .padStart(2, '0')}`,
-
-        transportStoppedProviders,
-      ),
-    );
-  }
-
-
-  const [
-    codexValues,
-    antigravityValues,
-  ] =
-    await Promise.all([
-      Promise.all(
-        codexPromises,
-      ),
-
-      runAntigravitySlotsBounded(),
-    ]);
-
-  const codex =
-    aggregateStats(
-      'codex',
-      options.codexSlots,
+    const [
       codexValues,
-    );
-
-  const antigravity =
-    aggregateStats(
-      'antigravity',
-      options.antigravitySlots,
       antigravityValues,
-    );
+    ] =
+      await Promise.all([
+        Promise.all(
+          codexPromises,
+        ),
 
-  return Object.freeze({
-    schemaVersion:
-      LIVE_TRANSACTIONAL_PROVIDER_POOL_SCHEMA,
+        runAntigravitySlotsBounded(),
+      ]);
 
-    codex,
-    antigravity,
+    const codex =
+      aggregateStats(
+        'codex',
+        options.codexSlots,
+        codexValues,
+      );
 
-    totalSlots:
-      options.codexSlots +
-      options.antigravitySlots,
+    const antigravity =
+      aggregateStats(
+        'antigravity',
+        options.antigravitySlots,
+        antigravityValues,
+      );
 
-    totalLiveProviderCalls:
-      codex.liveProviderCalls +
-      antigravity
-        .liveProviderCalls,
+    return Object.freeze({
+      schemaVersion:
+        LIVE_TRANSACTIONAL_PROVIDER_POOL_SCHEMA,
 
-    totalUsefulUnique:
-      codex.usefulUnique +
-      antigravity
-        .usefulUnique,
+      codex,
+      antigravity,
 
-    totalUsefulDuplicate:
-      codex.usefulDuplicate +
-      antigravity
-        .usefulDuplicate,
+      totalSlots:
+        options.codexSlots +
+        options.antigravitySlots,
 
-    fulgorCalled:
-      false,
+      totalLiveProviderCalls:
+        codex.liveProviderCalls +
+        antigravity
+          .liveProviderCalls,
 
-    verificationGranted:
-      false,
+      totalUsefulUnique:
+        codex.usefulUnique +
+        antigravity
+          .usefulUnique,
 
-    authorityGranted:
-      false,
-  });
+      totalUsefulDuplicate:
+        codex.usefulDuplicate +
+        antigravity
+          .usefulDuplicate,
+
+      fulgorCalled:
+        false,
+
+      verificationGranted:
+        false,
+
+      authorityGranted:
+        false,
+    });
+  } finally {
+    try {
+      for (
+        const lease
+        of acquiredLeases
+      ) {
+        if (lease.isHeld()) {
+          lease.releaseSync(
+            lease.provider,
+          );
+        }
+      }
+    } finally {
+      if (
+        ownedCapacityController
+      ) {
+        capacityController.close();
+      }
+    }
+  }
 }

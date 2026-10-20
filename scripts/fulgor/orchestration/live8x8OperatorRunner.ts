@@ -3,12 +3,28 @@ import {
 } from '../scheduler/providerTaskClassEvidenceStore';
 
 import {
+  buildProviderTaskClassRecoveryEvidenceFromHostLedger,
+  buildProviderTaskLaneEvidenceFromHostLedger,
+} from '../scheduler/providerTaskClassEvidenceLedger';
+
+import {
+  PROVIDER_TASK_CLASS_RECOVERY_POLICY,
+  evaluateProviderTaskClassRecovery,
+} from '../scheduler/providerTaskClassRecoveryPolicy';
+
+import {
+  HostProviderCapacityController,
+} from '../scheduler/sharedProviderCapacity';
+
+import {
   recoverProviderTaskClassEvidenceStateRoot,
 } from './providerTaskClassEvidenceReconciler';
 
 import {
   appendFileSync,
   constants,
+  existsSync,
+  readFileSync,
 } from 'node:fs';
 
 import {
@@ -17,6 +33,7 @@ import {
   lstat,
   mkdir,
   open,
+  readFile,
   realpath,
 } from 'node:fs/promises';
 
@@ -39,17 +56,23 @@ import {
 } from './agentProcess';
 
 import {
+  PROVIDER_WORK_RECORD_SCHEMA,
   createProviderWorkOrder,
 } from './providerWorkOrder';
 
-import type {
-  HostEvidenceCapsule,
+import {
+  parseProviderWorkProduct,
+  type HostEvidenceCapsule,
 } from './providerWorkProductGate';
 
 import {
   createBoundedLiveProviderInvoker,
   type LiveProviderProcessRunnerOptions,
 } from './liveProviderProcessRunner';
+
+import type {
+  LiveProviderInvoker,
+} from './liveTransactionalProviderWorkerPool';
 
 import {
   runLive8x8OneShot,
@@ -67,11 +90,76 @@ import {
   publishAcceptedWorkLatestPointer,
 } from './acceptedWorkLatestPointer';
 
+import {
+  runTaskClassRecoveryLive,
+} from './taskClassRecoveryLiveCoordinator';
+
+import {
+  createSealedV3RecoveryAuthorityBindings,
+} from './taskClassRecoveryHostAuthorities';
+
+import type {
+  RecoveryAuthorityCheckDependencies,
+} from './taskClassRecoveryAuthorityCheckBridge';
+
+import type {
+  RecoveryAuthorizationCreateDependencies,
+} from './taskClassRecoveryAuthorizationBridge';
+
+import type {
+  RecoveryEffectGateDependencies,
+} from './taskClassRecoveryEffectGateBridge';
+
+import type {
+  TaskClassRecoveryHostAdapterDependencies,
+} from './taskClassRecoveryHostAdapter';
+
+import type {
+  TaskClassRecoveryProviderRequest,
+  TaskClassRecoveryProviderResult,
+} from './taskClassRecoveryRunner';
+
 export const LIVE_8X8_OPERATOR_REQUEST_SCHEMA =
   'VELNAR_LIVE_8X8_OPERATOR_REQUEST_V1' as const;
 
 export const LIVE_ANTIGRAVITY_PROVIDER_TIMEOUT_MS =
   360_000 as const;
+
+export const TASK_CLASS_RECOVERY_LIVE_ENABLED_ENV =
+  'VELNAR_TASK_CLASS_RECOVERY_LIVE_ENABLED' as const;
+
+/*
+ * Host-owned explicit switch for recovery execution.
+ *
+ * Default is strictly DISABLED. Only exact value "1"
+ * enables live recovery wiring. Unset, empty, "0",
+ * "true", "yes", or malformed values remain disabled.
+ * Provider/model/request payloads cannot enable it.
+ */
+export function isTaskClassRecoveryLiveEnabled(
+  env: NodeJS.ProcessEnv,
+): boolean {
+  return env[TASK_CLASS_RECOVERY_LIVE_ENABLED_ENV] === '1';
+}
+
+export type Live8x8OperatorRecoveryStatus =
+  | 'DISABLED'
+  | 'HOLD'
+  | 'COMPLETE'
+  | 'STOPPED_GATE_DENIED'
+  | 'STOPPED_NON_USEFUL';
+
+export interface Live8x8OperatorRecoveryDependencies {
+  readonly batchId?: string;
+  readonly intentPath?: string;
+  readonly expectedIntentSha256?: string;
+  readonly readIntent?: RecoveryAuthorityCheckDependencies['readIntent'];
+  readonly executeAuthorizer?: RecoveryAuthorityCheckDependencies['executeAuthorizer'];
+  readonly executeAuthorization?: RecoveryAuthorizationCreateDependencies['executeAuthorization'];
+  readonly executeGate?: RecoveryEffectGateDependencies['executeGate'];
+  readonly invokeBoundAntigravity?: TaskClassRecoveryHostAdapterDependencies['invokeBoundAntigravity'];
+  readonly appendBoundHostOutcome?: TaskClassRecoveryHostAdapterDependencies['appendBoundHostOutcome'];
+}
 
 export interface Live8x8RequestEvidence {
   readonly id:
@@ -133,6 +221,18 @@ export interface Live8x8OperatorDependencies {
         Live8x8OneShotInput,
     ) =>
       Promise<Live8x8OneShotResult>;
+
+  readonly invokeProvider?:
+    LiveProviderInvoker;
+
+  readonly nowMs?:
+    () => number;
+
+  readonly sharedCapacity?:
+    HostProviderCapacityController;
+
+  readonly recovery?:
+    Live8x8OperatorRecoveryDependencies;
 }
 
 export interface Live8x8OperatorResult {
@@ -162,6 +262,27 @@ export interface Live8x8OperatorResult {
 
   readonly actualProviderCalls:
     number;
+
+  readonly normalProviderCalls:
+    number;
+
+  readonly recoveryEnabled:
+    boolean;
+
+  readonly recoveryStatus:
+    Live8x8OperatorRecoveryStatus;
+
+  readonly recoveryProviderCalls:
+    number;
+
+  readonly recoveryUsefulUnique:
+    number;
+
+  readonly totalProviderCalls:
+    number;
+
+  readonly capacityControllerId:
+    string;
 
   readonly usefulUnique:
     number;
@@ -1037,215 +1158,613 @@ runLive8x8Operator(
       `${request.baseline}.sqlite`,
     );
 
-  const taskClassEvidenceStore =
-    new ProviderTaskClassEvidenceStore(
-      taskClassEvidencePath,
-      request.baseline,
+  const nowMs =
+    dependencies.nowMs ??
+    (
+      () =>
+        Date.now()
     );
 
-  const processTelemetryPath =
+  const safeOperatorClock =
+    (): number => {
+      const value =
+        nowMs();
+
+      if (
+        !Number.isSafeInteger(
+          value,
+        ) ||
+        value < 0
+      ) {
+        fail();
+      }
+
+      return value;
+    };
+
+  const ownedSharedCapacity =
+    dependencies.sharedCapacity ===
+      undefined;
+
+  const sharedCapacityPath =
     join(
-      runDirectory,
-      'process-telemetry.jsonl',
+      stateRoot,
+      'shared-provider-capacity.sqlite',
     );
 
-  const materializedByPath =
-    new Map<
-      string,
-      BoundHostEvidenceText
-    >();
+  const sharedCapacity =
+    dependencies.sharedCapacity ??
+    new HostProviderCapacityController({
+      dbPath:
+        sharedCapacityPath,
 
-  const preparedByJob =
-    new Map<
-      string,
-      readonly BoundHostEvidenceText[]
-    >();
+      nowMs:
+        safeOperatorClock,
+    });
 
-  const jobs:
-    Live8x8OneShotJob[] =
-      [];
+  let operatorOwnershipHeld =
+    false;
 
-  for (
-    const requested
-    of request.jobs
-  ) {
-    const prepared:
-      BoundHostEvidenceText[] =
-        [];
-
-    let totalEvidenceBytes =
-      0;
-
-    for (
-      const reference
-      of requested.evidence
+  try {
+    if (
+      ownedSharedCapacity
     ) {
-      let materialized =
-        materializedByPath.get(
-          reference.path,
-        );
-
-      if (
-        materialized ===
-          undefined
-      ) {
-        const content =
-          await gitText(
-            repoRoot,
-            [
-              'show',
-              `${request.baseline}:${reference.path}`,
-            ],
-          );
-
-        const bytes =
-          byteLength(
-            content,
-          );
-
-        if (
-          bytes === 0 ||
-          bytes >
-            32_768
-        ) {
-          fail();
-        }
-
-        materialized =
-          Object.freeze({
-            id:
-              reference.id,
-
-            path:
-              reference.path,
-
-            sha256:
-              sha256(
-                content,
-              ),
-
-            content,
-          });
-
-        materializedByPath.set(
-          reference.path,
-          materialized,
-        );
-      } else if (
-        materialized.id !==
-          reference.id
-      ) {
-        /*
-         * One path has one canonical evidence identity
-         * inside a single request.
-         */
-        fail();
-      }
-
-      totalEvidenceBytes +=
-        byteLength(
-          materialized.content,
-        );
-
-      if (
-        totalEvidenceBytes >
-          65_536
-      ) {
-        fail();
-      }
-
-      prepared.push(
-        materialized,
+      sharedCapacity.acquireOperatorOwnership(
+        request.requestId,
       );
+
+      operatorOwnershipHeld =
+        true;
     }
 
-    const order =
-      createProviderWorkOrder({
-        jobId:
+    const initialCapacity =
+      sharedCapacity.snapshot();
+
+    if (
+      initialCapacity.codexMax !==
+        8 ||
+      initialCapacity.antigravityMax !==
+        8 ||
+      initialCapacity.globalMax !==
+        16 ||
+      initialCapacity.normalCodexHeld >
+        8 ||
+      initialCapacity.normalAntigravityHeld +
+        initialCapacity.recoveryAntigravityHeld >
+        8 ||
+      initialCapacity.globalHeld >
+        16
+    ) {
+      fail();
+    }
+
+    const taskClassEvidenceStore =
+      new ProviderTaskClassEvidenceStore(
+        taskClassEvidencePath,
+        request.baseline,
+      );
+
+    const processTelemetryPath =
+      join(
+        runDirectory,
+        'process-telemetry.jsonl',
+      );
+
+    const materializedByPath =
+      new Map<
+        string,
+        BoundHostEvidenceText
+      >();
+
+    const preparedByJob =
+      new Map<
+        string,
+        readonly BoundHostEvidenceText[]
+      >();
+
+    const jobs:
+      Live8x8OneShotJob[] =
+        [];
+
+    try {
+      for (
+        const requested
+        of request.jobs
+      ) {
+        const prepared:
+          BoundHostEvidenceText[] =
+            [];
+
+        let totalEvidenceBytes =
+          0;
+
+        for (
+          const reference
+          of requested.evidence
+        ) {
+          let materialized =
+            materializedByPath.get(
+              reference.path,
+            );
+
+          if (
+            materialized ===
+              undefined
+          ) {
+            const content =
+              await gitText(
+                repoRoot,
+                [
+                  'show',
+                  `${request.baseline}:${reference.path}`,
+                ],
+              );
+
+            const bytes =
+              byteLength(
+                content,
+              );
+
+            if (
+              bytes === 0 ||
+              bytes >
+                32_768
+            ) {
+              fail();
+            }
+
+            materialized =
+              Object.freeze({
+                id:
+                  reference.id,
+
+                path:
+                  reference.path,
+
+                sha256:
+                  sha256(
+                    content,
+                  ),
+
+                content,
+              });
+
+            materializedByPath.set(
+              reference.path,
+              materialized,
+            );
+          } else if (
+            materialized.id !==
+              reference.id
+          ) {
+            /*
+             * One path has one canonical evidence identity
+             * inside a single request.
+             */
+            fail();
+          }
+
+          totalEvidenceBytes +=
+            byteLength(
+              materialized.content,
+            );
+
+          if (
+            totalEvidenceBytes >
+              65_536
+          ) {
+            fail();
+          }
+
+          prepared.push(
+            materialized,
+          );
+        }
+
+        const order =
+          createProviderWorkOrder({
+            jobId:
+              requested.jobId,
+
+            baseline:
+              request.baseline,
+
+            task:
+              requested.task,
+
+            evidenceIds:
+              requested.evidence.map(
+                value =>
+                  value.id,
+              ),
+
+            affinity:
+              requested.provider,
+          });
+
+        const capsule:
+          HostEvidenceCapsule =
+            Object.freeze({
+              taskId:
+                requested.jobId,
+
+              baseline:
+                request.baseline,
+
+              evidence:
+                Object.freeze(
+                  prepared.map(
+                    evidence =>
+                      Object.freeze({
+                        id:
+                          evidence.id,
+
+                        path:
+                          evidence.path,
+
+                        sha256:
+                          evidence.sha256,
+                      }),
+                  ),
+                ),
+            });
+
+        preparedByJob.set(
           requested.jobId,
+          Object.freeze(
+            prepared,
+          ),
+        );
 
-        baseline:
-          request.baseline,
+        /*
+         * V1 classification is host-owned GENERAL.
+         *
+         * Request/provider/model text cannot choose a class.
+         * Specialized host classification can be introduced
+         * later without widening this admission boundary.
+         */
+        const routing =
+          Object.freeze({
+            taskClass:
+              'GENERAL' as const,
 
-        task:
-          requested.task,
+            codex:
+              taskClassEvidenceStore
+                .laneEvidence(
+                  'codex',
+                  'GENERAL',
+                  {
+                    qualityCircuit:
+                      'CLOSED',
 
-        evidenceIds:
-          requested.evidence.map(
-            value =>
-              value.id,
+                    quotaCircuit:
+                      'CLOSED',
+
+                    availableSlots:
+                      8,
+                  },
+                ),
+
+            antigravity:
+              taskClassEvidenceStore
+                .laneEvidence(
+                  'antigravity',
+                  'GENERAL',
+                  {
+                    qualityCircuit:
+                      'CLOSED',
+
+                    quotaCircuit:
+                      'CLOSED',
+
+                    availableSlots:
+                      8,
+                  },
+                ),
+          });
+
+        jobs.push(
+          Object.freeze({
+            order,
+            capsule,
+
+            routing,}),
+        );
+      }
+    } finally {
+      /*
+       * Read-side store is closed before any provider
+       * execution begins.
+       */
+      taskClassEvidenceStore.close();
+    }
+
+    const processOptions:
+      LiveProviderProcessRunnerOptions =
+        {
+          repoRoot,
+
+          tempRoot,
+
+          codex: {
+            executable:
+              codexExecutable,
+
+            timeoutMs:
+              360_000,
+
+            maxStdoutBytes:
+              131_072,
+
+            maxStderrBytes:
+              32_768,
+          },
+
+          antigravity: {
+            executable:
+              antigravityExecutable,
+
+            /*
+             * Antigravity completion envelope:
+             * healthy plan-mode work has demonstrated
+             * completion well beyond ninety seconds.
+             *
+             * Physical AGY slot execution is serialized
+             * in the live worker pool so the former 8-way
+             * local resource/inotify burst cannot occur.
+             *
+             * 360 seconds remains a hard fail-closed
+             * per-process bound. Timeout never grants
+             * protocol/useful-work authority and is never
+             * retried automatically.
+             */
+            timeoutMs:
+              LIVE_ANTIGRAVITY_PROVIDER_TIMEOUT_MS,
+
+            maxStdoutBytes:
+              131_072,
+
+            maxStderrBytes:
+              32_768,
+          },
+
+          /*
+           * Sanitized process telemetry only.
+           *
+           * No stdout, stderr, prompt, provider response,
+           * credentials or environment values are persisted.
+           * Observer failure cannot change provider accounting.
+           */
+          observeProcessTelemetry:
+            telemetry => {
+              appendFileSync(
+                processTelemetryPath,
+                JSON.stringify({
+                  provider:
+                    telemetry.provider,
+
+                  jobId:
+                    telemetry.jobId,
+
+                  requestedModel:
+                    telemetry.requestedModel,
+
+                  antigravityAuthorityDiagnostic:
+                    telemetry.antigravityAuthorityDiagnostic,
+
+                  outcome:
+                    telemetry.outcome,
+
+                  failureReason:
+                    telemetry.failureReason,
+
+                  exitCode:
+                    telemetry.exitCode,
+
+                  signal:
+                    telemetry.signal,
+
+                  stdoutBytes:
+                    telemetry.stdoutBytes,
+
+                  stderrBytes:
+                    telemetry.stderrBytes,
+
+                  timedOut:
+                    telemetry.timedOut,
+
+                  outputOverflow:
+                    telemetry.outputOverflow,
+                }) + '\n',
+                {
+                  encoding:
+                    'utf8',
+
+                  flag:
+                    'a',
+
+                  mode:
+                    0o600,
+                },
+              );
+            },
+
+          resolvePreparedEvidence:
+            input => {
+              const evidence =
+                preparedByJob.get(
+                  input.record.order.jobId,
+                );
+
+              if (
+                evidence ===
+                  undefined
+              ) {
+                fail();
+              }
+
+              return evidence;
+            },
+        };
+
+    const defaultInvokeProvider =
+      createBoundedLiveProviderInvoker(
+        processOptions,
+      );
+
+    const invokeProvider =
+      dependencies.invokeProvider ??
+      defaultInvokeProvider;
+
+    const runOneShot =
+      dependencies.runOneShot ??
+      runLive8x8OneShot;
+
+    const result =
+      await runOneShot({
+        queuePath,
+
+        jobs:
+          Object.freeze(
+            jobs,
           ),
 
-        affinity:
-          requested.provider,
+        invokeProvider,
+
+        nowMs:
+          safeOperatorClock,
+
+        leaseDurationMs:
+          600_000,
+
+        sharedCapacity,
       });
 
-    const capsule:
-      HostEvidenceCapsule =
-        Object.freeze({
-          taskId:
-            requested.jobId,
+    if (
+      result.baseline !==
+        request.baseline ||
+      result.expectedProviderCalls !==
+        16 ||
+      result.pool.totalSlots !==
+        16 ||
+      result.pool.codex.slots !==
+        8 ||
+      result.pool.antigravity.slots !==
+        8 ||
+      result.pool.totalLiveProviderCalls >
+        16 ||
+      result.fulgorCalled !==
+        false ||
+      result.verificationGranted !==
+        false ||
+      result.authorityGranted !==
+        false
+    ) {
+      fail();
+    }
+
+    const acceptedWorkPointerPath =
+      await publishAcceptedWorkLatestPointer(
+        stateRoot,
+        {
+          schemaVersion:
+            ACCEPTED_WORK_LATEST_POINTER_SCHEMA,
+
+          requestId:
+            request.requestId,
 
           baseline:
             request.baseline,
 
-          evidence:
-            Object.freeze(
-              prepared.map(
-                evidence =>
-                  Object.freeze({
-                    id:
-                      evidence.id,
+          runDirectory,
+          queuePath,
 
-                    path:
-                      evidence.path,
+          usefulUnique:
+            result.pool
+              .totalUsefulUnique,
 
-                    sha256:
-                      evidence.sha256,
-                  }),
+          completedAtMs:
+            result.completedAtMs,
+        },
+      );
+
+    const recoveryEnabled =
+      isTaskClassRecoveryLiveEnabled(
+        env,
+      );
+
+    let recoveryStatus:
+      Live8x8OperatorRecoveryStatus =
+        'DISABLED';
+
+    let recoveryProviderCalls =
+      0;
+
+    let recoveryUsefulUnique =
+      0;
+
+    if (recoveryEnabled) {
+      try {
+        if (
+          existsSync(
+            queuePath,
+          )
+        ) {
+          const header =
+            Buffer.from(
+              readFileSync(
+                queuePath,
+              ).subarray(
+                0,
+                16,
               ),
-            ),
-        });
+            ).toString(
+              'utf8',
+            );
 
-    preparedByJob.set(
-      requested.jobId,
-      Object.freeze(
-        prepared,
-      ),
-    );
+          if (
+            header ===
+              'SQLite format 3\0'
+          ) {
+            recoverProviderTaskClassEvidenceStateRoot(
+              stateRoot,
+            );
+          }
+        }
 
-    /*
-     * V1 classification is host-owned GENERAL.
-     *
-     * Request/provider/model text cannot choose a class.
-     * Specialized host classification can be introduced
-     * later without widening this admission boundary.
-     */
-    const routing =
-      Object.freeze({
-        taskClass:
-          'GENERAL' as const,
+        const postOneShotCapacity =
+          sharedCapacity.snapshot();
 
-        codex:
-          taskClassEvidenceStore
-            .laneEvidence(
-              'codex',
-              'GENERAL',
-              {
-                qualityCircuit:
-                  'CLOSED',
+        if (
+          postOneShotCapacity.normalCodexHeld >
+            8 ||
+          postOneShotCapacity.normalAntigravityHeld +
+            postOneShotCapacity.recoveryAntigravityHeld >
+            8 ||
+          postOneShotCapacity.globalHeld >
+            16
+        ) {
+          fail();
+        }
 
-                quotaCircuit:
-                  'CLOSED',
+        const recoveryStore =
+          new ProviderTaskClassEvidenceStore(
+            taskClassEvidencePath,
+            request.baseline,
+          );
 
-                availableSlots:
-                  8,
-              },
-            ),
+        try {
+          const ledger =
+            recoveryStore.loadLedger();
 
-        antigravity:
-          taskClassEvidenceStore
-            .laneEvidence(
+          const availableAntigravitySlots =
+            sharedCapacity.availableProviderCapacity(
+              'antigravity',
+            );
+
+          const lane =
+            buildProviderTaskLaneEvidenceFromHostLedger(
+              ledger,
               'antigravity',
               'GENERAL',
               {
@@ -1256,284 +1775,703 @@ runLive8x8Operator(
                   'CLOSED',
 
                 availableSlots:
-                  8,
-              },
-            ),
-      });
-
-    jobs.push(
-      Object.freeze({
-        order,
-        capsule,
-
-        routing,}),
-    );
-  }
-
-  /*
-   * Read-side store is closed before any provider
-   * execution begins.
-   */
-  taskClassEvidenceStore.close();
-
-
-  const processOptions:
-    LiveProviderProcessRunnerOptions =
-      {
-        repoRoot,
-
-        tempRoot,
-
-        codex: {
-          executable:
-            codexExecutable,
-
-          timeoutMs:
-            360_000,
-
-          maxStdoutBytes:
-            131_072,
-
-          maxStderrBytes:
-            32_768,
-        },
-
-        antigravity: {
-          executable:
-            antigravityExecutable,
-
-          /*
-           * Antigravity completion envelope:
-           * healthy plan-mode work has demonstrated
-           * completion well beyond ninety seconds.
-           *
-           * Physical AGY slot execution is serialized
-           * in the live worker pool so the former 8-way
-           * local resource/inotify burst cannot occur.
-           *
-           * 360 seconds remains a hard fail-closed
-           * per-process bound. Timeout never grants
-           * protocol/useful-work authority and is never
-           * retried automatically.
-           */
-          timeoutMs:
-            LIVE_ANTIGRAVITY_PROVIDER_TIMEOUT_MS,
-
-          maxStdoutBytes:
-            131_072,
-
-          maxStderrBytes:
-            32_768,
-        },
-
-        /*
-         * Sanitized process telemetry only.
-         *
-         * No stdout, stderr, prompt, provider response,
-         * credentials or environment values are persisted.
-         * Observer failure cannot change provider accounting.
-         */
-        observeProcessTelemetry:
-          telemetry => {
-            appendFileSync(
-              processTelemetryPath,
-              JSON.stringify({
-                provider:
-                  telemetry.provider,
-
-                jobId:
-                  telemetry.jobId,
-
-                requestedModel:
-                  telemetry.requestedModel,
-
-                antigravityAuthorityDiagnostic:
-                  telemetry.antigravityAuthorityDiagnostic,
-
-                outcome:
-                  telemetry.outcome,
-
-                failureReason:
-                  telemetry.failureReason,
-
-                exitCode:
-                  telemetry.exitCode,
-
-                signal:
-                  telemetry.signal,
-
-                stdoutBytes:
-                  telemetry.stdoutBytes,
-
-                stderrBytes:
-                  telemetry.stderrBytes,
-
-                timedOut:
-                  telemetry.timedOut,
-
-                outputOverflow:
-                  telemetry.outputOverflow,
-              }) + '\n',
-              {
-                encoding:
-                  'utf8',
-
-                flag:
-                  'a',
-
-                mode:
-                  0o600,
+                  availableAntigravitySlots,
               },
             );
-          },
 
-        resolvePreparedEvidence:
-          input => {
-            const evidence =
-              preparedByJob.get(
-                input.record.order.jobId,
-              );
+          const recoveryEvidence =
+            buildProviderTaskClassRecoveryEvidenceFromHostLedger(
+              ledger,
+              'antigravity',
+              'GENERAL',
+            );
+
+          const recoveryNowMs =
+            safeOperatorClock();
+
+          const requestedProviderCalls =
+            recoveryEvidence.postFailureUsefulUnique ===
+              0
+              ? PROVIDER_TASK_CLASS_RECOVERY_POLICY
+                  .probationBootstrapCalls
+              : Math.max(
+                  1,
+                  PROVIDER_TASK_CLASS_RECOVERY_POLICY
+                    .certificationSamples -
+                    recoveryEvidence
+                      .postFailureUsefulUnique,
+                );
+
+          const policyDecision =
+            evaluateProviderTaskClassRecovery({
+              baseline:
+                request.baseline,
+
+              nowMs:
+                recoveryNowMs,
+
+              requestedProviderCalls,
+
+              requestedConcurrency:
+                1,
+
+              lane,
+
+              recovery:
+                recoveryEvidence,
+            });
+
+          if (
+            policyDecision.status !==
+              'ELIGIBLE' ||
+            policyDecision.phase ===
+              null
+          ) {
+            recoveryStatus =
+              'HOLD';
+          } else {
+            const intentPath =
+              dependencies.recovery
+                ?.intentPath ??
+              env.VELNAR_TASK_CLASS_RECOVERY_INTENT_FILE;
+
+            const batchId =
+              dependencies.recovery
+                ?.batchId ??
+              env.VELNAR_TASK_CLASS_RECOVERY_BATCH_ID;
+
+            const defaultAuthorityBindings =
+              createSealedV3RecoveryAuthorityBindings();
+
+            const readIntent =
+              dependencies.recovery
+                ?.readIntent ??
+              defaultAuthorityBindings.readIntent;
 
             if (
-              evidence ===
-                undefined
+              !intentPath ||
+              !batchId
             ) {
-              fail();
+              const checkless =
+                await runTaskClassRecoveryLive(
+                  {
+                    baseline:
+                      request.baseline,
+
+                    nowMs:
+                      recoveryNowMs,
+
+                    requestedProviderCalls:
+                      policyDecision.requiredProviderCalls,
+
+                    requestedConcurrency:
+                      1,
+
+                    requestedModel:
+                      'gemini-3.8-flash-high',
+
+                    lane,
+
+                    recovery:
+                      recoveryEvidence,
+                  },
+                  {
+                    acquireHostAntigravitySlot:
+                      async () =>
+                        sharedCapacity.acquireRecoveryAntigravitySlot({
+                          nowMs:
+                            safeOperatorClock(),
+                        }),
+
+                    readIntent,
+
+                    executeAuthorizer:
+                      dependencies.recovery
+                        ?.executeAuthorizer ??
+                      defaultAuthorityBindings.executeAuthorizer,
+
+                    executeAuthorization:
+                      dependencies.recovery
+                        ?.executeAuthorization ??
+                      defaultAuthorityBindings.executeAuthorization,
+
+                    executeGate:
+                      dependencies.recovery
+                        ?.executeGate ??
+                      defaultAuthorityBindings.executeGate,
+
+                    invokeBoundAntigravity:
+                      async () => {
+                        throw new Error(
+                          'RECOVERY_WITHOUT_CHECK_ONLY_FORBIDDEN',
+                        );
+                      },
+
+                    appendBoundHostOutcome:
+                      async outcome => {
+                        recoveryStore.appendRecoveryHostOutcome(
+                          outcome,
+                        );
+                      },
+
+                    nowMs:
+                      safeOperatorClock,
+                  },
+                );
+
+              recoveryStatus =
+                checkless.status ===
+                  'AUTHORIZATION_REQUIRED'
+                  ? 'HOLD'
+                  : checkless.status;
+            } else {
+              const expectedIntentSha256 =
+                dependencies.recovery
+                  ?.expectedIntentSha256 ??
+                env.VELNAR_TASK_CLASS_RECOVERY_INTENT_SHA256 ??
+                sha256(
+                  await readIntent(
+                    intentPath,
+                  ),
+                );
+
+              const seenCandidateDigests =
+                new Set<string>();
+
+              const defaultInvokeRecoveryAntigravity =
+                async (
+                  providerRequest:
+                    TaskClassRecoveryProviderRequest,
+                ): Promise<TaskClassRecoveryProviderResult> => {
+                  const recoveryPrepared:
+                    BoundHostEvidenceText[] =
+                      [];
+
+                  for (
+                    const binding
+                    of providerRequest
+                      .job.evidence
+                  ) {
+                    const content =
+                      await gitText(
+                        repoRoot,
+                        [
+                          'show',
+                          `${request.baseline}:${binding.path}`,
+                        ],
+                      );
+
+                    const digest =
+                      sha256(
+                        content,
+                      );
+
+                    if (
+                      digest !==
+                        binding.sha256.toLowerCase()
+                    ) {
+                      return Object.freeze({
+                        outcome:
+                          'CONTRACT_REJECTED' as const,
+                      });
+                    }
+
+                    recoveryPrepared.push(
+                      Object.freeze({
+                        id:
+                          binding.id,
+
+                        path:
+                          binding.path,
+
+                        sha256:
+                          digest,
+
+                        content,
+                      }),
+                    );
+                  }
+
+                  preparedByJob.set(
+                    providerRequest
+                      .job.jobId,
+                    Object.freeze(
+                      recoveryPrepared,
+                    ),
+                  );
+
+                  const recoveryOrder =
+                    createProviderWorkOrder({
+                      jobId:
+                        providerRequest
+                          .job.jobId,
+
+                      baseline:
+                        request.baseline,
+
+                      task:
+                        providerRequest
+                          .job.task,
+
+                      evidenceIds:
+                        providerRequest.job.evidence.map(
+                          item =>
+                            item.id,
+                        ),
+
+                      affinity:
+                        'antigravity',
+                    });
+
+                  const recoveryCapsule:
+                    HostEvidenceCapsule =
+                      Object.freeze({
+                        taskId:
+                          providerRequest
+                            .job.jobId,
+
+                        baseline:
+                          request.baseline,
+
+                        evidence:
+                          Object.freeze(
+                            recoveryPrepared.map(
+                              item =>
+                                Object.freeze({
+                                  id:
+                                    item.id,
+
+                                  path:
+                                    item.path,
+
+                                  sha256:
+                                    item.sha256,
+                                }),
+                            ),
+                          ),
+                      });
+
+                  const invocation =
+                    await invokeProvider({
+                      provider:
+                        'antigravity',
+
+                      slotId:
+                        'recovery-antigravity-01',
+
+                      record:
+                        Object.freeze({
+                          schemaVersion:
+                            PROVIDER_WORK_RECORD_SCHEMA,
+
+                          order:
+                            recoveryOrder,
+
+                          state:
+                            'LEASED' as const,
+
+                          attempts:
+                            1,
+
+                          lease:
+                            Object.freeze({
+                              leaseId:
+                                `recovery-lease-${providerRequest.securityMetadata.ordinal}`,
+
+                              provider:
+                                'antigravity' as const,
+
+                              slotId:
+                                'recovery-antigravity-01',
+
+                              attempt:
+                                1,
+
+                              leasedAtMs:
+                                safeOperatorClock(),
+
+                              expiresAtMs:
+                                safeOperatorClock() +
+                                600_000,
+                            }),
+
+                          lastOutcome:
+                            null,
+
+                          fingerprint:
+                            null,
+
+                          recoveryHoldReason:
+                            null,
+
+                          createdAtMs:
+                            safeOperatorClock(),
+
+                          updatedAtMs:
+                            safeOperatorClock(),
+                        }),
+
+                      capsule:
+                        recoveryCapsule,
+                    });
+
+                  if (
+                    invocation.transport ===
+                      'FAILURE'
+                  ) {
+                    return Object.freeze({
+                      outcome:
+                        'TRANSPORT_FAILURE' as const,
+                    });
+                  }
+
+                  if (
+                    invocation.protocol !==
+                      'PASS'
+                  ) {
+                    return Object.freeze({
+                      outcome:
+                        'PROTOCOL_REJECTED' as const,
+                    });
+                  }
+
+                  try {
+                    const accepted =
+                      parseProviderWorkProduct(
+                        invocation.raw,
+                        recoveryCapsule,
+                        'antigravity',
+                      );
+
+                    if (
+                      !accepted.usable
+                    ) {
+                      return Object.freeze({
+                        outcome:
+                          'BLOCKED' as const,
+                      });
+                    }
+
+                    const candidateDigest =
+                      sha256(
+                        JSON.stringify(
+                          accepted.workProduct,
+                        ),
+                      );
+
+                    if (
+                      seenCandidateDigests.has(
+                        candidateDigest,
+                      )
+                    ) {
+                      return Object.freeze({
+                        outcome:
+                          'USEFUL_DUPLICATE' as const,
+                      });
+                    }
+
+                    seenCandidateDigests.add(
+                      candidateDigest,
+                    );
+
+                    return Object.freeze({
+                      outcome:
+                        'USEFUL_UNIQUE' as const,
+                    });
+                  } catch {
+                    return Object.freeze({
+                      outcome:
+                        'CONTRACT_REJECTED' as const,
+                    });
+                  }
+                };
+
+              const liveResult =
+                await runTaskClassRecoveryLive(
+                  {
+                    baseline:
+                      request.baseline,
+
+                    nowMs:
+                      recoveryNowMs,
+
+                    requestedProviderCalls:
+                      policyDecision.requiredProviderCalls,
+
+                    requestedConcurrency:
+                      1,
+
+                    requestedModel:
+                      'gemini-3.8-flash-high',
+
+                    lane,
+
+                    recovery:
+                      recoveryEvidence,
+
+                    checkOnly: {
+                      input: {
+                        baseline:
+                          request.baseline,
+
+                        batchId,
+
+                        intentPath,
+
+                        provider:
+                          'antigravity',
+
+                        taskClass:
+                          'GENERAL',
+
+                        phase:
+                          policyDecision.phase,
+
+                        requestedModel:
+                          'gemini-3.8-flash-high',
+
+                        requestedProviderCalls:
+                          policyDecision.requiredProviderCalls,
+
+                        requestedConcurrency:
+                          1,
+                      },
+
+                      expectedIntentSha256,
+                    },
+                  },
+                  {
+                    acquireHostAntigravitySlot:
+                      async () =>
+                        sharedCapacity.acquireRecoveryAntigravitySlot({
+                          nowMs:
+                            safeOperatorClock(),
+                        }),
+
+                    readIntent,
+
+                    executeAuthorizer:
+                      dependencies.recovery
+                        ?.executeAuthorizer ??
+                      defaultAuthorityBindings.executeAuthorizer,
+
+                    executeAuthorization:
+                      dependencies.recovery
+                        ?.executeAuthorization ??
+                      defaultAuthorityBindings.executeAuthorization,
+
+                    executeGate:
+                      dependencies.recovery
+                        ?.executeGate ??
+                      defaultAuthorityBindings.executeGate,
+
+                    invokeBoundAntigravity:
+                      async providerRequest => {
+                        const activeSnap =
+                          sharedCapacity.snapshot();
+
+                        if (
+                          activeSnap.recoveryAntigravityHeld !==
+                            1 ||
+                          activeSnap.normalCodexHeld >
+                            8 ||
+                          activeSnap.normalAntigravityHeld +
+                            activeSnap.recoveryAntigravityHeld >
+                            8 ||
+                          activeSnap.globalHeld >
+                            16
+                        ) {
+                          throw new Error(
+                            'SHARED_CAPACITY_RECOVERY_ENVELOPE_VIOLATED',
+                          );
+                        }
+
+                        if (
+                          dependencies
+                            .recovery
+                            ?.invokeBoundAntigravity
+                        ) {
+                          return dependencies.recovery.invokeBoundAntigravity(
+                            providerRequest,
+                          );
+                        }
+
+                        return defaultInvokeRecoveryAntigravity(
+                          providerRequest,
+                        );
+                      },
+
+                    appendBoundHostOutcome:
+                      async outcome => {
+                        recoveryStore.appendRecoveryHostOutcome(
+                          outcome,
+                        );
+
+                        if (
+                          dependencies
+                            .recovery
+                            ?.appendBoundHostOutcome
+                        ) {
+                          await dependencies.recovery.appendBoundHostOutcome(
+                            outcome,
+                          );
+                        }
+                      },
+
+                    nowMs:
+                      safeOperatorClock,
+                  },
+                );
+
+              recoveryStatus =
+                liveResult.status ===
+                  'AUTHORIZATION_REQUIRED'
+                  ? 'HOLD'
+                  : liveResult.status;
+
+              recoveryProviderCalls =
+                liveResult.run
+                  ?.attemptedProviderCalls ??
+                0;
+
+              recoveryUsefulUnique =
+                liveResult.run
+                  ?.usefulUnique ??
+                0;
+
+              if (
+                recoveryProviderCalls <
+                  0 ||
+                recoveryProviderCalls >
+                  8 ||
+                liveResult.automaticRetry !==
+                  false ||
+                liveResult.codexFallback !==
+                  false ||
+                liveResult.verificationGranted !==
+                  false ||
+                liveResult.automaticPromotionAllowed !==
+                  false
+              ) {
+                fail();
+              }
             }
+          }
+        } finally {
+          recoveryStore.close();
+        }
+      } catch {
+        fail();
+      }
+    }
 
-            return evidence;
-          },
-      };
+    const finalCapacity =
+      sharedCapacity.snapshot();
 
-  const invokeProvider =
-    createBoundedLiveProviderInvoker(
-      processOptions,
-    );
+    if (
+      finalCapacity.recoveryAntigravityHeld !==
+        0 ||
+      finalCapacity.normalCodexHeld >
+        8 ||
+      finalCapacity.normalAntigravityHeld +
+        finalCapacity.recoveryAntigravityHeld >
+        8 ||
+      finalCapacity.globalHeld >
+        16
+    ) {
+      fail();
+    }
 
-  const runOneShot =
-    dependencies.runOneShot ??
-    runLive8x8OneShot;
+    const normalProviderCalls =
+      result.pool
+        .totalLiveProviderCalls;
 
-  const result =
-    await runOneShot({
+    return Object.freeze({
+      requestId:
+        request.requestId,
+
+      baseline:
+        request.baseline,
+
+      runDirectory,
+
       queuePath,
 
-      jobs:
-        Object.freeze(
-          jobs,
-        ),
+      processTelemetryPath,
 
-      invokeProvider,
+      acceptedWorkPointerPath,
 
-      nowMs:
-        () =>
-          Date.now(),
+      elapsedMs:
+        result.elapsedMs,
 
-      leaseDurationMs:
-        600_000,
+      expectedProviderCalls:
+        16,
+
+      actualProviderCalls:
+        normalProviderCalls,
+
+      normalProviderCalls,
+
+      recoveryEnabled,
+
+      recoveryStatus,
+
+      recoveryProviderCalls,
+
+      recoveryUsefulUnique,
+
+      totalProviderCalls:
+        normalProviderCalls +
+        recoveryProviderCalls,
+
+      capacityControllerId:
+        sharedCapacity.controllerId,
+
+      usefulUnique:
+        result.pool
+          .totalUsefulUnique,
+
+      fulgorCalled:
+        false,
+
+      verificationGranted:
+        false,
+
+      authorityGranted:
+        false,
+
+      automaticPromotionAllowed:
+        false,
+
+      autoCommit:
+        false,
+
+      autoPush:
+        false,
+
+      autoMerge:
+        false,
+
+      deploy:
+        false,
     });
-
-  if (
-    result.baseline !==
-      request.baseline ||
-    result.expectedProviderCalls !==
-      16 ||
-    result.pool.totalSlots !==
-      16 ||
-    result.pool.codex.slots !==
-      8 ||
-    result.pool.antigravity.slots !==
-      8 ||
-    result.pool.totalLiveProviderCalls >
-      16 ||
-    result.fulgorCalled !==
-      false ||
-    result.verificationGranted !==
-      false ||
-    result.authorityGranted !==
-      false
-  ) {
-    fail();
-  }
-
-  const acceptedWorkPointerPath =
-    await publishAcceptedWorkLatestPointer(
-      stateRoot,
-      {
-        schemaVersion:
-          ACCEPTED_WORK_LATEST_POINTER_SCHEMA,
-
-        requestId:
+  } finally {
+    try {
+      if (
+        operatorOwnershipHeld
+      ) {
+        sharedCapacity.releaseOperatorOwnership(
           request.requestId,
-
-        baseline:
-          request.baseline,
-
-        runDirectory,
-        queuePath,
-
-        usefulUnique:
-          result.pool
-            .totalUsefulUnique,
-
-        completedAtMs:
-          result.completedAtMs,
-      },
-    );
-
-  return Object.freeze({
-    requestId:
-      request.requestId,
-
-    baseline:
-      request.baseline,
-
-    runDirectory,
-
-    queuePath,
-
-    processTelemetryPath,
-
-    acceptedWorkPointerPath,
-
-    elapsedMs:
-      result.elapsedMs,
-
-    expectedProviderCalls:
-      16,
-
-    actualProviderCalls:
-      result.pool
-        .totalLiveProviderCalls,
-
-    usefulUnique:
-      result.pool
-        .totalUsefulUnique,
-
-    fulgorCalled:
-      false,
-
-    verificationGranted:
-      false,
-
-    authorityGranted:
-      false,
-
-    automaticPromotionAllowed:
-      false,
-
-    autoCommit:
-      false,
-
-    autoPush:
-      false,
-
-    autoMerge:
-      false,
-
-    deploy:
-      false,
-  });
+        );
+      }
+    } finally {
+      if (
+        ownedSharedCapacity
+      ) {
+        sharedCapacity.close();
+      }
+    }
+  }
 }
 
 export function live8x8OperatorSummary(
@@ -1570,6 +2508,12 @@ export function live8x8OperatorSummary(
     `ELAPSED_MS=${result.elapsedMs}`,
     `EXPECTED_PROVIDER_CALLS=${result.expectedProviderCalls}`,
     `ACTUAL_PROVIDER_CALLS=${result.actualProviderCalls}`,
+    `NORMAL_PROVIDER_CALLS=${result.normalProviderCalls ?? result.actualProviderCalls}`,
+    `RECOVERY_ENABLED=${result.recoveryEnabled ? 'True' : 'False'}`,
+    `RECOVERY_STATUS=${safe(result.recoveryStatus ?? 'DISABLED')}`,
+    `RECOVERY_PROVIDER_CALLS=${result.recoveryProviderCalls ?? 0}`,
+    `RECOVERY_USEFUL_UNIQUE=${result.recoveryUsefulUnique ?? 0}`,
+    `TOTAL_PROVIDER_CALLS=${result.totalProviderCalls ?? result.actualProviderCalls}`,
     `USEFUL_UNIQUE=${result.usefulUnique}`,
     'FULGOR_CALLED=False',
     'VERIFICATION_GRANTED=False',
