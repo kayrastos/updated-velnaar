@@ -1487,3 +1487,81 @@ describe(
     );
   },
 );
+
+
+describe(
+  'provider model identity telemetry',
+  () => {
+    it(
+      'reports exact requested model identity for both provider plans',
+      async () => {
+        const directory =
+          root();
+
+        const telemetry:
+          any[] = [];
+
+        const invoke =
+          createBoundedLiveProviderInvoker({
+            ...config(
+              directory,
+              'nonzero',
+            ),
+
+            observeProcessTelemetry:
+              value => {
+                telemetry.push(
+                  value,
+                );
+              },
+          });
+
+        await invoke(
+          input(
+            'codex',
+            'job-model-identity-codex',
+          ),
+        );
+
+        await invoke(
+          input(
+            'antigravity',
+            'job-model-identity-antigravity',
+          ),
+        );
+
+        expect(
+          telemetry,
+        ).toHaveLength(2);
+
+        expect(
+          telemetry[0],
+        ).toMatchObject({
+          provider:
+            'codex',
+
+          requestedModel:
+            'gpt-6-luna',
+        });
+
+        expect(
+          telemetry[1],
+        ).toMatchObject({
+          provider:
+            'antigravity',
+
+          requestedModel:
+            'gemini-3.8-flash-high',
+        });
+
+        expect(
+          telemetry.every(
+            item =>
+              typeof item.requestedModel ===
+                'string',
+          ),
+        ).toBe(true);
+      },
+    );
+  },
+);

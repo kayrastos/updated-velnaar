@@ -26,6 +26,7 @@ import {
   parseCodexWorkProductProtocol,
   type BoundHostEvidenceText,
   type ProviderProtocolBindingInput,
+  type ProviderProtocolPlan,
 } from './liveProviderProtocolBindings';
 
 import {
@@ -80,6 +81,17 @@ export interface LiveProviderProcessTelemetry {
 
   readonly jobId:
     string;
+
+  /*
+   * Exact model requested by the immutable
+   * provider protocol plan.
+   *
+   * This records requested identity only.
+   * It does not itself prove provider-side
+   * execution identity.
+   */
+  readonly requestedModel:
+    ProviderProtocolPlan['modelId'];
 
   readonly antigravityAuthorityDiagnostic:
     AntigravityAuthorityDiagnostic
@@ -386,6 +398,9 @@ function emitProcessTelemetry(
   jobId:
     string,
 
+  requestedModel:
+    ProviderProtocolPlan['modelId'],
+
   antigravityAuthorityDiagnostic:
     AntigravityAuthorityDiagnostic
     | null,
@@ -409,6 +424,8 @@ function emitProcessTelemetry(
         provider,
 
         jobId,
+
+        requestedModel,
 
         antigravityAuthorityDiagnostic,
 
@@ -845,6 +862,7 @@ async function invokeCodex(
       options,
       'codex',
       input.record.order.jobId,
+      plan.modelId,
       null,
       processResult,
     );
@@ -927,6 +945,7 @@ async function invokeAntigravity(
     options,
     'antigravity',
     input.record.order.jobId,
+    plan.modelId,
     antigravityAuthorityDiagnostic,
     processResult,
   );

@@ -23,10 +23,6 @@ import type {
 } from '../../../scripts/fulgor/scheduler/verified8x8Scheduler';
 
 import {
-  issueLiveTierCanaryPermit,
-} from '../../../scripts/fulgor/scheduler/liveProviderTierGate';
-
-import {
   createProviderWorkOrder,
   type ProviderWorkRecord,
 } from '../../../scripts/fulgor/orchestration/providerWorkOrder';
@@ -974,6 +970,44 @@ describe(
             'USEFUL_COMPLETE',
           );
 
+          const diagnostic =
+            queue.getBlockedWorkDiagnostic(
+              'job-blocked-1',
+            );
+
+          expect(
+            diagnostic,
+          ).toMatchObject({
+            provider:
+              'codex',
+
+            status:
+              'BLOCKED',
+
+            summary:
+              'Insufficient bounded evidence.',
+
+            blocker:
+              'Required evidence is unavailable.',
+
+            evidenceIds:
+              [],
+          });
+
+          expect(
+            diagnostic?.verified,
+          ).toBe(false);
+
+          expect(
+            diagnostic?.authorityGranted,
+          ).toBe(false);
+
+          expect(
+            queue.getAcceptedWorkProduct(
+              'job-blocked-1',
+            ),
+          ).toBeNull();
+
           expect(
             queue.canLaunchProvider(
               'codex',
@@ -1074,123 +1108,12 @@ describe(
     );
 
     it(
-      'admits exactly one explicit 9+9 canary permit and rejects replay while default 9 remains denied',
+      'hard-denies plans above the V1 8-per-provider and global-16 ceiling even when permit metadata is supplied',
       async () => {
-        const adaptiveDecision =
-          Object.freeze({
-            schemaVersion:
-              'VELNAR_ADAPTIVE_PROVIDER_SCALER_V1',
-
-            codex:
-              Object.freeze({
-                provider:
-                  'codex' as const,
-
-                action:
-                  'SCALE_UP' as const,
-
-                reason:
-                  'HEALTHY_SCALE_UP' as const,
-
-                previousTargetSlots:
-                  8,
-
-                nextTargetSlots:
-                  9,
-
-                usefulYield:
-                  1,
-
-                nextHealthyWindows:
-                  0,
-
-                throughputRatioToPriorTier:
-                  null,
-              }),
-
-            antigravity:
-              Object.freeze({
-                provider:
-                  'antigravity' as const,
-
-                action:
-                  'SCALE_UP' as const,
-
-                reason:
-                  'HEALTHY_SCALE_UP' as const,
-
-                previousTargetSlots:
-                  8,
-
-                nextTargetSlots:
-                  9,
-
-                usefulYield:
-                  1,
-
-                nextHealthyWindows:
-                  0,
-
-                throughputRatioToPriorTier:
-                  null,
-              }),
-
-            nextState:
-              Object.freeze({
-                codex:
-                  Object.freeze({
-                    provider:
-                      'codex' as const,
-
-                    targetSlots:
-                      9,
-
-                    healthyWindows:
-                      0,
-
-                    lastTargetChangeAtMs:
-                      600_000,
-
-                    priorTierUsefulPerMinute:
-                      10,
-                  }),
-
-                antigravity:
-                  Object.freeze({
-                    provider:
-                      'antigravity' as const,
-
-                    targetSlots:
-                      9,
-
-                    healthyWindows:
-                      0,
-
-                    lastTargetChangeAtMs:
-                      600_000,
-
-                    priorTierUsefulPerMinute:
-                      10,
-                  }),
-
-                preferAntigravityFirst:
-                  false,
-              }),
-
-            totalTargetSlots:
-              18,
-
-            liveEnvelopeExpanded:
-              false as const,
-
-            authorityGranted:
-              false as const,
-          });
-
         const db =
           join(
             root(),
-            'tier-gate.sqlite',
+            'hard-v1-envelope.sqlite',
           );
 
         const base = {
@@ -1223,15 +1146,26 @@ describe(
               }),
         };
 
-        /*
-         * Existing default remains fail closed.
-         */
         await expect(
           runLiveTransactionalProviderWorkerPool({
             ...base,
 
             codexSlots:
               9,
+
+            antigravitySlots:
+              8,
+          }),
+        ).rejects.toThrow(
+          /PROVIDER_TARGET_EXCEEDED/,
+        );
+
+        await expect(
+          runLiveTransactionalProviderWorkerPool({
+            ...base,
+
+            codexSlots:
+              8,
 
             antigravitySlots:
               9,
@@ -1240,51 +1174,11 @@ describe(
           /PROVIDER_TARGET_EXCEEDED/,
         );
 
-        const permit =
-          issueLiveTierCanaryPermit({
-            baseline,
-
-            nowMs:
-              1_000_000,
-
-            ttlMs:
-              60_000,
-
-            previousTierEvidenceSha256:
-              'b'.repeat(64),
-
-            adaptiveDecision,
-          });
-
-        const result =
-          await runLiveTransactionalProviderWorkerPool({
-            ...base,
-
-            codexSlots:
-              9,
-
-            antigravitySlots:
-              9,
-
-            currentBaseline:
-              baseline,
-
-            liveTierCanaryPermit:
-              permit,
-          });
-
         /*
-         * Empty queue: proving admission does not call
-         * an injected provider.
+         * Even legacy permit-shaped metadata cannot
+         * bypass the hard worker envelope because the
+         * hard cap is evaluated first.
          */
-        expect(
-          result.totalSlots,
-        ).toBe(18);
-
-        expect(
-          result.totalLiveProviderCalls,
-        ).toBe(0);
-
         await expect(
           runLiveTransactionalProviderWorkerPool({
             ...base,
@@ -1295,14 +1189,9 @@ describe(
             antigravitySlots:
               9,
 
-            currentBaseline:
-              baseline,
-
-            liveTierCanaryPermit:
-              permit,
           }),
         ).rejects.toThrow(
-          /PERMIT_REPLAYED/,
+          /PROVIDER_TARGET_EXCEEDED/,
         );
       },
     );
@@ -1311,13 +1200,137 @@ describe(
 );
 
 
+// VELNAR_CODEX_ONLY_MODE_V1
+
+describe(
+  'Codex-only V1 live envelope',
+  () => {
+    it(
+      'admits up to eight Codex slots with zero Antigravity slots',
+      async () => {
+        const db =
+          join(
+            root(),
+            'codex-only-v1.sqlite',
+          );
+
+        const result =
+          await runLiveTransactionalProviderWorkerPool({
+            queuePath:
+              db,
+
+            mode:
+              'CODEX_ONLY',
+
+            codexSlots:
+              8,
+
+            antigravitySlots:
+              0,
+
+            leaseDurationMs:
+              60_000,
+
+            maxClaimsPerSlot:
+              1,
+
+            nowMs:
+              clock(),
+
+            loadCapsule:
+              capsule,
+
+            invokeProvider:
+              async () =>
+                Object.freeze({
+                  source:
+                    'LIVE_PROVIDER',
+
+                  transport:
+                    'FAILURE',
+                }),
+          });
+
+        /*
+         * Empty queue means no injected provider call.
+         */
+        expect(
+          result.totalSlots,
+        ).toBe(8);
+
+        expect(
+          result.codex.slots,
+        ).toBe(8);
+
+        expect(
+          result.antigravity.slots,
+        ).toBe(0);
+
+        expect(
+          result.totalLiveProviderCalls,
+        ).toBe(0);
+      },
+    );
+
+    it(
+      'rejects any Antigravity slot in CODEX_ONLY mode',
+      async () => {
+        await expect(
+          runLiveTransactionalProviderWorkerPool({
+            queuePath:
+              join(
+                root(),
+                'codex-only-invalid.sqlite',
+              ),
+
+            mode:
+              'CODEX_ONLY',
+
+            codexSlots:
+              8,
+
+            antigravitySlots:
+              1,
+
+            leaseDurationMs:
+              60_000,
+
+            maxClaimsPerSlot:
+              1,
+
+            nowMs:
+              clock(),
+
+            loadCapsule:
+              capsule,
+
+            invokeProvider:
+              async () =>
+                Object.freeze({
+                  source:
+                    'LIVE_PROVIDER',
+
+                  transport:
+                    'FAILURE',
+                }),
+          }),
+        ).rejects.toThrow(
+          /PROVIDER_TARGET_EXCEEDED/,
+        );
+      },
+    );
+  },
+);
+
+
+
 // VELNAR_ANTIGRAVITY_SERIAL_SLOT_EXECUTION
 
 describe(
-  'Antigravity serialized physical lane',
+  'Antigravity bounded physical lane',
   () => {
     it(
-      'keeps logical Antigravity slots while never invoking two AGY jobs concurrently',
+      'defaults to physical concurrency one when the explicit concurrency option is omitted',
       async () => {
         const db =
           join(
@@ -1437,6 +1450,142 @@ describe(
     );
 
     it(
+      'enforces exact bounded Antigravity physical concurrency at 1, 2, 4 and 8',
+      async () => {
+        for (
+          const concurrency
+          of [1, 2, 4, 8]
+        ) {
+          const db =
+            join(
+              root(),
+              `agy-concurrency-${concurrency}.sqlite`,
+            );
+
+          for (
+            let index = 1;
+            index <= 8;
+            index += 1
+          ) {
+            enqueue(
+              db,
+              `job-agy-concurrency-${concurrency}-${index}`,
+              'antigravity',
+              index * 10,
+            );
+          }
+
+          let active =
+            0;
+
+          let maxActive =
+            0;
+
+          let calls =
+            0;
+
+          const result =
+            await runLiveTransactionalProviderWorkerPool({
+              queuePath:
+                db,
+
+              mode:
+                'ANTIGRAVITY_ONLY',
+
+              codexSlots:
+                0,
+
+              antigravitySlots:
+                8,
+
+              antigravityConcurrency:
+                concurrency,
+
+              leaseDurationMs:
+                60_000,
+
+              maxClaimsPerSlot:
+                1,
+
+              nowMs:
+                clock(),
+
+              loadCapsule:
+                capsule,
+
+              invokeProvider:
+                async input => {
+                  calls +=
+                    1;
+
+                  active +=
+                    1;
+
+                  maxActive =
+                    Math.max(
+                      maxActive,
+                      active,
+                    );
+
+                  await new Promise<void>(
+                    resolve => {
+                      setTimeout(
+                        resolve,
+                        5,
+                      );
+                    },
+                  );
+
+                  active -=
+                    1;
+
+                  return Object.freeze({
+                    source:
+                      'LIVE_PROVIDER',
+
+                    transport:
+                      'OK',
+
+                    protocol:
+                      'PASS',
+
+                    raw:
+                      proposal(
+                        input.record,
+                        input.provider,
+                      ),
+                  });
+                },
+            });
+
+          expect(
+            calls,
+          ).toBe(8);
+
+          expect(
+            maxActive,
+          ).toBe(
+            concurrency,
+          );
+
+          expect(
+            result.antigravity
+              .liveProviderCalls,
+          ).toBe(8);
+
+          expect(
+            result.totalLiveProviderCalls,
+          ).toBe(8);
+
+          expect(
+            result.antigravity
+              .transportFailures,
+          ).toBe(0);
+        }
+      },
+    );
+
+    it(
       're-checks the Antigravity quality circuit before later serialized slots',
       async () => {
         const db =
@@ -1521,5 +1670,341 @@ describe(
         ).toBe(3);
       },
     );
+
+    it(
+      'does not launch later Antigravity work after a transport failure at physical concurrency two',
+      async () => {
+        const db =
+          join(
+            root(),
+            'agy-concurrency-two-transport-stop.sqlite',
+          );
+
+        for (
+          let index = 1;
+          index <= 4;
+          index += 1
+        ) {
+          enqueue(
+            db,
+            `job-agy-concurrent-stop-${index}`,
+            'antigravity',
+            index * 10,
+          );
+        }
+
+        let calls =
+          0;
+
+        let release:
+          (() => void)
+          | null =
+            null;
+
+        const twoStarted =
+          new Promise<void>(
+            resolve => {
+              release =
+                resolve;
+            },
+          );
+
+        const result =
+          await runLiveTransactionalProviderWorkerPool({
+            queuePath:
+              db,
+
+            mode:
+              'ANTIGRAVITY_ONLY',
+
+            codexSlots:
+              0,
+
+            antigravitySlots:
+              4,
+
+            antigravityConcurrency:
+              2,
+
+            leaseDurationMs:
+              60_000,
+
+            maxClaimsPerSlot:
+              1,
+
+            nowMs:
+              clock(),
+
+            loadCapsule:
+              capsule,
+
+            invokeProvider:
+              async input => {
+                calls +=
+                  1;
+
+                const callNumber =
+                  calls;
+
+                if (
+                  calls === 2
+                ) {
+                  release?.();
+                }
+
+                await twoStarted;
+
+                if (
+                  callNumber === 1
+                ) {
+                  return Object.freeze({
+                    source:
+                      'LIVE_PROVIDER',
+
+                    transport:
+                      'FAILURE',
+                  });
+                }
+
+                return Object.freeze({
+                  source:
+                    'LIVE_PROVIDER',
+
+                  transport:
+                    'OK',
+
+                  protocol:
+                    'PASS',
+
+                  raw:
+                    proposal(
+                      input.record,
+                      input.provider,
+                    ),
+                });
+              },
+          });
+
+        /*
+         * Two calls were already in-flight at the time
+         * the first transport failure became known.
+         *
+         * Slots 3 and 4 must never reach invokeProvider.
+         */
+        expect(
+          calls,
+        ).toBe(2);
+
+        expect(
+          result.antigravity
+            .transportFailures,
+        ).toBe(1);
+
+        expect(
+          result.antigravity
+            .stoppedByTransportCircuit,
+        ).toBe(2);
+
+        expect(
+          result.totalLiveProviderCalls,
+        ).toBe(2);
+      },
+    );
+
+    it(
+      'stops later serialized Antigravity slots after the first transport failure without poisoning quality',
+      async () => {
+        const db =
+          join(
+            root(),
+            'agy-transport-stop.sqlite',
+          );
+
+        for (
+          let index = 1;
+          index <= 4;
+          index += 1
+        ) {
+          enqueue(
+            db,
+            `job-agy-transport-${index}`,
+            'antigravity',
+            index * 10,
+          );
+        }
+
+        let calls =
+          0;
+
+        const result =
+          await runLiveTransactionalProviderWorkerPool({
+            queuePath:
+              db,
+
+            mode:
+              'DUAL',
+
+            codexSlots:
+              0,
+
+            antigravitySlots:
+              4,
+
+            leaseDurationMs:
+              60_000,
+
+            maxClaimsPerSlot:
+              1,
+
+            nowMs:
+              clock(),
+
+            loadCapsule:
+              capsule,
+
+            invokeProvider:
+              async () => {
+                calls += 1;
+
+                return Object.freeze({
+                  source:
+                    'LIVE_PROVIDER',
+
+                  transport:
+                    'FAILURE',
+                });
+              },
+          });
+
+        expect(
+          calls,
+        ).toBe(1);
+
+        expect(
+          result.totalLiveProviderCalls,
+        ).toBe(1);
+
+        expect(
+          result.antigravity.transportFailures,
+        ).toBe(1);
+
+        expect(
+          result.antigravity.stoppedByTransportCircuit,
+        ).toBe(3);
+
+        expect(
+          result.antigravity.stoppedByQualityCircuit,
+        ).toBe(0);
+
+        const queue =
+          new TransactionalProviderQueue(
+            db,
+          );
+
+        try {
+          expect(
+            queue.get(
+              'job-agy-transport-1',
+            )?.state,
+          ).toBe(
+            'RECOVERY_HOLD',
+          );
+
+          for (
+            let index = 2;
+            index <= 4;
+            index += 1
+          ) {
+            expect(
+              queue.get(
+                `job-agy-transport-${index}`,
+              )?.state,
+            ).toBe(
+              'PENDING',
+            );
+          }
+
+          /*
+           * Transport uncertainty is deliberately not
+           * represented as an output-quality failure.
+           *
+           * The fail-closed stop above is owned by this
+           * bounded run.
+           */
+          expect(
+            queue.canLaunchProvider(
+              'antigravity',
+            ),
+          ).toBe(true);
+        } finally {
+          queue.close();
+        }
+      },
+    );
+    it(
+      'rejects invalid Antigravity physical concurrency before any provider call',
+      async () => {
+        for (
+          const concurrency
+          of [0, 9]
+        ) {
+          let calls =
+            0;
+
+          await expect(
+            runLiveTransactionalProviderWorkerPool({
+              queuePath:
+                join(
+                  root(),
+                  `agy-invalid-concurrency-${concurrency}.sqlite`,
+                ),
+
+              mode:
+                'ANTIGRAVITY_ONLY',
+
+              codexSlots:
+                0,
+
+              antigravitySlots:
+                8,
+
+              antigravityConcurrency:
+                concurrency,
+
+              leaseDurationMs:
+                60_000,
+
+              maxClaimsPerSlot:
+                1,
+
+              nowMs:
+                clock(),
+
+              loadCapsule:
+                capsule,
+
+              invokeProvider:
+                async () => {
+                  calls +=
+                    1;
+
+                  return Object.freeze({
+                    source:
+                      'LIVE_PROVIDER',
+
+                    transport:
+                      'FAILURE',
+                  });
+                },
+            }),
+          ).rejects.toThrow();
+
+          expect(
+            calls,
+          ).toBe(0);
+        }
+      },
+    );
+
   },
 );

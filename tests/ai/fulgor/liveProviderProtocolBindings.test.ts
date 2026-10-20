@@ -513,6 +513,8 @@ describe(
           plan.args,
         ).toEqual([
           'exec',
+          '--model',
+          'gpt-6-luna',
           '--json',
           '--ephemeral',
           '--sandbox',
@@ -525,6 +527,19 @@ describe(
           '/tmp/velnar-repo',
           plan.prompt,
         ]);
+
+        expect(
+          plan.modelId,
+        ).toBe(
+          'gpt-6-luna',
+        );
+
+        expect(
+          plan.args.filter(
+            value =>
+              value === '--model',
+          ),
+        ).toHaveLength(1);
 
         expect(
           plan.args,
@@ -547,9 +562,11 @@ describe(
         expect(
           plan.args.slice(
             0,
-            8,
+            10,
           ),
         ).toEqual([
+          '--model',
+          'gemini-3.8-flash-high',
           '--sandbox',
           '--mode',
           'plan',
@@ -571,6 +588,19 @@ describe(
         ).toBe(
           plan.prompt,
         );
+
+        expect(
+          plan.modelId,
+        ).toBe(
+          'gemini-3.8-flash-high',
+        );
+
+        expect(
+          plan.args.filter(
+            value =>
+              value === '--model',
+          ),
+        ).toHaveLength(1);
 
         expect(
           plan.args,

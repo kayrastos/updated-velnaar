@@ -33,6 +33,7 @@ import {
   parseProviderWorkProduct,
   type AcceptedWorkProduct,
   type HostEvidence,
+  type HostEvidenceCapsule,
 } from './providerWorkProductGate';
 
 import {
@@ -47,10 +48,16 @@ import {
 } from './providerWorkOrder';
 
 export const TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
-  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V4' as const;
+  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V5' as const;
 
 const PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
+  'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V4' as const;
+
+const LEGACY_PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA =
   'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V3' as const;
+
+export const BLOCKED_WORK_DIAGNOSTIC_SCHEMA =
+  'VELNAR_BLOCKED_WORK_DIAGNOSTIC_V1' as const;
 
 export type PersistedQualityCircuitState =
   | 'CLOSED'
@@ -92,6 +99,44 @@ export interface PersistedAcceptedWorkProduct {
     number;
 }
 
+export interface PersistedBlockedWorkDiagnostic {
+  readonly schemaVersion:
+    typeof BLOCKED_WORK_DIAGNOSTIC_SCHEMA;
+
+  readonly jobId:
+    string;
+
+  readonly provider:
+    Provider;
+
+  readonly baseline:
+    string;
+
+  readonly status:
+    'BLOCKED';
+
+  readonly summary:
+    string;
+
+  readonly blocker:
+    string;
+
+  readonly evidenceIds:
+    readonly string[];
+
+  readonly diagnosticSha256:
+    string;
+
+  readonly createdAtMs:
+    number;
+
+  readonly verified:
+    false;
+
+  readonly authorityGranted:
+    false;
+}
+
 export interface PersistedProviderQualityState {
   readonly provider: Provider;
 
@@ -111,6 +156,7 @@ const REQUIRED_OBJECTS =
     'jobs',
     'work_fingerprints',
     'accepted_work_products',
+    'blocked_work_diagnostics',
     'provider_quality_state',
     'idx_jobs_pending',
     'idx_jobs_lease_expiry',
@@ -324,6 +370,21 @@ function journalValue(
     Object.values(value)[0];
 
   return String(first ?? '');
+}
+
+function sanitizeBlockedDiagnosticText(
+  value:
+    string,
+): string {
+  return value
+    .replace(
+      /\b(?:authorization|bearer|token|api[_-]?key|cookie|secret|password|access[_-]?token|refresh[_-]?token)\s*[:=]\s*[^\s,;"']+/gi,
+      '<REDACTED_SECRET>',
+    )
+    .replace(
+      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+      '<REDACTED_EMAIL>',
+    );
 }
 
 export class TransactionalProviderQueue {
@@ -732,6 +793,85 @@ export class TransactionalProviderQueue {
             );
 
             /*
+             * Host-validated BLOCKED diagnostics.
+             *
+             * This table is observability only:
+             * - never accepted work
+             * - never fingerprint authority
+             * - never verification authority
+             * - never execution authority
+             *
+             * Raw provider output is deliberately not
+             * persisted here.
+             */
+            CREATE TABLE blocked_work_diagnostics (
+              job_id TEXT
+                PRIMARY KEY,
+
+              provider TEXT
+                NOT NULL
+                CHECK(
+                  provider IN (
+                    'codex',
+                    'antigravity'
+                  )
+                ),
+
+              baseline TEXT
+                NOT NULL
+                CHECK(
+                  length(baseline) = 40
+                  AND
+                  baseline = lower(baseline)
+                  AND
+                  baseline
+                    NOT GLOB '*[^0-9a-f]*'
+                ),
+
+              status TEXT
+                NOT NULL
+                CHECK(status = 'BLOCKED'),
+
+              summary TEXT
+                NOT NULL
+                CHECK(length(summary) > 0),
+
+              blocker TEXT
+                NOT NULL
+                CHECK(length(blocker) > 0),
+
+              evidence_ids_json TEXT
+                NOT NULL,
+
+              evidence_count INTEGER
+                NOT NULL
+                CHECK(
+                  evidence_count >= 0
+                  AND
+                  evidence_count <= 8
+                ),
+
+              diagnostic_sha256 TEXT
+                NOT NULL
+                CHECK(
+                  length(diagnostic_sha256) = 64
+                  AND
+                  diagnostic_sha256 =
+                    lower(diagnostic_sha256)
+                  AND
+                  diagnostic_sha256
+                    NOT GLOB '*[^0-9a-f]*'
+                ),
+
+              created_ms INTEGER
+                NOT NULL,
+
+              FOREIGN KEY(job_id)
+              REFERENCES jobs(job_id)
+              ON DELETE RESTRICT
+            );
+
+            /*
              * Provider-local persistent quality circuit.
              *
              * Restart must never silently reset an OPEN
@@ -854,7 +994,7 @@ export class TransactionalProviderQueue {
         },
       );
     } else {
-      const schema =
+      let schema =
         asString(
           requireRow(
             schemaRow,
@@ -865,7 +1005,7 @@ export class TransactionalProviderQueue {
 
       if (
         schema ===
-        PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
+        LEGACY_PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
       ) {
         /*
          * V3 did not persist the accepted provider
@@ -995,6 +1135,103 @@ export class TransactionalProviderQueue {
             `);
           },
         );
+
+        schema =
+          PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA;
+      }
+
+      if (
+        schema ===
+        PREVIOUS_TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
+      ) {
+        /*
+         * V4 already has durable accepted work.
+         *
+         * V5 adds only host-validated BLOCKED
+         * observability metadata. Historical BLOCKED
+         * payloads cannot be reconstructed and therefore
+         * are intentionally not backfilled.
+         */
+        this.transaction(
+          () => {
+            this.db.exec(`
+              CREATE TABLE blocked_work_diagnostics (
+                job_id TEXT
+                  PRIMARY KEY,
+
+                provider TEXT
+                  NOT NULL
+                  CHECK(
+                    provider IN (
+                      'codex',
+                      'antigravity'
+                    )
+                  ),
+
+                baseline TEXT
+                  NOT NULL
+                  CHECK(
+                    length(baseline) = 40
+                    AND
+                    baseline = lower(baseline)
+                    AND
+                    baseline
+                      NOT GLOB '*[^0-9a-f]*'
+                  ),
+
+                status TEXT
+                  NOT NULL
+                  CHECK(status = 'BLOCKED'),
+
+                summary TEXT
+                  NOT NULL
+                  CHECK(length(summary) > 0),
+
+                blocker TEXT
+                  NOT NULL
+                  CHECK(length(blocker) > 0),
+
+                evidence_ids_json TEXT
+                  NOT NULL,
+
+                evidence_count INTEGER
+                  NOT NULL
+                  CHECK(
+                    evidence_count >= 0
+                    AND
+                    evidence_count <= 8
+                  ),
+
+                diagnostic_sha256 TEXT
+                  NOT NULL
+                  CHECK(
+                    length(diagnostic_sha256) = 64
+                    AND
+                    diagnostic_sha256 =
+                      lower(diagnostic_sha256)
+                    AND
+                    diagnostic_sha256
+                      NOT GLOB '*[^0-9a-f]*'
+                  ),
+
+                created_ms INTEGER
+                  NOT NULL,
+
+                FOREIGN KEY(job_id)
+                REFERENCES jobs(job_id)
+                ON DELETE RESTRICT
+              );
+
+              UPDATE queue_meta
+              SET value =
+                'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V5'
+              WHERE key = 'schema';
+            `);
+          },
+        );
+
+        schema =
+          TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA;
       } else if (
         schema !==
         TRANSACTIONAL_PROVIDER_QUEUE_SCHEMA
@@ -1013,6 +1250,7 @@ export class TransactionalProviderQueue {
               'jobs',
               'work_fingerprints',
               'accepted_work_products',
+              'blocked_work_diagnostics',
               'provider_quality_state',
               'idx_jobs_pending',
               'idx_jobs_lease_expiry',
@@ -1533,6 +1771,223 @@ export class TransactionalProviderQueue {
     });
   }
 
+  getBlockedWorkDiagnostic(
+    jobId:
+      string,
+  ): PersistedBlockedWorkDiagnostic | null {
+    const current =
+      this.get(
+        jobId,
+      );
+
+    if (current === null) {
+      return null;
+    }
+
+    const row =
+      this.db
+        .prepare(`
+          SELECT *
+          FROM blocked_work_diagnostics
+          WHERE job_id = ?
+          LIMIT 1
+        `)
+        .get(
+          jobId,
+        );
+
+    if (!row) {
+      return null;
+    }
+
+    const raw =
+      requireRow(
+        row,
+        'BLOCKED_DIAGNOSTIC_ROW',
+      );
+
+    const provider =
+      asString(
+        raw.provider,
+        'BLOCKED_DIAGNOSTIC_PROVIDER',
+      );
+
+    if (
+      provider !== 'codex' &&
+      provider !== 'antigravity'
+    ) {
+      throw new Error(
+        'QUEUE_BLOCKED_DIAGNOSTIC_PROVIDER_INVALID',
+      );
+    }
+
+    const baseline =
+      asString(
+        raw.baseline,
+        'BLOCKED_DIAGNOSTIC_BASELINE',
+      );
+
+    const status =
+      asString(
+        raw.status,
+        'BLOCKED_DIAGNOSTIC_STATUS',
+      );
+
+    if (status !== 'BLOCKED') {
+      throw new Error(
+        'QUEUE_BLOCKED_DIAGNOSTIC_STATUS_INVALID',
+      );
+    }
+
+    const summary =
+      asString(
+        raw.summary,
+        'BLOCKED_DIAGNOSTIC_SUMMARY',
+      );
+
+    const blocker =
+      asString(
+        raw.blocker,
+        'BLOCKED_DIAGNOSTIC_BLOCKER',
+      );
+
+    const evidenceCount =
+      asNumber(
+        raw.evidence_count,
+        'BLOCKED_DIAGNOSTIC_EVIDENCE_COUNT',
+      );
+
+    const evidenceJson =
+      asString(
+        raw.evidence_ids_json,
+        'BLOCKED_DIAGNOSTIC_EVIDENCE_JSON',
+      );
+
+    let evidenceUnknown:
+      unknown;
+
+    try {
+      evidenceUnknown =
+        JSON.parse(
+          evidenceJson,
+        );
+    } catch {
+      throw new Error(
+        'QUEUE_BLOCKED_DIAGNOSTIC_EVIDENCE_JSON_INVALID',
+      );
+    }
+
+    if (
+      !Array.isArray(
+        evidenceUnknown,
+      ) ||
+      evidenceUnknown.length !==
+        evidenceCount ||
+      evidenceUnknown.some(
+        value =>
+          typeof value !==
+            'string',
+      ) ||
+      new Set(
+        evidenceUnknown,
+      ).size !==
+        evidenceUnknown.length
+    ) {
+      throw new Error(
+        'QUEUE_BLOCKED_DIAGNOSTIC_EVIDENCE_INVALID',
+      );
+    }
+
+    const evidenceIds =
+      evidenceUnknown as string[];
+
+    if (
+      current.state !==
+        'BLOCKED' ||
+      current.lastOutcome !==
+        'BLOCKED' ||
+      current.order.baseline !==
+        baseline ||
+      !evidenceIds.every(
+        id =>
+          current.order.evidenceIds
+            .includes(id),
+      )
+    ) {
+      throw new Error(
+        'QUEUE_BLOCKED_DIAGNOSTIC_BINDING_INVALID',
+      );
+    }
+
+    const diagnosticSha256 =
+      asString(
+        raw.diagnostic_sha256,
+        'BLOCKED_DIAGNOSTIC_SHA256',
+      );
+
+    const canonicalJson =
+      JSON.stringify({
+        schemaVersion:
+          BLOCKED_WORK_DIAGNOSTIC_SCHEMA,
+
+        jobId,
+        provider,
+        baseline,
+
+        status:
+          'BLOCKED',
+
+        summary,
+        blocker,
+        evidenceIds,
+      });
+
+    if (
+      sha256Text(
+        canonicalJson,
+      ) !==
+        diagnosticSha256
+    ) {
+      throw new Error(
+        'QUEUE_BLOCKED_DIAGNOSTIC_HASH_MISMATCH',
+      );
+    }
+
+    return Object.freeze({
+      schemaVersion:
+        BLOCKED_WORK_DIAGNOSTIC_SCHEMA,
+
+      jobId,
+      provider,
+      baseline,
+
+      status:
+        'BLOCKED',
+
+      summary,
+      blocker,
+
+      evidenceIds:
+        Object.freeze([
+          ...evidenceIds,
+        ]),
+
+      diagnosticSha256,
+
+      createdAtMs:
+        asNumber(
+          raw.created_ms,
+          'BLOCKED_DIAGNOSTIC_CREATED_MS',
+        ),
+
+      verified:
+        false,
+
+      authorityGranted:
+        false,
+    });
+  }
+
   getAcceptedWorkProduct(
     jobId:
       string,
@@ -1907,6 +2362,20 @@ export class TransactionalProviderQueue {
       );
     }
 
+    /*
+     * BLOCKED settlement owns durable diagnostic
+     * persistence. Generic callers may not bypass
+     * settleBlocked() and create a diagnostic-less
+     * terminal BLOCKED record.
+     */
+    if (
+      outcome === 'BLOCKED'
+    ) {
+      throw new Error(
+        'QUEUE_USE_SETTLE_BLOCKED',
+      );
+    }
+
     return this.transaction(
       () => {
         const row =
@@ -2023,6 +2492,266 @@ export class TransactionalProviderQueue {
         ) {
           throw new Error(
             'QUEUE_ATOMIC_SETTLE_LOST',
+          );
+        }
+
+        return settled;
+      },
+    );
+  }
+
+  /*
+   * A protocol-valid BLOCKED response is not accepted
+   * work. Persist only bounded, sanitized diagnostics
+   * in the same transaction as BLOCKED settlement.
+   */
+  settleBlocked(
+    provider:
+      Provider,
+
+    leaseId:
+      string,
+
+    accepted:
+      AcceptedWorkProduct,
+
+    capsule:
+      HostEvidenceCapsule,
+
+    nowMs:
+      number,
+  ): ProviderWorkRecord {
+    return this.transaction(
+      () => {
+        const row =
+          this.db
+            .prepare(`
+              SELECT *
+              FROM jobs
+              WHERE
+                state = 'LEASED'
+                AND lease_id = ?
+              LIMIT 1
+            `)
+            .get(
+              leaseId,
+            );
+
+        if (!row) {
+          throw new Error(
+            'QUEUE_ACTIVE_LEASE_NOT_FOUND',
+          );
+        }
+
+        const current =
+          this.parsePersistedRow(
+            row,
+          );
+
+        if (
+          current.lease === null ||
+          current.lease.provider !==
+            provider
+        ) {
+          throw new Error(
+            'QUEUE_BLOCKED_PROVIDER_MISMATCH',
+          );
+        }
+
+        const capsuleIds =
+          capsule.evidence.map(
+            value =>
+              value.id,
+          );
+
+        if (
+          capsule.taskId !==
+            current.order.jobId ||
+          capsule.baseline !==
+            current.order.baseline ||
+          capsuleIds.length !==
+            current.order.evidenceIds.length ||
+          !capsuleIds.every(
+            id =>
+              current.order.evidenceIds
+                .includes(id),
+          )
+        ) {
+          throw new Error(
+            'QUEUE_BLOCKED_CAPSULE_BINDING_INVALID',
+          );
+        }
+
+        /*
+         * Re-run exact work-product parsing at the
+         * persistence boundary.
+         */
+        const canonical =
+          parseProviderWorkProduct(
+            JSON.stringify(
+              accepted.workProduct,
+            ),
+            capsule,
+            provider,
+          );
+
+        const product =
+          canonical.workProduct;
+
+        if (
+          canonical.usable ||
+          product.status !==
+            'BLOCKED' ||
+          product.blocker ===
+            null
+        ) {
+          throw new Error(
+            'QUEUE_BLOCKED_PRODUCT_INVALID',
+          );
+        }
+
+        const summary =
+          sanitizeBlockedDiagnosticText(
+            product.summary,
+          );
+
+        const blocker =
+          sanitizeBlockedDiagnosticText(
+            product.blocker,
+          );
+
+        const evidenceIds =
+          Object.freeze([
+            ...product.evidenceIds,
+          ]);
+
+        const canonicalJson =
+          JSON.stringify({
+            schemaVersion:
+              BLOCKED_WORK_DIAGNOSTIC_SCHEMA,
+
+            jobId:
+              current.order.jobId,
+
+            provider,
+
+            baseline:
+              current.order.baseline,
+
+            status:
+              'BLOCKED',
+
+            summary,
+            blocker,
+            evidenceIds,
+          });
+
+        const diagnosticSha256 =
+          sha256Text(
+            canonicalJson,
+          );
+
+        const settled =
+          settleProviderWork(
+            current,
+            provider,
+            leaseId,
+            'BLOCKED',
+            null,
+            nowMs,
+          );
+
+        const diagnosticResult =
+          this.db
+            .prepare(`
+              INSERT INTO blocked_work_diagnostics(
+                job_id,
+                provider,
+                baseline,
+                status,
+                summary,
+                blocker,
+                evidence_ids_json,
+                evidence_count,
+                diagnostic_sha256,
+                created_ms
+              )
+              VALUES(
+                ?,
+                ?,
+                ?,
+                'BLOCKED',
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?
+              )
+            `)
+            .run(
+              current.order.jobId,
+              provider,
+              current.order.baseline,
+              summary,
+              blocker,
+              JSON.stringify(
+                evidenceIds,
+              ),
+              evidenceIds.length,
+              diagnosticSha256,
+              nowMs,
+            );
+
+        if (
+          Number(
+            diagnosticResult.changes,
+          ) !== 1
+        ) {
+          throw new Error(
+            'QUEUE_ATOMIC_BLOCKED_DIAGNOSTIC_INSERT_FAILED',
+          );
+        }
+
+        const indexed =
+          this.indexedFields(
+            settled,
+          );
+
+        const result =
+          this.db
+            .prepare(`
+              UPDATE jobs
+              SET
+                state = ?,
+                assigned_provider = NULL,
+                slot_id = NULL,
+                lease_id = NULL,
+                lease_expires_at_ms = NULL,
+                updated_ms = ?,
+                record_json = ?
+              WHERE
+                job_id = ?
+                AND state = 'LEASED'
+                AND lease_id = ?
+            `)
+            .run(
+              indexed.state,
+              settled.updatedAtMs,
+              serializeProviderWorkRecord(
+                settled,
+              ),
+              settled.order.jobId,
+              leaseId,
+            );
+
+        if (
+          Number(
+            result.changes,
+          ) !== 1
+        ) {
+          throw new Error(
+            'QUEUE_ATOMIC_BLOCKED_SETTLE_LOST',
           );
         }
 

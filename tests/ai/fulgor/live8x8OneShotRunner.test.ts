@@ -90,6 +90,74 @@ afterEach(
   },
 );
 
+function healthyLane(
+  provider:
+    'codex'
+    | 'antigravity',
+) {
+  return Object.freeze({
+    provider,
+
+    taskClass:
+      'GENERAL' as const,
+
+    counters:
+      Object.freeze({
+        provider,
+
+        attempts:
+          8,
+
+        transportFailures:
+          0,
+
+        protocolRejected:
+          0,
+
+        contractRejected:
+          0,
+
+        blocked:
+          0,
+
+        usefulDuplicate:
+          0,
+
+        usefulUnique:
+          8,
+      }),
+
+    certified:
+      true,
+
+    qualityCircuit:
+      'CLOSED' as const,
+
+    quotaCircuit:
+      'CLOSED' as const,
+
+    availableSlots:
+      8,
+  });
+}
+
+function healthyRouting() {
+  return Object.freeze({
+    taskClass:
+      'GENERAL' as const,
+
+    codex:
+      healthyLane(
+        'codex',
+      ),
+
+    antigravity:
+      healthyLane(
+        'antigravity',
+      ),
+  });
+}
+
 function job(
   provider:
     'codex'
@@ -156,7 +224,9 @@ function job(
   return Object.freeze({
     order,
     capsule,
-  });
+
+    routing:
+      healthyRouting(),});
 }
 
 function exactJobs() {

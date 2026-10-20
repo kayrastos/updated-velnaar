@@ -4,6 +4,7 @@ export type Provider =
 
 export type SchedulerMode =
   | 'DUAL'
+  | 'CODEX_ONLY'
   | 'ANTIGRAVITY_ONLY';
 
 export const VERIFIED_8X8_POLICY =
@@ -61,6 +62,16 @@ export function targetsForMode(
       antigravity:
         VERIFIED_8X8_POLICY
           .targetAntigravity,
+    });
+  }
+
+  if (mode === 'CODEX_ONLY') {
+    return Object.freeze({
+      codex:
+        VERIFIED_8X8_POLICY.targetCodex,
+
+      antigravity:
+        0,
     });
   }
 

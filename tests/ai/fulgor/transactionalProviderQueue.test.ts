@@ -750,7 +750,7 @@ describe(
     );
 
     it(
-      'migrates V3 queues additively to V4',
+      'migrates V3 queues additively through V4 to V5',
       () => {
         const root =
           makeRoot();
@@ -783,6 +783,7 @@ describe(
 
         db.exec(`
           DROP TABLE accepted_work_products;
+          DROP TABLE blocked_work_diagnostics;
 
           UPDATE queue_meta
           SET value =
@@ -827,7 +828,7 @@ describe(
         expect(
           schema.value,
         ).toBe(
-          'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V4',
+          'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V5',
         );
 
         const table =
@@ -845,6 +846,80 @@ describe(
           .toBeTruthy();
 
         migrated.close();
+        queue.close();
+      },
+    );
+
+    it(
+      'does not allow generic settlement to bypass atomic BLOCKED diagnostics',
+      () => {
+        const root =
+          makeRoot();
+
+        const queue =
+          new TransactionalProviderQueue(
+            join(
+              root,
+              'queue.sqlite',
+            ),
+          );
+
+        const jobId =
+          'job-generic-blocked-denied';
+
+        queue.enqueue(
+          order(
+            jobId,
+            'codex',
+          ),
+          1000,
+        );
+
+        const leased =
+          queue.claimNext(
+            'codex',
+            'codex-01',
+            2000,
+            60_000,
+          )!;
+
+        expect(() =>
+          queue.settle(
+            'codex',
+            leased.lease!.leaseId,
+            'BLOCKED',
+            null,
+            3000,
+          ),
+        ).toThrow(
+          /USE_SETTLE_BLOCKED/,
+        );
+
+        /*
+         * Guard fires before the queue transaction:
+         * the caller did not consume the lease and did
+         * not manufacture a diagnostic-less BLOCKED row.
+         */
+        expect(
+          queue.get(
+            jobId,
+          )?.state,
+        ).toBe(
+          'LEASED',
+        );
+
+        expect(
+          queue.getBlockedWorkDiagnostic(
+            jobId,
+          ),
+        ).toBeNull();
+
+        expect(
+          queue.getAcceptedWorkProduct(
+            jobId,
+          ),
+        ).toBeNull();
+
         queue.close();
       },
     );
@@ -2067,5 +2142,109 @@ describe(
         queue.close();
       },
     );
+    it(
+      'migrates an existing V4 queue additively to V5 without changing jobs or accepted work',
+      () => {
+        const root =
+          makeRoot();
+
+        const dbPath =
+          join(
+            root,
+            'queue-v4-to-v5.sqlite',
+          );
+
+        let queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        queue.enqueue(
+          order(
+            'job-v4-preserved',
+            'codex',
+          ),
+          1000,
+        );
+
+        queue.close();
+
+        const db =
+          new DatabaseSync(
+            dbPath,
+          );
+
+        db.exec(`
+          DROP TABLE blocked_work_diagnostics;
+
+          UPDATE queue_meta
+          SET value =
+            'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V4'
+          WHERE key = 'schema';
+        `);
+
+        db.close();
+
+        queue =
+          new TransactionalProviderQueue(
+            dbPath,
+          );
+
+        expect(
+          queue.get(
+            'job-v4-preserved',
+          )?.state,
+        ).toBe(
+          'PENDING',
+        );
+
+        expect(
+          queue.getBlockedWorkDiagnostic(
+            'job-v4-preserved',
+          ),
+        ).toBeNull();
+
+        queue.close();
+
+        const migrated =
+          new DatabaseSync(
+            dbPath,
+          );
+
+        const schema =
+          migrated.prepare(`
+            SELECT value
+            FROM queue_meta
+            WHERE key = 'schema'
+          `)
+            .get() as {
+              value: string;
+            };
+
+        const table =
+          migrated.prepare(`
+            SELECT name
+            FROM sqlite_master
+            WHERE
+              type = 'table'
+              AND name =
+                'blocked_work_diagnostics'
+          `)
+            .get();
+
+        expect(
+          schema.value,
+        ).toBe(
+          'VELNAR_TRANSACTIONAL_PROVIDER_QUEUE_V5',
+        );
+
+        expect(
+          table,
+        ).toBeTruthy();
+
+        migrated.close();
+      },
+    );
+
   },
 );

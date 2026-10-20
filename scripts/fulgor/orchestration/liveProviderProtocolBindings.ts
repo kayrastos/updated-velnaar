@@ -31,6 +31,12 @@ import type {
 export const LIVE_PROVIDER_PROTOCOL_SCHEMA =
   'VELNAR_LIVE_PROVIDER_PROTOCOL_BINDING_V1' as const;
 
+export const LIVE_CODEX_MODEL_ID =
+  'gpt-6-luna' as const;
+
+export const LIVE_ANTIGRAVITY_MODEL_ID =
+  'gemini-3.8-flash-high' as const;
+
 const MAX_WORK_PRODUCT_BYTES =
   65_536;
 
@@ -80,6 +86,10 @@ export interface ProviderProtocolPlan {
 
   readonly provider:
     Provider;
+
+  readonly modelId:
+    | typeof LIVE_CODEX_MODEL_ID
+    | typeof LIVE_ANTIGRAVITY_MODEL_ID;
 
   readonly prompt:
     string;
@@ -806,6 +816,9 @@ export function buildCodexWorkProductPlan(
     provider:
       'codex',
 
+    modelId:
+      LIVE_CODEX_MODEL_ID,
+
     prompt,
 
     schemaJson,
@@ -813,6 +826,8 @@ export function buildCodexWorkProductPlan(
     args:
       Object.freeze([
         'exec',
+        '--model',
+        LIVE_CODEX_MODEL_ID,
         '--json',
         '--ephemeral',
         '--sandbox',
@@ -862,12 +877,17 @@ export function buildAntigravityWorkProductPlan(
     provider:
       'antigravity',
 
+    modelId:
+      LIVE_ANTIGRAVITY_MODEL_ID,
+
     prompt,
 
     schemaJson,
 
     args:
       Object.freeze([
+        '--model',
+        LIVE_ANTIGRAVITY_MODEL_ID,
         '--sandbox',
         '--mode',
         'plan',

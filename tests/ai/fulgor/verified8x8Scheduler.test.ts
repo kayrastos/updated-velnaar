@@ -65,6 +65,15 @@ describe(
           codex: 0,
           antigravity: 8,
         });
+
+        expect(
+          targetsForMode(
+            'CODEX_ONLY',
+          ),
+        ).toEqual({
+          codex: 8,
+          antigravity: 0,
+        });
       },
     );
 

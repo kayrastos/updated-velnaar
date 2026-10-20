@@ -17,23 +17,40 @@ export const ADAPTIVE_PROVIDER_SCALER_SCHEMA =
   'VELNAR_ADAPTIVE_PROVIDER_SCALER_V1' as const;
 
 /*
- * This policy is an OFFLINE logical planning envelope.
+ * V1 adaptive live planning policy.
  *
- * It does not expand the currently certified live
- * worker envelope. The existing live path remains
- * 8 + 8 / global 16 until separately changed and
- * live-certified tier by tier.
+ * Zero is a valid target.
+ * Eight is a hard per-provider ceiling.
+ * Sixteen is the hard global ceiling.
+ *
+ * The scaler never grants verification, execution or
+ * production authority.
  */
 export const ADAPTIVE_PROVIDER_SCALER_POLICY =
   Object.freeze({
+    /*
+     * Compatibility name retained from the original
+     * scaler, but baseline is now genuinely zero.
+     */
     baselineSlots:
-      8,
+      0,
+
+    probationBootstrapSlots:
+      1,
+
+    /*
+     * A safety stop must be followed by a fresh
+     * observation window and this minimum quiet period
+     * before a single probation slot may reopen.
+     */
+    recoveryDwellMs:
+      60_000,
 
     maxLogicalSlotsPerProvider:
-      12,
+      8,
 
     maxLogicalTotalSlots:
-      24,
+      16,
 
     stepSlots:
       1,
@@ -45,17 +62,16 @@ export const ADAPTIVE_PROVIDER_SCALER_POLICY =
       8,
 
     /*
-     * 8 attempts means scale-up effectively requires
-     * 8/8 unique useful outputs.
+     * User-required productivity floor.
+     *
+     * BLOCKED, duplicate and failure attempts remain in
+     * the denominator through productiveWorkRate().
      */
     minimumUsefulYieldForScaleUp:
-      0.95,
+      0.90,
 
-    /*
-     * Below this, an already-expanded lane steps down.
-     */
     usefulYieldScaleDownThreshold:
-      0.75,
+      0.90,
 
     requiredHealthyWindows:
       2,
@@ -63,19 +79,9 @@ export const ADAPTIVE_PROVIDER_SCALER_POLICY =
     scaleUpDwellMs:
       5 * 60_000,
 
-    /*
-     * Once above baseline, the current tier must
-     * retain at least 95% of the previous tier's
-     * useful throughput or we step down.
-     */
     minimumThroughputRetentionRatio:
       0.95,
 
-    /*
-     * To climb again above an already-expanded tier,
-     * useful throughput must improve by at least 2%
-     * over the previous tier.
-     */
     minimumThroughputGainRatio:
       1.02,
   } as const);
@@ -86,7 +92,8 @@ export type AdaptiveScaleAction =
   | 'SCALE_DOWN';
 
 export type AdaptiveScaleReason =
-  | 'BASELINE_NOT_LIVE_EXPANDED'
+  | 'NO_DEMAND'
+  | 'DEMAND_CAP'
   | 'QUALITY_OPEN'
   | 'TRANSPORT_FAILURE'
   | 'INTEGRATION_FAILURE'
@@ -102,7 +109,11 @@ export type AdaptiveScaleReason =
   | 'TIME_DWELL'
   | 'MACHINE_CAP'
   | 'MAX_LOGICAL_TIER'
-  | 'HEALTHY_SCALE_UP';
+  | 'PROBATION_BOOTSTRAP'
+  | 'RECOVERY_DWELL'
+  | 'RECOVERY_WINDOW_STALE'
+  | 'HEALTHY_SCALE_UP'
+  | 'BASELINE_NOT_LIVE_EXPANDED';
 
 export interface AdaptiveLaneState {
   readonly provider:
@@ -118,9 +129,15 @@ export interface AdaptiveLaneState {
     number;
 
   /*
-   * When targetSlots > baseline, this is the useful
-   * throughput observed at the previous tier.
+   * Zero means no safety hold.
+   *
+   * A transport/integration/quality safety stop moves
+   * this boundary forward. It cannot itself authorize
+   * an invocation; it only prevents premature reopen.
    */
+  readonly recoveryNotBeforeMs:
+    number;
+
   readonly priorTierUsefulPerMinute:
     number | null;
 }
@@ -128,6 +145,16 @@ export interface AdaptiveLaneState {
 export interface AdaptiveLaneObservation {
   readonly provider:
     Provider;
+
+  /*
+   * Current work demand for this lane.
+   *
+   * Optional only for compatibility with historical
+   * callers. Omitted means demand may use the full
+   * provider ceiling.
+   */
+  readonly requestedSlots?:
+    number;
 
   readonly quotaCircuit:
     QuotaCircuitState;
@@ -138,7 +165,20 @@ export interface AdaptiveLaneObservation {
   readonly certification:
     QualityCertification | null;
 
-  readonly counters:
+  /*
+   * Start time of the bounded observation window.
+   */
+  readonly windowStartedAtMs:
+    number;
+
+  /*
+   * Counters for THIS observation window only.
+   *
+   * They are intentionally not lifetime/cumulative
+   * provider counters. This prevents an old failure
+   * from permanently pinning a recovered lane to zero.
+   */
+  readonly windowCounters:
     ProviderQualityCounters;
 
   readonly usefulPerMinute:
@@ -152,11 +192,6 @@ export interface AdaptiveScalerState {
   readonly antigravity:
     AdaptiveLaneState;
 
-  /*
-   * Historical scheduler ordering is reused only as
-   * a fairness mechanism when machine capacity can
-   * admit one provider but not both.
-   */
   readonly preferAntigravityFirst:
     boolean;
 }
@@ -223,10 +258,6 @@ export interface AdaptivePairDecision {
   readonly totalTargetSlots:
     number;
 
-  /*
-   * Explicit reminder: this planner does not itself
-   * authorize or execute >8 live concurrency.
-   */
   readonly liveEnvelopeExpanded:
     false;
 
@@ -238,7 +269,7 @@ function assertSafeNonNegativeInteger(
   value:
     number,
 
-  name:
+  label:
     string,
 ): void {
   if (
@@ -248,7 +279,7 @@ function assertSafeNonNegativeInteger(
     value < 0
   ) {
     throw new Error(
-      `ADAPTIVE_SCALER_${name}_INVALID`,
+      `ADAPTIVE_SCALER_${label}_INVALID`,
     );
   }
 }
@@ -257,7 +288,7 @@ function assertFiniteNonNegative(
   value:
     number,
 
-  name:
+  label:
     string,
 ): void {
   if (
@@ -267,7 +298,7 @@ function assertFiniteNonNegative(
     value < 0
   ) {
     throw new Error(
-      `ADAPTIVE_SCALER_${name}_INVALID`,
+      `ADAPTIVE_SCALER_${label}_INVALID`,
     );
   }
 }
@@ -326,6 +357,33 @@ function validateCounters(
   }
 }
 
+function requestedSlots(
+  observation:
+    AdaptiveLaneObservation,
+): number {
+  const value =
+    observation.requestedSlots ??
+    ADAPTIVE_PROVIDER_SCALER_POLICY
+      .maxLogicalSlotsPerProvider;
+
+  assertSafeNonNegativeInteger(
+    value,
+    'REQUESTED_SLOTS',
+  );
+
+  if (
+    value >
+      ADAPTIVE_PROVIDER_SCALER_POLICY
+        .maxLogicalSlotsPerProvider
+  ) {
+    throw new Error(
+      'ADAPTIVE_SCALER_REQUESTED_SLOTS_EXCEEDED',
+    );
+  }
+
+  return value;
+}
+
 function validateLaneState(
   provider:
     Provider,
@@ -348,15 +406,12 @@ function validateLaneState(
   );
 
   if (
-    state.targetSlots <
-      ADAPTIVE_PROVIDER_SCALER_POLICY
-        .baselineSlots ||
     state.targetSlots >
       ADAPTIVE_PROVIDER_SCALER_POLICY
         .maxLogicalSlotsPerProvider
   ) {
     throw new Error(
-      'ADAPTIVE_SCALER_TARGET_OUT_OF_RANGE',
+      'ADAPTIVE_SCALER_TARGET_EXCEEDED',
     );
   }
 
@@ -367,7 +422,12 @@ function validateLaneState(
 
   assertSafeNonNegativeInteger(
     state.lastTargetChangeAtMs,
-    'LAST_CHANGE',
+    'LAST_TARGET_CHANGE',
+  );
+
+  assertSafeNonNegativeInteger(
+    state.recoveryNotBeforeMs,
+    'RECOVERY_NOT_BEFORE',
   );
 
   if (
@@ -378,53 +438,6 @@ function validateLaneState(
       state.priorTierUsefulPerMinute,
       'PRIOR_THROUGHPUT',
     );
-
-    if (
-      state.targetSlots ===
-        ADAPTIVE_PROVIDER_SCALER_POLICY
-          .baselineSlots
-    ) {
-      throw new Error(
-        'ADAPTIVE_SCALER_BASELINE_PRIOR_THROUGHPUT_INVALID',
-      );
-    }
-  }
-}
-
-function validateCertification(
-  provider:
-    Provider,
-
-  baseline:
-    string,
-
-  certification:
-    QualityCertification | null,
-): void {
-  if (
-    certification ===
-      null
-  ) {
-    return;
-  }
-
-  if (
-    certification.provider !==
-      provider
-  ) {
-    throw new Error(
-      'ADAPTIVE_SCALER_CERT_PROVIDER_MISMATCH',
-    );
-  }
-
-  if (
-    certification.baseline
-      .toLowerCase() !==
-    baseline.toLowerCase()
-  ) {
-    throw new Error(
-      'ADAPTIVE_SCALER_CERT_BASELINE_MISMATCH',
-    );
   }
 }
 
@@ -434,6 +447,9 @@ function validateObservation(
 
   baseline:
     string,
+
+  nowMs:
+    number,
 
   observation:
     AdaptiveLaneObservation,
@@ -447,21 +463,89 @@ function validateObservation(
     );
   }
 
-  validateCounters(
-    provider,
-    observation.counters,
+  requestedSlots(
+    observation,
   );
 
-  validateCertification(
+  assertSafeNonNegativeInteger(
+    observation.windowStartedAtMs,
+    'WINDOW_START',
+  );
+
+  if (
+    observation.windowStartedAtMs >
+      nowMs
+  ) {
+    throw new Error(
+      'ADAPTIVE_SCALER_WINDOW_FROM_FUTURE',
+    );
+  }
+
+  validateCounters(
     provider,
-    baseline,
-    observation.certification,
+    observation.windowCounters,
   );
 
   assertFiniteNonNegative(
     observation.usefulPerMinute,
     'USEFUL_PER_MINUTE',
   );
+
+  if (
+    observation.quotaCircuit.state !==
+      'CLOSED' &&
+    observation.quotaCircuit.state !==
+      'OPEN'
+  ) {
+    throw new Error(
+      'ADAPTIVE_SCALER_QUOTA_STATE_INVALID',
+    );
+  }
+
+  if (
+    observation.qualityCircuit !==
+      'CLOSED' &&
+    observation.qualityCircuit !==
+      'OPEN'
+  ) {
+    throw new Error(
+      'ADAPTIVE_SCALER_QUALITY_STATE_INVALID',
+    );
+  }
+
+  const certification =
+    observation.certification;
+
+  if (
+    certification !== null
+  ) {
+    if (
+      certification.provider !==
+        provider ||
+      certification.baseline
+        .toLowerCase() !==
+        baseline.toLowerCase()
+    ) {
+      throw new Error(
+        'ADAPTIVE_SCALER_CERTIFICATION_BINDING_INVALID',
+      );
+    }
+
+    assertSafeNonNegativeInteger(
+      certification.sampleCount,
+      'CERT_SAMPLE',
+    );
+
+    assertSafeNonNegativeInteger(
+      certification.usefulUniqueCount,
+      'CERT_USEFUL',
+    );
+
+    assertSafeNonNegativeInteger(
+      certification.rejectedCount,
+      'CERT_REJECTED',
+    );
+  }
 }
 
 function validateInput(
@@ -488,13 +572,7 @@ function validateInput(
     'MACHINE_MAX',
   );
 
-  const minimumBaselineTotal =
-    ADAPTIVE_PROVIDER_SCALER_POLICY
-      .baselineSlots * 2;
-
   if (
-    input.machineEffectiveMax <
-      minimumBaselineTotal ||
     input.machineEffectiveMax >
       ADAPTIVE_PROVIDER_SCALER_POLICY
         .maxLogicalTotalSlots
@@ -517,42 +595,89 @@ function validateInput(
   validateObservation(
     'codex',
     input.baseline,
+    input.nowMs,
     input.codex,
   );
 
   validateObservation(
     'antigravity',
     input.baseline,
+    input.nowMs,
     input.antigravity,
   );
 
-  const currentTotal =
+  const total =
     input.state.codex.targetSlots +
-    input.state.antigravity
-      .targetSlots;
+    input.state.antigravity.targetSlots;
 
   if (
-    currentTotal >
-      input.machineEffectiveMax
+    total >
+      ADAPTIVE_PROVIDER_SCALER_POLICY
+        .maxLogicalTotalSlots
   ) {
     throw new Error(
-      'ADAPTIVE_SCALER_CURRENT_TARGET_EXCEEDS_MACHINE_MAX',
+      'ADAPTIVE_SCALER_CURRENT_TARGET_EXCEEDS_GLOBAL_MAX',
     );
   }
 }
 
-function scaleDownDecision(
+function throughputRatio(
   state:
     AdaptiveLaneState,
+
+  observation:
+    AdaptiveLaneObservation,
+): number | null {
+  if (
+    state.priorTierUsefulPerMinute ===
+      null ||
+    state.priorTierUsefulPerMinute ===
+      0
+  ) {
+    return null;
+  }
+
+  return (
+    observation.usefulPerMinute /
+    state.priorTierUsefulPerMinute
+  );
+}
+
+function transition(
+  state:
+    AdaptiveLaneState,
+
+  nowMs:
+    number,
 
   usefulYield:
     number,
 
-  throughputRatio:
+  ratio:
     number | null,
+
+  action:
+    AdaptiveScaleAction,
 
   reason:
     AdaptiveScaleReason,
+
+  target:
+    number,
+
+  healthyWindows:
+    number,
+
+  priorTierUsefulPerMinute:
+    number | null,
+
+  recoveryNotBeforeMs:
+    number =
+      state.recoveryNotBeforeMs,
+
+  forceTargetTimestamp:
+    boolean =
+      false,
 ): Readonly<{
   decision:
     AdaptiveLaneDecision;
@@ -560,58 +685,10 @@ function scaleDownDecision(
   state:
     AdaptiveLaneState;
 }> {
-  const nextTarget =
-    Math.max(
-      ADAPTIVE_PROVIDER_SCALER_POLICY
-        .baselineSlots,
-
-      state.targetSlots -
-      ADAPTIVE_PROVIDER_SCALER_POLICY
-        .stepSlots,
-    );
-
-  /*
-   * Baseline itself never goes below 8 in this V1.
-   * Provider circuits/quota may still prevent launches.
-   */
-  if (
-    nextTarget ===
-      state.targetSlots
-  ) {
-    return Object.freeze({
-      decision:
-        Object.freeze({
-          provider:
-            state.provider,
-
-          action:
-            'HOLD',
-
-          reason,
-
-          previousTargetSlots:
-            state.targetSlots,
-
-          nextTargetSlots:
-            state.targetSlots,
-
-          usefulYield,
-
-          nextHealthyWindows:
-            0,
-
-          throughputRatioToPriorTier:
-            throughputRatio,
-        }),
-
-      state:
-        Object.freeze({
-          ...state,
-          healthyWindows:
-            0,
-        }),
-    });
-  }
+  const changed =
+    target !==
+      state.targetSlots ||
+    forceTargetTimestamp;
 
   return Object.freeze({
     decision:
@@ -619,8 +696,7 @@ function scaleDownDecision(
         provider:
           state.provider,
 
-        action:
-          'SCALE_DOWN',
+        action,
 
         reason,
 
@@ -628,15 +704,15 @@ function scaleDownDecision(
           state.targetSlots,
 
         nextTargetSlots:
-          nextTarget,
+          target,
 
         usefulYield,
 
         nextHealthyWindows:
-          0,
+          healthyWindows,
 
         throughputRatioToPriorTier:
-          throughputRatio,
+          ratio,
       }),
 
     state:
@@ -645,80 +721,64 @@ function scaleDownDecision(
           state.provider,
 
         targetSlots:
-          nextTarget,
+          target,
 
-        healthyWindows:
-          0,
+        healthyWindows,
 
         lastTargetChangeAtMs:
-          state.lastTargetChangeAtMs,
-
-        priorTierUsefulPerMinute:
-          nextTarget ===
-            ADAPTIVE_PROVIDER_SCALER_POLICY
-              .baselineSlots
-            ? null
+          changed
+            ? nowMs
             : state
-                .priorTierUsefulPerMinute,
+                .lastTargetChangeAtMs,
+
+        recoveryNotBeforeMs,
+
+        priorTierUsefulPerMinute,
       }),
   });
 }
 
-function holdDecision(
+function stopLane(
   state:
     AdaptiveLaneState,
+
+  nowMs:
+    number,
 
   usefulYield:
     number,
 
-  throughputRatio:
+  ratio:
     number | null,
-
-  nextHealthyWindows:
-    number,
 
   reason:
     AdaptiveScaleReason,
-): Readonly<{
-  decision:
-    AdaptiveLaneDecision;
 
-  state:
-    AdaptiveLaneState;
-}> {
-  return Object.freeze({
-    decision:
-      Object.freeze({
-        provider:
-          state.provider,
+  safetyStop:
+    boolean =
+      false,
+): ReturnType<typeof transition> {
+  return transition(
+    state,
+    nowMs,
+    usefulYield,
+    ratio,
+    state.targetSlots === 0
+      ? 'HOLD'
+      : 'SCALE_DOWN',
+    reason,
+    0,
+    0,
+    null,
 
-        action:
-          'HOLD',
+    safetyStop
+      ? nowMs +
+        ADAPTIVE_PROVIDER_SCALER_POLICY
+          .recoveryDwellMs
+      : state.recoveryNotBeforeMs,
 
-        reason,
-
-        previousTargetSlots:
-          state.targetSlots,
-
-        nextTargetSlots:
-          state.targetSlots,
-
-        usefulYield,
-
-        nextHealthyWindows,
-
-        throughputRatioToPriorTier:
-          throughputRatio,
-      }),
-
-    state:
-      Object.freeze({
-        ...state,
-
-        healthyWindows:
-          nextHealthyWindows,
-      }),
-  });
+    safetyStop,
+  );
 }
 
 function evaluateLane(
@@ -739,171 +799,336 @@ function evaluateLane(
 
   observation:
     AdaptiveLaneObservation,
-): Readonly<{
-  decision:
-    AdaptiveLaneDecision;
-
-  state:
-    AdaptiveLaneState;
-}> {
-  validateCertification(
-    state.provider,
-    baseline,
-    observation.certification,
-  );
-
+): ReturnType<typeof transition> {
   const usefulYield =
     productiveWorkRate(
-      observation.counters,
+      observation.windowCounters,
     );
 
-  const throughputRatio =
-    state.priorTierUsefulPerMinute ===
-      null ||
-    state.priorTierUsefulPerMinute ===
-      0
-      ? null
-      : (
-          observation.usefulPerMinute /
-          state.priorTierUsefulPerMinute
-        );
+  const ratio =
+    throughputRatio(
+      state,
+      observation,
+    );
 
-  /*
-   * Degradation is evaluated before quota. An OPEN
-   * quota circuit must not hide an already-observed
-   * quality/output degradation.
-   */
+  const demand =
+    requestedSlots(
+      observation,
+    );
+
+  if (
+    demand === 0
+  ) {
+    return stopLane(
+      state,
+      nowMs,
+      usefulYield,
+      ratio,
+      'NO_DEMAND',
+    );
+  }
+
+  if (
+    observation.quotaCircuit
+      .state === 'OPEN'
+  ) {
+    return stopLane(
+      state,
+      nowMs,
+      usefulYield,
+      ratio,
+      'QUOTA_OPEN',
+      true,
+    );
+  }
+
   if (
     observation.qualityCircuit ===
       'OPEN'
   ) {
-    return scaleDownDecision(
+    return stopLane(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
+      ratio,
       'QUALITY_OPEN',
+      true,
     );
   }
 
   if (
-    observation.counters
-      .protocolRejected > 0 ||
-    observation.counters
-      .contractRejected > 0
-  ) {
-    return scaleDownDecision(
-      state,
-      usefulYield,
-      throughputRatio,
-      'INTEGRATION_FAILURE',
-    );
-  }
-
-  if (
-    observation.counters
+    observation.windowCounters
       .transportFailures > 0
   ) {
-    return scaleDownDecision(
+    return stopLane(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
+      ratio,
       'TRANSPORT_FAILURE',
+      true,
     );
   }
 
   if (
-    state.targetSlots >
+    observation.windowCounters
+      .protocolRejected > 0 ||
+    observation.windowCounters
+      .contractRejected > 0
+  ) {
+    return stopLane(
+      state,
+      nowMs,
+      usefulYield,
+      ratio,
+      'INTEGRATION_FAILURE',
+      true,
+    );
+  }
+
+  if (
+    observation.windowCounters.attempts >=
       ADAPTIVE_PROVIDER_SCALER_POLICY
-        .baselineSlots &&
-    observation.counters.attempts >
-      0 &&
+        .minimumWindowAttempts &&
     usefulYield <
       ADAPTIVE_PROVIDER_SCALER_POLICY
         .usefulYieldScaleDownThreshold
   ) {
-    return scaleDownDecision(
+    /*
+     * Strict productivity gate.
+     *
+     * BLOCKED remains in attempts, therefore it lowers
+     * usefulYield and cannot be hidden from this gate.
+     */
+    return stopLane(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
+      ratio,
       'USEFUL_YIELD_DEGRADED',
+      true,
     );
+  }
+
+  const machineLaneCap =
+    Math.max(
+      0,
+      Math.min(
+        ADAPTIVE_PROVIDER_SCALER_POLICY
+          .maxLogicalSlotsPerProvider,
+
+        machineEffectiveMax -
+        otherTargetSlots,
+      ),
+    );
+
+  const effectiveDemand =
+    Math.min(
+      demand,
+      machineLaneCap,
+      ADAPTIVE_PROVIDER_SCALER_POLICY
+        .maxLogicalSlotsPerProvider,
+    );
+
+  /*
+   * A stopped lane cannot manufacture the eight prior
+   * attempts required by the normal scale-up gate.
+   *
+   * Therefore 0 -> 1 is a distinct probation action,
+   * never an ordinary healthy scale-up.
+   */
+  if (
+    state.targetSlots === 0 &&
+    effectiveDemand > 0
+  ) {
+    if (
+      nowMs <
+        state.recoveryNotBeforeMs
+    ) {
+      return transition(
+        state,
+        nowMs,
+        usefulYield,
+        ratio,
+        'HOLD',
+        'RECOVERY_DWELL',
+        0,
+        0,
+        null,
+      );
+    }
+
+    if (
+      observation.windowStartedAtMs <
+        state.lastTargetChangeAtMs
+    ) {
+      return transition(
+        state,
+        nowMs,
+        usefulYield,
+        ratio,
+        'HOLD',
+        'RECOVERY_WINDOW_STALE',
+        0,
+        0,
+        null,
+      );
+    }
+
+    /*
+     * No pre-existing work sample is required for the
+     * probation slot. If a real window already exists,
+     * the normal certification path below remains in
+     * force instead.
+     */
+    if (
+      observation.windowCounters
+        .attempts === 0
+    ) {
+      const probation =
+        Math.min(
+          ADAPTIVE_PROVIDER_SCALER_POLICY
+            .probationBootstrapSlots,
+
+          effectiveDemand,
+          machineLaneCap,
+        );
+
+      if (
+        probation > 0
+      ) {
+        return transition(
+          state,
+          nowMs,
+          usefulYield,
+          ratio,
+          'SCALE_UP',
+          'PROBATION_BOOTSTRAP',
+          probation,
+          0,
+          null,
+          0,
+        );
+      }
+    }
   }
 
   if (
     state.targetSlots >
-      ADAPTIVE_PROVIDER_SCALER_POLICY
-        .baselineSlots &&
-    throughputRatio !==
-      null &&
-    throughputRatio <
-      ADAPTIVE_PROVIDER_SCALER_POLICY
-        .minimumThroughputRetentionRatio
+      effectiveDemand
   ) {
-    return scaleDownDecision(
-      state,
-      usefulYield,
-      throughputRatio,
-      'THROUGHPUT_REGRESSION',
-    );
-  }
+    const reason:
+      AdaptiveScaleReason =
+        demand <
+          state.targetSlots
+          ? 'DEMAND_CAP'
+          : 'MACHINE_CAP';
 
-  if (
-    observation.quotaCircuit.state !==
-      'CLOSED'
-  ) {
-    return holdDecision(
+    return transition(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
+      ratio,
+      'SCALE_DOWN',
+      reason,
+      effectiveDemand,
       0,
-      'QUOTA_OPEN',
+      effectiveDemand === 0
+        ? null
+        : state
+            .priorTierUsefulPerMinute,
     );
   }
 
-  const certification =
-    observation.certification;
-
   if (
-    !qualityAllowsScaleUp(
-      certification,
-    )
+    state.targetSlots >=
+      demand
   ) {
-    return holdDecision(
+    return transition(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
+      ratio,
+      'HOLD',
+      'DEMAND_CAP',
+      state.targetSlots,
       0,
-      'QUALITY_NOT_CERTIFIED',
+      state.priorTierUsefulPerMinute,
     );
   }
 
   if (
-    certification ===
-      null ||
-    certification.sampleCount <
+    state.targetSlots >=
       ADAPTIVE_PROVIDER_SCALER_POLICY
-        .minimumCertificationSamples
+        .maxLogicalSlotsPerProvider
   ) {
-    return holdDecision(
+    return transition(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
+      ratio,
+      'HOLD',
+      'MAX_LOGICAL_TIER',
+      state.targetSlots,
       0,
-      'CERTIFICATION_SAMPLE_TOO_SMALL',
+      state.priorTierUsefulPerMinute,
     );
   }
 
   if (
-    observation.counters.attempts <
+    observation.windowCounters.attempts <
       ADAPTIVE_PROVIDER_SCALER_POLICY
         .minimumWindowAttempts
   ) {
-    return holdDecision(
+    return transition(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
-      0,
+      ratio,
+      'HOLD',
       'WINDOW_SAMPLE_TOO_SMALL',
+      state.targetSlots,
+      0,
+      state.priorTierUsefulPerMinute,
+    );
+  }
+
+  if (
+    observation.certification ===
+      null ||
+    !qualityAllowsScaleUp(
+      observation.certification,
+    )
+  ) {
+    return transition(
+      state,
+      nowMs,
+      usefulYield,
+      ratio,
+      'HOLD',
+      'QUALITY_NOT_CERTIFIED',
+      state.targetSlots,
+      0,
+      state.priorTierUsefulPerMinute,
+    );
+  }
+
+  if (
+    observation.certification
+      .sampleCount <
+      ADAPTIVE_PROVIDER_SCALER_POLICY
+        .minimumCertificationSamples
+  ) {
+    return transition(
+      state,
+      nowMs,
+      usefulYield,
+      ratio,
+      'HOLD',
+      'CERTIFICATION_SAMPLE_TOO_SMALL',
+      state.targetSlots,
+      0,
+      state.priorTierUsefulPerMinute,
     );
   }
 
@@ -912,42 +1137,16 @@ function evaluateLane(
       ADAPTIVE_PROVIDER_SCALER_POLICY
         .minimumUsefulYieldForScaleUp
   ) {
-    return holdDecision(
+    return transition(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
-      0,
+      ratio,
+      'HOLD',
       'USEFUL_YIELD_TOO_LOW',
-    );
-  }
-
-  /*
-   * At the historical 8-slot baseline there is no
-   * higher-tier throughput result to compare yet.
-   *
-   * Once expanded, every further climb requires
-   * measured useful-throughput gain.
-   */
-  if (
-    state.targetSlots >
-      ADAPTIVE_PROVIDER_SCALER_POLICY
-        .baselineSlots &&
-    state.priorTierUsefulPerMinute !==
-      null &&
-    (
-      throughputRatio ===
-        null ||
-      throughputRatio <
-        ADAPTIVE_PROVIDER_SCALER_POLICY
-          .minimumThroughputGainRatio
-    )
-  ) {
-    return holdDecision(
-      state,
-      usefulYield,
-      throughputRatio,
+      state.targetSlots,
       0,
-      'THROUGHPUT_GAIN_NOT_PROVEN',
+      state.priorTierUsefulPerMinute,
     );
   }
 
@@ -955,120 +1154,85 @@ function evaluateLane(
     state.healthyWindows + 1;
 
   if (
-    state.targetSlots >=
-      ADAPTIVE_PROVIDER_SCALER_POLICY
-        .maxLogicalSlotsPerProvider
-  ) {
-    return holdDecision(
-      state,
-      usefulYield,
-      throughputRatio,
-      nextHealthyWindows,
-      'MAX_LOGICAL_TIER',
-    );
-  }
-
-  if (
     nextHealthyWindows <
       ADAPTIVE_PROVIDER_SCALER_POLICY
         .requiredHealthyWindows
   ) {
-    return holdDecision(
+    return transition(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
-      nextHealthyWindows,
+      ratio,
+      'HOLD',
       'HEALTHY_WINDOW_DWELL',
+      state.targetSlots,
+      nextHealthyWindows,
+      state.priorTierUsefulPerMinute,
     );
   }
 
-  const elapsedSinceChange =
-    nowMs -
-    state.lastTargetChangeAtMs;
-
   if (
-    elapsedSinceChange <
+    nowMs -
+      state.lastTargetChangeAtMs <
       ADAPTIVE_PROVIDER_SCALER_POLICY
         .scaleUpDwellMs
   ) {
-    return holdDecision(
+    return transition(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
-      nextHealthyWindows,
+      ratio,
+      'HOLD',
       'TIME_DWELL',
+      state.targetSlots,
+      nextHealthyWindows,
+      state.priorTierUsefulPerMinute,
     );
   }
 
-  const proposedTarget =
-    state.targetSlots +
-    ADAPTIVE_PROVIDER_SCALER_POLICY
-      .stepSlots;
+  const proposed =
+    Math.min(
+      state.targetSlots +
+        ADAPTIVE_PROVIDER_SCALER_POLICY
+          .stepSlots,
+
+      demand,
+
+      machineLaneCap,
+
+      ADAPTIVE_PROVIDER_SCALER_POLICY
+        .maxLogicalSlotsPerProvider,
+    );
 
   if (
-    proposedTarget +
-    otherTargetSlots >
-      machineEffectiveMax
+    proposed <=
+      state.targetSlots
   ) {
-    return holdDecision(
+    return transition(
       state,
+      nowMs,
       usefulYield,
-      throughputRatio,
-      nextHealthyWindows,
+      ratio,
+      'HOLD',
       'MACHINE_CAP',
+      state.targetSlots,
+      0,
+      state.priorTierUsefulPerMinute,
     );
   }
 
-  return Object.freeze({
-    decision:
-      Object.freeze({
-        provider:
-          state.provider,
-
-        action:
-          'SCALE_UP',
-
-        reason:
-          'HEALTHY_SCALE_UP',
-
-        previousTargetSlots:
-          state.targetSlots,
-
-        nextTargetSlots:
-          proposedTarget,
-
-        usefulYield,
-
-        nextHealthyWindows:
-          0,
-
-        throughputRatioToPriorTier:
-          throughputRatio,
-      }),
-
-    state:
-      Object.freeze({
-        provider:
-          state.provider,
-
-        targetSlots:
-          proposedTarget,
-
-        healthyWindows:
-          0,
-
-        lastTargetChangeAtMs:
-          nowMs,
-
-        /*
-         * The throughput measured at the tier we are
-         * leaving becomes the comparison baseline for
-         * the newly entered tier.
-         */
-        priorTierUsefulPerMinute:
-          observation.usefulPerMinute,
-      }),
-  });
+  return transition(
+    state,
+    nowMs,
+    usefulYield,
+    ratio,
+    'SCALE_UP',
+    'HEALTHY_SCALE_UP',
+    proposed,
+    0,
+    observation.usefulPerMinute,
+    0,
+  );
 }
 
 export function initialAdaptiveScalerState(
@@ -1080,44 +1244,39 @@ export function initialAdaptiveScalerState(
     'INITIAL_TIME',
   );
 
+  const lane = (
+    provider:
+      Provider,
+  ): AdaptiveLaneState =>
+    Object.freeze({
+      provider,
+
+      targetSlots:
+        0,
+
+      healthyWindows:
+        0,
+
+      lastTargetChangeAtMs:
+        nowMs,
+
+      recoveryNotBeforeMs:
+        0,
+
+      priorTierUsefulPerMinute:
+        null,
+    });
+
   return Object.freeze({
     codex:
-      Object.freeze({
-        provider:
-          'codex',
-
-        targetSlots:
-          ADAPTIVE_PROVIDER_SCALER_POLICY
-            .baselineSlots,
-
-        healthyWindows:
-          0,
-
-        lastTargetChangeAtMs:
-          nowMs,
-
-        priorTierUsefulPerMinute:
-          null,
-      }),
+      lane(
+        'codex',
+      ),
 
     antigravity:
-      Object.freeze({
-        provider:
-          'antigravity',
-
-        targetSlots:
-          ADAPTIVE_PROVIDER_SCALER_POLICY
-            .baselineSlots,
-
-        healthyWindows:
-          0,
-
-        lastTargetChangeAtMs:
-          nowMs,
-
-        priorTierUsefulPerMinute:
-          null,
-      }),
+      lane(
+        'antigravity',
+      ),
 
     preferAntigravityFirst:
       false,
@@ -1160,7 +1319,7 @@ export function evaluateAdaptiveProviderPair(
       provider ===
         'codex'
     ) {
-      const evaluated =
+      const result =
         evaluateLane(
           input.baseline,
           input.nowMs,
@@ -1172,12 +1331,12 @@ export function evaluateAdaptiveProviderPair(
         );
 
       codexState =
-        evaluated.state;
+        result.state;
 
       codexDecision =
-        evaluated.decision;
+        result.decision;
     } else {
-      const evaluated =
+      const result =
         evaluateLane(
           input.baseline,
           input.nowMs,
@@ -1189,10 +1348,10 @@ export function evaluateAdaptiveProviderPair(
         );
 
       antigravityState =
-        evaluated.state;
+        result.state;
 
       antigravityDecision =
-        evaluated.decision;
+        result.decision;
     }
   }
 
@@ -1205,19 +1364,6 @@ export function evaluateAdaptiveProviderPair(
       'ADAPTIVE_SCALER_INTERNAL_DECISION_MISSING',
     );
   }
-
-  const nextState =
-    Object.freeze({
-      codex:
-        codexState,
-
-      antigravity:
-        antigravityState,
-
-      preferAntigravityFirst:
-        !input.state
-          .preferAntigravityFirst,
-    });
 
   const totalTargetSlots =
     codexState.targetSlots +
@@ -1234,6 +1380,19 @@ export function evaluateAdaptiveProviderPair(
       'ADAPTIVE_SCALER_POST_DECISION_CAP_VIOLATION',
     );
   }
+
+  const nextState =
+    Object.freeze({
+      codex:
+        codexState,
+
+      antigravity:
+        antigravityState,
+
+      preferAntigravityFirst:
+        !input.state
+          .preferAntigravityFirst,
+    });
 
   return Object.freeze({
     schemaVersion:
@@ -1258,9 +1417,9 @@ export function evaluateAdaptiveProviderPair(
 }
 
 /*
- * Keep this invariant explicit in the module itself:
- * adaptive planning does not silently rewrite the
- * currently live-certified scheduler envelope.
+ * Compatibility API name retained.
+ *
+ * These values are now hard ceilings, not fixed targets.
  */
 export function currentLiveEnvelopeStill8x8():
 Readonly<{

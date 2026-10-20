@@ -1,3 +1,12 @@
+import type {
+  ProviderTaskClass,
+  ProviderTaskLaneEvidence,
+} from '../scheduler/providerTaskRouter';
+
+import {
+  routeAndEnqueueProviderWork,
+} from './providerTaskRoutingAdmission';
+
 import {
   existsSync,
 } from 'node:fs';
@@ -28,12 +37,31 @@ import type {
 export const LIVE_8X8_ONE_SHOT_SCHEMA =
   'VELNAR_LIVE_8X8_ONE_SHOT_V1' as const;
 
+export interface Live8x8OneShotRoutingEvidence {
+  readonly taskClass:
+    ProviderTaskClass;
+
+  readonly codex:
+    ProviderTaskLaneEvidence;
+
+  readonly antigravity:
+    ProviderTaskLaneEvidence;
+}
+
 export interface Live8x8OneShotJob {
   readonly order:
     ProviderWorkOrder;
 
   readonly capsule:
     HostEvidenceCapsule;
+
+
+  /*
+   * Host-produced evidence only.
+   * Routing grants no execution or verification authority.
+   */
+  readonly routing:
+    Live8x8OneShotRoutingEvidence;
 }
 
 export interface Live8x8OneShotInput {
@@ -330,12 +358,79 @@ runLive8x8OneShot(
         item.capsule,
       );
 
-      queue.enqueue(
-        item.order,
+      const admissionNowMs =
         safeClock(
           input.nowMs,
-        ),
-      );
+        );
+
+      if (
+        item.routing ===
+          undefined
+      ) {
+        throw new Error(
+          'LIVE_8X8_ROUTING_REQUIRED',
+        );
+      } else {
+        const codexQuality =
+          queue.canLaunchProvider(
+            'codex',
+          )
+            ? 'CLOSED'
+            : 'OPEN';
+
+        const antigravityQuality =
+          queue.canLaunchProvider(
+            'antigravity',
+          )
+            ? 'CLOSED'
+            : 'OPEN';
+
+        if (
+          item.routing.codex
+            .qualityCircuit !==
+            codexQuality ||
+          item.routing.antigravity
+            .qualityCircuit !==
+            antigravityQuality
+        ) {
+          throw new Error(
+            'LIVE_8X8_ROUTING_CIRCUIT_MISMATCH',
+          );
+        }
+
+        const admission =
+          routeAndEnqueueProviderWork({
+            queue,
+
+            order:
+              item.order,
+
+            taskClass:
+              item.routing.taskClass,
+
+            codex:
+              item.routing.codex,
+
+            antigravity:
+              item.routing.antigravity,
+
+            nowMs:
+              admissionNowMs,
+          });
+
+        if (
+          admission.status !==
+            'ENQUEUED' ||
+          admission.record ===
+            null ||
+          admission.decision.provider !==
+            item.order.affinity
+        ) {
+          throw new Error(
+            'LIVE_8X8_ROUTING_ADMISSION_HOLD',
+          );
+        }
+      }
     }
   } finally {
     queue.close();

@@ -6,9 +6,7 @@ import {
 } from '../scheduler/verified8x8Scheduler';
 
 import {
-  consumeLiveTierCanaryPermit,
   livePlanFitsCurrentCertifiedEnvelope,
-  type LiveTierCanaryPermit,
 } from '../scheduler/liveProviderTierGate';
 
 import {
@@ -109,18 +107,22 @@ export interface LiveTransactionalPoolOptions {
     number;
 
   /*
-   * Optional only because the historical <=8+8 path
-   * requires no permit.
+   * Physical Antigravity process concurrency.
    *
-   * Any request above the currently certified live
-   * envelope requires both fields and must pass the
-   * one-shot tier gate.
+   * Logical slots and physical concurrency are
+   * intentionally separate:
+   *
+   *   antigravitySlots       = admitted logical work
+   *   antigravityConcurrency = simultaneous AGY work
+   *
+   * Omitted => conservative legacy default:
+   *   0 when there are zero AGY slots
+   *   1 otherwise.
+   *
+   * V1 hard maximum remains 8.
    */
-  readonly currentBaseline?:
-    string;
-
-  readonly liveTierCanaryPermit?:
-    LiveTierCanaryPermit;
+  readonly antigravityConcurrency?:
+    number;
 
   readonly leaseDurationMs:
     number;
@@ -186,6 +188,14 @@ export interface LiveProviderPoolStats {
     number;
 
   readonly stoppedByQualityCircuit:
+    number;
+
+  /*
+   * Run-local fail-closed stop caused by uncertain
+   * transport. This is deliberately separate from
+   * provider output-quality state.
+   */
+  readonly stoppedByTransportCircuit:
     number;
 }
 
@@ -256,6 +266,9 @@ interface MutableStats {
     number;
 
   stoppedByQualityCircuit:
+    number;
+
+  stoppedByTransportCircuit:
     number;
 }
 
@@ -384,6 +397,9 @@ function emptyStats(
     transportFailures: 0,
     stoppedByQualityCircuit:
       0,
+
+    stoppedByTransportCircuit:
+      0,
   };
 }
 
@@ -425,6 +441,10 @@ function freezeStats(
     stoppedByQualityCircuit:
       value
         .stoppedByQualityCircuit,
+
+    stoppedByTransportCircuit:
+      value
+        .stoppedByTransportCircuit,
   });
 }
 
@@ -453,6 +473,9 @@ async function runSlot(
 
   slotId:
     string,
+
+  transportStoppedProviders:
+    Set<Provider>,
 ): Promise<MutableStats> {
   const stats =
     emptyStats(
@@ -472,6 +495,25 @@ async function runSlot(
         options.maxClaimsPerSlot;
       claimIndex += 1
     ) {
+      /*
+       * A transport failure is uncertain execution.
+       *
+       * It must not poison the independent output-quality
+       * circuit, but the same bounded run must not blindly
+       * issue later calls for that provider.
+       */
+      if (
+        transportStoppedProviders.has(
+          provider,
+        )
+      ) {
+        stats
+          .stoppedByTransportCircuit +=
+          1;
+
+        break;
+      }
+
       if (
         !queue.canLaunchProvider(
           provider,
@@ -572,6 +614,10 @@ async function runSlot(
           now(options),
         );
 
+        transportStoppedProviders.add(
+          provider,
+        );
+
         stats.transportFailures +=
           1;
 
@@ -593,6 +639,10 @@ async function runSlot(
           now(options),
         );
 
+        transportStoppedProviders.add(
+          provider,
+        );
+
         stats.transportFailures +=
           1;
 
@@ -609,6 +659,10 @@ async function runSlot(
           'TRANSPORT_FAILURE',
           null,
           now(options),
+        );
+
+        transportStoppedProviders.add(
+          provider,
         );
 
         stats.transportFailures +=
@@ -689,11 +743,11 @@ async function runSlot(
       }
 
       if (!accepted.usable) {
-        queue.settle(
+        queue.settleBlocked(
           provider,
           record.lease.leaseId,
-          'BLOCKED',
-          null,
+          accepted,
+          capsule,
           now(options),
         );
 
@@ -788,11 +842,60 @@ function aggregateStats(
     total.stoppedByQualityCircuit +=
       value
         .stoppedByQualityCircuit;
+
+    total.stoppedByTransportCircuit +=
+      value
+        .stoppedByTransportCircuit;
   }
 
   return freezeStats(
     total,
   );
+}
+
+function resolvedAntigravityConcurrency(
+  options:
+    LiveTransactionalPoolOptions,
+): number {
+  const value =
+    options.antigravityConcurrency ??
+    (
+      options.antigravitySlots === 0
+        ? 0
+        : 1
+    );
+
+  validateInteger(
+    value,
+    'ANTIGRAVITY_CONCURRENCY',
+    0,
+    VERIFIED_8X8_POLICY
+      .targetAntigravity,
+  );
+
+  if (
+    options.antigravitySlots === 0
+  ) {
+    if (value !== 0) {
+      throw new Error(
+        'LIVE_POOL_ANTIGRAVITY_CONCURRENCY_WITHOUT_SLOTS',
+      );
+    }
+
+    return 0;
+  }
+
+  if (
+    value < 1 ||
+    value >
+      options.antigravitySlots
+  ) {
+    throw new Error(
+      'LIVE_POOL_ANTIGRAVITY_CONCURRENCY_INVALID',
+    );
+  }
+
+  return value;
 }
 
 function validatePlan(
@@ -801,6 +904,8 @@ function validatePlan(
 ): void {
   if (
     options.mode !== 'DUAL' &&
+    options.mode !==
+      'CODEX_ONLY' &&
     options.mode !==
       'ANTIGRAVITY_ONLY'
   ) {
@@ -837,108 +942,52 @@ function validatePlan(
     10_000,
   );
 
+  resolvedAntigravityConcurrency(
+    options,
+  );
+
   const total =
     options.codexSlots +
     options.antigravitySlots;
 
+  const targets =
+    targetsForMode(
+      options.mode,
+    );
+
   if (
-    total < 1
+    options.codexSlots >
+      targets.codex ||
+    options.antigravitySlots >
+      targets.antigravity
+  ) {
+    throw new Error(
+      'LIVE_POOL_PROVIDER_TARGET_EXCEEDED',
+    );
+  }
+
+  if (
+    total < 1 ||
+    total >
+      VERIFIED_8X8_POLICY
+        .globalEffectiveMax
   ) {
     throw new Error(
       'LIVE_POOL_GLOBAL_SLOT_LIMIT_EXCEEDED',
     );
   }
 
-  const withinCurrentEnvelope =
-    livePlanFitsCurrentCertifiedEnvelope(
+  if (
+    !livePlanFitsCurrentCertifiedEnvelope(
       options.mode,
       options.codexSlots,
       options.antigravitySlots,
-    );
-
-  if (
-    withinCurrentEnvelope
+    )
   ) {
-    if (
-      options.liveTierCanaryPermit !==
-        undefined
-    ) {
-      throw new Error(
-        'LIVE_POOL_TIER_PERMIT_NOT_REQUIRED',
-      );
-    }
-
-    return;
-  }
-
-  /*
-   * Preserve the historical fail-closed errors when
-   * no explicit expansion permit is supplied.
-   */
-  if (
-    options.liveTierCanaryPermit ===
-      undefined ||
-    options.currentBaseline ===
-      undefined
-  ) {
-    const targets =
-      targetsForMode(
-        options.mode,
-      );
-
-    if (
-      options.codexSlots >
-        targets.codex ||
-      options.antigravitySlots >
-        targets.antigravity
-    ) {
-      throw new Error(
-        'LIVE_POOL_PROVIDER_TARGET_EXCEEDED',
-      );
-    }
-
-    if (
-      total >
-        VERIFIED_8X8_POLICY
-          .globalEffectiveMax
-    ) {
-      throw new Error(
-        'LIVE_POOL_GLOBAL_SLOT_LIMIT_EXCEEDED',
-      );
-    }
-
     throw new Error(
-      'LIVE_POOL_TIER_GATE_REQUIRED',
+      'LIVE_POOL_HARD_ENVELOPE_REJECTED',
     );
   }
-
-  /*
-   * This does not certify or promote a new tier.
-   *
-   * It only consumes one process-local permit for the
-   * exact 9+9 certification canary.
-   */
-  consumeLiveTierCanaryPermit({
-    mode:
-      options.mode,
-
-    currentBaseline:
-      options.currentBaseline,
-
-    nowMs:
-      now(
-        options,
-      ),
-
-    codexSlots:
-      options.codexSlots,
-
-    antigravitySlots:
-      options.antigravitySlots,
-
-    permit:
-      options.liveTierCanaryPermit,
-  });
 }
 
 export async function
@@ -954,34 +1003,93 @@ runLiveTransactionalProviderWorkerPool(
     Promise<MutableStats>[] = [];
 
   /*
-   * Antigravity keeps its logical slot count for the
-   * certified 8+8 accounting contract, but AGY slots
-   * execute serially at the runSlot boundary.
+   * Shared only within this bounded pool invocation.
    *
-   * This prevents the local CLI resource/inotify burst
-   * and, critically, re-checks the provider quality
-   * circuit before each later claim.
+   * This prevents blind later calls after uncertain
+   * transport without conflating transport health with
+   * provider output quality.
    */
-  const runAntigravitySlotsSerially =
-    async (): Promise<MutableStats[]> => {
-      const values:
-        MutableStats[] = [];
+  const transportStoppedProviders =
+    new Set<Provider>();
 
-      for (
-        let slot = 1;
-        slot <=
-          options.antigravitySlots;
-        slot += 1
-      ) {
-        values.push(
-          await runSlot(
-            options,
-            'antigravity',
-            `live-antigravity-${String(slot)
-              .padStart(2, '0')}`,
-          ),
+  /*
+   * Antigravity logical slot count and physical process
+   * concurrency are independent.
+   *
+   * No more than antigravityConcurrency runSlot calls
+   * are active simultaneously.
+   *
+   * Each worker re-enters runSlot before claiming the
+   * next logical slot, so the run-local transport stop
+   * and persistent quality circuit are re-checked before
+   * later work is launched.
+   */
+  const runAntigravitySlotsBounded =
+    async (): Promise<MutableStats[]> => {
+      const concurrency =
+        resolvedAntigravityConcurrency(
+          options,
         );
+
+      if (
+        options.antigravitySlots === 0
+      ) {
+        return [];
       }
+
+      const values:
+        MutableStats[] =
+          new Array(
+            options.antigravitySlots,
+          );
+
+      let nextSlot =
+        1;
+
+      const worker =
+        async (): Promise<void> => {
+          while (true) {
+            /*
+             * JavaScript executes this allocation
+             * synchronously between awaits, making each
+             * logical slot unique within this invocation.
+             */
+            const slot =
+              nextSlot;
+
+            if (
+              slot >
+                options.antigravitySlots
+            ) {
+              return;
+            }
+
+            nextSlot +=
+              1;
+
+            values[
+              slot - 1
+            ] =
+              await runSlot(
+                options,
+                'antigravity',
+                `live-antigravity-${String(slot)
+                  .padStart(2, '0')}`,
+                transportStoppedProviders,
+              );
+          }
+        };
+
+      await Promise.all(
+        Array.from(
+          {
+            length:
+              concurrency,
+          },
+          () =>
+            worker(),
+        ),
+      );
 
       return values;
     };
@@ -998,6 +1106,8 @@ runLiveTransactionalProviderWorkerPool(
         'codex',
         `live-codex-${String(slot)
           .padStart(2, '0')}`,
+
+        transportStoppedProviders,
       ),
     );
   }
@@ -1012,7 +1122,7 @@ runLiveTransactionalProviderWorkerPool(
         codexPromises,
       ),
 
-      runAntigravitySlotsSerially(),
+      runAntigravitySlotsBounded(),
     ]);
 
   const codex =

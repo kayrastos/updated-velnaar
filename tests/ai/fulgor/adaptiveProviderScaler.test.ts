@@ -23,12 +23,22 @@ import {
   evaluateAdaptiveProviderPair,
   initialAdaptiveScalerState,
   type AdaptiveLaneObservation,
-  type AdaptiveLaneState,
   type AdaptiveScalerState,
 } from '../../../scripts/fulgor/scheduler/adaptiveProviderScaler';
 
 const baseline =
   '0123456789abcdef0123456789abcdef01234567';
+
+const strictUseful =
+  Object.freeze(
+    Array.from(
+      {
+        length: 8,
+      },
+      () =>
+        'USEFUL_UNIQUE' as const,
+    ),
+  );
 
 function counters(
   provider:
@@ -38,7 +48,7 @@ function counters(
   outcomes:
     readonly WorkOutcome[],
 ): ProviderQualityCounters {
-  let state =
+  let value =
     emptyProviderQualityCounters(
       provider,
     );
@@ -47,142 +57,184 @@ function counters(
     const outcome
     of outcomes
   ) {
-    state =
+    value =
       recordWorkOutcome(
-        state,
+        value,
         outcome,
       );
   }
 
-  return state;
+  return value;
 }
 
-const eightUseful:
-  readonly WorkOutcome[] =
-    Object.freeze([
-      'USEFUL_UNIQUE',
-      'USEFUL_UNIQUE',
-      'USEFUL_UNIQUE',
-      'USEFUL_UNIQUE',
-      'USEFUL_UNIQUE',
-      'USEFUL_UNIQUE',
-      'USEFUL_UNIQUE',
-      'USEFUL_UNIQUE',
-    ]);
-
-function healthyObservation(
+function observation(
   provider:
     'codex'
     | 'antigravity',
 
-  usefulPerMinute:
-    number = 10,
+  options:
+    Readonly<{
+      requestedSlots?: number;
+      outcomes?: readonly WorkOutcome[];
+      quotaOpen?: boolean;
+      qualityOpen?: boolean;
+      certification?: boolean;
+      usefulPerMinute?: number;
+      windowStartedAtMs?: number;
+    }> = {},
 ): AdaptiveLaneObservation {
+  const outcomes =
+    options.outcomes ??
+    strictUseful;
+
   return {
     provider,
 
+    requestedSlots:
+      options.requestedSlots ??
+      8,
+
     quotaCircuit:
-      closedQuotaCircuit(),
+      options.quotaOpen
+        ? openQuotaCircuit(
+            0,
+          )
+        : closedQuotaCircuit(),
 
     qualityCircuit:
-      'CLOSED',
+      options.qualityOpen
+        ? 'OPEN'
+        : 'CLOSED',
 
     certification:
-      certifyProviderQuality(
-        provider,
-        baseline,
-        eightUseful,
-      ),
+      options.certification ===
+        false
+        ? null
+        : certifyProviderQuality(
+            provider,
+            baseline,
+            strictUseful,
+          ),
 
-    counters:
+    windowStartedAtMs:
+      options.windowStartedAtMs ??
+      0,
+
+    windowCounters:
       counters(
         provider,
-        eightUseful,
+        outcomes,
       ),
 
-    usefulPerMinute,
+    usefulPerMinute:
+      options.usefulPerMinute ??
+      10,
   };
 }
 
-function stateWithTargets(
-  codexTarget:
+function state(
+  codex:
     number,
 
-  antigravityTarget:
+  antigravity:
     number,
 
-  options?:
+  options:
     Readonly<{
-      nowMs?: number;
       codexHealthy?: number;
       antigravityHealthy?: number;
-      codexPrior?: number | null;
-      antigravityPrior?: number | null;
-      preferAntigravityFirst?: boolean;
-    }>,
+      changedAt?: number;
+      codexRecoveryNotBefore?: number;
+      antigravityRecoveryNotBefore?: number;
+    }> = {},
 ): AdaptiveScalerState {
   const changedAt =
-    options?.nowMs ??
+    options.changedAt ??
     0;
-
-  const lane = (
-    provider:
-      'codex'
-      | 'antigravity',
-
-    targetSlots:
-      number,
-
-    healthyWindows:
-      number,
-
-    prior:
-      number | null,
-  ): AdaptiveLaneState =>
-    Object.freeze({
-      provider,
-      targetSlots,
-      healthyWindows,
-      lastTargetChangeAtMs:
-        changedAt,
-      priorTierUsefulPerMinute:
-        prior,
-    });
 
   return Object.freeze({
     codex:
-      lane(
-        'codex',
-        codexTarget,
-        options?.codexHealthy ??
+      Object.freeze({
+        provider:
+          'codex' as const,
+
+        targetSlots:
+          codex,
+
+        healthyWindows:
+          options.codexHealthy ??
           0,
-        options?.codexPrior ??
+
+        lastTargetChangeAtMs:
+          changedAt,
+
+        recoveryNotBeforeMs:
+          options.codexRecoveryNotBefore ??
+          0,
+
+        priorTierUsefulPerMinute:
           null,
-      ),
+      }),
 
     antigravity:
-      lane(
-        'antigravity',
-        antigravityTarget,
-        options?.antigravityHealthy ??
+      Object.freeze({
+        provider:
+          'antigravity' as const,
+
+        targetSlots:
+          antigravity,
+
+        healthyWindows:
+          options.antigravityHealthy ??
           0,
-        options?.antigravityPrior ??
+
+        lastTargetChangeAtMs:
+          changedAt,
+
+        recoveryNotBeforeMs:
+          options.antigravityRecoveryNotBefore ??
+          0,
+
+        priorTierUsefulPerMinute:
           null,
-      ),
+      }),
 
     preferAntigravityFirst:
-      options
-        ?.preferAntigravityFirst ??
       false,
   });
 }
 
 describe(
-  'VELNAR adaptive provider scaler',
+  'VELNAR adaptive provider scaler V1 hard 0-8',
   () => {
     it(
-      'does not alter the currently live-certified 8+8 / global 16 envelope',
+      'pins zero-to-eight per lane, global sixteen and the ninety-percent productivity floor',
       () => {
+        expect(
+          ADAPTIVE_PROVIDER_SCALER_POLICY
+            .baselineSlots,
+        ).toBe(0);
+
+        expect(
+          ADAPTIVE_PROVIDER_SCALER_POLICY
+            .maxLogicalSlotsPerProvider,
+        ).toBe(8);
+
+        expect(
+          ADAPTIVE_PROVIDER_SCALER_POLICY
+            .maxLogicalTotalSlots,
+        ).toBe(16);
+
+        expect(
+          ADAPTIVE_PROVIDER_SCALER_POLICY
+            .minimumUsefulYieldForScaleUp,
+        ).toBe(0.90);
+
+        expect(
+          ADAPTIVE_PROVIDER_SCALER_POLICY
+            .usefulYieldScaleDownThreshold,
+        ).toBe(0.90);
+
         expect(
           currentLiveEnvelopeStill8x8(),
         ).toEqual({
@@ -195,21 +247,416 @@ describe(
           global:
             16,
         });
-
-        expect(
-          ADAPTIVE_PROVIDER_SCALER_POLICY
-            .baselineSlots,
-        ).toBe(8);
-
-        expect(
-          ADAPTIVE_PROVIDER_SCALER_POLICY
-            .maxLogicalSlotsPerProvider,
-        ).toBe(12);
       },
     );
 
     it(
-      'requires two healthy windows before any scale-up',
+      'starts with zero active targets',
+      () => {
+        const initial =
+          initialAdaptiveScalerState(
+            0,
+          );
+
+        expect(
+          initial.codex.targetSlots,
+        ).toBe(0);
+
+        expect(
+          initial.antigravity
+            .targetSlots,
+        ).toBe(0);
+      },
+    );
+
+    it(
+      'bootstraps zero to exactly one probation slot without impossible prior samples',
+      () => {
+        const empty:
+          readonly WorkOutcome[] =
+            Object.freeze([]);
+
+        const result =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              1,
+
+            machineEffectiveMax:
+              16,
+
+            state:
+              initialAdaptiveScalerState(
+                0,
+              ),
+
+            codex:
+              observation(
+                'codex',
+                {
+                  outcomes:
+                    empty,
+
+                  certification:
+                    false,
+
+                  windowStartedAtMs:
+                    0,
+                },
+              ),
+
+            antigravity:
+              observation(
+                'antigravity',
+                {
+                  outcomes:
+                    empty,
+
+                  certification:
+                    false,
+
+                  windowStartedAtMs:
+                    0,
+                },
+              ),
+          });
+
+        expect(
+          result.codex.action,
+        ).toBe(
+          'SCALE_UP',
+        );
+
+        expect(
+          result.codex.reason,
+        ).toBe(
+          'PROBATION_BOOTSTRAP',
+        );
+
+        expect(
+          result.codex.nextTargetSlots,
+        ).toBe(1);
+
+        expect(
+          result.antigravity
+            .nextTargetSlots,
+        ).toBe(1);
+
+        expect(
+          result.totalTargetSlots,
+        ).toBe(2);
+
+        expect(
+          result.authorityGranted,
+        ).toBe(false);
+
+        expect(
+          result.liveEnvelopeExpanded,
+        ).toBe(false);
+      },
+    );
+
+    it(
+      'holds after a transport safety stop then permits only a fresh one-slot probation recovery',
+      () => {
+        const failedWindow:
+          readonly WorkOutcome[] =
+            Object.freeze([
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'TRANSPORT_FAILURE',
+            ]);
+
+        const stopped =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              700_000,
+
+            machineEffectiveMax:
+              16,
+
+            state:
+              state(
+                4,
+                0,
+              ),
+
+            codex:
+              observation(
+                'codex',
+                {
+                  outcomes:
+                    failedWindow,
+
+                  windowStartedAtMs:
+                    690_000,
+                },
+              ),
+
+            antigravity:
+              observation(
+                'antigravity',
+                {
+                  requestedSlots:
+                    0,
+                },
+              ),
+          });
+
+        expect(
+          stopped.codex
+            .nextTargetSlots,
+        ).toBe(0);
+
+        expect(
+          stopped.codex.reason,
+        ).toBe(
+          'TRANSPORT_FAILURE',
+        );
+
+        expect(
+          stopped.nextState.codex
+            .lastTargetChangeAtMs,
+        ).toBe(
+          700_000,
+        );
+
+        expect(
+          stopped.nextState.codex
+            .recoveryNotBeforeMs,
+        ).toBe(
+          760_000,
+        );
+
+        const empty:
+          readonly WorkOutcome[] =
+            Object.freeze([]);
+
+        const early =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              730_000,
+
+            machineEffectiveMax:
+              16,
+
+            state:
+              stopped.nextState,
+
+            codex:
+              observation(
+                'codex',
+                {
+                  outcomes:
+                    empty,
+
+                  certification:
+                    false,
+
+                  windowStartedAtMs:
+                    700_000,
+                },
+              ),
+
+            antigravity:
+              observation(
+                'antigravity',
+                {
+                  requestedSlots:
+                    0,
+                },
+              ),
+          });
+
+        expect(
+          early.codex.reason,
+        ).toBe(
+          'RECOVERY_DWELL',
+        );
+
+        expect(
+          early.codex
+            .nextTargetSlots,
+        ).toBe(0);
+
+        const stale =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              760_000,
+
+            machineEffectiveMax:
+              16,
+
+            state:
+              stopped.nextState,
+
+            codex:
+              observation(
+                'codex',
+                {
+                  outcomes:
+                    empty,
+
+                  certification:
+                    false,
+
+                  windowStartedAtMs:
+                    699_999,
+                },
+              ),
+
+            antigravity:
+              observation(
+                'antigravity',
+                {
+                  requestedSlots:
+                    0,
+                },
+              ),
+          });
+
+        expect(
+          stale.codex.reason,
+        ).toBe(
+          'RECOVERY_WINDOW_STALE',
+        );
+
+        expect(
+          stale.codex
+            .nextTargetSlots,
+        ).toBe(0);
+
+        const recovered =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              760_000,
+
+            machineEffectiveMax:
+              16,
+
+            state:
+              stopped.nextState,
+
+            codex:
+              observation(
+                'codex',
+                {
+                  outcomes:
+                    empty,
+
+                  certification:
+                    false,
+
+                  windowStartedAtMs:
+                    700_000,
+                },
+              ),
+
+            antigravity:
+              observation(
+                'antigravity',
+                {
+                  requestedSlots:
+                    0,
+                },
+              ),
+          });
+
+        expect(
+          recovered.codex.action,
+        ).toBe(
+          'SCALE_UP',
+        );
+
+        expect(
+          recovered.codex.reason,
+        ).toBe(
+          'PROBATION_BOOTSTRAP',
+        );
+
+        expect(
+          recovered.codex
+            .nextTargetSlots,
+        ).toBe(1);
+
+        expect(
+          recovered.nextState.codex
+            .recoveryNotBeforeMs,
+        ).toBe(0);
+      },
+    );
+
+    it(
+      'keeps a lane at zero when there is no demand',
+      () => {
+        const result =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              300_000,
+
+            machineEffectiveMax:
+              16,
+
+            state:
+              initialAdaptiveScalerState(
+                0,
+              ),
+
+            codex:
+              observation(
+                'codex',
+                {
+                  requestedSlots:
+                    0,
+                },
+              ),
+
+            antigravity:
+              observation(
+                'antigravity',
+                {
+                  requestedSlots:
+                    0,
+                },
+              ),
+          });
+
+        expect(
+          result.totalTargetSlots,
+        ).toBe(0);
+
+        expect(
+          result.codex.reason,
+        ).toBe(
+          'NO_DEMAND',
+        );
+
+        expect(
+          result.antigravity.reason,
+        ).toBe(
+          'NO_DEMAND',
+        );
+      },
+    );
+
+    it(
+      'requires two healthy certified windows before scaling zero to one',
       () => {
         const first =
           evaluateAdaptiveProviderPair({
@@ -219,7 +666,7 @@ describe(
               300_000,
 
             machineEffectiveMax:
-              18,
+              16,
 
             state:
               initialAdaptiveScalerState(
@@ -227,21 +674,20 @@ describe(
               ),
 
             codex:
-              healthyObservation(
+              observation(
                 'codex',
               ),
 
             antigravity:
-              healthyObservation(
+              observation(
                 'antigravity',
               ),
           });
 
         expect(
-          first.codex.action,
-        ).toBe(
-          'HOLD',
-        );
+          first.codex
+            .nextTargetSlots,
+        ).toBe(0);
 
         expect(
           first.codex.reason,
@@ -249,22 +695,6 @@ describe(
           'HEALTHY_WINDOW_DWELL',
         );
 
-        expect(
-          first.antigravity.action,
-        ).toBe(
-          'HOLD',
-        );
-
-        expect(
-          first.nextState.codex
-            .healthyWindows,
-        ).toBe(1);
-
-        expect(
-          first.nextState.antigravity
-            .healthyWindows,
-        ).toBe(1);
-
         const second =
           evaluateAdaptiveProviderPair({
             baseline,
@@ -273,318 +703,48 @@ describe(
               600_000,
 
             machineEffectiveMax:
-              18,
+              16,
 
             state:
               first.nextState,
 
             codex:
-              healthyObservation(
+              observation(
                 'codex',
               ),
 
             antigravity:
-              healthyObservation(
+              observation(
                 'antigravity',
               ),
           });
 
         expect(
-          second.codex.action,
-        ).toBe(
-          'SCALE_UP',
-        );
-
-        expect(
-          second.antigravity.action,
-        ).toBe(
-          'SCALE_UP',
-        );
-
-        expect(
-          second.nextState.codex
-            .targetSlots,
-        ).toBe(9);
-
-        expect(
-          second.nextState.antigravity
-            .targetSlots,
-        ).toBe(9);
-
-        expect(
-          second.totalTargetSlots,
-        ).toBe(18);
-
-        expect(
-          second.liveEnvelopeExpanded,
-        ).toBe(false);
-
-        expect(
-          second.authorityGranted,
-        ).toBe(false);
-      },
-    );
-
-    it(
-      'uses historical alternating provider order to arbitrate a one-slot machine headroom',
-      () => {
-        const first =
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              300_000,
-
-            machineEffectiveMax:
-              17,
-
-            state:
-              initialAdaptiveScalerState(
-                0,
-              ),
-
-            codex:
-              healthyObservation(
-                'codex',
-              ),
-
-            antigravity:
-              healthyObservation(
-                'antigravity',
-              ),
-          });
-
-        /*
-         * First window only establishes health.
-         * The returned preference is now AGY-first.
-         */
-        expect(
-          first.nextState
-            .preferAntigravityFirst,
-        ).toBe(true);
-
-        const second =
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              600_000,
-
-            machineEffectiveMax:
-              17,
-
-            state:
-              first.nextState,
-
-            codex:
-              healthyObservation(
-                'codex',
-              ),
-
-            antigravity:
-              healthyObservation(
-                'antigravity',
-              ),
-          });
-
-        expect(
-          second.antigravity.action,
-        ).toBe(
-          'SCALE_UP',
-        );
+          second.codex
+            .nextTargetSlots,
+        ).toBe(1);
 
         expect(
           second.antigravity
             .nextTargetSlots,
-        ).toBe(9);
+        ).toBe(1);
+
+        expect(
+          second.totalTargetSlots,
+        ).toBe(2);
 
         expect(
           second.codex.action,
         ).toBe(
-          'HOLD',
-        );
-
-        expect(
-          second.codex.reason,
-        ).toBe(
-          'MACHINE_CAP',
-        );
-
-        expect(
-          second.totalTargetSlots,
-        ).toBe(17);
-      },
-    );
-
-    it(
-      'never scales a provider while its quota circuit is open',
-      () => {
-        const codex =
-          healthyObservation(
-            'codex',
-          );
-
-        const result =
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              600_000,
-
-            machineEffectiveMax:
-              18,
-
-            state:
-              stateWithTargets(
-                8,
-                8,
-                {
-                  codexHealthy:
-                    2,
-
-                  antigravityHealthy:
-                    2,
-                },
-              ),
-
-            codex: {
-              ...codex,
-
-              quotaCircuit:
-                openQuotaCircuit(
-                  1000,
-                ),
-            },
-
-            antigravity:
-              healthyObservation(
-                'antigravity',
-              ),
-          });
-
-        expect(
-          result.codex.action,
-        ).toBe(
-          'HOLD',
-        );
-
-        expect(
-          result.codex.reason,
-        ).toBe(
-          'QUOTA_OPEN',
-        );
-
-        expect(
-          result.codex
-            .nextTargetSlots,
-        ).toBe(8);
-      },
-    );
-
-    it(
-      'requires strict provider-quality certification and minimum sample size',
-      () => {
-        const observation =
-          healthyObservation(
-            'codex',
-          );
-
-        const noCert =
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              600_000,
-
-            machineEffectiveMax:
-              18,
-
-            state:
-              stateWithTargets(
-                8,
-                8,
-                {
-                  codexHealthy:
-                    2,
-
-                  antigravityHealthy:
-                    2,
-                },
-              ),
-
-            codex: {
-              ...observation,
-
-              certification:
-                null,
-            },
-
-            antigravity:
-              healthyObservation(
-                'antigravity',
-              ),
-          });
-
-        expect(
-          noCert.codex.reason,
-        ).toBe(
-          'QUALITY_NOT_CERTIFIED',
-        );
-
-        const oneSample =
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              600_000,
-
-            machineEffectiveMax:
-              18,
-
-            state:
-              stateWithTargets(
-                8,
-                8,
-                {
-                  codexHealthy:
-                    2,
-
-                  antigravityHealthy:
-                    2,
-                },
-              ),
-
-            codex: {
-              ...observation,
-
-              certification:
-                certifyProviderQuality(
-                  'codex',
-                  baseline,
-                  [
-                    'USEFUL_UNIQUE',
-                  ],
-                ),
-            },
-
-            antigravity:
-              healthyObservation(
-                'antigravity',
-              ),
-          });
-
-        expect(
-          oneSample.codex.reason,
-        ).toBe(
-          'CERTIFICATION_SAMPLE_TOO_SMALL',
+          'SCALE_UP',
         );
       },
     );
 
     it(
-      'treats BLOCKED or duplicate output as non-productive instead of raw success',
+      'counts BLOCKED in the denominator and drops an 87.5 percent lane to zero',
       () => {
-        const blockedOutcomes:
+        const degraded:
           readonly WorkOutcome[] =
             Object.freeze([
               'USEFUL_UNIQUE',
@@ -602,75 +762,163 @@ describe(
             baseline,
 
             nowMs:
-              600_000,
+              700_000,
 
             machineEffectiveMax:
-              18,
+              16,
 
             state:
-              stateWithTargets(
-                8,
-                8,
-                {
-                  codexHealthy:
-                    2,
+              state(
+                4,
+                0,
+              ),
 
-                  antigravityHealthy:
-                    2,
+            codex:
+              observation(
+                'codex',
+                {
+                  outcomes:
+                    degraded,
                 },
               ),
 
-            codex: {
-              provider:
-                'codex',
-
-              quotaCircuit:
-                closedQuotaCircuit(),
-
-              qualityCircuit:
-                'CLOSED',
-
-              certification:
-                certifyProviderQuality(
-                  'codex',
-                  baseline,
-                  blockedOutcomes,
-                ),
-
-              counters:
-                counters(
-                  'codex',
-                  blockedOutcomes,
-                ),
-
-              usefulPerMinute:
-                10,
-            },
-
             antigravity:
-              healthyObservation(
+              observation(
                 'antigravity',
+                {
+                  requestedSlots:
+                    0,
+                },
               ),
           });
 
         expect(
-          result.codex.action,
+          result.codex
+            .usefulYield,
         ).toBe(
-          'HOLD',
+          7 / 8,
         );
+
+        expect(
+          result.codex
+            .nextTargetSlots,
+        ).toBe(0);
 
         expect(
           result.codex.reason,
         ).toBe(
-          'QUALITY_NOT_CERTIFIED',
+          'USEFUL_YIELD_DEGRADED',
         );
       },
     );
 
     it(
-      'steps an expanded provider down on any transport failure without poisoning the other lane',
+      'accepts exactly ninety percent rolling usefulness when strict certification is separately valid',
       () => {
-        const bad:
+        const rolling:
+          readonly WorkOutcome[] =
+            Object.freeze([
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'USEFUL_UNIQUE',
+              'BLOCKED',
+            ]);
+
+        const first =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              300_000,
+
+            machineEffectiveMax:
+              16,
+
+            state:
+              state(
+                2,
+                0,
+              ),
+
+            codex:
+              observation(
+                'codex',
+                {
+                  outcomes:
+                    rolling,
+                },
+              ),
+
+            antigravity:
+              observation(
+                'antigravity',
+                {
+                  requestedSlots:
+                    0,
+                },
+              ),
+          });
+
+        expect(
+          first.codex
+            .usefulYield,
+        ).toBe(0.9);
+
+        const second =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              600_000,
+
+            machineEffectiveMax:
+              16,
+
+            state:
+              first.nextState,
+
+            codex:
+              observation(
+                'codex',
+                {
+                  outcomes:
+                    rolling,
+                },
+              ),
+
+            antigravity:
+              observation(
+                'antigravity',
+                {
+                  requestedSlots:
+                    0,
+                },
+              ),
+          });
+
+        expect(
+          second.codex
+            .nextTargetSlots,
+        ).toBe(3);
+
+        expect(
+          second.codex.action,
+        ).toBe(
+          'SCALE_UP',
+        );
+      },
+    );
+
+    it(
+      'drops a transport-uncertain lane directly to zero',
+      () => {
+        const outcomes:
           readonly WorkOutcome[] =
             Object.freeze([
               'USEFUL_UNIQUE',
@@ -688,65 +936,176 @@ describe(
             baseline,
 
             nowMs:
-              900_000,
+              700_000,
 
             machineEffectiveMax:
-              18,
+              16,
 
             state:
-              stateWithTargets(
-                9,
-                8,
+              state(
+                0,
+                6,
+              ),
+
+            codex:
+              observation(
+                'codex',
                 {
-                  codexPrior:
-                    10,
+                  requestedSlots:
+                    0,
                 },
               ),
 
-            codex: {
-              provider:
+            antigravity:
+              observation(
+                'antigravity',
+                {
+                  outcomes,
+                },
+              ),
+          });
+
+        expect(
+          result.antigravity
+            .nextTargetSlots,
+        ).toBe(0);
+
+        expect(
+          result.antigravity.reason,
+        ).toBe(
+          'TRANSPORT_FAILURE',
+        );
+      },
+    );
+
+    it(
+      'drops an open quota lane to zero without affecting the independent lane',
+      () => {
+        const result =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              700_000,
+
+            machineEffectiveMax:
+              16,
+
+            state:
+              state(
+                4,
+                4,
+              ),
+
+            codex:
+              observation(
                 'codex',
-
-              quotaCircuit:
-                closedQuotaCircuit(),
-
-              qualityCircuit:
-                'CLOSED',
-
-              certification:
-                certifyProviderQuality(
-                  'codex',
-                  baseline,
-                  bad,
-                ),
-
-              counters:
-                counters(
-                  'codex',
-                  bad,
-                ),
-
-              usefulPerMinute:
-                10.1,
-            },
+                {
+                  quotaOpen:
+                    true,
+                },
+              ),
 
             antigravity:
-              healthyObservation(
+              observation(
                 'antigravity',
               ),
           });
 
         expect(
-          result.codex.action,
-        ).toBe(
-          'SCALE_DOWN',
-        );
+          result.codex
+            .nextTargetSlots,
+        ).toBe(0);
 
         expect(
           result.codex.reason,
         ).toBe(
-          'TRANSPORT_FAILURE',
+          'QUOTA_OPEN',
         );
+
+        expect(
+          result.antigravity
+            .nextTargetSlots,
+        ).toBeGreaterThan(0);
+      },
+    );
+
+    it(
+      'reduces targets to fit a smaller machine cap instead of violating the global cap',
+      () => {
+        const result =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              700_000,
+
+            machineEffectiveMax:
+              3,
+
+            state:
+              state(
+                2,
+                2,
+              ),
+
+            codex:
+              observation(
+                'codex',
+              ),
+
+            antigravity:
+              observation(
+                'antigravity',
+              ),
+          });
+
+        expect(
+          result.totalTargetSlots,
+        ).toBeLessThanOrEqual(3);
+
+        expect(
+          result.totalTargetSlots,
+        ).toBeLessThanOrEqual(16);
+      },
+    );
+
+    it(
+      'never plans a ninth slot for either provider',
+      () => {
+        const result =
+          evaluateAdaptiveProviderPair({
+            baseline,
+
+            nowMs:
+              700_000,
+
+            machineEffectiveMax:
+              16,
+
+            state:
+              state(
+                8,
+                8,
+                {
+                  codexHealthy:
+                    10,
+
+                  antigravityHealthy:
+                    10,
+                },
+              ),
+
+            codex:
+              observation(
+                'codex',
+              ),
+
+            antigravity:
+              observation(
+                'antigravity',
+              ),
+          });
 
         expect(
           result.codex
@@ -756,416 +1115,19 @@ describe(
         expect(
           result.antigravity
             .nextTargetSlots,
-        ).toBeGreaterThanOrEqual(
-          8,
-        );
-      },
-    );
-
-    it(
-      'steps an expanded provider down when useful yield materially degrades',
-      () => {
-        const poor:
-          readonly WorkOutcome[] =
-            Object.freeze([
-              'USEFUL_UNIQUE',
-              'USEFUL_UNIQUE',
-              'USEFUL_UNIQUE',
-              'USEFUL_UNIQUE',
-              'USEFUL_UNIQUE',
-              'BLOCKED',
-              'USEFUL_DUPLICATE',
-              'BLOCKED',
-            ]);
-
-        const result =
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              900_000,
-
-            machineEffectiveMax:
-              18,
-
-            state:
-              stateWithTargets(
-                9,
-                8,
-                {
-                  codexPrior:
-                    10,
-                },
-              ),
-
-            codex: {
-              provider:
-                'codex',
-
-              quotaCircuit:
-                closedQuotaCircuit(),
-
-              qualityCircuit:
-                'CLOSED',
-
-              certification:
-                certifyProviderQuality(
-                  'codex',
-                  baseline,
-                  poor,
-                ),
-
-              counters:
-                counters(
-                  'codex',
-                  poor,
-                ),
-
-              usefulPerMinute:
-                10,
-            },
-
-            antigravity:
-              healthyObservation(
-                'antigravity',
-              ),
-          });
-
-        expect(
-          result.codex.action,
-        ).toBe(
-          'SCALE_DOWN',
-        );
-
-        expect(
-          result.codex.reason,
-        ).toBe(
-          'USEFUL_YIELD_DEGRADED',
-        );
-      },
-    );
-
-    it(
-      'requires useful-throughput improvement before climbing beyond an expanded tier',
-      () => {
-        const state =
-          stateWithTargets(
-            9,
-            8,
-            {
-              codexHealthy:
-                2,
-
-              codexPrior:
-                10,
-
-              nowMs:
-                0,
-            },
-          );
-
-        const flat =
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              600_000,
-
-            machineEffectiveMax:
-              19,
-
-            state,
-
-            codex:
-              healthyObservation(
-                'codex',
-                10.1,
-              ),
-
-            antigravity: {
-              ...healthyObservation(
-                'antigravity',
-              ),
-
-              quotaCircuit:
-                openQuotaCircuit(
-                  0,
-                ),
-            },
-          });
-
-        expect(
-          flat.codex.action,
-        ).toBe(
-          'HOLD',
-        );
-
-        expect(
-          flat.codex.reason,
-        ).toBe(
-          'THROUGHPUT_GAIN_NOT_PROVEN',
-        );
-
-        const improved =
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              600_000,
-
-            machineEffectiveMax:
-              19,
-
-            state,
-
-            codex:
-              healthyObservation(
-                'codex',
-                10.3,
-              ),
-
-            antigravity: {
-              ...healthyObservation(
-                'antigravity',
-              ),
-
-              quotaCircuit:
-                openQuotaCircuit(
-                  0,
-                ),
-            },
-          });
-
-        expect(
-          improved.codex.action,
-        ).toBe(
-          'SCALE_UP',
-        );
-
-        expect(
-          improved.codex
-            .nextTargetSlots,
-        ).toBe(10);
-      },
-    );
-
-    it(
-      'steps down on a material throughput regression above baseline',
-      () => {
-        const result =
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              600_000,
-
-            machineEffectiveMax:
-              18,
-
-            state:
-              stateWithTargets(
-                9,
-                8,
-                {
-                  codexPrior:
-                    10,
-                },
-              ),
-
-            codex:
-              healthyObservation(
-                'codex',
-                9.4,
-              ),
-
-            antigravity:
-              healthyObservation(
-                'antigravity',
-              ),
-          });
-
-        expect(
-          result.codex.action,
-        ).toBe(
-          'SCALE_DOWN',
-        );
-
-        expect(
-          result.codex.reason,
-        ).toBe(
-          'THROUGHPUT_REGRESSION',
-        );
-
-        expect(
-          result.codex
-            .nextTargetSlots,
         ).toBe(8);
-      },
-    );
-
-    it(
-      'never plans above logical tier 12',
-      () => {
-        const result =
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              600_000,
-
-            machineEffectiveMax:
-              24,
-
-            state:
-              stateWithTargets(
-                12,
-                12,
-                {
-                  codexHealthy:
-                    2,
-
-                  antigravityHealthy:
-                    2,
-
-                  codexPrior:
-                    9,
-
-                  antigravityPrior:
-                    9,
-                },
-              ),
-
-            codex:
-              healthyObservation(
-                'codex',
-                10,
-              ),
-
-            antigravity:
-              healthyObservation(
-                'antigravity',
-                10,
-              ),
-          });
-
-        expect(
-          result.codex.action,
-        ).toBe(
-          'HOLD',
-        );
-
-        expect(
-          result.antigravity.action,
-        ).toBe(
-          'HOLD',
-        );
-
-        expect(
-          result.codex.reason,
-        ).toBe(
-          'MAX_LOGICAL_TIER',
-        );
-
-        expect(
-          result.antigravity.reason,
-        ).toBe(
-          'MAX_LOGICAL_TIER',
-        );
 
         expect(
           result.totalTargetSlots,
-        ).toBe(24);
-      },
-    );
+        ).toBe(16);
 
-    it(
-      'fails closed on inconsistent accounting instead of deriving a yield from corrupt counters',
-      () => {
-        const observation =
-          healthyObservation(
-            'codex',
-          );
+        expect(
+          result.authorityGranted,
+        ).toBe(false);
 
-        expect(() =>
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              600_000,
-
-            machineEffectiveMax:
-              18,
-
-            state:
-              initialAdaptiveScalerState(
-                0,
-              ),
-
-            codex: {
-              ...observation,
-
-              counters: {
-                ...observation
-                  .counters,
-
-                attempts:
-                  9,
-              },
-            },
-
-            antigravity:
-              healthyObservation(
-                'antigravity',
-              ),
-          }),
-        ).toThrow(
-          /COUNTER_TOTAL_MISMATCH/,
-        );
-      },
-    );
-
-    it(
-      'fails closed on stale or cross-provider certification',
-      () => {
-        const observation =
-          healthyObservation(
-            'codex',
-          );
-
-        expect(() =>
-          evaluateAdaptiveProviderPair({
-            baseline,
-
-            nowMs:
-              600_000,
-
-            machineEffectiveMax:
-              18,
-
-            state:
-              initialAdaptiveScalerState(
-                0,
-              ),
-
-            codex: {
-              ...observation,
-
-              certification:
-                certifyProviderQuality(
-                  'codex',
-                  'f'.repeat(40),
-                  eightUseful,
-                ),
-            },
-
-            antigravity:
-              healthyObservation(
-                'antigravity',
-              ),
-          }),
-        ).toThrow(
-          /CERT_BASELINE_MISMATCH/,
-        );
+        expect(
+          result.liveEnvelopeExpanded,
+        ).toBe(false);
       },
     );
   },

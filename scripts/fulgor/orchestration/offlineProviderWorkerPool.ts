@@ -574,11 +574,11 @@ async function runSlot(
       }
 
       if (!accepted.usable) {
-        queue.settle(
+        queue.settleBlocked(
           provider,
           record.lease.leaseId,
-          'BLOCKED',
-          null,
+          accepted,
+          capsule,
           Date.now(),
         );
 

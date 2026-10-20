@@ -1,4 +1,8 @@
 import {
+  ProviderTaskClassEvidenceStore,
+} from '../scheduler/providerTaskClassEvidenceStore';
+
+import {
   appendFileSync,
   constants,
 } from 'node:fs';
@@ -1001,6 +1005,31 @@ runLive8x8Operator(
       'queue.sqlite',
     );
 
+  /*
+   * Persistent baseline-bound host routing evidence.
+   */
+  const taskClassEvidenceDirectory =
+    join(
+      stateRoot,
+      'task-class-evidence',
+    );
+
+  await privateDirectory(
+    taskClassEvidenceDirectory,
+  );
+
+  const taskClassEvidencePath =
+    join(
+      taskClassEvidenceDirectory,
+      `${request.baseline}.sqlite`,
+    );
+
+  const taskClassEvidenceStore =
+    new ProviderTaskClassEvidenceStore(
+      taskClassEvidencePath,
+      request.baseline,
+    );
+
   const processTelemetryPath =
     join(
       runDirectory,
@@ -1172,13 +1201,68 @@ runLive8x8Operator(
       ),
     );
 
+    /*
+     * V1 classification is host-owned GENERAL.
+     *
+     * Request/provider/model text cannot choose a class.
+     * Specialized host classification can be introduced
+     * later without widening this admission boundary.
+     */
+    const routing =
+      Object.freeze({
+        taskClass:
+          'GENERAL' as const,
+
+        codex:
+          taskClassEvidenceStore
+            .laneEvidence(
+              'codex',
+              'GENERAL',
+              {
+                qualityCircuit:
+                  'CLOSED',
+
+                quotaCircuit:
+                  'CLOSED',
+
+                availableSlots:
+                  8,
+              },
+            ),
+
+        antigravity:
+          taskClassEvidenceStore
+            .laneEvidence(
+              'antigravity',
+              'GENERAL',
+              {
+                qualityCircuit:
+                  'CLOSED',
+
+                quotaCircuit:
+                  'CLOSED',
+
+                availableSlots:
+                  8,
+              },
+            ),
+      });
+
     jobs.push(
       Object.freeze({
         order,
         capsule,
-      }),
+
+        routing,}),
     );
   }
+
+  /*
+   * Read-side store is closed before any provider
+   * execution begins.
+   */
+  taskClassEvidenceStore.close();
+
 
   const processOptions:
     LiveProviderProcessRunnerOptions =
@@ -1246,6 +1330,9 @@ runLive8x8Operator(
 
                 jobId:
                   telemetry.jobId,
+
+                requestedModel:
+                  telemetry.requestedModel,
 
                 antigravityAuthorityDiagnostic:
                   telemetry.antigravityAuthorityDiagnostic,
