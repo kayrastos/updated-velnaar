@@ -106,6 +106,51 @@ export interface ProviderTaskClassRuntimeState {
     number;
 }
 
+export interface ProviderTaskClassRecoveryEvidence {
+  readonly baseline:
+    string;
+
+  readonly provider:
+    Provider;
+
+  readonly taskClass:
+    ProviderTaskClass;
+
+  /*
+   * Most recent transport uncertainty for this exact
+   * baseline + provider + task-class lane.
+   *
+   * Null means there is no transport recovery event.
+   */
+  readonly latestTransportFailureObservedAtMs:
+    number | null;
+
+  /*
+   * Recovery is eligible only when the immediately
+   * preceding bounded certification window was healthy.
+   *
+   * A recovery path must never convert an historically
+   * unproven lane into a trusted lane.
+   */
+  readonly certifiedImmediatelyBeforeLatestTransportFailure:
+    boolean;
+
+  /*
+   * Fresh outcomes after the latest transport failure.
+   *
+   * These are host-recorded evidence only. They are not
+   * provider claims and grant no execution authority.
+   */
+  readonly postFailureAttempts:
+    number;
+
+  readonly postFailureUsefulUnique:
+    number;
+
+  readonly postFailureNonUseful:
+    number;
+}
+
 function validBaseline(
   value:
     string,
@@ -391,6 +436,64 @@ export function providerTaskClassCounters(
     );
   }
 
+  /*
+   * Task-class routing evidence is a bounded recent
+   * certification window, not a lifetime reputation.
+   *
+   * This is intentionally the same canonical minimum
+   * sample count required by the router.
+   *
+   * A historical failure remains visible until it is
+   * displaced by a complete fresh window. One success
+   * can therefore never erase one failure.
+   */
+  const records =
+    ledger.records
+      .filter(
+        record =>
+          record.provider ===
+            provider &&
+          record.taskClass ===
+            taskClass,
+      )
+      .slice()
+      .sort(
+        (
+          left,
+          right,
+        ) => {
+          if (
+            left.observedAtMs !==
+              right.observedAtMs
+          ) {
+            return (
+              left.observedAtMs -
+              right.observedAtMs
+            );
+          }
+
+          if (
+            left.jobId <
+              right.jobId
+          ) {
+            return -1;
+          }
+
+          if (
+            left.jobId >
+              right.jobId
+          ) {
+            return 1;
+          }
+
+          return 0;
+        },
+      )
+      .slice(
+        -PROVIDER_TASK_ROUTER_POLICY
+          .minimumAttemptsPerTaskClass,
+      );
+
   let counters =
     emptyProviderQualityCounters(
       provider,
@@ -398,17 +501,8 @@ export function providerTaskClassCounters(
 
   for (
     const record
-    of ledger.records
+    of records
   ) {
-    if (
-      record.provider !==
-        provider ||
-      record.taskClass !==
-        taskClass
-    ) {
-      continue;
-    }
-
     counters =
       recordWorkOutcome(
         counters,
@@ -419,6 +513,200 @@ export function providerTaskClassCounters(
   return counters;
 }
 
+export function
+buildProviderTaskClassRecoveryEvidenceFromHostLedger(
+  ledger:
+    ProviderTaskClassEvidenceLedger,
+
+  provider:
+    Provider,
+
+  taskClass:
+    ProviderTaskClass,
+): ProviderTaskClassRecoveryEvidence {
+  if (
+    !validProvider(
+      provider,
+    )
+  ) {
+    throw new Error(
+      'TASK_CLASS_RECOVERY_PROVIDER_INVALID',
+    );
+  }
+
+  if (
+    !validTaskClass(
+      taskClass,
+    )
+  ) {
+    throw new Error(
+      'TASK_CLASS_RECOVERY_CLASS_INVALID',
+    );
+  }
+
+  const records =
+    ledger.records
+      .filter(
+        record =>
+          record.provider ===
+            provider &&
+          record.taskClass ===
+            taskClass,
+      )
+      .slice()
+      .sort(
+        (
+          left,
+          right,
+        ) => {
+          if (
+            left.observedAtMs !==
+              right.observedAtMs
+          ) {
+            return (
+              left.observedAtMs -
+              right.observedAtMs
+            );
+          }
+
+          if (
+            left.jobId <
+              right.jobId
+          ) {
+            return -1;
+          }
+
+          if (
+            left.jobId >
+              right.jobId
+          ) {
+            return 1;
+          }
+
+          return 0;
+        },
+      );
+
+  let failureIndex =
+    -1;
+
+  for (
+    let index =
+      records.length - 1;
+    index >= 0;
+    index -= 1
+  ) {
+    if (
+      records[index]?.outcome ===
+        'TRANSPORT_FAILURE'
+    ) {
+      failureIndex =
+        index;
+
+      break;
+    }
+  }
+
+  if (
+    failureIndex < 0
+  ) {
+    return Object.freeze({
+      baseline:
+        ledger.baseline,
+
+      provider,
+
+      taskClass,
+
+      latestTransportFailureObservedAtMs:
+        null,
+
+      certifiedImmediatelyBeforeLatestTransportFailure:
+        false,
+
+      postFailureAttempts:
+        0,
+
+      postFailureUsefulUnique:
+        0,
+
+      postFailureNonUseful:
+        0,
+    });
+  }
+
+  const failure =
+    records[
+      failureIndex
+    ];
+
+  if (
+    failure ===
+      undefined
+  ) {
+    throw new Error(
+      'TASK_CLASS_RECOVERY_FAILURE_RECORD_MISSING',
+    );
+  }
+
+  const priorWindow =
+    records
+      .slice(
+        0,
+        failureIndex,
+      )
+      .slice(
+        -PROVIDER_TASK_ROUTER_POLICY
+          .minimumAttemptsPerTaskClass,
+      );
+
+  const certifiedBefore =
+    priorWindow.length ===
+      PROVIDER_TASK_ROUTER_POLICY
+        .minimumAttemptsPerTaskClass &&
+    priorWindow.every(
+      record =>
+        record.outcome ===
+          'USEFUL_UNIQUE',
+    );
+
+  const postFailure =
+    records.slice(
+      failureIndex + 1,
+    );
+
+  const postFailureUsefulUnique =
+    postFailure.filter(
+      record =>
+        record.outcome ===
+          'USEFUL_UNIQUE',
+    ).length;
+
+  return Object.freeze({
+    baseline:
+      ledger.baseline,
+
+    provider,
+
+    taskClass,
+
+    latestTransportFailureObservedAtMs:
+      failure.observedAtMs,
+
+    certifiedImmediatelyBeforeLatestTransportFailure:
+      certifiedBefore,
+
+    postFailureAttempts:
+      postFailure.length,
+
+    postFailureUsefulUnique,
+
+    postFailureNonUseful:
+      postFailure.length -
+      postFailureUsefulUnique,
+  });
+}
+
 /*
  * Certification is derived from host-recorded outcomes only.
  *
@@ -426,9 +714,9 @@ export function providerTaskClassCounters(
  * `certified` parameter.
  *
  * V1 is deliberately stricter than the router's 90% useful
- * threshold: the certification window must contain at least
- * the canonical minimum sample count and every recorded
- * sample in that exact provider+taskClass lane must be
+ * threshold: the bounded recent certification window must
+ * contain the canonical minimum sample count and every
+ * sample in that exact provider+taskClass window must be
  * USEFUL_UNIQUE.
  */
 export function providerTaskClassCertified(
