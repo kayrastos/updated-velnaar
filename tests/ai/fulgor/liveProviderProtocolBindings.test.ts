@@ -405,7 +405,7 @@ describe(
     );
 
     it(
-      'requires at least two distinct evidence IDs when two host evidence IDs are supplied',
+      'requires two supplied evidence IDs without provider-incompatible uniqueness keywords',
       () => {
         for (
           const provider
@@ -444,9 +444,12 @@ describe(
           );
 
           expect(
-            evidence.uniqueItems,
+            Object.prototype.hasOwnProperty.call(
+              evidence,
+              'uniqueItems',
+            ),
           ).toBe(
-            true,
+            false,
           );
 
           expect(

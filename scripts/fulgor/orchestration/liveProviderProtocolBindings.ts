@@ -530,9 +530,6 @@ function evidenceIdsSchema(
         ids.length,
       ),
 
-    uniqueItems:
-      true,
-
     maxItems:
       Math.min(
         8,
