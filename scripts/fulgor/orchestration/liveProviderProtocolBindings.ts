@@ -525,7 +525,13 @@ function evidenceIdsSchema(
           },
 
     minItems:
-      0,
+      Math.min(
+        2,
+        ids.length,
+      ),
+
+    uniqueItems:
+      true,
 
     maxItems:
       Math.min(
@@ -740,14 +746,15 @@ export function buildProviderWorkProductPrompt(
       'Return only one schema-constrained VELNAR_PROVIDER_WORK_PRODUCT_V1 object.',
       '',
       'MANDATORY STATUS SEMANTICS:',
+      '- For every status: when two or more host evidence IDs are supplied, evidenceIds MUST contain at least two distinct supplied IDs; when fewer than two are supplied, evidenceIds MUST contain all supplied IDs.',
       '- PROPOSE_CHANGE: evidenceIds MUST contain at least two distinct supplied host evidence IDs; candidate MUST be non-null with a safe repository-relative path and non-empty content; tests MUST contain at least one regression test; blocker MUST be null.',
       '- For PROPOSE_CHANGE, candidate.content MUST be the COMPLETE FINAL UTF-8 CONTENTS of candidate.path after the proposed change.',
       '- candidate.content MUST NOT be a unified diff, code snippet, partial function/class, pseudocode, excerpt, placeholder, or content with omitted regions or ellipses.',
       '- When candidate.path modifies a supplied host evidence file, start from that exact supplied file content and preserve all unrelated existing content unless the bounded evidence supports changing it.',
       '- Do not omit unchanged imports, declarations, functions, classes, comments, exports, or other existing file regions from candidate.content.',
       '- If the complete final file cannot be produced safely within the candidate content limit, return BLOCKED rather than returning partial content.',
-      '- NO_CHANGE_NEEDED: candidate MUST be null; tests MUST be []; blocker MUST be null; evidenceIds MUST cite the supplied host evidence supporting the no-change conclusion.',
-      '- BLOCKED: candidate MUST be null; tests MUST be []; blocker MUST be a non-empty explanation; evidenceIds MAY be [] when the bounded host evidence is insufficient.',
+      '- NO_CHANGE_NEEDED: candidate MUST be null; tests MUST be []; blocker MUST be null.',
+      '- BLOCKED: candidate MUST be null; tests MUST be []; blocker MUST be a non-empty explanation.',
       '- Never use PROPOSE_CHANGE when fewer than two supplied host evidence IDs support the proposal.',
       '- candidate.path MUST be repository-relative and MUST NOT contain absolute paths, backslashes, empty path components, dot components or parent traversal.',
       '',

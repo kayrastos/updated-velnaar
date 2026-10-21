@@ -405,6 +405,74 @@ describe(
     );
 
     it(
+      'requires at least two distinct evidence IDs when two host evidence IDs are supplied',
+      () => {
+        for (
+          const provider
+          of [
+            'codex',
+            'antigravity',
+          ] as const
+        ) {
+          const schema =
+            buildProviderWorkProductSchema(
+              input(
+                provider,
+              ),
+            );
+
+          const properties =
+            schema.properties as
+              Record<
+                string,
+                any
+              >;
+
+          const evidence =
+            properties.evidenceIds;
+
+          expect(
+            evidence.minItems,
+          ).toBe(
+            2,
+          );
+
+          expect(
+            evidence.maxItems,
+          ).toBe(
+            2,
+          );
+
+          expect(
+            evidence.uniqueItems,
+          ).toBe(
+            true,
+          );
+
+          expect(
+            evidence.items.enum,
+          ).toEqual([
+            'E1',
+            'E2',
+          ]);
+
+          const prompt =
+            buildProviderWorkProductPrompt(
+              input(
+                provider,
+              ),
+            );
+
+          expect(
+            prompt,
+          ).toContain(
+            'when two or more host evidence IDs are supplied, evidenceIds MUST contain at least two distinct supplied IDs',
+          );
+        }
+      },
+    );
+
+    it(
       'fails closed if supplied evidence bytes do not match immutable capsule SHA256',
       () => {
         const bad =
