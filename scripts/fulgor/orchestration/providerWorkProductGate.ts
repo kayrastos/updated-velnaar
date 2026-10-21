@@ -24,6 +24,16 @@ export interface HostEvidenceCapsule {
 
 export interface ProviderCandidate {
   readonly path: string;
+
+  /*
+   * Complete final UTF-8 contents of `path` after the
+   * proposed change.
+   *
+   * This is NOT a diff, snippet, excerpt, partial
+   * function/class, pseudocode or placeholder.
+   *
+   * Provider output remains non-authoritative.
+   */
   readonly content: string;
 }
 

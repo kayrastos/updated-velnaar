@@ -494,6 +494,30 @@ describe(
         ).toContain(
           e1Content.trim(),
         );
+
+        expect(
+          prompt,
+        ).toContain(
+          'candidate.content MUST be the COMPLETE FINAL UTF-8 CONTENTS of candidate.path after the proposed change.',
+        );
+
+        expect(
+          prompt,
+        ).toContain(
+          'candidate.content MUST NOT be a unified diff, code snippet, partial function/class, pseudocode, excerpt, placeholder, or content with omitted regions or ellipses.',
+        );
+
+        expect(
+          prompt,
+        ).toContain(
+          'preserve all unrelated existing content unless the bounded evidence supports changing it.',
+        );
+
+        expect(
+          prompt,
+        ).toContain(
+          'return BLOCKED rather than returning partial content.',
+        );
       },
     );
 
