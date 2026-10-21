@@ -446,13 +446,29 @@ function evaluateAndApplyAdaptiveWindowIfReady(
       .qualityCircuit === 'CLOSED' &&
     pendingByProvider.antigravity > 0;
 
+  /*
+   * Queue drain is itself an adaptive event.
+   * A probation lane must not remain above zero
+   * merely because its observation window is small.
+   */
+  const codexNoDemandCandidate =
+    currentState.codex
+      .adaptiveLane.targetSlots > 0 &&
+    pendingByProvider.codex === 0;
+
+  const antigravityNoDemandCandidate =
+    currentState.antigravity
+      .adaptiveLane.targetSlots > 0 &&
+    pendingByProvider.antigravity === 0;
+
   const codexReady =
     forceEvaluateProviders.has('codex') ||
     codexHasImmediateFailure ||
     codexWin.counters.attempts >=
       ADAPTIVE_PROVIDER_SCALER_POLICY
         .minimumWindowAttempts ||
-    codexBootstrapCandidate;
+    codexBootstrapCandidate ||
+    codexNoDemandCandidate;
 
   const antigravityReady =
     forceEvaluateProviders.has(
@@ -462,7 +478,8 @@ function evaluateAndApplyAdaptiveWindowIfReady(
     antigravityWin.counters.attempts >=
       ADAPTIVE_PROVIDER_SCALER_POLICY
         .minimumWindowAttempts ||
-    antigravityBootstrapCandidate;
+    antigravityBootstrapCandidate ||
+    antigravityNoDemandCandidate;
 
   if (!codexReady && !antigravityReady) {
     return null;
@@ -487,7 +504,10 @@ function evaluateAndApplyAdaptiveWindowIfReady(
       codex: {
         provider: 'codex',
         requestedSlots:
-          VERIFIED_8X8_POLICY.targetCodex,
+          Math.min(
+            VERIFIED_8X8_POLICY.targetCodex,
+            pendingByProvider.codex,
+          ),
         quotaCircuit:
           currentState.codex
             .quotaCircuit,
@@ -518,7 +538,10 @@ function evaluateAndApplyAdaptiveWindowIfReady(
       antigravity: {
         provider: 'antigravity',
         requestedSlots:
-          VERIFIED_8X8_POLICY.targetAntigravity,
+          Math.min(
+            VERIFIED_8X8_POLICY.targetAntigravity,
+            pendingByProvider.antigravity,
+          ),
         quotaCircuit:
           currentState.antigravity
             .quotaCircuit,
