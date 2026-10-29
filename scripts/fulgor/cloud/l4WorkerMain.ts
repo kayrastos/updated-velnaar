@@ -71,6 +71,13 @@ export interface L4WorkerProcessConfig {
 export function loadL4WorkerProcessConfig(
   env: NodeJS.ProcessEnv,
 ): L4WorkerProcessConfig {
+  const inferenceTimeoutMs = requireInteger(
+    env.FULGOR_L4_INFERENCE_TIMEOUT_MS,
+    90000,
+    1000,
+    120000,
+  );
+
   return {
     ingressPort: requireInteger(
       env.PORT,
@@ -82,13 +89,7 @@ export function loadL4WorkerProcessConfig(
       requireModelId(
         env.FULGOR_L4_EXPECTED_MODEL_ID,
       ),
-    inferenceTimeoutMs:
-      requireInteger(
-        env.FULGOR_L4_INFERENCE_TIMEOUT_MS,
-        90000,
-        1000,
-        120000,
-      ),
+    inferenceTimeoutMs,
     maxPromptBytes: requireInteger(
       env.FULGOR_L4_MAX_PROMPT_BYTES,
       64 * 1024,
@@ -160,6 +161,9 @@ async function main(): Promise<void> {
     },
     adapter,
   );
+
+  server.requestTimeout =
+    processConfig.inferenceTimeoutMs + 5000;
 
   let child: ChildProcess | undefined;
   let stopping = false;
