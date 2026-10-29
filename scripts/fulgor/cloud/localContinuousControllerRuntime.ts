@@ -472,19 +472,17 @@ export async function runLocalContinuousController(
         kmsPublicKeyRequester,
     });
 
-  const feederStore =
+  const beforeCycle =
     (
       settings.feeder ||
       settings.acceptedWorkFeeder
     )
-      ? createControllerStateStore(
-          config,
-        )
-      : null;
-
-  const beforeCycle =
-    feederStore
       ? async () => {
+          const feederStore =
+            createControllerStateStore(
+              config,
+            );
+
           await runLocalControllerFeedersOnce(
             settings,
             feederStore,

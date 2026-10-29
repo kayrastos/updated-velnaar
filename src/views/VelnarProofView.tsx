@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { usePlatform } from '../context/PlatformContext';
 import type { ActionResultRow } from '../types/database';
+import {
+  createVelnarProofCertificate,
+  type VelnarProofCertificatePayload,
+} from '../utils/stateHash';
 import { 
   Award, 
   ShieldCheck, 
@@ -16,12 +20,30 @@ import {
 export const VelnarProofView: React.FC = () => {
   const { actionResults, formatCurrency, currentBusiness, currentMarket, t } = usePlatform();
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [exportedCertificate, setExportedCertificate] =
+    useState<VelnarProofCertificatePayload | null>(null);
+
+  const proofCertificate = useMemo(
+    () =>
+      createVelnarProofCertificate({
+        currentMarket,
+        currentBusiness,
+        actionResults,
+      }),
+    [currentMarket, currentBusiness, actionResults],
+  );
 
   const totalRecovered = actionResults
     .filter((r: ActionResultRow) => r.status === 'success')
     .reduce((sum, r) => sum + ((r.revenue_recovered_amount_minor || 0) / 100), 0);
 
   const handleExportCertificate = () => {
+    const cert = createVelnarProofCertificate({
+      currentMarket,
+      currentBusiness,
+      actionResults,
+    });
+    setExportedCertificate(cert);
     setDownloadSuccess(true);
     setTimeout(() => setDownloadSuccess(false), 3000);
   };
@@ -86,8 +108,11 @@ export const VelnarProofView: React.FC = () => {
           <div className="text-xs font-mono text-theme-muted uppercase font-semibold mb-2">
             Ledger Integrity Hash
           </div>
-          <div className="text-xs font-mono text-theme-primary bg-theme-surface-elevated p-2 rounded border border-theme-border truncate">
-            sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069
+          <div
+            data-testid="ledger-state-hash"
+            className="text-xs font-mono text-theme-primary bg-theme-surface-elevated p-2 rounded border border-theme-border truncate"
+          >
+            {(exportedCertificate ?? proofCertificate).state_hash}
           </div>
           <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2 flex items-center gap-1 font-mono">
             <ShieldCheck className="w-3.5 h-3.5" /> Immutable Attribution Verified

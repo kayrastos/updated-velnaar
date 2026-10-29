@@ -83,8 +83,13 @@ export function createAutomationEvidence(
     patchSha256,
     dryRunApplySucceeded:
       input.job.dryRunApplySucceeded,
-    staticGatePolicy:
-      input.job.staticGatePolicy,
+    staticGatePolicy: {
+      allowedScope: [...input.job.staticGatePolicy.allowedScope].sort(),
+      forbiddenPaths: [...input.job.staticGatePolicy.forbiddenPaths].sort(),
+      maxChangedLines: input.job.staticGatePolicy.maxChangedLines,
+      maxFiles: input.job.staticGatePolicy.maxFiles,
+      maxHunks: input.job.staticGatePolicy.maxHunks,
+    },
   };
 
   const inputSha256 = sha256(
@@ -104,7 +109,7 @@ export function createAutomationEvidence(
       failureCode:
         input.staticGateResult.failureCode,
       touchedFiles:
-        input.staticGateResult.touchedFiles,
+        [...input.staticGateResult.touchedFiles].sort(),
       hunkCount:
         input.staticGateResult.hunkCount,
       changedLineCount:

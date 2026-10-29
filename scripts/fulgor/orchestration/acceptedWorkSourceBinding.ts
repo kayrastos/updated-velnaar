@@ -30,8 +30,9 @@ import {
   ACCEPTED_WORK_FULGOR_BRIDGE_SCHEMA,
 } from './acceptedWorkFulgorBridge';
 
-import type {
-  AcceptedWorkLatestPointer,
+import {
+  ACCEPTED_WORK_LATEST_POINTER_SCHEMA,
+  type AcceptedWorkLatestPointer,
 } from './acceptedWorkLatestPointer';
 
 export const ACCEPTED_WORK_SOURCE_BINDING_SCHEMA =
@@ -501,6 +502,8 @@ export function createAcceptedWorkSourceBinding(
     ).size;
 
   if (
+    pointer.schemaVersion !==
+      ACCEPTED_WORK_LATEST_POINTER_SCHEMA ||
     materialized.schemaVersion !==
       ACCEPTED_WORK_GIT_MATERIALIZER_SCHEMA ||
     plan.schemaVersion !==

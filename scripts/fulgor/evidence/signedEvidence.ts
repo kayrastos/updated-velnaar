@@ -185,6 +185,65 @@ function canonicalize(value: unknown): unknown {
   throw new SignedEvidenceError('NON_CANONICAL_VALUE');
 }
 
+export const TRANSIENT_EVIDENCE_STATE_KEYS: ReadonlySet<string> = new Set([
+  'scan_timestamp',
+  'timestamp',
+  'exportedAt',
+  'exported_at',
+  'generatedAt',
+  'generated_at',
+  'run_id',
+  'runId',
+  'sessionId',
+  'session_id',
+  'verified_at',
+  'verifiedAt',
+  'created_at',
+  'createdAt',
+  'updated_at',
+  'updatedAt',
+  'executed_at',
+  'executedAt',
+  'observedAtMs',
+  'completedAtMs',
+]);
+
+export function stripTransientEvidenceFields(
+  value: unknown,
+): unknown {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new SignedEvidenceError('NON_CANONICAL_VALUE');
+    }
+    return Object.is(value, -0) ? 0 : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(stripTransientEvidenceFields);
+  }
+  if (isRecord(value)) {
+    const ordered: Record<string, unknown> = {};
+    for (const key of Object.keys(value).sort()) {
+      if (TRANSIENT_EVIDENCE_STATE_KEYS.has(key)) {
+        continue;
+      }
+      const child = value[key];
+      if (child === undefined) {
+        continue;
+      }
+      ordered[key] = stripTransientEvidenceFields(child);
+    }
+    return ordered;
+  }
+  throw new SignedEvidenceError('NON_CANONICAL_VALUE');
+}
+
 export function canonicalSignedEvidenceJson(
   value: unknown,
 ): string {
@@ -195,6 +254,30 @@ function sha256Canonical(value: unknown): string {
   return createHash('sha256')
     .update(canonicalSignedEvidenceJson(value), 'utf8')
     .digest('hex');
+}
+
+export function computeCanonicalEvidenceStateHash(
+  stateInput: unknown,
+): string {
+  const sanitized = stripTransientEvidenceFields(stateInput);
+  return `sha256:${sha256Canonical(sanitized)}`;
+}
+
+export function verifyCanonicalEvidenceStateHash(
+  stateInput: unknown,
+  expectedStateHash: string,
+): boolean {
+  if (
+    typeof expectedStateHash !== 'string' ||
+    !expectedStateHash.startsWith('sha256:') ||
+    !HEX64.test(expectedStateHash.slice(7))
+  ) {
+    return false;
+  }
+  return (
+    computeCanonicalEvidenceStateHash(stateInput) ===
+    expectedStateHash
+  );
 }
 
 function parseStaticGate(

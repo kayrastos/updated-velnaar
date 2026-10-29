@@ -33,6 +33,7 @@ import { GrowthActionsView } from '../../src/views/GrowthActionsView';
 import { LeadInboxView } from '../../src/views/LeadInboxView';
 import { OnboardingView } from '../../src/views/OnboardingView';
 import { VelnarProofView } from '../../src/views/VelnarProofView';
+import { createVelnarProofCertificate } from '../../src/utils/stateHash';
 import type { AppRoute, Language, MarketMetrics, PlatformState } from '../../src/types/app';
 import type { Appointment, AppointmentStatus, AppointmentCurrencyCode } from '../../src/types/appointment';
 import type { AttributionConfidence, AttributionType, AttributionCurrencyCode } from '../../src/types/attribution';
@@ -377,11 +378,17 @@ describe('VELNAR V1 Core Coverage & Behavioral Invariants', () => {
     expect(dashboardHtml).toContain('Apex Türkiye Sanayi &amp; Lojistik A.Ş.');
     expect(dashboardHtml).toContain('ARR Run-Rate: ₺48,500,000');
 
-    // 6. VelnarProofView: renders proof banner, export button, ledger integrity hash, and attribution ledger rows
+    // 6. VelnarProofView: renders proof banner, export button, deterministic JCS ledger integrity hash, and attribution ledger rows
+    const expectedCert = createVelnarProofCertificate({
+      currentMarket: 'TR',
+      currentBusiness: mockBusinesses.TR,
+      actionResults: initialActionResults,
+    });
     const proofHtml = renderWithContext({}, React.createElement(VelnarProofView));
     expect(proofHtml).toContain('id="velnar-proof-view"');
     expect(proofHtml).toContain('id="export-proof-certificate"');
-    expect(proofHtml).toContain('sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069');
+    expect(proofHtml).toContain(expectedCert.state_hash);
+    expect(proofHtml).not.toContain('sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069');
     expect(proofHtml).toContain('Immutable Attribution Verified');
     if (initialActionResults.length > 0) {
       expect(proofHtml).toContain(initialActionResults[0].id);
