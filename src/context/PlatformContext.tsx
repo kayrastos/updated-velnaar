@@ -65,7 +65,7 @@ export interface DatasetStatuses {
   securityEvents: DatasetStatus;
 }
 
-interface PlatformContextValue {
+export interface PlatformContextValue {
   currentRoute: AppRoute;
   setCurrentRoute: (route: AppRoute) => void;
   currentMarket: MarketType;
@@ -151,7 +151,7 @@ interface PlatformContextValue {
   formatCurrency: (amount: number) => string;
 }
 
-const PlatformContext = createContext<PlatformContextValue | undefined>(undefined);
+export const PlatformContext = createContext<PlatformContextValue | undefined>(undefined);
 
 export const PlatformProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>('/dashboard');

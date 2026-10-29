@@ -24,7 +24,7 @@ export const DashboardView: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-theme-secondary font-mono mt-0.5">
-            ARR Run-Rate: {currentBusiness ? formatCurrency(currentBusiness.annual_revenue_run_rate) : 'N/A'} | Baseline Margin: {currentBusiness?.baseline_margin_pct ?? 0}%
+            ARR Run-Rate: {currentBusiness ? formatCurrency(currentBusiness.annual_revenue_run_rate ?? ((currentBusiness.annual_revenue_run_rate_minor || 0) / 100)) : 'N/A'} | Baseline Margin: {currentBusiness?.baseline_margin_pct ?? 0}%
           </p>
         </div>
 

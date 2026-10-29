@@ -43,7 +43,7 @@ export interface POSTransactionSummary {
   grossAmountMinor: number; // in currency minor units (e.g. 425000 = 4,250 TRY / $4,250)
   taxAmountMinor: number;
   tipAmountMinor?: number;
-  currency: string;
+  currency: POSCurrencyCode;
   categories: string[]; // e.g. ["mains", "beverages", "dessert"]
   anonymousCustomerId: string; // Vault token or hashed loyalty ID
   source: POSIntegrationMethod;

@@ -13,8 +13,16 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
   const selectedBizTypeRef: BusinessRow['id'] | null = activeBusinessId;
   void Shield; void LogIn; void selectedOrgId; void setSelectedOrgId; void currentBusiness; void t; void selectedBizTypeRef;
 
-  // In DEV, bypass session gates unless explicitly unauthenticated
-  if (import.meta.env.DEV) {
+  // In DEV, bypass session gates unless explicitly unauthenticated or in fail-closed boundary states
+  if (
+    import.meta.env.DEV &&
+    sessionStatus === 'AUTHENTICATED' &&
+    Boolean(activeOrganizationId) &&
+    businessLoadStatus !== 'LOADING' &&
+    businessLoadStatus !== 'ERROR' &&
+    businesses.length > 0 &&
+    (businesses.length === 1 || Boolean(activeBusinessId))
+  ) {
     return <>{children}</>;
   }
 
@@ -274,7 +282,7 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
                     <span>{biz.name}</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-theme-surface border border-theme-border text-theme-muted uppercase font-mono">{biz.currency}</span>
                   </div>
-                  <div className="text-[10px] text-theme-secondary mt-0.5 font-mono">ID: {biz.id} • {biz.industry_vertical}</div>
+                  <div className="text-[10px] text-theme-secondary mt-0.5 font-mono">ID: {biz.id} • {biz.industry}</div>
                 </div>
                 <ArrowRight className="w-4 h-4 text-theme-muted group-hover:text-theme-accent transition-transform group-hover:translate-x-0.5" />
               </button>

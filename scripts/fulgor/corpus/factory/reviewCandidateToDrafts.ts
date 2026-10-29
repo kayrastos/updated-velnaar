@@ -351,7 +351,8 @@ export function recomputeCorpusDraftSha256(
       draft.diffSha256,
 
     changedFiles:
-      [...draft.changedFiles],
+      [...draft.changedFiles]
+        .sort(),
 
     license: {
       spdxId:

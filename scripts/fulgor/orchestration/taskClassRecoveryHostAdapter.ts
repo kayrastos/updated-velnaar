@@ -225,6 +225,7 @@ function normalizedReceipt(
 
   if (
     (expected.transaction !== undefined && !sameRecoveryTransaction(value.transaction, expected.transaction)) ||
+    (expected.transaction === undefined && 'transaction' in value && value.transaction !== undefined) ||
     value.schemaVersion !==
       TASK_CLASS_RECOVERY_HOST_GATE_SCHEMA ||
     typeof value.allowed !==

@@ -175,6 +175,9 @@ export function splitCorpusDeterministically(
   const advisoryRepository =
     new Map<string, string>();
 
+  const contentRepository =
+    new Map<string, string>();
+
   for (const record of records) {
     const repository =
       record.source.repository.toLowerCase();
@@ -185,23 +188,41 @@ export function splitCorpusDeterministically(
       record.source.advisoryId
         ?.toUpperCase();
 
-    if (!advisory) {
-      continue;
+    if (advisory) {
+      const existing =
+        advisoryRepository.get(advisory);
+
+      if (existing) {
+        dsu.union(
+          existing,
+          repository,
+        );
+      } else {
+        advisoryRepository.set(
+          advisory,
+          repository,
+        );
+      }
     }
 
-    const existing =
-      advisoryRepository.get(advisory);
+    const contentHash =
+      record.provenance.sourceContentSha256;
 
-    if (existing) {
-      dsu.union(
-        existing,
-        repository,
-      );
-    } else {
-      advisoryRepository.set(
-        advisory,
-        repository,
-      );
+    if (contentHash) {
+      const existing =
+        contentRepository.get(contentHash);
+
+      if (existing) {
+        dsu.union(
+          existing,
+          repository,
+        );
+      } else {
+        contentRepository.set(
+          contentHash,
+          repository,
+        );
+      }
     }
   }
 

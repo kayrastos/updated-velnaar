@@ -212,7 +212,7 @@ implements FulgorVerifierWorker {
               this.config.workerEndpoint,
 
             audience:
-              this.config.workerAudience,
+              this.config.workerOrigin,
 
             timeoutMs:
               this.config.timeoutMs,

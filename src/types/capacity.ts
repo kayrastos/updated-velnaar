@@ -9,7 +9,10 @@
  * - CONSULTING / B2B: available partner meeting hours
  */
 
+import type { AttributionCurrencyCode } from './attribution';
 import { MetricProvenance } from './leakEngine';
+
+export type CapacityCurrencyCode = AttributionCurrencyCode;
 
 export type ResourceType = 
   | 'staff_member' 

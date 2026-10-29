@@ -188,9 +188,10 @@ implements L4IdTokenProvider {
         .getRequestHeaders();
 
     const authorization =
-      headers.get(
-        'authorization',
-      );
+      headers instanceof Headers
+        ? headers.get('authorization')
+        : (headers as Record<string, string | undefined>)['authorization'] ??
+          (headers as Record<string, string | undefined>)['Authorization'];
 
     const prefix = 'Bearer ';
 
