@@ -311,7 +311,8 @@ export class SecurityTestSuite {
     const sampleActionDraft: any = {
       title: 'Discount Offering',
       actionType: 'pricing_adjustment',
-      suggestedPayload: { discountPercent: 35, adBudgetMinor: 50000 },
+      discountPercent: 35,
+      adBudgetMinor: 50000,
       revenueLeakId: 'leak_01',
       evidenceReferences: ['REVENUE_LEAK:leak_01'],
       requiresHumanApproval: true,

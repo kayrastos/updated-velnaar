@@ -366,19 +366,7 @@ export function recomputeCorpusDraftSha256(
     },
 
     verificationRequirements:
-      draft.role === 'VULNERABLE'
-        ? [
-            'SOURCE_CONTENT_EXTRACTED_FROM_EXACT_COMMIT',
-            'VULNERABLE_BEHAVIOR_INDEPENDENTLY_VERIFIED',
-            'EXPECTED_EVIDENCE_AUTHORED',
-            'EXPECTED_REMEDIATION_AUTHORED',
-          ]
-        : [
-            'SOURCE_CONTENT_EXTRACTED_FROM_EXACT_COMMIT',
-            'FIX_BEHAVIOR_INDEPENDENTLY_VERIFIED',
-            'EXPECTED_EVIDENCE_AUTHORED',
-            'EXPECTED_REMEDIATION_AUTHORED',
-          ],
+      [...draft.verificationRequirements],
   });
 }
 function buildHardNegativeRequest(

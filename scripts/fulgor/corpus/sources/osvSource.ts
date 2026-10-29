@@ -364,7 +364,11 @@ function parsePackages(
       name,
       ranges,
 
-      gitRanges,
+      ...(gitRanges.length > 0
+        ? {
+            gitRanges,
+          }
+        : {}),
     });
   }
 
