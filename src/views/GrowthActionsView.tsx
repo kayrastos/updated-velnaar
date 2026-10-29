@@ -56,7 +56,7 @@ export const GrowthActionsView: React.FC = () => {
   const handleDefer = async (id: string) => {
     const res = await deferAction(id);
     setFeedbackAlert({
-      type: 'success',
+      type: res.success ? 'success' : 'error',
       message: res.message,
     });
     setTimeout(() => setFeedbackAlert(null), 5000);
@@ -275,3 +275,4 @@ export const GrowthActionsView: React.FC = () => {
     </div>
   );
 };
+

@@ -149,7 +149,8 @@ async function impersonatedAccessToken(
 
   const iamUrl =
     'https://iamcredentials.googleapis.com/v1/' +
-    'projects/-/serviceAccounts/' +
+    'projects/-/' +
+    'serviceAccounts/' +
     encodeURIComponent(
       controllerServiceAccount,
     ) +
@@ -312,83 +313,12 @@ export function createGcloudImpersonatedKmsRequester(
   ): Promise<unknown> => {
     assertRequest(request);
 
-    const commandResult =
-      accessTokenCommand();
-
-    const sourceAccessToken =
-      commandResult.stdout.trim();
-
-    if (
-      commandResult.status !== 0 ||
-      !validToken(sourceAccessToken)
-    ) {
-      return fail();
-    }
-
-    const iamUrl =
-      'https://iamcredentials.googleapis.com/v1/' +
-      'projects/-/serviceAccounts/' +
-      encodeURIComponent(
-        controllerServiceAccount,
-      ) +
-      ':generateAccessToken';
-
-    let iamResponse: Response;
-
-    try {
-      iamResponse =
-        await fetchImpl(
-          iamUrl,
-          {
-            method: 'POST',
-
-            headers: {
-              authorization:
-                `Bearer ${sourceAccessToken}`,
-
-              'content-type':
-                'application/json',
-            },
-
-            body:
-              JSON.stringify({
-                scope: [
-                  'https://www.googleapis.com/auth/cloud-platform',
-                ],
-
-                lifetime:
-                  '3600s',
-              }),
-          },
-        );
-    } catch {
-      return fail();
-    }
-
-    if (!iamResponse.ok) {
-      return fail();
-    }
-
-    let iamBody: unknown;
-
-    try {
-      iamBody =
-        await iamResponse.json();
-    } catch {
-      return fail();
-    }
-
-    if (
-      !isRecord(iamBody) ||
-      !validToken(
-        iamBody.accessToken,
-      )
-    ) {
-      return fail();
-    }
-
     const controllerAccessToken =
-      iamBody.accessToken;
+      await impersonatedAccessToken(
+        controllerServiceAccount,
+        accessTokenCommand,
+        fetchImpl,
+      );
 
     let kmsResponse: Response;
 

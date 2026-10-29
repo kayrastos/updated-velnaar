@@ -49,7 +49,7 @@ export async function transitionVerificationState(current: FindingVerification, 
   if (raw.type === 'BEGIN') {
     if (!['CANDIDATE', 'NOT_VERIFIED', 'INCONCLUSIVE'].includes(current.state)) protocolError('BEGIN forbidden from this state');
     const request = validateVerificationRequest(raw.request, current.candidate, current.organizationId);
-    if (current.request && (request.requestId === current.request.requestId || request.createdAt < current.result.completedAt)) {
+    if (current.request && (request.requestId === current.request.requestId || (current.result && request.createdAt < current.result.completedAt))) {
       protocolError('retry requires a new request after previous execution');
     }
     return mint({ organizationId: current.organizationId, candidate: current.candidate, state: 'PENDING_VERIFICATION', request });

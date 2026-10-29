@@ -21,11 +21,12 @@ export class SecurityPipeline {
    */
   public static recordEvent(event: Omit<SecurityEvent, 'id' | 'timestamp'>): SecurityEvent {
     const id = `sec_${crypto.randomUUID()}`;
+    const redactedDetails = SafeLogger.redactData(event.details);
     const fullEvent: SecurityEvent = {
       id,
       timestamp: new Date().toISOString(),
       ...event,
-      details: SafeLogger.redactData(event.details),
+      details: redactedDetails,
     };
 
     SecurityPipeline.securityEventsStore.unshift(fullEvent);
@@ -37,7 +38,7 @@ export class SecurityPipeline {
     SafeLogger.warn(`[SECURITY_INCIDENT] [${event.eventType}] [Severity: ${event.severity}] Target Org: ${event.organizationId}`, {
       enforcement: event.enforcementAction,
       sourceIpHash: event.sourceIpHash,
-      details: event.details
+      details: redactedDetails
     });
 
     return fullEvent;

@@ -300,6 +300,7 @@ function deniedDecision(
     TaskClassRecoverySecurityMetadata,
 ): TaskClassRecoveryGateDecision {
   return Object.freeze({
+    ...(metadata.transaction ? { transaction: metadata.transaction } : {}),
     allowed:
       false,
 

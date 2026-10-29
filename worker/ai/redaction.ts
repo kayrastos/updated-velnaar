@@ -120,7 +120,7 @@ export class RedactionLayer {
         const result: Record<string, any> = {};
         for (const [k, v] of Object.entries(val)) {
           const normalizedKey = DataClassifier.normalizeKey(k);
-          if (DataClassifier.FORBIDDEN_OBJECT_KEYS.has(normalizedKey)) {
+          if (this.PROHIBITED_FIELDS.has(k) || this.PROHIBITED_FIELDS.has(normalizedKey) || DataClassifier.FORBIDDEN_OBJECT_KEYS.has(normalizedKey)) {
             fieldsRemoved.push(k);
             patternsRedacted++;
             continue; // Drop prohibited PII / Secret fields entirely
@@ -161,3 +161,4 @@ export class RedactionLayer {
     };
   }
 }
+

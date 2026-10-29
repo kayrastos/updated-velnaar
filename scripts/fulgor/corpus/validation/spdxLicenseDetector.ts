@@ -55,15 +55,24 @@ function includesAll(
 function isApache20(
   text: string,
 ): boolean {
-  return includesAll(
-    text,
-    [
-      'apache license',
-      'version 2.0, january 2004',
-      'www.apache.org/licenses/',
-      'terms and conditions for use, reproduction, and distribution',
-      'software distributed under the license is distributed on an "as is" basis',
-    ],
+  return (
+    includesAll(
+      text,
+      [
+        'apache license',
+        'terms and conditions for use, reproduction, and distribution',
+        'software distributed under the license is distributed on an "as is" basis',
+      ],
+    ) &&
+    (
+      text.includes('version 2.0, january 2004') ||
+      text.includes('version 2.0')
+    ) &&
+    (
+      text.includes('www.apache.org/licenses/') ||
+      text.includes('http://www.apache.org/licenses/') ||
+      text.includes('https://www.apache.org/licenses/')
+    )
   );
 }
 

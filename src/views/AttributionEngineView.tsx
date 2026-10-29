@@ -31,12 +31,12 @@ export const AttributionEngineView: React.FC = () => {
   const [lookbackDays, setLookbackDays] = useState<number>(30);
 
   const totalAttributed = attributionResults
-    .filter(r => r.confidenceGrade === 'HIGH')
-    .reduce((sum, r) => sum + (r.attributedAmountMinor / 100), 0);
+    .filter(r => r.revenueType === 'ATTRIBUTED_REVENUE')
+    .reduce((sum, r) => sum + (r.grossAmountMinor / 100), 0);
 
   const totalInfluenced = attributionResults
-    .filter(r => r.confidenceGrade !== 'HIGH')
-    .reduce((sum, r) => sum + (r.attributedAmountMinor / 100), 0);
+    .filter(r => r.revenueType === 'INFLUENCED_REVENUE')
+    .reduce((sum, r) => sum + (r.grossAmountMinor / 100), 0);
 
   const getChannelIcon = (type: string) => {
     switch (type) {
@@ -170,10 +170,10 @@ export const AttributionEngineView: React.FC = () => {
                   <div>
                     <div className="text-xs font-medium text-theme-primary flex items-center gap-2">
                       <span>Customer Pseudonym: {journey.customerPseudonymId}</span>
-                      <span className="text-[10px] font-mono text-theme-muted">({journey.touchpoints.length} Touchpoints)</span>
+                      <span className="text-[10px] font-mono text-theme-muted">({journey.touches.length} Touchpoints)</span>
                     </div>
                     <div className="text-[11px] text-theme-muted font-mono mt-0.5">
-                      Converted at: {new Date(journey.conversionTimestamp).toLocaleString()}
+                      Converted at: {new Date(journey.convertedAt).toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -181,46 +181,39 @@ export const AttributionEngineView: React.FC = () => {
                 <div className="flex items-center space-x-3">
                   <div className="text-right">
                     <div className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      +{formatCurrency(journey.convertedValueMinor / 100)}
+                      +{formatCurrency(journey.grossRevenueMinor / 100)}
                     </div>
                     <div className="text-[10px] text-theme-muted font-mono">
                       POS Transaction Verified
                     </div>
                   </div>
-                  {getConfidenceBadge(journey.confidenceGrade)}
                 </div>
               </div>
 
               {/* Touchpoint Chain Visualization */}
               <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border overflow-x-auto">
                 <div className="flex items-center space-x-2 min-w-max">
-                  {journey.touchpoints.map((tp, idx) => (
+                  {journey.touches.map((tp, idx) => (
                     <React.Fragment key={tp.id}>
                       <div className="bg-theme-surface p-2 rounded-lg border border-theme-border text-left space-y-0.5">
                         <div className="flex items-center space-x-1.5 text-[10px] font-mono text-theme-accent">
-                          {getChannelIcon(tp.type)}
+                          {getChannelIcon(tp.channel)}
                           <span className="font-semibold uppercase">{tp.channel}</span>
                         </div>
                         <div className="text-[11px] text-theme-primary max-w-[160px] truncate">
-                          {tp.metadata.campaignName || tp.metadata.service || tp.metadata.direction || tp.type}
+                          {tp.campaignName || tp.medium || tp.source || tp.channel}
                         </div>
                         <div className="text-[9px] font-mono text-theme-muted">
                           {new Date(tp.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
 
-                      {idx < journey.touchpoints.length - 1 && (
+                      {idx < journey.touches.length - 1 && (
                         <ArrowRight className="w-3 h-3 text-theme-muted shrink-0" />
                       )}
                     </React.Fragment>
                   ))}
                 </div>
-              </div>
-
-              {/* Evidence Attribution Details */}
-              <div className="text-[11px] text-theme-secondary font-mono flex items-center justify-between pt-1">
-                <span>Attribution Model: <strong>Position-Based (40/20/40) Multi-Touch</strong></span>
-                <span className="text-theme-accent">Evidence: {journey.evidenceChain.join(' → ')}</span>
               </div>
             </div>
           ))}
@@ -229,3 +222,4 @@ export const AttributionEngineView: React.FC = () => {
     </div>
   );
 };
+

@@ -43,7 +43,7 @@ export class AppointmentResourceRepository {
     if (!db) {
       const isDevOrTest = environment === 'development' || environment === 'test';
       if (!isDevOrTest) {
-        throw new Error('APPOINTMENT_RESOURCE_LOOKUP_FAILED');
+        throw new Error('DATABASE_NOT_CONFIGURED');
       }
     }
   }

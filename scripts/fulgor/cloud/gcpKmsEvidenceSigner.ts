@@ -142,7 +142,7 @@ implements EvidenceSigner {
     options: GcpKmsEvidenceSignerOptions,
   ) {
     if (!KEY_ID.test(options.keyId)) {
-      return fail('INVALID_KEY_ID');
+      fail('INVALID_KEY_ID');
     }
 
     if (
@@ -151,7 +151,7 @@ implements EvidenceSigner {
         options.keyVersionResource,
       )
     ) {
-      return fail(
+      fail(
         'INVALID_KEY_VERSION_RESOURCE',
       );
     }
