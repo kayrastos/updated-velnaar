@@ -12,6 +12,9 @@
  * ============================================================================
  */
 
+import type { OrganizationRow } from './database';
+
+export type CheckInOrganizationId = OrganizationRow['id'];
 export type CheckInType = 'new_visitor' | 'returning_visitor' | 'anonymous_walk_in';
 
 export type CheckInSource = 'velnar_tap_nfc' | 'qr_counter_stand' | 'tablet_fallback_kiosk' | 'staff_manual_entry';

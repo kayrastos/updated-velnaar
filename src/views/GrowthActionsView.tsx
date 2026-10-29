@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePlatform } from '../context/PlatformContext';
+import type { GrowthActionRow } from '../types/database';
 import { 
   Sparkles, 
   Check, 
@@ -29,8 +30,8 @@ export const GrowthActionsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
   const [selectedActionPayload, setSelectedActionPayload] = useState<string | null>(null);
 
-  const pendingActions = actions.filter(a => a.approval_status === 'pending_approval');
-  const historyActions = actions.filter(a => a.approval_status !== 'pending_approval');
+  const pendingActions: GrowthActionRow[] = actions.filter(a => a.approval_status === 'pending_approval');
+  const historyActions: GrowthActionRow[] = actions.filter(a => a.approval_status !== 'pending_approval');
 
   const displayedActions = activeTab === 'pending' ? pendingActions : historyActions;
 

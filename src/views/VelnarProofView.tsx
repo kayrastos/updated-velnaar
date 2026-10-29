@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePlatform } from '../context/PlatformContext';
+import type { ActionResultRow } from '../types/database';
 import { 
   Award, 
   ShieldCheck, 
@@ -17,7 +18,7 @@ export const VelnarProofView: React.FC = () => {
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   const totalRecovered = actionResults
-    .filter(r => r.status === 'success')
+    .filter((r: ActionResultRow) => r.status === 'success')
     .reduce((sum, r) => sum + ((r.revenue_recovered_amount_minor || 0) / 100), 0);
 
   const handleExportCertificate = () => {

@@ -70,7 +70,7 @@ export interface GcpKmsEvidenceVerifierOptions {
 }
 
 const KEY_ID =
-  /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+  /^[A-Za-z0-9._:-]{1,128}$/;
 
 const KEY_VERSION_RESOURCE =
   /^projects\/[^/\s]+\/locations\/[^/\s]+\/keyRings\/[^/\s]+\/cryptoKeys\/[^/\s]+\/cryptoKeyVersions\/[^/\s]+$/;

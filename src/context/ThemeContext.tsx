@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import type { Language } from '../types/app';
 
 export type Theme = 'dark' | 'light' | 'system';
 export type ResolvedTheme = 'dark' | 'light';
+export type ThemeLocale = Language;
 
 export interface ThemeContextType {
   theme: Theme;

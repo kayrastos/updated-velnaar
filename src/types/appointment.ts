@@ -2,6 +2,9 @@
  * @file appointment.ts
  * @description Provider-Neutral Appointment Engine & Event Normalization
  */
+import type { CurrencyCode } from './database';
+
+export type AppointmentCurrencyCode = CurrencyCode;
 
 export type AppointmentStatus = 
   | 'scheduled' 

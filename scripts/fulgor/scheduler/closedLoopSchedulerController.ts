@@ -485,6 +485,29 @@ function evaluateAndApplyAdaptiveWindowIfReady(
     return null;
   }
 
+  const codexCertifiedIdleResume =
+    codexBootstrapCandidate &&
+    currentState.codex.lastAdaptiveReason ===
+      'NO_DEMAND' &&
+    currentState.codex.certification !==
+      null &&
+    currentState.codex.certification
+      .certified &&
+    currentState.codex.adaptiveLane
+      .recoveryNotBeforeMs === 0;
+
+  const antigravityCertifiedIdleResume =
+    antigravityBootstrapCandidate &&
+    currentState.antigravity
+      .lastAdaptiveReason ===
+      'NO_DEMAND' &&
+    currentState.antigravity
+      .certification !== null &&
+    currentState.antigravity.certification
+      .certified &&
+    currentState.antigravity.adaptiveLane
+      .recoveryNotBeforeMs === 0;
+
   const pairDecision =
     evaluateAdaptiveProviderPair({
       baseline,
@@ -492,22 +515,50 @@ function evaluateAndApplyAdaptiveWindowIfReady(
       machineEffectiveMax:
         VERIFIED_8X8_POLICY.globalEffectiveMax,
       state: {
-        codex:
-          currentState.codex
-            .adaptiveLane,
+        codex: codexCertifiedIdleResume
+          ? Object.freeze({
+              ...currentState.codex
+                .adaptiveLane,
+              targetSlots:
+                currentState.codex
+                  .preQuotaTargetSlots > 0
+                  ? Math.min(
+                      VERIFIED_8X8_POLICY.targetCodex,
+                      currentState.codex
+                        .preQuotaTargetSlots,
+                    )
+                  : VERIFIED_8X8_POLICY.targetCodex,
+            })
+          : currentState.codex
+              .adaptiveLane,
         antigravity:
-          currentState.antigravity
-            .adaptiveLane,
+          antigravityCertifiedIdleResume
+            ? Object.freeze({
+                ...currentState.antigravity
+                  .adaptiveLane,
+                targetSlots:
+                  currentState.antigravity
+                    .preQuotaTargetSlots >
+                  0
+                    ? Math.min(
+                        VERIFIED_8X8_POLICY.targetAntigravity,
+                        currentState
+                          .antigravity
+                          .preQuotaTargetSlots,
+                      )
+                    : VERIFIED_8X8_POLICY.targetAntigravity,
+              })
+            : currentState.antigravity
+                .adaptiveLane,
         preferAntigravityFirst:
           currentState.preferAntigravityFirst,
       },
       codex: {
         provider: 'codex',
         requestedSlots:
-          Math.min(
-            VERIFIED_8X8_POLICY.targetCodex,
-            pendingByProvider.codex,
-          ),
+          pendingByProvider.codex > 0
+            ? VERIFIED_8X8_POLICY.targetCodex
+            : 0,
         quotaCircuit:
           currentState.codex
             .quotaCircuit,
@@ -538,10 +589,9 @@ function evaluateAndApplyAdaptiveWindowIfReady(
       antigravity: {
         provider: 'antigravity',
         requestedSlots:
-          Math.min(
-            VERIFIED_8X8_POLICY.targetAntigravity,
-            pendingByProvider.antigravity,
-          ),
+          pendingByProvider.antigravity > 0
+            ? VERIFIED_8X8_POLICY.targetAntigravity
+            : 0,
         quotaCircuit:
           currentState.antigravity
             .quotaCircuit,
@@ -652,6 +702,7 @@ function evaluateAndApplyAdaptiveWindowIfReady(
   if (
     codexReady &&
     (codexHasImmediateFailure ||
+      codexNoDemandCandidate ||
       codexWin.counters.attempts >=
         ADAPTIVE_PROVIDER_SCALER_POLICY
           .minimumWindowAttempts)
@@ -665,6 +716,7 @@ function evaluateAndApplyAdaptiveWindowIfReady(
   if (
     antigravityReady &&
     (antigravityHasImmediateFailure ||
+      antigravityNoDemandCandidate ||
       antigravityWin.counters.attempts >=
         ADAPTIVE_PROVIDER_SCALER_POLICY
           .minimumWindowAttempts)
@@ -1536,8 +1588,14 @@ export async function runClosedLoopSchedulerCycle(
           antigravity: antigravityTaskClassCertified,
         },
         {
-          codex: pendingCodex,
-          antigravity: pendingAntigravity,
+          codex: Math.max(
+            pendingCodex,
+            codexAdmission.admittedNormalSlots,
+          ),
+          antigravity: Math.max(
+            pendingAntigravity,
+            antigravityAdmission.admittedNormalSlots,
+          ),
         },
         forceEvaluate,
       );

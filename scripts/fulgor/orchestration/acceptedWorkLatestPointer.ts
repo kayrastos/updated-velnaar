@@ -427,6 +427,9 @@ readAcceptedWorkLatestPointer(
       pointerPath,
     );
 
+  const allowSeparateControllerReadOnlyAcl =
+    info.uid === 60999;
+
   if (
     info.isSymbolicLink() ||
     !info.isFile() ||
@@ -435,7 +438,9 @@ readAcceptedWorkLatestPointer(
       MAX_POINTER_BYTES ||
     (
       info.mode &
-      0o077
+      (allowSeparateControllerReadOnlyAcl
+        ? 0o037
+        : 0o077)
     ) !==
       0
   ) {

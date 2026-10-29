@@ -235,13 +235,27 @@ export async function auditSeals(
       continue;
     }
 
-    if (!historical.has(item.target)) {
+    let normalizedHistoricalTarget: string;
+    try {
+      normalizedHistoricalTarget = normalizeSafeRelativePath(item.target);
+    } catch {
+      normalizedHistoricalTarget = item.target;
+    }
+
+    let normalizedSuccessorTarget: string;
+    try {
+      normalizedSuccessorTarget = normalizeSafeRelativePath(item.target);
+    } catch {
+      normalizedSuccessorTarget = item.target;
+    }
+
+    if (!historical.has(normalizedHistoricalTarget) && !historical.has(item.target)) {
       configurationErrors.push(
         `HISTORICAL_SEAL_DOES_NOT_BIND_TARGET:${item.historicalSealId}:${item.target}`,
       );
     }
 
-    if (!successor.has(item.target)) {
+    if (!successor.has(normalizedSuccessorTarget) && !successor.has(item.target)) {
       configurationErrors.push(
         `SUCCESSOR_SEAL_DOES_NOT_BIND_TARGET:${item.successorSealId}:${item.target}`,
       );
@@ -281,14 +295,37 @@ export async function auditSeals(
           ? 'CURRENT'
           : 'UNRESOLVED_DRIFT';
 
-      const key = `${sealId}\u0000${target}`;
-      const supersession = successorMap.get(key);
+      let supersession = successorMap.get(`${sealId}\u0000${target}`);
+      if (!supersession) {
+        for (const item of supersessions) {
+          if (item.historicalSealId === sealId) {
+            let normalizedItemTarget: string;
+            try {
+              normalizedItemTarget = normalizeSafeRelativePath(item.target);
+            } catch {
+              normalizedItemTarget = item.target;
+            }
+            if (normalizedItemTarget === target || item.target === target) {
+              supersession = item;
+              break;
+            }
+          }
+        }
+      }
 
       if (status !== 'CURRENT' && supersession) {
-        const successorExpected =
+        let successorTarget = target;
+        let successorExpected =
           parsed
             .get(supersession.successorSealId)
-            ?.get(target);
+            ?.get(successorTarget);
+
+        if (successorExpected === undefined) {
+          successorExpected =
+            parsed
+              .get(supersession.successorSealId)
+              ?.get(supersession.target);
+        }
 
         status =
           successorExpected !== undefined &&

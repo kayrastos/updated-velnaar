@@ -1,4 +1,15 @@
 import {
+  copyFile,
+  mkdtemp,
+  rm,
+} from 'node:fs/promises';
+
+import {
+  tmpdir,
+} from 'node:os';
+
+import {
+  basename,
   join,
 } from 'node:path';
 
@@ -143,18 +154,58 @@ async function loadAcceptedProduction(
 ): Promise<
   readonly PersistedAcceptedWorkProduct[]
 > {
-  const queue =
-    new TransactionalProviderQueue(
-      queuePath,
+  const tempDir =
+    await mkdtemp(
+      join(
+        tmpdir(),
+        'velnar-fulgor-qro-',
+      ),
+    );
+
+  const tempQueuePath =
+    join(
+      tempDir,
+      basename(queuePath),
     );
 
   try {
-    return queue
-      .listAcceptedWorkProducts(
-        64,
+    await copyFile(
+      queuePath,
+      tempQueuePath,
+    );
+
+    for (const suffix of ['-wal', '-shm']) {
+      try {
+        await copyFile(
+          `${queuePath}${suffix}`,
+          `${tempQueuePath}${suffix}`,
+        );
+      } catch {
+        // Optional WAL/SHM sidecar files
+      }
+    }
+
+    const queue =
+      new TransactionalProviderQueue(
+        tempQueuePath,
       );
+
+    try {
+      return queue
+        .listAcceptedWorkProducts(
+          64,
+        );
+    } finally {
+      queue.close();
+    }
   } finally {
-    queue.close();
+    await rm(
+      tempDir,
+      {
+        recursive: true,
+        force: true,
+      },
+    );
   }
 }
 

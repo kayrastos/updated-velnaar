@@ -2,6 +2,9 @@
  * @file src/utils/rfc3339Validator.ts
  * @description Strict RFC 3339 / ISO 8601 Calendar Timestamp Validator (Frontend Client-Side)
  */
+import type { Appointment } from '../types/appointment';
+
+export type Rfc3339TimestampString = Appointment['scheduledStart'];
 
 export function isValidIsoWithTimezone(val: unknown): val is string {
   if (typeof val !== 'string') return false;

@@ -15,6 +15,9 @@
  * ============================================================================
  */
 
+import type { CurrencyCode } from './database';
+
+export type POSCurrencyCode = CurrencyCode;
 export type POSIntegrationMethod = 
   | 'official_api_webhook' 
   | 'readonly_db_bridge' 

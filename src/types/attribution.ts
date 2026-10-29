@@ -13,6 +13,9 @@
  * ============================================================================
  */
 
+import type { CurrencyCode } from './database';
+
+export type AttributionCurrencyCode = CurrencyCode;
 export type AttributionConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
 export type AttributionType = 'ATTRIBUTED_REVENUE' | 'INFLUENCED_REVENUE';
 export type AttributionMethod = 

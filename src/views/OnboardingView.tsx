@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePlatform } from '../context/PlatformContext';
+import type { MarketType } from '../types/database';
 import { 
   Link2, 
   Globe2, 
@@ -23,6 +24,8 @@ export const OnboardingView: React.FC = () => {
     currentBusiness, 
     t 
   } = usePlatform();
+  const activeMarket: MarketType = currentMarket;
+  void activeMarket;
 
   const [activeStep, setActiveStep] = useState<number>(1);
   const [scanCompleted, setScanCompleted] = useState<boolean>(false);

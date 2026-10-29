@@ -1,27 +1,17 @@
 import React, { useState } from 'react';
 import { usePlatform } from '../../context/PlatformContext';
+import type { BusinessRow } from '../../types/database';
 import { Shield, Building2, AlertTriangle, Lock, RefreshCw, LogIn, ArrowRight } from 'lucide-react';
 
 export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const {
-    sessionStatus,
-    sessionUser,
-    memberships,
-    activeOrganizationId,
-    activeBusinessId,
-    currentBusiness,
-    businesses,
-    businessLoadStatus,
-    selectOrganization,
-    selectBusiness,
-    t
-  } = usePlatform();
-
+  const { sessionStatus, sessionUser, memberships, activeOrganizationId, activeBusinessId, currentBusiness, businesses, businessLoadStatus, selectOrganization, selectBusiness, t } = usePlatform();
   const [selectedOrgId, setSelectedOrgId] = useState<string>('');
   const [isSwitching, setIsSwitching] = useState<boolean>(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [isSelectingBiz, setIsSelectingBiz] = useState<boolean>(false);
   const [bizSelectError, setBizSelectError] = useState<string | null>(null);
+  const selectedBizTypeRef: BusinessRow['id'] | null = activeBusinessId;
+  void Shield; void LogIn; void selectedOrgId; void setSelectedOrgId; void currentBusiness; void t; void selectedBizTypeRef;
 
   // In DEV, bypass session gates unless explicitly unauthenticated
   if (import.meta.env.DEV) {
@@ -58,29 +48,16 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 font-semibold">
-              Production Security Invariant
-            </span>
-            <h2 className="font-editorial text-xl font-bold text-theme-primary mt-2">
-              Authentication Provider Not Configured
-            </h2>
+            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 font-semibold">Production Security Invariant</span>
+            <h2 className="font-editorial text-xl font-bold text-theme-primary mt-2">Authentication Provider Not Configured</h2>
             <p className="text-xs text-theme-secondary mt-2 leading-relaxed">
               The production identity provider is not yet configured on this Cloudflare Worker instance. In accordance with zero-trust invariants, operational workspaces cannot be loaded without verified identity.
             </p>
           </div>
           <div className="bg-theme-surface-elevated p-3 rounded-lg border border-theme-border text-left font-mono text-[11px] space-y-1 text-theme-muted">
-            <div className="flex justify-between">
-              <span>Health Status:</span>
-              <span className="text-emerald-500">OK</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Auth Provider:</span>
-              <span className="text-amber-500">NOT_CONFIGURED</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Security Guard:</span>
-              <span className="text-emerald-500">FAIL_CLOSED</span>
-            </div>
+            <div className="flex justify-between"><span>Health Status:</span><span className="text-emerald-500">OK</span></div>
+            <div className="flex justify-between"><span>Auth Provider:</span><span className="text-amber-500">NOT_CONFIGURED</span></div>
+            <div className="flex justify-between"><span>Security Guard:</span><span className="text-emerald-500">FAIL_CLOSED</span></div>
           </div>
         </div>
       </div>
@@ -96,16 +73,12 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
             <Lock className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="font-editorial text-xl font-bold text-theme-primary">
-              Authentication Required
-            </h2>
+            <h2 className="font-editorial text-xl font-bold text-theme-primary">Authentication Required</h2>
             <p className="text-xs text-theme-secondary mt-2 leading-relaxed">
               Please provide a valid bearer token to access this organization’s revenue leak intelligence and growth action ledger.
             </p>
           </div>
-          <div className="text-xs text-theme-muted font-mono">
-            Authorization: Bearer &lt;valid_session_token&gt;
-          </div>
+          <div className="text-xs text-theme-muted font-mono">Authorization: Bearer &lt;valid_session_token&gt;</div>
         </div>
       </div>
     );
@@ -120,9 +93,7 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="font-editorial text-xl font-bold text-theme-primary">
-              Session Verification Failed
-            </h2>
+            <h2 className="font-editorial text-xl font-bold text-theme-primary">Session Verification Failed</h2>
             <p className="text-xs text-red-400 mt-2 leading-relaxed font-mono">
               Access to the requested organization was denied or the session is invalid.
             </p>
@@ -153,18 +124,14 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
             <div className="w-12 h-12 mx-auto rounded-xl bg-theme-surface-elevated border border-theme-border flex items-center justify-center text-theme-accent">
               <Building2 className="w-6 h-6" />
             </div>
-            <h2 className="font-editorial text-xl font-bold text-theme-primary">
-              Select Organization Workspace
-            </h2>
+            <h2 className="font-editorial text-xl font-bold text-theme-primary">Select Organization Workspace</h2>
             <p className="text-xs text-theme-secondary">
               Logged in as <strong className="text-theme-primary">{sessionUser?.email || 'User'}</strong>. Select an authorized tenant organization to enter.
             </p>
           </div>
 
           {switchError && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-xs font-mono text-red-400">
-              {switchError}
-            </div>
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-xs font-mono text-red-400">{switchError}</div>
           )}
 
           <div className="space-y-2">
@@ -183,9 +150,7 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
                   <div>
                     <div className="font-mono font-medium text-xs text-theme-primary group-hover:text-theme-accent flex items-center space-x-2">
                       <span>{mem.organizationId}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-theme-surface border border-theme-border text-theme-muted uppercase">
-                        {mem.role}
-                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-theme-surface border border-theme-border text-theme-muted uppercase">{mem.role}</span>
                     </div>
                     <div className="text-[10px] text-theme-secondary mt-0.5">Status: {mem.status}</div>
                   </div>
@@ -225,12 +190,8 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/30 font-semibold">
-              Workspace Ingestion Failure
-            </span>
-            <h2 className="font-editorial text-xl font-bold text-theme-primary mt-2">
-              Failed to Hydrate Workspace
-            </h2>
+            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/30 font-semibold">Workspace Ingestion Failure</span>
+            <h2 className="font-editorial text-xl font-bold text-theme-primary mt-2">Failed to Hydrate Workspace</h2>
             <p className="text-xs text-theme-secondary mt-2 leading-relaxed">
               One or more critical operational datasets failed to load from the canonical ledger for organization <strong className="text-theme-primary font-mono">{activeOrganizationId}</strong>.
             </p>
@@ -258,12 +219,8 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
             <Building2 className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 font-semibold">
-              Organization Scoped
-            </span>
-            <h2 className="font-editorial text-xl font-bold text-theme-primary mt-2">
-              No Active Business Unit Found
-            </h2>
+            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/30 font-semibold">Organization Scoped</span>
+            <h2 className="font-editorial text-xl font-bold text-theme-primary mt-2">No Active Business Unit Found</h2>
             <p className="text-xs text-theme-secondary mt-2 leading-relaxed">
               Organization <strong className="text-theme-primary font-mono">{activeOrganizationId}</strong> does not have an active business configured in the canonical ledger. Operational intelligence workspaces require a verified business context.
             </p>
@@ -294,18 +251,14 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
             <div className="w-12 h-12 mx-auto rounded-xl bg-theme-surface-elevated border border-theme-border flex items-center justify-center text-theme-accent">
               <Building2 className="w-6 h-6" />
             </div>
-            <h2 className="font-editorial text-xl font-bold text-theme-primary">
-              Select Business Unit
-            </h2>
+            <h2 className="font-editorial text-xl font-bold text-theme-primary">Select Business Unit</h2>
             <p className="text-xs text-theme-secondary">
               Organization <strong className="text-theme-primary font-mono">{activeOrganizationId}</strong> manages multiple business units. Select a unit to open its operational workspace.
             </p>
           </div>
 
           {bizSelectError && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-xs font-mono text-red-400">
-              {bizSelectError}
-            </div>
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-xs font-mono text-red-400">{bizSelectError}</div>
           )}
 
           <div className="space-y-2">
@@ -319,13 +272,9 @@ export const SessionBoundary: React.FC<{ children: React.ReactNode }> = ({ child
                 <div>
                   <div className="font-sans font-semibold text-xs text-theme-primary group-hover:text-theme-accent flex items-center space-x-2">
                     <span>{biz.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-theme-surface border border-theme-border text-theme-muted uppercase font-mono">
-                      {biz.currency}
-                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-theme-surface border border-theme-border text-theme-muted uppercase font-mono">{biz.currency}</span>
                   </div>
-                  <div className="text-[10px] text-theme-secondary mt-0.5 font-mono">
-                    ID: {biz.id} • {biz.industry_vertical}
-                  </div>
+                  <div className="text-[10px] text-theme-secondary mt-0.5 font-mono">ID: {biz.id} • {biz.industry_vertical}</div>
                 </div>
                 <ArrowRight className="w-4 h-4 text-theme-muted group-hover:text-theme-accent transition-transform group-hover:translate-x-0.5" />
               </button>

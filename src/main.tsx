@@ -4,6 +4,8 @@ import App from './App.tsx';
 import './index.css';
 import { bootstrapDevSession } from './dev/devSessionBootstrap';
 
+export type MainBootstrapRoot = typeof App;
+
 if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
   bootstrapDevSession();
 }

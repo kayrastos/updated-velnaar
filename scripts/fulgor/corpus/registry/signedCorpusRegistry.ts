@@ -661,49 +661,46 @@ export function verifySignedCorpusRegistry(
    * verification must independently derive them from the canonical
    * record and require exact equality.
    *
-   * validateEntries preserves input order for accepted records and
-   * recomputes both derived values from each record.
+   * validateEntries sorts entries deterministically by recordId and
+   * recomputes both derived values from each record. We index derived
+   * entries by recordId to verify declaredEntry fields regardless of ordering.
    */
-  if (
-    entryValidation.entries.length ===
-      registry.entries.length
-  ) {
-    for (
-      let index = 0;
-      index <
-        registry.entries.length;
-      index += 1
+  const derivedByRecordId =
+    new Map<string, CorpusRegistryEntry>(
+      entryValidation.entries.map((entry) => [
+        entry.record.recordId,
+        entry,
+      ]),
+    );
+
+  for (const declaredEntry of registry.entries) {
+    if (!declaredEntry) {
+      continue;
+    }
+
+    const derivedEntry =
+      derivedByRecordId.get(declaredEntry.record?.recordId);
+
+    if (!derivedEntry) {
+      continue;
+    }
+
+    if (
+      declaredEntry.recordSha256 !==
+        derivedEntry.recordSha256
     ) {
-      const declaredEntry =
-        registry.entries[index];
+      failures.push(
+        'ENTRY_RECORD_SHA256_MISMATCH',
+      );
+    }
 
-      const derivedEntry =
-        entryValidation.entries[index];
-
-      if (
-        !declaredEntry ||
-        !derivedEntry
-      ) {
-        continue;
-      }
-
-      if (
-        declaredEntry.recordSha256 !==
-          derivedEntry.recordSha256
-      ) {
-        failures.push(
-          'ENTRY_RECORD_SHA256_MISMATCH',
-        );
-      }
-
-      if (
-        declaredEntry.pairGroupKey !==
-          derivedEntry.pairGroupKey
-      ) {
-        failures.push(
-          'ENTRY_PAIR_GROUP_KEY_MISMATCH',
-        );
-      }
+    if (
+      declaredEntry.pairGroupKey !==
+        derivedEntry.pairGroupKey
+    ) {
+      failures.push(
+        'ENTRY_PAIR_GROUP_KEY_MISMATCH',
+      );
     }
   }
 

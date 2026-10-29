@@ -11,6 +11,10 @@
  * ============================================================================
  */
 
+import type { EnvironmentTier } from '../../types/security';
+
+export type FulgorRayEnvironment = EnvironmentTier;
+
 export interface FulgorRayTelemetryPayload {
   organizationId: string;
   businessId: string;

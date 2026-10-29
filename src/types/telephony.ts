@@ -19,6 +19,9 @@
  * ============================================================================
  */
 
+import type { OrganizationRow } from './database';
+
+export type TelephonyOrganizationId = OrganizationRow['id'];
 export type CallDirection = 'inbound' | 'outbound';
 export type CallStatus = 'answered' | 'missed' | 'voicemail' | 'busy' | 'dropped';
 export type CallStaffResult = 

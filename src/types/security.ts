@@ -2,8 +2,9 @@
  * @file security.ts
  * @description Identity Vault, Server-Side Envelope Encryption, RBAC, Audit, Security Events & Data Retention
  */
+import type { UserRole } from './database';
 
-export type PlatformRole = 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF' | 'VIEWER';
+export type PlatformRole = UserRole;
 
 export type EnvironmentTier = 'development' | 'staging' | 'production';
 

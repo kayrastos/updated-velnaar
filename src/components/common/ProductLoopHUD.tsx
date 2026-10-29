@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePlatform } from '../../context/PlatformContext';
+import type { AppRoute } from '../../types/app';
 import { 
   Zap, 
   BrainCircuit, 
@@ -14,7 +15,7 @@ import {
 export const ProductLoopHUD: React.FC = () => {
   const { metrics, t, currentRoute, setCurrentRoute } = usePlatform();
 
-  const steps = [
+  const steps: Array<{ key: string; label: string; icon: React.ComponentType<{ className?: string }>; route: AppRoute; badge?: number; highlight?: boolean }> = [
     { key: 'CONNECT', label: t.loop.connect, icon: Zap, route: '/onboarding' as const },
     { key: 'UNDERSTAND', label: t.loop.understand, icon: BrainCircuit, route: '/business-twin' as const },
     { key: 'DETECT', label: t.loop.detect, icon: Search, route: '/leaks' as const, badge: metrics.leaksCount.critical + metrics.leaksCount.high },

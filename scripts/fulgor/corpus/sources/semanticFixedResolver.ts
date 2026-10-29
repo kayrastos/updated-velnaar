@@ -213,6 +213,25 @@ export function extractSemanticFixedBoundaries(
           event.kind ===
           'INTRODUCED'
         ) {
+          if (
+            event.commit !==
+              '0' &&
+            !EXACT_GIT_SHA.test(
+              event.commit,
+            )
+          ) {
+            introducedSeen =
+              false;
+
+            activeIntroduced =
+              null;
+
+            fromRepositoryRoot =
+              false;
+
+            continue;
+          }
+
           introducedSeen =
             true;
 

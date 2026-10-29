@@ -1,41 +1,17 @@
 import React from 'react';
 import { usePlatform } from '../context/PlatformContext';
-import { 
-  AlertTriangle, 
-  TrendingUp, 
-  Clock, 
-  ShieldCheck, 
-  ArrowUpRight, 
-  ArrowRight,
-  Radar, 
-  Sparkles, 
-  Check, 
-  X,
-  FileCheck2,
-  Lock,
-  Layers
-} from 'lucide-react';
+import type { GrowthActionRow, RevenueLeakRow } from '../types/database';
+import { AlertTriangle, TrendingUp, Clock, ShieldCheck, ArrowUpRight, ArrowRight, Radar, Sparkles, Check, X, FileCheck2, Lock, Layers } from 'lucide-react';
 
 export const DashboardView: React.FC = () => {
-  const { 
-    metrics, 
-    formatCurrency, 
-    leaks, 
-    actions, 
-    currentBusiness, 
-    currentMarket, 
-    approveAction, 
-    rejectAction, 
-    t, 
-    setCurrentRoute 
-  } = usePlatform();
+  const { metrics, formatCurrency, leaks, actions, currentBusiness, currentMarket, approveAction, rejectAction, t, setCurrentRoute } = usePlatform();
+  void ArrowUpRight; void FileCheck2;
 
-  const pendingActions = actions.filter(a => a.approval_status === 'pending_approval');
-  const criticalLeaks = leaks.filter(l => l.status === 'active').slice(0, 3);
+  const pendingActions: GrowthActionRow[] = actions.filter(a => a.approval_status === 'pending_approval');
+  const criticalLeaks: RevenueLeakRow[] = leaks.filter(l => l.status === 'active').slice(0, 3);
 
   return (
     <div id="dashboard-view" className="space-y-6">
-      
       {/* Top Banner: Business Context & Market Isolation State */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-theme-surface p-4 rounded-xl border border-theme-border">
         <div>
@@ -60,7 +36,6 @@ export const DashboardView: React.FC = () => {
 
       {/* Hero Outcome Metric Cards (Emphasizing Business Outcomes, NOT Vanity Metrics) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
         {/* 1. Revenue at Risk */}
         <div id="metric-revenue-at-risk" className="bg-theme-surface p-5 rounded-xl border border-red-500/30 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl group-hover:bg-red-500/10 transition-all pointer-events-none" />
@@ -72,15 +47,10 @@ export const DashboardView: React.FC = () => {
             {formatCurrency(metrics.revenueAtRisk)}
             <span className="text-xs font-normal text-theme-muted ml-1">/mo</span>
           </div>
-          <p className="text-[11px] text-theme-secondary mt-2 line-clamp-2 leading-relaxed">
-            {t.hero.revenueAtRiskSub}
-          </p>
+          <p className="text-[11px] text-theme-secondary mt-2 line-clamp-2 leading-relaxed">{t.hero.revenueAtRiskSub}</p>
           <div className="mt-3 pt-3 border-t border-theme-border flex items-center justify-between text-[11px] font-mono">
             <span className="text-red-500 font-medium">{metrics.leaksCount.critical} Critical Vectors</span>
-            <button 
-              onClick={() => setCurrentRoute('/leaks')}
-              className="text-theme-accent hover:underline flex items-center gap-0.5 cursor-pointer"
-            >
+            <button onClick={() => setCurrentRoute('/leaks')} className="text-theme-accent hover:underline flex items-center gap-0.5 cursor-pointer">
               Radar <ArrowRight className="w-3 h-3" />
             </button>
           </div>
@@ -96,15 +66,10 @@ export const DashboardView: React.FC = () => {
           <div className="text-2xl sm:text-3xl font-mono font-bold text-theme-primary tracking-tight">
             {formatCurrency(metrics.growthOpportunities)}
           </div>
-          <p className="text-[11px] text-theme-secondary mt-2 line-clamp-2 leading-relaxed">
-            {t.hero.growthOpportunitiesSub}
-          </p>
+          <p className="text-[11px] text-theme-secondary mt-2 line-clamp-2 leading-relaxed">{t.hero.growthOpportunitiesSub}</p>
           <div className="mt-3 pt-3 border-t border-theme-border flex items-center justify-between text-[11px] font-mono">
             <span className="text-theme-muted">High-Intent Pipeline</span>
-            <button 
-              onClick={() => setCurrentRoute('/leads')}
-              className="text-theme-accent hover:underline flex items-center gap-0.5 cursor-pointer"
-            >
+            <button onClick={() => setCurrentRoute('/leads')} className="text-theme-accent hover:underline flex items-center gap-0.5 cursor-pointer">
               Leads <ArrowRight className="w-3 h-3" />
             </button>
           </div>
@@ -126,17 +91,10 @@ export const DashboardView: React.FC = () => {
               {metrics.actionsWaitingApproval > 0 ? 'Requires Sign-Off' : 'All Clear'}
             </span>
           </div>
-          <p className="text-[11px] text-theme-secondary mt-2 line-clamp-2 leading-relaxed">
-            {t.hero.actionsWaitingApprovalSub}
-          </p>
+          <p className="text-[11px] text-theme-secondary mt-2 line-clamp-2 leading-relaxed">{t.hero.actionsWaitingApprovalSub}</p>
           <div className="mt-3 pt-3 border-t border-theme-border flex items-center justify-between text-[11px] font-mono">
-            <span className="text-theme-accent flex items-center gap-1">
-              <Lock className="w-3 h-3" /> Guard Gated
-            </span>
-            <button 
-              onClick={() => setCurrentRoute('/actions')}
-              className="text-theme-accent font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
-            >
+            <span className="text-theme-accent flex items-center gap-1"><Lock className="w-3 h-3" /> Guard Gated</span>
+            <button onClick={() => setCurrentRoute('/actions')} className="text-theme-accent font-bold hover:underline flex items-center gap-0.5 cursor-pointer">
               Review <ArrowRight className="w-3 h-3" />
             </button>
           </div>
@@ -152,25 +110,18 @@ export const DashboardView: React.FC = () => {
           <div className="text-2xl sm:text-3xl font-mono font-bold text-theme-primary tracking-tight">
             {formatCurrency(metrics.revenueInfluenced)}
           </div>
-          <p className="text-[11px] text-theme-secondary mt-2 line-clamp-2 leading-relaxed">
-            {t.hero.revenueInfluencedSub}
-          </p>
+          <p className="text-[11px] text-theme-secondary mt-2 line-clamp-2 leading-relaxed">{t.hero.revenueInfluencedSub}</p>
           <div className="mt-3 pt-3 border-t border-theme-border flex items-center justify-between text-[11px] font-mono">
             <span className="text-emerald-600 dark:text-emerald-400 font-medium">Audited & Verified</span>
-            <button 
-              onClick={() => setCurrentRoute('/proof')}
-              className="text-theme-accent hover:underline flex items-center gap-0.5 cursor-pointer"
-            >
+            <button onClick={() => setCurrentRoute('/proof')} className="text-theme-accent hover:underline flex items-center gap-0.5 cursor-pointer">
               Ledger <ArrowRight className="w-3 h-3" />
             </button>
           </div>
         </div>
-
       </div>
 
       {/* Two-Column Operations Grid: Pending Approval Actions & Revenue Leak Radar */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
         {/* Left Column (7 cols): Growth Actions Waiting for Executive Sign-off */}
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
@@ -180,10 +131,7 @@ export const DashboardView: React.FC = () => {
                 {t.actions.pendingApproval} ({pendingActions.length})
               </h2>
             </div>
-            <button
-              onClick={() => setCurrentRoute('/actions')}
-              className="text-xs font-mono text-theme-accent hover:underline flex items-center gap-1 cursor-pointer"
-            >
+            <button onClick={() => setCurrentRoute('/actions')} className="text-xs font-mono text-theme-accent hover:underline flex items-center gap-1 cursor-pointer">
               All Actions <ArrowRight className="w-3 h-3" />
             </button>
           </div>
@@ -207,19 +155,13 @@ export const DashboardView: React.FC = () => {
                         <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-theme-surface-elevated text-theme-accent border border-theme-border">
                           {action.action_type.replace(/_/g, ' ')}
                         </span>
-                        <span className="text-[10px] font-mono text-theme-muted">
-                          Guard: Passed
-                        </span>
+                        <span className="text-[10px] font-mono text-theme-muted">Guard: Passed</span>
                       </div>
-                      <h3 className="text-sm font-semibold text-theme-primary mt-1.5">
-                        {action.title}
-                      </h3>
+                      <h3 className="text-sm font-semibold text-theme-primary mt-1.5">{action.title}</h3>
                     </div>
                   </div>
 
-                  <p className="text-xs text-theme-secondary leading-relaxed">
-                    {action.hypothesis}
-                  </p>
+                  <p className="text-xs text-theme-secondary leading-relaxed">{action.hypothesis}</p>
 
                   <div className="pt-2 border-t border-theme-border flex flex-wrap items-center justify-between gap-3">
                     <div className="text-[11px] font-mono text-theme-accent flex items-center gap-1">
@@ -257,14 +199,9 @@ export const DashboardView: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Radar className="w-4 h-4 text-red-500" />
-              <h2 className="text-sm font-mono uppercase tracking-wider font-semibold text-theme-primary">
-                {t.leaks.title}
-              </h2>
+              <h2 className="text-sm font-mono uppercase tracking-wider font-semibold text-theme-primary">{t.leaks.title}</h2>
             </div>
-            <button
-              onClick={() => setCurrentRoute('/leaks')}
-              className="text-xs font-mono text-theme-accent hover:underline flex items-center gap-1 cursor-pointer"
-            >
+            <button onClick={() => setCurrentRoute('/leaks')} className="text-xs font-mono text-theme-accent hover:underline flex items-center gap-1 cursor-pointer">
               Full Radar <ArrowRight className="w-3 h-3" />
             </button>
           </div>
@@ -289,13 +226,8 @@ export const DashboardView: React.FC = () => {
                   </span>
                 </div>
 
-                <h4 className="text-xs font-semibold text-theme-primary">
-                  {leak.title}
-                </h4>
-
-                <p className="text-[11px] text-theme-secondary line-clamp-2 leading-relaxed">
-                  {leak.root_cause}
-                </p>
+                <h4 className="text-xs font-semibold text-theme-primary">{leak.title}</h4>
+                <p className="text-[11px] text-theme-secondary line-clamp-2 leading-relaxed">{leak.root_cause}</p>
 
                 <div className="pt-2 flex items-center justify-between text-[10px] font-mono text-theme-muted">
                   <span>Stage: {leak.affected_funnel_stage}</span>
@@ -312,9 +244,7 @@ export const DashboardView: React.FC = () => {
                 <Layers className="w-3.5 h-3.5 text-theme-accent" />
                 <span className="font-semibold">{t.businessTwin.confidenceScore}</span>
               </div>
-              <span className="text-xs font-mono font-bold text-theme-accent">
-                {metrics.twinConfidenceScore}%
-              </span>
+              <span className="text-xs font-mono font-bold text-theme-accent">{metrics.twinConfidenceScore}%</span>
             </div>
 
             <div className="w-full bg-theme-surface-elevated h-1.5 rounded-full overflow-hidden">
@@ -328,11 +258,8 @@ export const DashboardView: React.FC = () => {
               Based on verified unit economics, pricing limits, and customer profile facts.
             </p>
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 };

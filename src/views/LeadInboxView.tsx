@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePlatform } from '../context/PlatformContext';
+import type { LeadRow } from '../types/database';
 import { 
   Inbox, 
   Clock, 
@@ -16,7 +17,7 @@ import {
 export const LeadInboxView: React.FC = () => {
   const { leads, formatCurrency, triggerFastLeadResponse, currentMarket, t } = usePlatform();
 
-  const openLeads = leads.filter(l => l.status === 'open');
+  const openLeads: LeadRow[] = leads.filter(l => l.status === 'open');
   const avgLatency = Math.round(
     leads.reduce((sum, l) => sum + l.response_latency_minutes, 0) / (leads.length || 1)
   );

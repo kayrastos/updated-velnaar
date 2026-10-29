@@ -8,6 +8,9 @@
  * 3. Leads and Appointments reference pseudonymous customer identifiers.
  */
 
+import type { AppointmentStatus } from './appointment';
+
+export type CanonicalAppointmentStatus = AppointmentStatus;
 export type UserRole = 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF' | 'VIEWER';
 export type MarketType = 'TR' | 'GLOBAL';
 export type CurrencyCode = 'TRY' | 'USD' | 'EUR';
